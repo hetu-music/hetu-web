@@ -16,7 +16,7 @@ import React, {
 } from "react";
 import { useLocale } from "next-intl";
 import { useTheme } from "next-themes";
-import { flushSync } from "react-dom";
+import { runThemeTransition } from "@/lib/theme-transition";
 
 const LANGUAGES = [
   { code: "zh-CN", label: "简体中文" },
@@ -156,43 +156,8 @@ function MoreMenu() {
     e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     if (resolvedTheme === targetTheme) return;
-
-    if (!document.startViewTransition) {
+    runThemeTransition(e.clientX, e.clientY, () => {
       setTheme(targetTheme);
-      return;
-    }
-
-    const x = e.clientX;
-    const y = e.clientY;
-    const endRadius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y),
-    );
-
-    document.documentElement.classList.add("no-transitions");
-    const transition = document.startViewTransition(() => {
-      flushSync(() => {
-        setTheme(targetTheme);
-      });
-    });
-
-    transition.finished.then(() => {
-      document.documentElement.classList.remove("no-transitions");
-    });
-
-    transition.ready.then(() => {
-      const clipPath = [
-        `circle(0px at ${x}px ${y}px)`,
-        `circle(${endRadius}px at ${x}px ${y}px)`,
-      ];
-      document.documentElement.animate(
-        { clipPath },
-        {
-          duration: 500,
-          easing: "ease-in-out",
-          pseudoElement: "::view-transition-new(root)",
-        },
-      );
     });
   };
 

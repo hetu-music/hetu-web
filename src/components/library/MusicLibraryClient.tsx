@@ -345,10 +345,19 @@ export default function MusicLibraryClient({
         <section className="sticky top-20 z-40 -mx-6 mb-8 border-y border-transparent bg-[#FAFAFA]/95 px-6 py-4 backdrop-blur-sm dark:bg-[#0B0F19]/95 data-[scrolled=true]:border-slate-100">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col-reverse justify-between gap-4 md:flex-row md:items-center">
+              {/*
+                overflow-x-auto 会让 overflow-y 从 visible 计算成 auto，
+                即这一行在垂直方向同样会裁切（裁在 padding box 上）。
+                原先桌面端 md:pb-0 让胶囊的 border box 与内容盒严丝合缝，
+                裁切线正好落在圆角边框的抗锯齿像素上，Chrome 把合成滚动层的
+                裁切矩形对齐到整数设备像素后就会削掉底部一行 —— 位置取决于
+                元素落在设备像素网格的哪一档，所以 sticky 吸顶前后表现不同。
+                这里上下都留出余量，再用负 margin 抵掉，视觉盒尺寸保持不变。
+              */}
               <div
                 ref={containerRef}
                 {...dragHandlers}
-                className="no-scrollbar flex w-full cursor-grab items-center gap-2 overflow-x-auto pb-2 active:cursor-grabbing md:w-auto md:pb-0"
+                className="no-scrollbar -my-1 flex w-full cursor-grab items-center gap-2 overflow-x-auto pt-1 pb-3 active:cursor-grabbing md:w-auto md:pb-1"
               >
                 {filterOptions.allTypes.map((type) => {
                   if (type === FILTER_OPTION_ALL && isAnyFilterActive) {

@@ -7,7 +7,7 @@ import {
   purgeCloudflareCache,
   purgeEdgeOneCache,
 } from "@/lib/server/server-utils";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 /**
  * 后台歌曲审批同步操作 (Server Action)
@@ -33,33 +33,33 @@ export async function handleApprove(id: number) {
     }
 
     // 【第二步】同步成功，执行缓存刷新以实现实时数据更新
-    revalidateTag("music", "max");
+    //
+    // 注：此处曾调用 revalidateTag("music")，但全站没有任何缓存条目打过
+    // 这个标签，等于空操作。页面级失效由下面的 revalidatePath 完成。
 
-    // 收集需要刷新缓存的相对路径
-    const pathsToPurge: string[] = [];
-
-    // 首页与歌曲页（包含不同语言版本）
+    // Next.js 侧：只有带 locale 前缀的路由真实存在。无前缀的 /、/song/:id
+    // 在 next.config 的 redirects() 里是 301，Next 没有对应的缓存条目。
+    const nextPaths: string[] = [];
     for (const locale of locales) {
-      pathsToPurge.push(`/${locale}`);
-      pathsToPurge.push(`/${locale}/song/${id}`);
+      nextPaths.push(`/${locale}`);
+      nextPaths.push(`/${locale}/song/${id}`);
     }
-    pathsToPurge.push("/");
-    pathsToPurge.push(`/song/${id}`);
+    nextPaths.push("/sitemap.xml");
+    nextPaths.push("/api/public/songs/lyrics-index");
 
-    // 站点地图与歌词 API 索引
-    pathsToPurge.push("/sitemap.xml");
-    pathsToPurge.push("/api/public/songs/lyrics-index");
+    // CDN 侧：还要额外清掉无前缀的旧 URL——边缘节点会把那些 301 响应缓存下来。
+    const cdnPaths = [...nextPaths, "/", `/song/${id}`];
 
     // 1. 刷新 Next.js 本地服务缓存
-    for (const path of pathsToPurge) {
+    for (const path of nextPaths) {
       revalidatePath(path);
     }
 
-    // 2. 刷新 Cloudflare CDN 的边缘节点缓存
-    await purgeCloudflareCache(pathsToPurge);
-
-    // 3. 刷新腾讯云 EdgeOne CDN 的边缘节点缓存（如果是独立域名）
-    await purgeEdgeOneCache(pathsToPurge);
+    // 2. 两家 CDN 互不依赖，并行刷新，缩短发布等待时间
+    await Promise.all([
+      purgeCloudflareCache(cdnPaths),
+      purgeEdgeOneCache(cdnPaths),
+    ]);
 
     return { success: true };
   } catch (err: unknown) {

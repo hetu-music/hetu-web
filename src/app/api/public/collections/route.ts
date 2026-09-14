@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { getSongs } from "@/lib/server/service-songs";
+import { getSongsByIds } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
 
 const TARGET_TYPE_FAVORITE = 0;
@@ -28,9 +28,10 @@ export const GET = withAuth(
       return NextResponse.json({ songIds: [], songs: [] });
     }
 
-    // 服务端直接查歌曲数据，避免客户端二次请求
+    // 服务端直接查歌曲数据，避免客户端二次请求。
+    // 只查收藏涉及的这几首，不再拉全表——songIds 通常是个位数到几十。
     const locale = _request.cookies.get("NEXT_LOCALE")?.value || "zh-CN";
-    const allSongs = await getSongs(undefined, undefined, true, locale);
+    const favoriteSongs = await getSongsByIds(songIds, locale);
 
     // 从数据行转为映射
     const idToCol = Object.fromEntries(
@@ -44,8 +45,10 @@ export const GET = withAuth(
       ]),
     );
 
+    // 按 songIds 的顺序（收藏时间倒序）重排，与此前行为一致
+    const songById = new Map(favoriteSongs.map((s) => [s.id, s]));
     const songs = songIds
-      .map((id) => allSongs.find((s) => s.id === id))
+      .map((id) => songById.get(id))
       .filter((s): s is NonNullable<typeof s> => Boolean(s))
       .map((song) => ({
         ...song,

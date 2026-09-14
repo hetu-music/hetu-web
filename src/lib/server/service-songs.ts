@@ -14,6 +14,29 @@ import {
 } from "@/lib/utils/utils-convert";
 
 /**
+ * 列表字段的简→繁转换（zh-TW）
+ * getSongs 与 getSongsByIds 共用，避免两处转换逻辑漂移。
+ */
+function toTraditionalSongList(songs: Song[]): Song[] {
+  return songs.map((s) => {
+    const item = s as Song & { albumartist?: string[] | null };
+    const res: Song & { albumartist?: string[] | null } = {
+      ...s,
+      title: toTraditional(s.title) ?? s.title,
+      album: toTraditional(s.album),
+      artist: toTraditionalArray(s.artist),
+      lyricist: toTraditionalArray(s.lyricist),
+      composer: toTraditionalArray(s.composer),
+      arranger: toTraditionalArray(s.arranger),
+    };
+    if (item.albumartist) {
+      res.albumartist = toTraditionalArray(item.albumartist);
+    }
+    return res as Song;
+  });
+}
+
+/**
  * 获取所有歌曲数据
  *
  * - 公共展示路径（不传 accessToken）：高权限客户端 + 全量分页，确保获取全部数据
@@ -70,25 +93,58 @@ export async function getSongs(
   }
 
   if (locale === "zh-TW") {
-    return songs.map((s) => {
-      const item = s as Song & { albumartist?: string[] | null };
-      const res: Song & { albumartist?: string[] | null } = {
-        ...s,
-        title: toTraditional(s.title) ?? s.title,
-        album: toTraditional(s.album),
-        artist: toTraditionalArray(s.artist),
-        lyricist: toTraditionalArray(s.lyricist),
-        composer: toTraditionalArray(s.composer),
-        arranger: toTraditionalArray(s.arranger),
-      };
-      if (item.albumartist) {
-        res.albumartist = toTraditionalArray(item.albumartist);
-      }
-      return res as Song;
-    });
+    return toTraditionalSongList(songs);
   }
 
   return songs;
+}
+
+/**
+ * 按 ID 批量获取歌曲列表字段（公共主表）
+ *
+ * 供收藏等「只要其中几首」的场景使用——此前这类调用走的是 getSongs 全量
+ * 拉取再在内存里 find，随曲库线性增长。
+ *
+ * @param ids    - 歌曲 ID 列表，返回结果不保证顺序，由调用方按需重排
+ * @param locale - 当前语言，'zh-TW' 时自动转换繁体
+ */
+export async function getSongsByIds(
+  ids: number[],
+  locale: string = "zh-CN",
+): Promise<Song[]> {
+  if (ids.length === 0) return [];
+
+  const supabase = getServiceClient();
+  if (!supabase) {
+    console.warn("[getSongsByIds] Service client unavailable");
+    return [];
+  }
+
+  const selectFields = SONG_LIST_VIEW_FIELDS.join(",");
+  const uniqueIds = [...new Set(ids)];
+  const rows: Record<string, unknown>[] = [];
+
+  // 分批查询：单次 .in() 的 id 过多会把 PostgREST 的查询串撑得过长，
+  // 且单次响应同样受 1000 行上限约束。
+  const BATCH_SIZE = 200;
+  for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
+    const batch = uniqueIds.slice(i, i + BATCH_SIZE);
+    const { data, error } = await supabase
+      .from(TABLES.MUSIC)
+      .select(selectFields)
+      .in("id", batch);
+
+    if (error) {
+      console.error("[getSongsByIds] Supabase error:", error);
+      throw new Error("Failed to fetch songs");
+    }
+    if (data) rows.push(...(data as unknown as Record<string, unknown>[]));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const songs = mapAndSortSongs(rows as any);
+
+  return locale === "zh-TW" ? toTraditionalSongList(songs) : songs;
 }
 
 /**

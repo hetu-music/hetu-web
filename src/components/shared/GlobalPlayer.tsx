@@ -229,6 +229,11 @@ export default function GlobalPlayer() {
   // 等下一个 rAF 帧（此时 seekBase + audio.currentTime 已稳定）再释放 preview
   // 只清 ref，不操作 DOM——rAF 接管后会用正确的 seekBase + audio.currentTime 写入
   useEffect(() => {
+    // getAudio() 是模块级单例，浏览器里同步返回，只有 SSR 才是 null，
+    // 而 effect 不会在服务端跑——因此无需轮询等待，直接绑定即可。
+    const audio = audioRef.current;
+    if (!audio) return;
+
     const onCanPlay = () => {
       if (isSeekingRef.current) {
         requestAnimationFrame(() => {
@@ -251,20 +256,9 @@ export default function GlobalPlayer() {
         });
       }
     };
-    const bind = () => {
-      const a = audioRef.current;
-      if (!a) {
-        setTimeout(bind, 100);
-        return;
-      }
-      a.addEventListener("canplay", onCanPlay);
-    };
-    bind();
-    return () => {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      const a = audioRef.current;
-      a?.removeEventListener("canplay", onCanPlay);
-    };
+    audio.addEventListener("canplay", onCanPlay);
+    // 捕获绑定时的那个元素来解绑，而不是在 cleanup 时重新读 ref
+    return () => audio.removeEventListener("canplay", onCanPlay);
   }, []);
 
   // 沉浸式全屏页面不显示播放条 UI（音频继续播放）

@@ -32,10 +32,10 @@ vi.mock("@/lib/server/server-utils", () => ({
 }));
 
 vi.mock("@/lib/server/service-songs", () => ({
-  getSongs: vi.fn(async () => []),
+  getSongsByIds: vi.fn(async () => []),
 }));
 
-import { getSongs } from "@/lib/server/service-songs";
+import { getSongsByIds } from "@/lib/server/service-songs";
 import { DELETE, GET, POST } from "./route";
 
 function makeRequest(
@@ -61,8 +61,8 @@ beforeEach(() => {
   mockCsrfValid = true;
   mockFromBuilders = [];
   fromCallIndex = 0;
-  vi.mocked(getSongs).mockReset();
-  vi.mocked(getSongs).mockResolvedValue([]);
+  vi.mocked(getSongsByIds).mockReset();
+  vi.mocked(getSongsByIds).mockResolvedValue([]);
 });
 
 describe("GET /api/public/collections", () => {
@@ -79,7 +79,7 @@ describe("GET /api/public/collections", () => {
     const res = await GET(makeRequest("GET"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ songIds: [], songs: [] });
-    expect(getSongs).not.toHaveBeenCalled();
+    expect(getSongsByIds).not.toHaveBeenCalled();
   });
 
   it("有收藏时把收藏行信息（review/snippet等）合并进对应歌曲", async () => {
@@ -96,7 +96,9 @@ describe("GET /api/public/collections", () => {
         error: null,
       }),
     ];
-    vi.mocked(getSongs).mockResolvedValue([{ id: 1, title: "标题" }] as never);
+    vi.mocked(getSongsByIds).mockResolvedValue([
+      { id: 1, title: "标题" },
+    ] as never);
 
     const res = await GET(makeRequest("GET"));
     const body = await res.json();

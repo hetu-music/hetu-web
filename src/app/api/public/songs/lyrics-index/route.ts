@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
 import { processLyricsForSearch } from "@/lib/utils/utils-song";
 
 // 歌词索引 API - 仅返回 id 和处理后的纯文本歌词
@@ -13,21 +13,18 @@ export const GET = async () => {
     );
   }
 
-  const { data, error } = await supabase
-    .from(TABLES.MUSIC)
-    .select("id,lyrics")
-    .not("lyrics", "is", null);
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch lyrics" },
-      { status: 500 },
-    );
-  }
+  // 必须走 fetchAll 分页：PostgREST 单次最多返回 1000 行，直接 select
+  // 会在曲库超过 1000 首有歌词的歌之后静默截断，前端搜索再也搜不到后面的歌。
+  const rows = await fetchAll<{ id: number; lyrics: string | null }>(
+    supabase,
+    TABLES.MUSIC,
+    "id,lyrics",
+    (q) => q.not("lyrics", "is", null).order("id", { ascending: true }),
+  );
 
   // 处理 LRC 歌词为纯文本
-  const index = (data ?? [])
-    .map((row: { id: number; lyrics: string | null }) => ({
+  const index = rows
+    .map((row) => ({
       id: row.id,
       l: processLyricsForSearch(row.lyrics),
     }))

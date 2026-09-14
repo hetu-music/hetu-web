@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { FileText, Loader2, MessageSquarePlus, Pencil } from "lucide-react";
 import { useUserContext } from "@/context/UserContext";
 import { useFavorites } from "@/context/FavoritesContext";
+import { getCsrfToken } from "@/lib/api/csrf";
 import { cn } from "@/lib/utils/utils";
 
 interface UserReviewProps {
@@ -33,9 +34,7 @@ const UserReview: React.FC<UserReviewProps> = ({ songId }) => {
   const handleSaveReview = async () => {
     setIsSavingReview(true);
     try {
-      const csrfRes = await fetch("/api/public/csrf-token");
-      const csrfData = await csrfRes.json();
-      const csrf = csrfData.csrfToken;
+      const csrf = await getCsrfToken();
 
       // 确保收藏行存在（唯一约束保证不会重复，23505 冲突视为成功）
       if (!isFavorite(songId)) {

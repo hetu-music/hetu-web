@@ -1,6 +1,7 @@
 "use client";
 
 import ThemeToggle from "@/components/shared/ThemeToggle";
+import { getCsrfToken } from "@/lib/api/csrf";
 import {
   createAuthFormSchema,
   createAuthFormValues,
@@ -68,12 +69,7 @@ export default function AuthClient({ nonce, mode }: AuthClientProps) {
     authForm.clearErrors("root");
 
     try {
-      const csrfRes = await fetch("/api/public/csrf-token", {
-        cache: "no-store",
-      });
-      if (!csrfRes.ok) throw new Error("无法获取安全令牌");
-      const { csrfToken } = await csrfRes.json();
-      if (!csrfToken) throw new Error("安全令牌无效");
+      const csrfToken = await getCsrfToken();
 
       const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
 
@@ -118,11 +114,7 @@ export default function AuthClient({ nonce, mode }: AuthClientProps) {
       otpForm.clearErrors("root");
 
       try {
-        const csrfRes = await fetch("/api/public/csrf-token", {
-          cache: "no-store",
-        });
-        if (!csrfRes.ok) throw new Error("无法获取安全令牌");
-        const { csrfToken } = await csrfRes.json();
+        const csrfToken = await getCsrfToken();
 
         const res = await fetch("/api/auth/verify-otp", {
           method: "POST",

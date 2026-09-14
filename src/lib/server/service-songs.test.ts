@@ -20,6 +20,7 @@ import {
   getSongById,
   getSongs,
   getSongsByIds,
+  getSongLastModifiedMap,
   updateSong,
 } from "./service-songs";
 
@@ -317,5 +318,57 @@ describe("getSongsByIds", () => {
     );
     const songs = await getSongsByIds([1], "zh-TW");
     expect(songs[0].title).toBe("中國話");
+  });
+});
+
+describe("getSongLastModifiedMap", () => {
+  beforeEach(() => {
+    vi.mocked(getServiceClient).mockReset();
+  });
+
+  it("service client 不可用时返回空 Map", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(null);
+    expect((await getSongLastModifiedMap()).size).toBe(0);
+  });
+
+  it("把 temp 的 updated_at 映射为 id → Date", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: [
+            { id: 1, updated_at: "2025-03-01T10:00:00+00:00" },
+            { id: 2, updated_at: "2026-01-15T08:30:00+00:00" },
+          ],
+          error: null,
+        }),
+      ]),
+    );
+
+    const map = await getSongLastModifiedMap();
+
+    expect(map.size).toBe(2);
+    expect(map.get(1)?.toISOString()).toBe("2025-03-01T10:00:00.000Z");
+    expect(map.get(2)?.toISOString()).toBe("2026-01-15T08:30:00.000Z");
+  });
+
+  it("updated_at 为空或非法时跳过该行，不写入无效 Date", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: [
+            { id: 1, updated_at: null },
+            { id: 2, updated_at: "not-a-date" },
+            { id: 3, updated_at: "2025-06-01T00:00:00+00:00" },
+          ],
+          error: null,
+        }),
+      ]),
+    );
+
+    const map = await getSongLastModifiedMap();
+
+    expect(map.has(1)).toBe(false);
+    expect(map.has(2)).toBe(false);
+    expect(map.has(3)).toBe(true);
   });
 });

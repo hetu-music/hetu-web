@@ -509,3 +509,29 @@ export async function getSongsForImagery(
     return [];
   }
 }
+
+/**
+ * 意象页内容的最后变更时间，供 sitemap 使用。
+ * imagery 表只有 created_at——该页内容以新增意象为主，取最新一条的创建时间
+ * 作为近似；对已有意象的文字修订无法反映，属于可接受的偏晚上报。
+ */
+export const getImageryLastModified = cache(
+  async function getImageryLastModified(): Promise<Date | null> {
+    const supabase = getServiceClient();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.IMAGERY)
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error || !data?.created_at) return null;
+      const parsed = new Date(data.created_at as string);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    } catch (e) {
+      console.error("[getImageryLastModified]", e);
+      return null;
+    }
+  },
+);

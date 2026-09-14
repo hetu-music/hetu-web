@@ -14,7 +14,7 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 });
 
 import { getServiceClient } from "@/lib/db/supabase-server";
-import { getQjtxTimeline } from "./service-story";
+import { getQjtxTimeline, getStoryLastModified } from "./service-story";
 
 // getQjtxTimeline 用 React cache() 包装（同一请求内多次调用只查一次数据库）。
 // React 的 cache() 依赖请求作用域（AsyncLocalStorage），在测试里每次 import
@@ -83,5 +83,38 @@ describe("getQjtxTimeline", () => {
     });
     expect(result[1]).toMatchObject({ id: "2", month: "03" });
     expect(result[1].detail).toBeUndefined();
+  });
+});
+
+describe("getStoryLastModified", () => {
+  beforeEach(() => {
+    vi.mocked(getServiceClient).mockReset();
+  });
+
+  it("service client 不可用时返回 null", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(null);
+    expect(await getStoryLastModified()).toBeNull();
+  });
+
+  it("返回最新一条的 created_at", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: { created_at: "2025-11-20T12:00:00+00:00" },
+          error: null,
+        }),
+      ]),
+    );
+    const d = await getStoryLastModified();
+    expect(d?.toISOString()).toBe("2025-11-20T12:00:00.000Z");
+  });
+
+  it("查询出错或无数据时返回 null，不抛异常", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: null, error: { message: "boom" } }),
+      ]),
+    );
+    expect(await getStoryLastModified()).toBeNull();
   });
 });

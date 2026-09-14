@@ -7,6 +7,7 @@ import {
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { serializeJsonLd } from "@/lib/utils/utils-common";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -112,7 +113,7 @@ export default async function ImageryPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         suppressHydrationWarning
       />
       <Suspense fallback={<Loading />}>

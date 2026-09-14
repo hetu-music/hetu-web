@@ -5,6 +5,7 @@ import {
   formatDate,
   formatField,
   formatTime,
+  serializeJsonLd,
 } from "./utils-common";
 
 describe("formatTime", () => {
@@ -97,5 +98,37 @@ describe("formatField", () => {
 
   it("textarea 未超过50字时原样返回", () => {
     expect(formatField("短文本", "textarea")).toBe("短文本");
+  });
+});
+
+describe("serializeJsonLd", () => {
+  it("转义尖括号，阻断 </script> 提前闭合标签", () => {
+    const out = serializeJsonLd({
+      description: "前 </script><script>alert(1)</script> 后",
+    });
+    expect(out).not.toContain("</script>");
+    expect(out).not.toContain("<");
+    expect(out).not.toContain(">");
+  });
+
+  it("转义后仍是合法 JSON，且内容无损", () => {
+    const data = { name: "意象<词云>&测试", count: 27 };
+    expect(JSON.parse(serializeJsonLd(data))).toEqual(data);
+  });
+
+  it("转义 & 号", () => {
+    expect(serializeJsonLd({ a: "x&y" })).toContain("\\u0026");
+  });
+
+  it("转义 U+2028 / U+2029（JSON 合法但 JS 源码里是换行）", () => {
+    const out = serializeJsonLd({ a: "x y z" });
+    expect(out).toContain("\\u2028");
+    expect(out).toContain("\\u2029");
+    expect(out).not.toContain(" ");
+    expect(out).not.toContain(" ");
+  });
+
+  it("普通内容不受影响", () => {
+    expect(serializeJsonLd({ name: "河图" })).toBe('{"name":"河图"}');
   });
 });

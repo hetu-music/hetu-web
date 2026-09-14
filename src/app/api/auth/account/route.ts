@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { TABLES } from "@/lib/db/supabase-server";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 export const GET = withAuth(
   async (_request: NextRequest, user: AuthenticatedUser) => {
@@ -16,7 +17,7 @@ export const GET = withAuth(
         .maybeSingle();
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return serverErrorResponse("GET /api/auth/account", error);
       }
 
       return NextResponse.json({

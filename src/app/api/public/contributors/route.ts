@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 export async function GET() {
   const supabase = getServiceClient();
@@ -18,7 +19,7 @@ export async function GET() {
     .order("sort_order", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverErrorResponse("GET /api/public/contributors", error);
   }
 
   // 直接返回完整信息

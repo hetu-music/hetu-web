@@ -32,6 +32,20 @@ export async function proxy(request: NextRequest) {
   // Only use Nonce in Production on Strict routes
   const useNonce = isStrictRoute && !isDev;
 
+  // ─── Cloudflare 相关来源说明（勿随手清理）────────────────────────────────
+  //
+  // challenges.cloudflare.com     — Turnstile。登录/注册页显式使用；此外 CF
+  //                                 边缘也可能向任意页面注入挑战组件，故公开
+  //                                 页面同样保留 script-src 与 frame-src。
+  // static.cloudflareinsights.com — CF Web Analytics 的 beacon，由 CDN 自动注入，
+  //                                 应用代码里搜不到引用，但线上确实会出现。
+  // cloudflareinsights.com        — beacon 的上报目标。只放开 script-src 而不放开
+  //                                 connect-src，脚本能加载却发不出数据，且浏览器
+  //                                 只在控制台报错，表现为「统计一直没数据」。
+  //
+  // 严格 CSP 里同时带 'strict-dynamic' 和这些 host：支持 CSP3 的浏览器会忽略
+  // host 白名单只认 nonce，不支持的老浏览器则回退到 host 白名单——这是规范
+  // 推荐的向后兼容写法，两者都要留。
   let cspHeader = "";
 
   if (useNonce) {
@@ -43,6 +57,7 @@ export async function proxy(request: NextRequest) {
       img-src 'self' blob: data: https://cover.hetu-music.com;
       font-src 'self';
       media-src 'self' https://pre.hetu-music.com;
+      connect-src 'self' https://cloudflareinsights.com;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
@@ -62,6 +77,7 @@ export async function proxy(request: NextRequest) {
       img-src 'self' blob: data: https://cover.hetu-music.com;
       font-src 'self';
       media-src 'self' https://pre.hetu-music.com;
+      connect-src 'self' https://cloudflareinsights.com;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
@@ -83,17 +99,39 @@ export async function proxy(request: NextRequest) {
     return intlResponse;
   }
 
-  // 直接使用 intl 中间件的响应作为基础
-  const response = intlResponse;
+  // 需要 nonce 的路由：走 Next 文档化的「向下游请求注入 header」通道。
+  //
+  // 这里必须重建响应而不能沿用 intlResponse：请求头注入只能通过
+  // NextResponse.next({ request }) 完成。此前的写法是直接往响应上写
+  // x-middleware-request-* ——那是 Next 的内部约定，既未公开，又会把这些
+  // 内部头原样发给浏览器（线上可见 x-middleware-request-content-security-policy）。
+  //
+  // content-security-policy 这个请求头是必需的，不是冗余：Next 会读取它、
+  // 取出其中的 nonce 并自动加到自己生成的 <script> 上（线上 19 个 script 的
+  // nonce 都来自这里）。删掉它会导致除 Turnstile 外所有脚本失去 nonce。
+  let response: NextResponse;
 
-  // 向请求头中注入自定义数据（nonce、CSP）
   if (useNonce) {
-    response.headers.set("x-middleware-request-x-nonce", nonce);
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-nonce", nonce);
+    requestHeaders.set("content-security-policy", cspHeader);
+
+    response = NextResponse.next({ request: { headers: requestHeaders } });
+
+    // 保留 next-intl 在响应上设置的内容（locale cookie、alternate link 等），
+    // 但不要把它的内部 x-middleware-* 约定头一起搬过来。
+    intlResponse.headers.forEach((value, key) => {
+      if (!key.toLowerCase().startsWith("x-middleware-")) {
+        response.headers.set(key, value);
+      }
+    });
+    intlResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie);
+    });
+  } else {
+    // 公开页面是 ISR，不用 nonce，直接沿用 intl 响应
+    response = intlResponse;
   }
-  response.headers.set(
-    "x-middleware-request-content-security-policy",
-    cspHeader,
-  );
 
   // Apply Security Headers to Response
   response.headers.set("Content-Security-Policy", cspHeader);

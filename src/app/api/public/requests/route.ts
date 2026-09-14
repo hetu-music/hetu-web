@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 // ─── 创建请求 schema ──────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ export const GET = withAuth(
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverErrorResponse("GET /api/public/requests", error);
     }
 
     const rows = data ?? [];
@@ -136,7 +137,7 @@ export const POST = withAuth(
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverErrorResponse("POST /api/public/requests", error);
     }
 
     return NextResponse.json({ request: data }, { status: 201 });

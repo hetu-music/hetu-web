@@ -1,8 +1,44 @@
 import crypto from "crypto";
 import { cookies as nextCookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 const CSRF_COOKIE_NAME = "csrf-token";
 const CSRF_HEADER_NAME = "x-csrf-token";
+
+/**
+ * 把服务端错误转成不泄漏内部细节的响应。
+ *
+ * PostgREST 的 error.message 原文里带表名、列名和约束名，直接回给客户端
+ * 等于把 schema 送出去。这里把原文留在服务端日志，响应体只给通用文案。
+ *
+ * @param scope         - 日志定位用的标识，如 "GET /api/public/requests"
+ * @param error         - 原始错误对象，只进日志
+ * @param clientMessage - 回给客户端的文案
+ */
+export function serverErrorResponse(
+  scope: string,
+  error: unknown,
+  clientMessage = "服务器错误，请稍后重试",
+  status = 500,
+): NextResponse {
+  console.error(`[${scope}]`, error);
+  return NextResponse.json({ error: clientMessage }, { status });
+}
+
+/**
+ * 常量时间比较两个密钥字符串。
+ * 先做 SHA-256 再比较，以规避 timingSafeEqual 对等长的要求
+ * （长度不等会直接抛错，本身也是一种泄漏）。
+ */
+export function safeCompareSecret(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  if (!a || !b) return false;
+  const ha = crypto.createHash("sha256").update(a).digest();
+  const hb = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
 
 // 生成安全的 CSRF token
 export function generateCSRFToken(): string {

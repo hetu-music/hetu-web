@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 const PAGE_SIZE = 50;
 
@@ -35,7 +36,7 @@ export const GET = withAuth(
       .range(from, to);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverErrorResponse("GET /api/admin/audit-logs", error);
     }
 
     return NextResponse.json({

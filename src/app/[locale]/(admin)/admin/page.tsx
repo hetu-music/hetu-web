@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import AdminClientComponent from "@/components/admin/AdminClient";
 import { getSongs } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { getAdminPageSession } from "@/lib/server/server-auth";
 import type { Song } from "@/lib/types";
 
 // 强制动态渲染，不在构建时预渲染
@@ -14,22 +14,17 @@ type Props = {
 
 export default async function AdminPage({ params }: Props) {
   const { locale } = await params;
-  const supabase = await createSupabaseServerClient();
 
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  if (sessionError || !session) {
+  // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
+  const adminSession = await getAdminPageSession();
+  if (!adminSession) {
     redirect(`/${locale}/login`);
   }
 
-  // middleware 已经验证了 is_admin，这里直接获取数据
   let songs: Song[] = [];
   let error = null;
   try {
-    songs = await getSongs(TABLES.ADMIN, session.access_token);
+    songs = await getSongs(TABLES.ADMIN, adminSession.accessToken);
   } catch (e: unknown) {
     if (
       e &&

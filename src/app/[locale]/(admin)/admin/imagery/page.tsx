@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { getAdminPageSession } from "@/lib/server/server-auth";
 import { getImageryCategories } from "@/lib/server/service-imagery";
 import ImageryAdminClient from "@/components/admin/ImageryAdminClient";
 import type { Metadata } from "next";
@@ -17,14 +17,10 @@ type Props = {
 
 export default async function ImageryAdminPage({ params }: Props) {
   const { locale } = await params;
-  const supabase = await createSupabaseServerClient();
 
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  if (sessionError || !session) {
+  // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
+  const adminSession = await getAdminPageSession();
+  if (!adminSession) {
     redirect(`/${locale}/login`);
   }
 

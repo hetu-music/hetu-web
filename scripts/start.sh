@@ -12,7 +12,7 @@ sleep 10
 # 执行 revalidate 请求（刷新主页、意象页、故事页和 sitemap）
 echo "执行 revalidate 请求 (首页 & 意象 & 故事)..."
 if [ -n "$REVALIDATE_SECRET" ]; then
-    if curl -X POST "127.0.0.1:3000/api/public/revalidate?secret=$REVALIDATE_SECRET" > /dev/null 2>&1; then
+    if curl -X POST -H "x-revalidate-secret: $REVALIDATE_SECRET" "127.0.0.1:3000/api/public/revalidate" > /dev/null 2>&1; then
         echo "✅ Revalidate 请求执行成功"
     else
         echo "Revalidate 请求失败，应用可能还在启动中"

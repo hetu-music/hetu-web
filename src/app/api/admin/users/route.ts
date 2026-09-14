@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
 import type { UserRecord } from "@/lib/types";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 // ─── 更新字段 Zod schema ──────────────────────────────────────────────────────
 
@@ -115,10 +116,7 @@ export const PUT = withAuth(
       .eq("id", id);
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message || "更新失败" },
-        { status: 500 },
-      );
+      return serverErrorResponse("PUT /api/admin/users", error, "更新失败");
     }
 
     return NextResponse.json({ success: true });

@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import React, { createContext, useCallback, useContext } from "react";
+import { getCsrfToken } from "@/lib/api/csrf";
 
 export interface UserInfo {
   id: string;
@@ -37,23 +38,6 @@ async function fetchCurrentUser(): Promise<UserInfo | null> {
   return res.json();
 }
 
-async function fetchCsrfToken() {
-  const response = await fetch("/api/public/csrf-token", {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error("获取 CSRF Token 失败");
-  }
-
-  const data: { csrfToken?: string } = await response.json();
-  if (!data.csrfToken) {
-    throw new Error("CSRF Token 缺失");
-  }
-
-  return data.csrfToken;
-}
-
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
   const {
@@ -69,7 +53,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const csrfToken = await fetchCsrfToken();
+      const csrfToken = await getCsrfToken();
       const response = await fetch("/api/auth/logout", {
         method: "POST",
         headers: {

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   getServiceClient,
   getUserClient,
@@ -54,45 +55,51 @@ function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceWithSong {
 
 // ─── read functions ───────────────────────────────────────────────────────────
 
-export async function getImageryCategories(): Promise<ImageryCategory[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  return fetchAll(
-    supabase,
-    TABLES.IMAGERY_CAT,
-    "id,name,parent_id,level,description",
-  ) as Promise<ImageryCategory[]>;
-}
-
-export async function getImageryWithCounts(): Promise<ImageryItem[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  try {
-    const rows = (await fetchAll(
+// cache(): 同一次请求内 generateMetadata 与页面组件各调一次，去重成一次查询
+export const getImageryCategories = cache(
+  async function getImageryCategories(): Promise<ImageryCategory[]> {
+    const supabase = getServiceClient();
+    if (!supabase) return [];
+    return fetchAll(
       supabase,
-      TABLES.IMAGERY_SUMMARY,
-      'id,name,count,"categoryIds"',
-    )) as Array<{
-      id: number;
-      name: string;
-      count: number | null;
-      categoryIds: Array<number | string> | null;
-    }>;
+      TABLES.IMAGERY_CAT,
+      "id,name,parent_id,level,description",
+    ) as Promise<ImageryCategory[]>;
+  },
+);
 
-    return rows.map((item) => ({
-      id: item.id,
-      name: item.name,
-      count: item.count ?? 0,
-      categoryIds: (item.categoryIds ?? [])
-        .map((value) => Number(value))
-        .filter(Number.isFinite),
-      meaningCount: 0,
-    }));
-  } catch (e) {
-    console.error("[getImageryWithCounts]", e);
-    return [];
-  }
-}
+// cache(): 同上，意象页两处调用去重
+export const getImageryWithCounts = cache(
+  async function getImageryWithCounts(): Promise<ImageryItem[]> {
+    const supabase = getServiceClient();
+    if (!supabase) return [];
+    try {
+      const rows = (await fetchAll(
+        supabase,
+        TABLES.IMAGERY_SUMMARY,
+        'id,name,count,"categoryIds"',
+      )) as Array<{
+        id: number;
+        name: string;
+        count: number | null;
+        categoryIds: Array<number | string> | null;
+      }>;
+
+      return rows.map((item) => ({
+        id: item.id,
+        name: item.name,
+        count: item.count ?? 0,
+        categoryIds: (item.categoryIds ?? [])
+          .map((value) => Number(value))
+          .filter(Number.isFinite),
+        meaningCount: 0,
+      }));
+    } catch (e) {
+      console.error("[getImageryWithCounts]", e);
+      return [];
+    }
+  },
+);
 
 export async function getImageryMeanings(): Promise<ImageryMeaning[]> {
   const supabase = getServiceClient();
@@ -502,3 +509,29 @@ export async function getSongsForImagery(
     return [];
   }
 }
+
+/**
+ * 意象页内容的最后变更时间，供 sitemap 使用。
+ * imagery 表只有 created_at——该页内容以新增意象为主，取最新一条的创建时间
+ * 作为近似；对已有意象的文字修订无法反映，属于可接受的偏晚上报。
+ */
+export const getImageryLastModified = cache(
+  async function getImageryLastModified(): Promise<Date | null> {
+    const supabase = getServiceClient();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.IMAGERY)
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error || !data?.created_at) return null;
+      const parsed = new Date(data.created_at as string);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    } catch (e) {
+      console.error("[getImageryLastModified]", e);
+      return null;
+    }
+  },
+);

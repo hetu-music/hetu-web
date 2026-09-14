@@ -180,6 +180,44 @@ export function withAuth(
   };
 }
 
+export interface AdminPageSession {
+  user: AuthenticatedUser;
+  /** 供 getUserClient() 以该用户身份访问受 RLS 约束的表 */
+  accessToken: string | undefined;
+}
+
+/**
+ * 后台页面用：校验登录态与管理员身份，并返回可用于 RLS 查询的 accessToken。
+ *
+ * 必须先 getUser() 再取 token——getUser() 会向 Supabase 校验 JWT 签名，
+ * 而 getSession() 只读 cookie、不验签（@supabase/ssr 对此有明确警告）。
+ * 页面自身完成校验，不把授权完全交给 middleware：matcher 一旦改动，
+ * 仅靠 middleware 的页面会失去保护。
+ *
+ * 校验失败返回 null，由调用方决定跳转目标。
+ */
+export async function getAdminPageSession(): Promise<AdminPageSession | null> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+  if (user.app_metadata?.is_admin !== true) return null;
+
+  // 身份已验签，这里只是取 token 交给 RLS 客户端使用
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  return {
+    user: user as unknown as AuthenticatedUser,
+    accessToken: session?.access_token,
+  };
+}
+
 /**
  * 验证当前用户是否为管理员（适用于 Server Actions）
  * 如果验证失败则抛出错误，成功则返回当前登录的 AuthenticatedUser 对象。

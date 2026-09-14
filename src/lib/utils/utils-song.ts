@@ -220,7 +220,28 @@ export function createFuseInstance(songs: Song[]) {
 }
 
 // 过滤歌曲
-export function filterSongs(
+/** 歌词全文在 Fuse 索引中的字段名，检索与片段展示共用 */
+export const LYRIC_SEARCH_KEY = "lyricContent";
+
+/** Fuse 给出的命中字符区间 [start, end]（闭区间） */
+export type MatchRanges = ReadonlyArray<readonly [number, number]>;
+
+export interface SearchAndFilterResult {
+  songs: Song[];
+  /**
+   * 每首歌「命中发生在歌词字段上」的字符区间。
+   * 直接取自 Fuse 的 matches，不再由展示层用 indexOf 重新推断——
+   * 两者算法不同会导致搜出来的歌显示不出片段。
+   * 靠标题/专辑等元数据命中的歌不会出现在这里，也就不会错误地展示歌词片段。
+   */
+  lyricMatchesById: Map<number, MatchRanges>;
+}
+
+/**
+ * 搜索 + 筛选，同时保留 Fuse 的命中区间。
+ * filterSongs 是它只取 songs 的薄封装。
+ */
+export function searchAndFilterSongs(
   songsData: Song[],
   searchTerm: string,
   selectedType: string,
@@ -233,18 +254,29 @@ export function filterSongs(
   // 接受基础索引或含歌词的扩展索引
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fuseInstance?: Fuse<any>,
-): Song[] {
+): SearchAndFilterResult {
   let filteredBySearch = songsData;
+  const lyricMatchesById = new Map<number, MatchRanges>();
 
   // 如果有搜索词，使用 Fuse.js 进行模糊搜索
   if (searchTerm.trim()) {
     const fuse = fuseInstance || createFuseInstance(songsData);
     const searchResults = fuse.search(searchTerm);
     filteredBySearch = searchResults.map((result) => result.item);
+
+    // 保留命中区间：仅当 Fuse 配置了 includeMatches 时存在
+    for (const result of searchResults) {
+      const lyricMatch = result.matches?.find(
+        (m) => m.key === LYRIC_SEARCH_KEY,
+      );
+      if (lyricMatch?.indices?.length) {
+        lyricMatchesById.set(result.item.id, lyricMatch.indices);
+      }
+    }
   }
 
   // 应用其他筛选条件
-  return filteredBySearch.filter((song) => {
+  const songs = filteredBySearch.filter((song) => {
     // type 筛选
     const matchesType =
       selectedType === FILTER_OPTION_ALL ||
@@ -318,6 +350,36 @@ export function filterSongs(
       matchesArtist
     );
   });
+
+  return { songs, lyricMatchesById };
+}
+
+/** 只要筛选结果、不关心命中区间时的薄封装 */
+export function filterSongs(
+  songsData: Song[],
+  searchTerm: string,
+  selectedType: string,
+  selectedYear: string | (string | number)[],
+  selectedLyricist: string[],
+  selectedComposer: string[],
+  selectedArranger: string[],
+  selectedGenre: string[] = [],
+  selectedArtist: string[] = [],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fuseInstance?: Fuse<any>,
+): Song[] {
+  return searchAndFilterSongs(
+    songsData,
+    searchTerm,
+    selectedType,
+    selectedYear,
+    selectedLyricist,
+    selectedComposer,
+    selectedArranger,
+    selectedGenre,
+    selectedArtist,
+    fuseInstance,
+  ).songs;
 }
 
 type TranslationFn = ReturnType<typeof useTranslations>;

@@ -46,6 +46,27 @@ describe("validateFileContent（Magic Number 校验）", () => {
     expect(result.error).toBeTruthy();
   });
 
+  // 第四字节随 JPEG 段类型变化，这些都是合法 JPEG，不应被当成伪造文件
+  it.each([
+    ["JFIF (E0)", 0xe0],
+    ["Exif (E1)", 0xe1],
+    ["无 APPn 段 (DB)", 0xdb],
+    ["Adobe (EE)", 0xee],
+    ["注释段 (FE)", 0xfe],
+  ])("合法 JPEG 变体通过校验: %s", async (_label, fourth) => {
+    const buf = Buffer.from([0xff, 0xd8, 0xff, fourth]);
+    const result = await validateFileContent(buf, "image/jpeg");
+    expect(result.valid).toBe(true);
+  });
+
+  it("仅 FF D8 两字节（缺少第三字节）被拒绝", async () => {
+    const result = await validateFileContent(
+      Buffer.from([0xff, 0xd8]),
+      "image/jpeg",
+    );
+    expect(result.valid).toBe(false);
+  });
+
   it("PNG header 冒充 JPEG 被拒绝（跨类型伪造）", async () => {
     const result = await validateFileContent(PNG_HEADER, "image/jpeg");
     expect(result.valid).toBe(false);

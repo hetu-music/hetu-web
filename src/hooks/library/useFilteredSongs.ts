@@ -10,7 +10,7 @@ import type { FilterOptions, Song } from "@/lib/types";
 import {
   calculateFilterOptions,
   createFuseInstance,
-  filterSongs,
+  searchAndFilterSongs,
 } from "@/lib/utils/utils-song";
 import { useLyricsIndex } from "./useLyricsIndex";
 
@@ -85,9 +85,9 @@ export function useFilteredSongs({
     return sliderYears.slice(start, end + 1);
   }, [resolvedYearRangeIndices, sliderYears]);
 
-  const filteredSongs = useMemo(
+  const searchResult = useMemo(
     () =>
-      filterSongs(
+      searchAndFilterSongs(
         songs,
         searchQueryForFiltering,
         filterType,
@@ -113,6 +113,9 @@ export function useFilteredSongs({
     ],
   );
 
+  const filteredSongs = searchResult.songs;
+  const lyricMatchesById = searchResult.lyricMatchesById;
+
   const isAnyFilterActive =
     searchQuery !== "" ||
     filterType !== FILTER_OPTION_ALL ||
@@ -129,6 +132,7 @@ export function useFilteredSongs({
     filterOptions,
     sliderYears,
     filteredSongs,
+    lyricMatchesById,
     lyricsMap,
     lyricsState,
     searchQueryForFiltering,

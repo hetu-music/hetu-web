@@ -19,6 +19,25 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// 允许进入 Cache Storage 的公开只读接口白名单。
+//
+// Cache Storage 按 origin 共享，不区分登录账号，因此身份相关的接口一律
+// 不得缓存：/api/auth/**（登录态）、/api/admin/**（后台数据）、收藏与
+// 用户请求（按 user_id 返回）、CSRF token（缓存会导致 token 与 cookie
+// 不一致）、Navidrome 串流凭证。用白名单而非黑名单，新增接口默认不缓存。
+const PUBLIC_CACHEABLE_API = [
+  /^\/api\/public\/songs\/lyrics-index$/,
+  /^\/api\/public\/songs\/\d+\/lyrics$/,
+  /^\/api\/public\/contributors$/,
+  /^\/api\/imagery\/\d+\/songs$/,
+];
+
+// 旧版本 SW 把全部 /api/** 写进了 "api-data"，其中可能残留上一个登录
+// 账号的 /api/auth/me 与收藏响应。激活时一次性删除该缓存。
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.delete("api-data"));
+});
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   precacheOptions: {
@@ -73,10 +92,12 @@ const serwist = new Serwist({
       }),
     },
     {
-      matcher: ({ sameOrigin, url }) =>
-        sameOrigin && url.pathname.startsWith("/api/"),
+      matcher: ({ sameOrigin, url, request }) =>
+        sameOrigin &&
+        request.method === "GET" &&
+        PUBLIC_CACHEABLE_API.some((pattern) => pattern.test(url.pathname)),
       handler: new NetworkFirst({
-        cacheName: "api-data",
+        cacheName: "public-api-data",
         networkTimeoutSeconds: 5,
         plugins: [
           new ExpirationPlugin({

@@ -7,6 +7,7 @@ import FavoriteButton from "@/components/shared/FavoriteButton";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import ImageModal from "@/components/shared/ImageModal";
 import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
+import MoreMenu from "@/components/shared/MoreMenu";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useUserContext } from "@/context/UserContext";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
@@ -202,7 +203,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => openUserPanel("favorites")}
               className="relative p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-400"
@@ -213,8 +214,17 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
                 className={user ? "text-blue-500 dark:text-blue-400" : ""}
               />
             </button>
-            <LocaleSwitcher />
-            <ThemeToggle />
+
+            {/* PC端显示的 语言 和 主题切换 */}
+            <div className="hidden md:flex items-center gap-2">
+              <LocaleSwitcher />
+              <ThemeToggle />
+            </div>
+
+            {/* 移动端显示的“更多”下拉菜单 */}
+            <div className="flex md:hidden relative">
+              <MoreMenu />
+            </div>
           </div>
         </div>
       </nav>

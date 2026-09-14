@@ -67,3 +67,28 @@ export const getQjtxTimeline = cache(async (): Promise<TimelineEvent[]> => {
 
   return (data as StoryQjtxRow[]).map(mapRowToEvent);
 });
+
+/**
+ * 故事页内容的最后变更时间，供 sitemap 使用。
+ * story_qjtx 只有 created_at，取最新一条作为近似。
+ */
+export const getStoryLastModified = cache(
+  async function getStoryLastModified(): Promise<Date | null> {
+    const supabase = getServiceClient();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.STORY_QJTX)
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error || !data?.created_at) return null;
+      const parsed = new Date(data.created_at as string);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    } catch (e) {
+      console.error("[getStoryLastModified]", e);
+      return null;
+    }
+  },
+);

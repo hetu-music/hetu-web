@@ -5,6 +5,8 @@ import {
   getCSRFCookie,
   purgeCloudflareCache,
   purgeEdgeOneCache,
+  safeCompareSecret,
+  serverErrorResponse,
   setCSRFCookie,
   verifyCSRFToken,
   verifyTurnstileToken,
@@ -330,5 +332,62 @@ describe("purgeEdgeOneCache", () => {
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
     await expect(purgeEdgeOneCache(["/"])).resolves.toBeUndefined();
+  });
+});
+
+describe("safeCompareSecret", () => {
+  it("相同字符串返回 true", () => {
+    expect(safeCompareSecret("s3cret-value", "s3cret-value")).toBe(true);
+  });
+
+  it("不同字符串返回 false", () => {
+    expect(safeCompareSecret("s3cret-value", "s3cret-valu3")).toBe(false);
+  });
+
+  it("长度不同也不抛异常，返回 false", () => {
+    expect(safeCompareSecret("short", "a-much-longer-secret")).toBe(false);
+  });
+
+  it("任一侧为空/未定义时返回 false", () => {
+    expect(safeCompareSecret(null, "x")).toBe(false);
+    expect(safeCompareSecret("x", undefined)).toBe(false);
+    expect(safeCompareSecret("", "")).toBe(false);
+  });
+});
+
+describe("serverErrorResponse", () => {
+  it("响应体不含原始数据库错误信息", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const dbError = {
+      message: 'relation "users" does not exist',
+      code: "42P01",
+    };
+
+    const res = serverErrorResponse("GET /api/test", dbError);
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(body)).not.toContain("users");
+    expect(JSON.stringify(body)).not.toContain("42P01");
+    expect(body.error).toBe("服务器错误，请稍后重试");
+    spy.mockRestore();
+  });
+
+  it("原始错误写入服务端日志", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const dbError = { message: 'column "navid_pw" does not exist' };
+
+    serverErrorResponse("PUT /api/test", dbError);
+
+    expect(spy).toHaveBeenCalledWith("[PUT /api/test]", dbError);
+    spy.mockRestore();
+  });
+
+  it("可自定义客户端文案与状态码", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const res = serverErrorResponse("X", new Error("boom"), "更新失败", 503);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("更新失败");
+    spy.mockRestore();
   });
 });

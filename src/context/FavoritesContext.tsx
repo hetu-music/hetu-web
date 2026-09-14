@@ -10,6 +10,7 @@ import React, {
   useRef,
 } from "react";
 import { useUserContext } from "@/context/UserContext";
+import { getCsrfToken, resetCsrfToken } from "@/lib/api/csrf";
 import type { Song } from "@/lib/types";
 
 interface FavoritesContextValue {
@@ -48,7 +49,6 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     favoriteSongs: [],
     loaded: false,
   });
-  const csrfRef = useRef<string>("");
   const prevUserIdRef = useRef<string | null>(null);
   const currentUserId = user?.id ?? null;
   const favorites = useMemo(
@@ -68,14 +68,6 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     : currentUserId === null
       ? true
       : favoritesState.userId === currentUserId && favoritesState.loaded;
-
-  const fetchCsrf = useCallback(async () => {
-    if (csrfRef.current) return csrfRef.current;
-    const res = await fetch("/api/public/csrf-token");
-    const data = await res.json();
-    csrfRef.current = data.csrfToken || "";
-    return csrfRef.current;
-  }, []);
 
   // Reload favorites when user changes
   const fetchFavorites = useCallback(async () => {
@@ -185,7 +177,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const csrf = await fetchCsrf();
+        const csrf = await getCsrfToken();
         const res = await fetch("/api/public/collections", {
           method: isCurrentlyFav ? "DELETE" : "POST",
           headers: {
@@ -204,7 +196,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
               ? [...prev.favorites, id]
               : prev.favorites.filter((x) => x !== id),
           }));
-          csrfRef.current = "";
+          resetCsrfToken();
           // Re-fetch to get consistent state
           void fetchFavorites();
           return;
@@ -226,7 +218,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         }));
       }
     },
-    [currentUserId, fetchCsrf, fetchFavorites, user],
+    [currentUserId, fetchFavorites, user],
   );
 
   const isFavorite = useCallback(
@@ -246,7 +238,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     });
 
     try {
-      const csrf = await fetchCsrf();
+      const csrf = await getCsrfToken();
       await Promise.all(
         prevFavs.map((id) =>
           fetch("/api/public/collections", {
@@ -268,7 +260,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         loaded: true,
       });
     }
-  }, [currentUserId, user, favorites, favoriteSongs, fetchCsrf]);
+  }, [currentUserId, user, favorites, favoriteSongs]);
 
   return (
     <FavoritesContext.Provider

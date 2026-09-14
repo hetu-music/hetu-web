@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import Fuse from "fuse.js";
 import {
   calculateFilterOptions,
   decodeFilterParam,
@@ -6,8 +7,10 @@ import {
   filterSongs,
   getCoverUrl,
   getNmnUrl,
+  LYRIC_SEARCH_KEY,
   mapAndSortSongs,
   processLyricsForSearch,
+  searchAndFilterSongs,
 } from "./utils-song";
 import type { Song } from "@/lib/types";
 
@@ -315,5 +318,95 @@ describe("encodeFilterParam & decodeFilterParam", () => {
       const decoded = decodeFilterParam(encoded, smallOptions);
       expect(decoded.sort()).toEqual(subset.sort());
     }
+  });
+});
+
+describe("searchAndFilterSongs — 命中区间", () => {
+  const lyricSongs = [
+    makeSong({ id: 1, title: "月下独酌" }),
+    makeSong({ id: 2, title: "无关的歌" }),
+  ];
+
+  // 构造一个带歌词字段、且开启 includeMatches 的索引，与 useLyricsIndex 一致
+  function makeLyricFuse(lyricsById: Record<number, string>) {
+    return new Fuse(
+      lyricSongs.map((s) => ({
+        ...s,
+        [LYRIC_SEARCH_KEY]: lyricsById[s.id] ?? "",
+      })),
+      {
+        keys: [
+          { name: "title", weight: 0.35 },
+          { name: LYRIC_SEARCH_KEY, weight: 0.15 },
+        ],
+        threshold: 0.35,
+        ignoreLocation: true,
+        findAllMatches: true,
+        minMatchCharLength: 1,
+        includeMatches: true,
+      },
+    );
+  }
+
+  it("命中歌词时给出该歌的字符区间", () => {
+    const fuse = makeLyricFuse({ 1: "举杯邀明月对影成三人", 2: "毫不相干" });
+    const { lyricMatchesById } = searchAndFilterSongs(
+      lyricSongs,
+      "明月",
+      "全部",
+      "全部",
+      [],
+      [],
+      [],
+      [],
+      [],
+      fuse,
+    );
+
+    const ranges = lyricMatchesById.get(1);
+    expect(ranges).toBeDefined();
+    // 区间应落在"明月"实际出现的位置上
+    const [start, end] = (ranges ?? [[0, 0]])[0];
+    expect("举杯邀明月对影成三人".slice(start, end + 1)).toContain("月");
+  });
+
+  it("只靠标题命中的歌不会出现在歌词命中表里", () => {
+    const fuse = makeLyricFuse({ 1: "与查询无关的歌词", 2: "也无关" });
+    const { lyricMatchesById } = searchAndFilterSongs(
+      lyricSongs,
+      "月下独酌",
+      "全部",
+      "全部",
+      [],
+      [],
+      [],
+      [],
+      [],
+      fuse,
+    );
+
+    expect(lyricMatchesById.has(1)).toBe(false);
+  });
+
+  it("没有搜索词时命中表为空", () => {
+    const { songs, lyricMatchesById } = searchAndFilterSongs(
+      lyricSongs,
+      "",
+      "全部",
+      "全部",
+      [],
+      [],
+      [],
+      [],
+      [],
+    );
+    expect(songs).toHaveLength(2);
+    expect(lyricMatchesById.size).toBe(0);
+  });
+
+  it("filterSongs 仍只返回歌曲数组，行为不变", () => {
+    const result = filterSongs(lyricSongs, "", "全部", "全部", [], [], []);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(2);
   });
 });

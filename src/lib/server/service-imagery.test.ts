@@ -31,6 +31,7 @@ import {
   updateImageryCategory,
   updateMeaning,
   updateOccurrence,
+  getImageryLastModified,
 } from "./service-imagery";
 
 beforeEach(() => {
@@ -472,5 +473,38 @@ describe("getOccurrencesForSong / getSongsForImagery", () => {
   it("getSongsForImagery service client 不可用时返回空数组", async () => {
     vi.mocked(getServiceClient).mockReturnValue(null);
     expect(await getSongsForImagery(1)).toEqual([]);
+  });
+});
+
+describe("getImageryLastModified", () => {
+  beforeEach(() => {
+    vi.mocked(getServiceClient).mockReset();
+  });
+
+  it("service client 不可用时返回 null", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(null);
+    expect(await getImageryLastModified()).toBeNull();
+  });
+
+  it("返回最新一条的 created_at", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: { created_at: "2026-02-02T09:00:00+00:00" },
+          error: null,
+        }),
+      ]),
+    );
+    const d = await getImageryLastModified();
+    expect(d?.toISOString()).toBe("2026-02-02T09:00:00.000Z");
+  });
+
+  it("时间戳非法时返回 null", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: { created_at: "garbage" }, error: null }),
+      ]),
+    );
+    expect(await getImageryLastModified()).toBeNull();
   });
 });

@@ -71,3 +71,21 @@ export function formatField(
   }
   return String(val);
 }
+
+/**
+ * 把对象序列化为可安全嵌入 <script type="application/ld+json"> 的字符串。
+ *
+ * JSON.stringify 不会转义 `<`，因此内容里出现 `</script>` 就能提前闭合标签
+ * 逃逸出脚本块。JSON-LD 的字段取自数据库（意象分类名、故事标题等），属于
+ * 可被编辑的内容，必须转义后再写入。
+ *
+ * 公开页面是 ISR、CSP 带 'unsafe-inline'，没有 CSP 兜底，这里是唯一防线。
+ * 同时转义 U+2028/U+2029——它们在 JSON 里合法，但在 JS 源码中是换行符。
+ */
+export function serializeJsonLd(data: unknown): string {
+  // 统一用 replacer 生成 \uXXXX 转义，避免逐条手写转义字面量时出错
+  return JSON.stringify(data).replace(
+    /[<>&\u2028\u2029]/g,
+    (char) => "\\u" + char.charCodeAt(0).toString(16).padStart(4, "0"),
+  );
+}

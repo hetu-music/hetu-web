@@ -1,12 +1,26 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { locales } from "@/i18n/config";
+import { safeCompareSecret } from "@/lib/server/server-utils";
+
+const SECRET_HEADER = "x-revalidate-secret";
+
+/**
+ * 校验刷新密钥。
+ *
+ * 密钥走请求头而非 query string——query string 会被 Nginx / CDN 的
+ * access log 原样记录下来。比较使用常量时间实现。
+ */
+function isAuthorized(request: NextRequest): boolean {
+  return safeCompareSecret(
+    request.headers.get(SECRET_HEADER),
+    process.env.REVALIDATE_SECRET,
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // 添加安全验证
-    const secret = request.nextUrl.searchParams.get("secret");
-    if (secret !== process.env.REVALIDATE_SECRET) {
+    if (!isAuthorized(request)) {
       return new NextResponse("ERROR: Invalid secret", {
         status: 401,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -47,10 +61,9 @@ export async function POST(request: NextRequest) {
 // 新增: 刷新指定 /song/[id] 页面的 GET 路由
 export async function GET(request: NextRequest) {
   try {
-    const secret = request.nextUrl.searchParams.get("secret");
     const id = request.nextUrl.searchParams.get("id");
 
-    if (secret !== process.env.REVALIDATE_SECRET) {
+    if (!isAuthorized(request)) {
       return new NextResponse("ERROR: Invalid secret", {
         status: 401,
         headers: { "Content-Type": "text/plain; charset=utf-8" },

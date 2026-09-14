@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 // ─── 回复 schema ──────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export const GET = withAuth(
     const { data, error, count } = await query;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverErrorResponse("GET /api/admin/requests", error);
     }
 
     const rows = data ?? [];
@@ -172,7 +173,7 @@ export const PUT = withAuth(
       .eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverErrorResponse("PUT /api/admin/requests", error);
     }
 
     return NextResponse.json({ success: true });

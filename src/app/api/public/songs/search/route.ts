@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/server/server-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 /**
  * GET /api/public/songs/search?q=关键词&limit=10
@@ -32,7 +33,7 @@ export const GET = withAuth(async (request: NextRequest) => {
     .limit(limit);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverErrorResponse("GET /api/public/songs/search", error);
   }
 
   return NextResponse.json({ songs: data ?? [] });

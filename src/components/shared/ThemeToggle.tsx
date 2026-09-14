@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { flushSync } from "react-dom";
+import { runThemeTransition } from "@/lib/theme-transition";
 
 interface ThemeToggleProps {
   /**
@@ -30,52 +30,8 @@ export default function ThemeToggle({ className }: ThemeToggleProps) {
   }, []);
 
   const toggleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // 如果浏览器不支持 View Transition API，直接切换主题
-    if (!document.startViewTransition) {
+    runThemeTransition(e.clientX, e.clientY, () => {
       setTheme(resolvedTheme === "dark" ? "light" : "dark");
-      return;
-    }
-
-    // 计算动画中心点和半径
-    const x = e.clientX;
-    const y = e.clientY;
-    const endRadius = Math.hypot(
-      Math.max(x, innerWidth - x),
-      Math.max(y, innerHeight - y),
-    );
-
-    // 临时禁用过渡效果，避免闪烁
-    document.documentElement.classList.add("no-transitions");
-
-    // 使用 View Transition API 创建流畅的主题切换动画
-    const transition = document.startViewTransition(() => {
-      flushSync(() => {
-        setTheme(resolvedTheme === "dark" ? "light" : "dark");
-      });
-    });
-
-    // 动画完成后重新启用过渡效果
-    transition.finished.then(() => {
-      document.documentElement.classList.remove("no-transitions");
-    });
-
-    // 添加圆形扩散动画
-    transition.ready.then(() => {
-      const clipPath = [
-        `circle(0px at ${x}px ${y}px)`,
-        `circle(${endRadius}px at ${x}px ${y}px)`,
-      ];
-
-      document.documentElement.animate(
-        {
-          clipPath: clipPath,
-        },
-        {
-          duration: 500,
-          easing: "ease-in-out",
-          pseudoElement: "::view-transition-new(root)",
-        },
-      );
     });
   };
 

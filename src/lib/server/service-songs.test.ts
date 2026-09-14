@@ -331,7 +331,7 @@ describe("getSongLastModifiedMap", () => {
     expect((await getSongLastModifiedMap()).size).toBe(0);
   });
 
-  it("把 temp 的 updated_at 映射为 id → Date", async () => {
+  it("把 music 的 updated_at 映射为 id → Date", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({

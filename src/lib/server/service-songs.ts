@@ -151,15 +151,12 @@ export async function getSongsByIds(
 /**
  * 获取每首歌的最后修改时间，供 sitemap 的 lastModified 使用。
  *
- * music 表本身没有 updated_at，只有发行日期 date——用 date 当 lastModified 是
- * 错的：一首 2012 年的歌即使昨天刚勘误过歌词，也会声称「2012 年后未变更」，
- * 反而会抑制搜索引擎重新抓取，与本站勘误的用途正好相反。
+ * 数据来源是 music.updated_at，由 temp→music 的两条同步路径维护
+ * （后台发布、每日定时同步）。
  *
- * temp 表是 music 的 1:1 暂存镜像（id 集合完全一致），其 updated_at 记录的正是
- * 编辑时间，因此以它作为修改时间来源。这里只读 id 与时间戳，不读任何内容字段。
- *
- * 注意：在 temp 中已编辑但尚未审批同步的歌，其时间会比线上实际内容更新——
- * 属于「偏早上报」，只会让爬虫早一点回访，比漏报安全。
+ * 不要改用发行日期 date：那是发行时间不是修改时间，一首 2012 年的歌即使
+ * 昨天刚勘误过歌词也会声称「2012 年后未变更」，反而抑制搜索引擎重新抓取，
+ * 与本站勘误的用途正好相反。
  */
 export const getSongLastModifiedMap = cache(
   async function getSongLastModifiedMap(): Promise<Map<number, Date>> {
@@ -173,7 +170,7 @@ export const getSongLastModifiedMap = cache(
 
     const rows = await fetchAll<{ id: number; updated_at: string | null }>(
       supabase,
-      TABLES.ADMIN,
+      TABLES.MUSIC,
       "id,updated_at",
       (q) => q.order("id", { ascending: true }),
     );

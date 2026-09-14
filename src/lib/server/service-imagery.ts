@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   getServiceClient,
   getUserClient,
@@ -54,45 +55,51 @@ function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceWithSong {
 
 // ─── read functions ───────────────────────────────────────────────────────────
 
-export async function getImageryCategories(): Promise<ImageryCategory[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  return fetchAll(
-    supabase,
-    TABLES.IMAGERY_CAT,
-    "id,name,parent_id,level,description",
-  ) as Promise<ImageryCategory[]>;
-}
-
-export async function getImageryWithCounts(): Promise<ImageryItem[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  try {
-    const rows = (await fetchAll(
+// cache(): 同一次请求内 generateMetadata 与页面组件各调一次，去重成一次查询
+export const getImageryCategories = cache(
+  async function getImageryCategories(): Promise<ImageryCategory[]> {
+    const supabase = getServiceClient();
+    if (!supabase) return [];
+    return fetchAll(
       supabase,
-      TABLES.IMAGERY_SUMMARY,
-      'id,name,count,"categoryIds"',
-    )) as Array<{
-      id: number;
-      name: string;
-      count: number | null;
-      categoryIds: Array<number | string> | null;
-    }>;
+      TABLES.IMAGERY_CAT,
+      "id,name,parent_id,level,description",
+    ) as Promise<ImageryCategory[]>;
+  },
+);
 
-    return rows.map((item) => ({
-      id: item.id,
-      name: item.name,
-      count: item.count ?? 0,
-      categoryIds: (item.categoryIds ?? [])
-        .map((value) => Number(value))
-        .filter(Number.isFinite),
-      meaningCount: 0,
-    }));
-  } catch (e) {
-    console.error("[getImageryWithCounts]", e);
-    return [];
-  }
-}
+// cache(): 同上，意象页两处调用去重
+export const getImageryWithCounts = cache(
+  async function getImageryWithCounts(): Promise<ImageryItem[]> {
+    const supabase = getServiceClient();
+    if (!supabase) return [];
+    try {
+      const rows = (await fetchAll(
+        supabase,
+        TABLES.IMAGERY_SUMMARY,
+        'id,name,count,"categoryIds"',
+      )) as Array<{
+        id: number;
+        name: string;
+        count: number | null;
+        categoryIds: Array<number | string> | null;
+      }>;
+
+      return rows.map((item) => ({
+        id: item.id,
+        name: item.name,
+        count: item.count ?? 0,
+        categoryIds: (item.categoryIds ?? [])
+          .map((value) => Number(value))
+          .filter(Number.isFinite),
+        meaningCount: 0,
+      }));
+    } catch (e) {
+      console.error("[getImageryWithCounts]", e);
+      return [];
+    }
+  },
+);
 
 export async function getImageryMeanings(): Promise<ImageryMeaning[]> {
   const supabase = getServiceClient();

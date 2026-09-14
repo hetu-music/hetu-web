@@ -193,6 +193,7 @@ export default function MusicLibraryClient({
   const {
     filteredSongs,
     lyricsMap,
+    lyricMatchesById,
     lyricsState,
     searchQueryForFiltering,
     isAnyFilterActive,
@@ -312,12 +313,14 @@ export default function MusicLibraryClient({
         return undefined;
       }
 
+      // 只有命中确实发生在歌词字段上才展示片段——靠标题/专辑命中的歌
+      // 不会在这个 Map 里，避免展示一段与命中无关的歌词。
       return extractLyricsSnippet(
         lyricsMap.get(songId) || "",
-        searchQueryForFiltering,
+        lyricMatchesById.get(songId),
       );
     },
-    [lyricsMap, lyricsState, searchQueryForFiltering],
+    [lyricsMap, lyricMatchesById, lyricsState, searchQueryForFiltering],
   );
 
   return (

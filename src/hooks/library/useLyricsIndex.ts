@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Fuse from "fuse.js";
 import { useEffect, useMemo, useState } from "react";
 import type { Song } from "@/lib/types";
+import { LYRIC_SEARCH_KEY, type MatchRanges } from "@/lib/utils/utils-song";
 
 export type LyricsEntry = { id: number; l: string };
 
@@ -42,7 +43,7 @@ function buildFromEntries(
     ]
       .filter(Boolean)
       .join(" "),
-    lyricContent: map.get(song.id) || "",
+    [LYRIC_SEARCH_KEY]: map.get(song.id) || "",
   }));
 
   const fuse = new Fuse(searchData, {
@@ -53,7 +54,7 @@ function buildFromEntries(
       { name: "lyricist", weight: 0.1 },
       { name: "composer", weight: 0.05 },
       { name: "arranger", weight: 0.05 },
-      { name: "lyricContent", weight: 0.15 },
+      { name: LYRIC_SEARCH_KEY, weight: 0.15 },
     ],
     threshold: 0.35,
     includeScore: true,
@@ -126,21 +127,31 @@ export function useLyricsIndex(songs: Song[]): UseLyricsIndexResult {
 }
 
 /**
- * 从歌词文本中提取包含搜索词的简短片段，用于搜索结果展示。
- * 只截取匹配点附近少量上下文，由 CSS truncate 负责视觉截断。
+ * 从歌词文本中截取 Fuse 实际命中的那一段，用于搜索结果展示。
+ *
+ * 区间直接来自检索时的 Fuse matches，不再用 indexOf 重新查一遍——
+ * Fuse 是模糊匹配而 indexOf 是精确匹配，两者算法不一致会让一部分
+ * 搜出来的歌显示不出任何片段（例如搜「不知道」命中 53 首，其中 50 首
+ * 并不含该精确子串）。
+ *
+ * @param lyricsText - 处理后的纯文本歌词
+ * @param ranges     - Fuse 给出的命中字符区间 [start, end]（闭区间）
  */
 export function extractLyricsSnippet(
   lyricsText: string,
-  query: string,
+  ranges: MatchRanges | undefined,
   maxLength = 36,
 ): string {
-  if (!lyricsText || !query) return "";
-  const lower = lyricsText.toLowerCase();
-  const queryLower = query.toLowerCase();
-  const idx = lower.indexOf(queryLower);
-  if (idx === -1) return "";
+  if (!lyricsText || !ranges?.length) return "";
 
-  const start = Math.max(0, idx - 8);
-  const end = Math.min(lyricsText.length, idx + query.length + maxLength);
+  // 取最长的那段命中，信息量最大
+  let best = ranges[0];
+  for (const range of ranges) {
+    if (range[1] - range[0] > best[1] - best[0]) best = range;
+  }
+
+  const [matchStart, matchEnd] = best;
+  const start = Math.max(0, matchStart - 8);
+  const end = Math.min(lyricsText.length, matchEnd + 1 + maxLength);
   return lyricsText.slice(start, end).trim();
 }

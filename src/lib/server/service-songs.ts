@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   getServiceClient,
   getUserClient,
@@ -46,7 +47,7 @@ function toTraditionalSongList(songs: Song[]): Song[] {
  * @param accessToken  - 登录用户的 accessToken（仅 Admin 路径需要）
  * @param forListView  - 为 true 时只获取列表字段，排除歌词等大字段
  */
-export async function getSongs(
+export const getSongs = cache(async function getSongs(
   table: string = TABLES.MUSIC,
   accessToken?: string,
   forListView: boolean = false,
@@ -97,7 +98,7 @@ export async function getSongs(
   }
 
   return songs;
-}
+});
 
 /**
  * 按 ID 批量获取歌曲列表字段（公共主表）
@@ -151,7 +152,7 @@ export async function getSongsByIds(
  * 根据 ID 获取歌曲详情（兼容 music 和 temp 表）
  * @param locale - 当前语言，'zh-TW' 时自动转换繁体
  */
-export async function getSongById(
+export const getSongById = cache(async function getSongById(
   id: number,
   table: string = TABLES.MUSIC,
   accessToken?: string,
@@ -217,7 +218,7 @@ export async function getSongById(
   }
 
   return result;
-}
+});
 
 /**
  * 新增歌曲（仅用于 Admin 路径，操作 temp 表）

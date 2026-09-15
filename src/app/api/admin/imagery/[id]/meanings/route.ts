@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import {
-  getMeaningsForImagery,
-  createMeaning,
+  getImageryMeanings,
+  createImageryMeaning,
 } from "@/lib/server/service-imagery";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
@@ -25,7 +25,9 @@ export const GET = withAuth(
     if (!imageryId)
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     try {
-      const meanings = await getMeaningsForImagery(imageryId);
+      // 注：释义目前是全库共享的词表，未按意象隔离。
+      // imagery_meanings 表虽有 imagery_id 列但从未写入，路径里的 id 仅用于校验。
+      const meanings = await getImageryMeanings();
       return NextResponse.json(meanings);
     } catch (e) {
       console.error("[GET /api/admin/imagery/[id]/meanings]", e);
@@ -60,8 +62,7 @@ export const POST = withAuth(
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-      const created = await createMeaning(
-        imageryId,
+      const created = await createImageryMeaning(
         parsed.data.label,
         parsed.data.description ?? null,
         session.access_token,

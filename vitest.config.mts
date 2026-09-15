@@ -81,6 +81,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(rootDir, "src"),
+      // server-only 的 exports map 只在 react-server 条件下解析到空实现，
+      // 其余条件解析到一个「一被导入就抛错」的入口。Next 的 RSC 构建满足该条件，
+      // vitest 不满足，因此显式指向包自带的 empty.js。
+      "server-only": path.resolve(rootDir, "node_modules/server-only/empty.js"),
     },
   },
 });

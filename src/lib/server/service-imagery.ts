@@ -9,13 +9,8 @@ import type {
   ImageryCategory,
   ImageryItem,
   ImageryMeaning,
-  ImageryOccurrence,
   SongRef,
 } from "@/lib/types";
-
-// Suppress unused import warnings — these types are re-exported or used transitively
-void (undefined as unknown as ImageryOccurrence);
-void (undefined as unknown as SongRef);
 
 export type OccurrenceWithSong = {
   id: number;
@@ -120,12 +115,6 @@ export async function getImageryMeanings(): Promise<ImageryMeaning[]> {
   }
 }
 
-export async function getMeaningsForImagery(
-  _imageryId: number,
-): Promise<ImageryMeaning[]> {
-  return getImageryMeanings();
-}
-
 export async function getOccurrencesForImagery(
   imageryId: number,
 ): Promise<OccurrenceWithSong[]> {
@@ -133,7 +122,7 @@ export async function getOccurrencesForImagery(
   if (!supabase) return [];
   try {
     const { data, error } = await supabase
-      .from("imagery_occurrences")
+      .from(TABLES.IMAGERY_OCC)
       .select(
         "*, music(title, album), imagery(name), imagery_categories(name), imagery_meanings(label)",
       )
@@ -156,7 +145,7 @@ export async function getOccurrencesForSong(
   if (!supabase) return [];
   try {
     const { data, error } = await supabase
-      .from("imagery_occurrences")
+      .from(TABLES.IMAGERY_OCC)
       .select(
         "*, music(title, album), imagery(name), imagery_categories(name), imagery_meanings(label)",
       )
@@ -339,15 +328,6 @@ export async function createImageryMeaning(
     .single();
   if (error) throw error;
   return data;
-}
-
-export async function createMeaning(
-  _imageryId: number,
-  label: string,
-  description: string | null,
-  accessToken: string,
-) {
-  return createImageryMeaning(label, description, accessToken);
 }
 
 export async function updateMeaning(

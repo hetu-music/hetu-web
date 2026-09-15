@@ -83,6 +83,19 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
     return calculateSongInfo(song, t, tCommon, tEnum);
   }, [song, t, tCommon, tEnum]);
 
+  // 歌词按行拆分后逐行渲染。整段文本配 whitespace-pre-line 时，浏览器把歌词
+  // 视为一个几十行的块，text-wrap: balance 会因超出实现的行数上限而失效；窄屏
+  // 上一句歌词折行后，最后一个汉字就被单独甩到下一行（中文可在任意两字间断行）。
+  const normalLyricLines = useMemo(
+    () => (song.normalLyrics || song.lyrics || "").split(/\r?\n/),
+    [song.normalLyrics, song.lyrics],
+  );
+
+  const lrcLyricLines = useMemo(
+    () => (song.lyrics || "").split(/\r?\n/),
+    [song.lyrics],
+  );
+
   // 在组件挂载后立即启动动画
   useEffect(() => {
     // 使用 requestAnimationFrame 确保在下一帧启动动画
@@ -566,33 +579,58 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900/50 rounded-3xl p-8 md:p-12 border border-slate-100 dark:border-slate-800 shadow-sm min-h-100">
+              <div className="bg-white dark:bg-slate-900/50 rounded-3xl p-5 sm:p-8 md:p-12 border border-slate-100 dark:border-slate-800 shadow-sm min-h-100">
                 {song.lyrics ? (
                   <div className="relative overflow-hidden">
                     {/* 普通歌词 */}
                     <div
                       className={cn(
-                        "whitespace-pre-line leading-loose text-lg text-slate-700 dark:text-slate-300 font-light text-center",
+                        "leading-loose text-base sm:text-lg text-slate-700 dark:text-slate-300 font-light text-center",
                         "transition-all duration-500 ease-in-out",
                         lyricsType === "normal"
                           ? "opacity-100 translate-y-0 relative"
                           : "opacity-0 translate-y-4 absolute inset-0 pointer-events-none",
                       )}
                     >
-                      {song.normalLyrics || song.lyrics}
+                      {normalLyricLines.map((line, i) =>
+                        line.trim() === "" ? (
+                          // 空行用一个满行高的不换行空格占位，等价于原先 pre-line 的空行
+                          <p key={i} aria-hidden>
+                            {"\u00A0"}
+                          </p>
+                        ) : (
+                          <p key={i} className="text-balance">
+                            {line}
+                          </p>
+                        ),
+                      )}
                     </div>
 
                     {/* LRC 歌词 */}
                     <div
                       className={cn(
-                        "whitespace-pre-line leading-loose text-lg text-slate-700 dark:text-slate-300 font-light text-left font-mono",
+                        "leading-loose text-base sm:text-lg text-slate-700 dark:text-slate-300 font-light text-left font-mono",
                         "transition-all duration-500 ease-in-out",
                         lyricsType === "lrc"
                           ? "opacity-100 translate-y-0 relative"
                           : "opacity-0 translate-y-4 absolute inset-0 pointer-events-none",
                       )}
                     >
-                      {song.lyrics}
+                      {lrcLyricLines.map((line, i) =>
+                        line.trim() === "" ? (
+                          <p key={i} aria-hidden>
+                            {"\u00A0"}
+                          </p>
+                        ) : (
+                          // 悬挂缩进：折行部分对齐到时间戳之后，而不是顶回最左侧
+                          <p
+                            key={i}
+                            className="text-balance pl-[10ch] -indent-[10ch]"
+                          >
+                            {line}
+                          </p>
+                        ),
+                      )}
                     </div>
                   </div>
                 ) : (

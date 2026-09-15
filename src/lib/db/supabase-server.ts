@@ -20,6 +20,10 @@
  * TABLES.ADMIN   — 后台暂存表（增删改，用户权限访问）
  */
 
+// 构建期护栏：任何客户端组件（含其依赖链）引用本模块都会直接构建失败。
+// 下方的 assertServerOnly() 只能在运行时发现问题，这一行把它提前到构建期。
+import "server-only";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // ─── 表名常量 — 全站唯一数据源，禁止在业务代码中硬编码表名字符串 ──────────────
@@ -73,26 +77,21 @@ function assertServerOnly() {
   }
 }
 
-// ─── 客户端缓存（进程级单例，防止重复创建连接）─────────────────────────────
+// ─── 客户端缓存（进程级单例）───────────────────────────────────────────────
+//
+// 只缓存不带用户身份的客户端（service / 匿名）。带 accessToken 的客户端一律
+// 新建：此前是以 JWT 本身作为 Map 的 key，等于把一批用户令牌长期挂在进程全局
+// 变量上；而且上限 20 的 FIFO 淘汰在并发管理员较多时会反复失效，缓存本身也没
+// 起到作用。supabase-js 的 REST 客户端只是配置对象、不持有连接，新建成本极低。
 
 const clientCache = new Map<string, SupabaseClient>();
 
-function getCachedClient(
-  url: string,
-  key: string,
-  options?: Parameters<typeof createClient>[2],
-  cacheKeySuffix = "",
-): SupabaseClient {
-  const cacheKey = `${url}::${key}::${cacheKeySuffix}`;
+function getCachedClient(url: string, key: string): SupabaseClient {
+  const cacheKey = `${url}::${key}`;
   let client = clientCache.get(cacheKey);
   if (!client) {
-    client = createClient(url, key, options);
+    client = createClient(url, key);
     clientCache.set(cacheKey, client);
-    // 限制缓存大小，防止内存泄漏
-    if (clientCache.size > 20) {
-      const firstKey = clientCache.keys().next().value;
-      if (firstKey) clientCache.delete(firstKey);
-    }
   }
   return client;
 }
@@ -155,11 +154,14 @@ export function getUserClient(accessToken?: string): SupabaseClient | null {
     return null;
   }
 
-  const options = accessToken
-    ? { global: { headers: { Authorization: `Bearer ${accessToken}` } } }
-    : undefined;
+  // 带用户身份的客户端不进缓存，避免把 JWT 挂在进程级 Map 上
+  if (accessToken) {
+    return createClient(url, key, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+  }
 
-  return getCachedClient(url, key, options, accessToken ?? "anon");
+  return getCachedClient(url, key);
 }
 
 // ─── 分页工具 ──────────────────────────────────────────────────────────────

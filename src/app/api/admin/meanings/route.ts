@@ -1,3 +1,9 @@
+/**
+ * ⚠️ 全局释义接口：POST 目前必定失败（imagery_meanings.imagery_id 为 NOT NULL，
+ * 此处不传）。仓库里另有一套按意象的 /api/admin/imagery/[id]/meanings，端到端
+ * 写好但零调用。两套并存且方向未定，详见 service-imagery.ts 中
+ * getImageryMeanings 上方的说明。
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import {

@@ -18,7 +18,7 @@ import { getServiceClient, getUserClient } from "@/lib/db/supabase-server";
 import {
   createImagery,
   createImageryCategory,
-  createMeaning,
+  createImageryMeaning,
   deleteMeaning,
   deleteOccurrence,
   getImageryMeanings,
@@ -348,8 +348,8 @@ describe("createImagery / updateImagery", () => {
   });
 });
 
-describe("createMeaning / updateMeaning / deleteMeaning", () => {
-  it("createMeaning 创建成功", async () => {
+describe("createImageryMeaning / updateMeaning / deleteMeaning", () => {
+  it("createImageryMeaning 创建成功", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({
@@ -358,7 +358,7 @@ describe("createMeaning / updateMeaning / deleteMeaning", () => {
         }),
       ]),
     );
-    const result = await createMeaning(0, "思念", null, "token");
+    const result = await createImageryMeaning("思念", null, "token");
     expect(result).toMatchObject({ label: "思念" });
   });
 

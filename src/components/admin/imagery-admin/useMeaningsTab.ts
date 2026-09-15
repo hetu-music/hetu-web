@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * ⚠️ 后台「含义」Tab：新增/编辑目前存不进去。
+ *
+ * imagery_meanings.imagery_id 是 NOT NULL 外键，而这里走的全局接口
+ * （/api/admin/meanings）不会传它，插入会被数据库拒掉——这也是该表一直为空的原因。
+ * 释义子系统的设计方向尚未确定，详见 lib/server/service-imagery.ts 中
+ * getImageryMeanings 上方的说明。暂不投入，等真正要用时再一并设计。
+ */
+
 import {
   apiCreateGlobalMeaning,
   apiDeleteGlobalMeaning,

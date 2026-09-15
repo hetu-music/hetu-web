@@ -25,8 +25,9 @@ export const GET = withAuth(
     if (!imageryId)
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     try {
-      // 注：释义目前是全库共享的词表，未按意象隔离。
-      // imagery_meanings 表虽有 imagery_id 列但从未写入，路径里的 id 仅用于校验。
+      // ⚠️ 这里没有按 imageryId 过滤，返回的是全部释义。
+      // 该路由目前零调用（后台走的是 /api/admin/meanings），释义子系统的
+      // 设计方向也未定，详见 service-imagery.ts 中 getImageryMeanings 上方的说明。
       const meanings = await getImageryMeanings();
       return NextResponse.json(meanings);
     } catch (e) {

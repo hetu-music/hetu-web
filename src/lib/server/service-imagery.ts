@@ -96,6 +96,30 @@ export const getImageryWithCounts = cache(
   },
 );
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 释义（imagery_meanings）子系统目前不可用，且设计未定，暂缓处理
+ *
+ * 现状（2026-09-15 核实）：
+ *   · imagery_meanings 表 0 行；imagery_occurrences 共 6573 行，meaning_id 全为 NULL
+ *   · 表结构声明的是「按意象隔离」：
+ *       imagery_id  bigint  NOT NULL  FK → imagery.id   且无默认值
+ *   · 但下面的 createImageryMeaning() 插入时不带 imagery_id
+ *     → 后台「含义」页点新增会被 NOT NULL 约束拒掉，这才是表一直为空的原因，
+ *       而不是「还没人用」
+ *
+ * 另有两套并行 API，只有前者接进了 UI：
+ *   · 全局    /api/admin/meanings              ← 后台「含义」Tab 在用（存不进去）
+ *   · 按意象  /api/admin/imagery/[id]/meanings ← 端到端写好了，但零调用
+ *
+ * 真要启用时需要先定方向，二选一：
+ *   A. 跟随表结构做「按意象隔离」——释义挂在具体意象下，出现记录的下拉只列本意象的；
+ *      改 UI，删掉全局那套；代价是无法跨意象聚合。
+ *   B. 改成「全局共享词表」——DROP 掉 imagery_id 列，删掉按意象那套；
+ *      可以回答「哪些意象都表达过思念」，代价是下拉框会随词表变长。
+ *
+ * 在方向定下来之前不要往这几个函数上叠功能。
+ * ────────────────────────────────────────────────────────────────────────── */
+
 export async function getImageryMeanings(): Promise<ImageryMeaning[]> {
   const supabase = getServiceClient();
   if (!supabase) return [];
@@ -314,6 +338,10 @@ async function getOccurrenceWithRelationsById(id: number, accessToken: string) {
   return mapOccurrenceRow(data as Record<string, unknown>);
 }
 
+/**
+ * ⚠️ 当前必定失败：imagery_meanings.imagery_id 为 NOT NULL 且无默认值，
+ * 而这里没有传。属于上面那段「释义子系统待定」的一部分，方向定了再改。
+ */
 export async function createImageryMeaning(
   label: string,
   description: string | null,

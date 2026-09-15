@@ -101,6 +101,33 @@ export default defineConfig(
     rules: {
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/no-non-null-assertion": "warn",
+
+      // 禁止 barrel 导入，一律用具体文件路径。
+      //
+      // 这些目录下曾有 index.ts 聚合导出，但全仓库零引用、已删除。
+      // 不恢复的原因是服务端/客户端边界：@/lib/db 的 barrel 会同时带出
+      // supabase-server（service role key）与 supabase-auth（next/headers），
+      // @/lib/server 会经 service-songs 带出 opencc-js 的整份字典。
+      // 客户端组件想拿个 TABLES 常量就可能把这些一起拖进 bundle。
+      // 用 paths（精确匹配模块名）而非 patterns——后者是前缀匹配，
+      // 会把 @/lib/db/supabase-auth 这类正常的具体路径一并拦掉。
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            "@/lib/db",
+            "@/lib/server",
+            "@/lib/api",
+            "@/lib/utils",
+            "@/lib/forms",
+            "@/lib/player",
+            "@/hooks/utils",
+          ].map((name) => ({
+            name,
+            message: `请直接导入具体文件（如 ${name}/xxx），不要使用目录聚合导入——barrel 会把服务端模块带进客户端依赖图。`,
+          })),
+        },
+      ],
     },
   },
 

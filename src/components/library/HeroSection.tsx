@@ -294,18 +294,20 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
                     />
                     {/* 核心印章 */}
                     <div
-                      className={`h-1.5 w-1.5 border border-current transition-all duration-500 ${hoveredId === feature.id
+                      className={`h-1.5 w-1.5 border border-current transition-all duration-500 ${
+                        hoveredId === feature.id
                           ? `rotate-135 bg-current ${feature.textHover.replace(/group-hover:/g, "")}`
                           : `rotate-45 bg-transparent ${feature.textBase} group-active:rotate-135 group-active:bg-current`
-                        }`}
+                      }`}
                     />
                   </div>
                   {/* 标题 */}
                   <div
-                    className={`flex items-center text-[16px] font-calligraphy font-medium tracking-[0.5em] leading-none transition-all duration-500 ${hoveredId === feature.id
+                    className={`flex items-center text-[16px] font-calligraphy font-medium tracking-[0.5em] leading-none transition-all duration-500 ${
+                      hoveredId === feature.id
                         ? `${feature.textHover.replace(/group-hover:/g, "")}`
                         : `${feature.textBase} ${feature.textHover}`
-                      }`}
+                    }`}
                   >
                     {t(`featureEntrances.${feature.id}.label`)
                       .split("")

@@ -32,6 +32,17 @@ const FEATURE_ENTRANCES = [
     glow: "rgba(46,117,108,0.15)",
     offsetClass: "relative -left-[0.5px]",
   },
+  // 寻曲测验内测中，暂不开放入口；上线时取消注释并在上方引入 Compass 图标
+  // {
+  //   id: "quiz",
+  //   href: "/quiz",
+  //   icon: Compass,
+  //   textBase: "text-[#9A6B2F] dark:text-[#D4A259]",
+  //   textHover: "group-hover:text-[#6E4A1C] dark:group-hover:text-[#EACB94]",
+  //   haloBg: "bg-[#9A6B2F]/25 dark:bg-[#D4A259]/25",
+  //   glow: "rgba(154,107,47,0.15)",
+  //   offsetClass: "relative",
+  // },
 ];
 
 export default function HeroSection({ songCount }: HeroSectionProps) {
@@ -50,12 +61,9 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
     () => false,
   );
 
-  const currentText =
-    hoveredId === "qjtx"
-      ? t("featureEntrances.qjtx.desc")
-      : hoveredId === "imagery"
-        ? t("featureEntrances.imagery.desc")
-        : t("defaultDesc");
+  const currentText = hoveredId
+    ? t(`featureEntrances.${hoveredId}.desc`)
+    : t("defaultDesc");
 
   return (
     <div
@@ -87,8 +95,8 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
           </AnimatePresence>
         </h2>
 
-        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 mt-auto -mb-1 lg:-mb-1.5 min-h-[24px]">
-          <span className="text-blue-600 dark:text-blue-500 font-mono text-lg leading-none relative top-[-0.5px] md:top-[-2px] select-none">
+        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 mt-auto -mb-1 lg:-mb-1.5 min-h-6">
+          <span className="text-blue-600 dark:text-blue-500 font-mono text-lg leading-none relative top-[-0.5px] md:-top-0.5 select-none">
             &gt;
           </span>
           <AnimatePresence mode="wait">
@@ -255,9 +263,9 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
           <div className="flex items-center w-full mt-2 mb-1 opacity-80">
             <div className="flex-1 h-px bg-linear-to-r from-transparent to-slate-300 dark:to-slate-700" />
             <div className="mx-4 flex items-center justify-center gap-1.5 text-slate-400 dark:text-slate-600">
-              <div className="h-[2px] w-[2px] rounded-full bg-current" />
-              <div className="h-[4px] w-[4px] rounded-xs bg-current rotate-45" />
-              <div className="h-[2px] w-[2px] rounded-full bg-current" />
+              <div className="h-0.5 w-0.5 rounded-full bg-current" />
+              <div className="h-1 w-1 rounded-xs bg-current rotate-45" />
+              <div className="h-0.5 w-0.5 rounded-full bg-current" />
             </div>
             <div className="flex-1 h-px bg-linear-to-l from-transparent to-slate-300 dark:to-slate-700" />
           </div>

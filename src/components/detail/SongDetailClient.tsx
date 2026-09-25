@@ -585,7 +585,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
                     {/* 普通歌词 */}
                     <div
                       className={cn(
-                        "text-base/loose sm:text-lg/loose text-slate-700 dark:text-slate-300 font-light text-center",
+                        "text-base/relaxed sm:text-lg/relaxed text-slate-700 dark:text-slate-300 font-light text-center",
                         "transition-all duration-500 ease-in-out",
                         lyricsType === "normal"
                           ? "opacity-100 translate-y-0 relative"
@@ -609,7 +609,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
                     {/* LRC 歌词 */}
                     <div
                       className={cn(
-                        "text-base/loose sm:text-lg/loose text-slate-700 dark:text-slate-300 font-light text-left font-mono",
+                        "text-base/relaxed sm:text-lg/relaxed text-slate-700 dark:text-slate-300 font-light text-left font-mono",
                         "transition-all duration-500 ease-in-out",
                         lyricsType === "lrc"
                           ? "opacity-100 translate-y-0 relative"

@@ -3,6 +3,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import nodeCrypto from "crypto";
+import { fetchWithTimeout } from "@/lib/utils/utils-common";
 
 function md5(input: string): string {
   return nodeCrypto.createHash("md5").update(input, "utf8").digest("hex");
@@ -97,7 +98,11 @@ export const GET = withAuth(
         id: navidSongId,
         f: "json",
       });
-      const songInfoRes = await fetch(`${base}/rest/getSong?${songInfoParams}`);
+      const songInfoRes = await fetchWithTimeout(
+        `${base}/rest/getSong?${songInfoParams}`,
+        {},
+        5000,
+      );
       if (songInfoRes.ok) {
         const songInfo = (await songInfoRes.json()) as {
           "subsonic-response"?: { song?: { duration?: number } };

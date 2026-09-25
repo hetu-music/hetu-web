@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import { fetchWithTimeout } from "@/lib/utils/utils-common";
 
 export const GET = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
@@ -30,9 +31,8 @@ export const GET = withAuth(
       const fileUrl = `${baseUrl}/${filePath}`;
 
       // 发送HEAD请求检查文件是否存在
-      const response = await fetch(fileUrl, {
-        method: "HEAD",
-      });
+      // 只取响应头，正常应在百毫秒级返回；后台编辑时这个请求是同步阻塞的
+      const response = await fetchWithTimeout(fileUrl, { method: "HEAD" }, 5000);
 
       const exists = response.status === 200;
 

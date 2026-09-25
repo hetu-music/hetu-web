@@ -89,3 +89,21 @@ export function serializeJsonLd(data: unknown): string {
     (char) => "\\u" + char.charCodeAt(0).toString(16).padStart(4, "0"),
   );
 }
+
+// 带超时的 fetch
+//
+// 原生 fetch 不带超时：外部服务不回包时，请求会一直挂到操作系统的 TCP 超时
+// （Linux 默认两分钟以上），期间连接和内存都占着。所有对外请求都应该走这里。
+//
+// 超时抛 TimeoutError（DOMException），调用方现有的 try/catch 即可接住。
+// 调用方自己传了 signal 时以调用方的为准。
+export function fetchWithTimeout(
+  input: string | URL | Request,
+  init: RequestInit = {},
+  timeoutMs = 5000,
+): Promise<Response> {
+  return fetch(input, {
+    ...init,
+    signal: init.signal ?? AbortSignal.timeout(timeoutMs),
+  });
+}

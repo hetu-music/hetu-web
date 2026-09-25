@@ -3,6 +3,7 @@ import type {
   SearchResponse,
   SearchResultItem,
 } from "@/lib/api/api-auto-complete";
+import { fetchWithTimeout } from "@/lib/utils/utils-common";
 import { type MusicProvider, parseLyricMetadata } from "./types";
 
 // ============================================
@@ -10,6 +11,8 @@ import { type MusicProvider, parseLyricMetadata } from "./types";
 // ============================================
 
 const KUGOU_API_BASE = "http://kgmapi:3000";
+// kgmapi 自己还要回源到酷狗，留出比纯内网调用更宽的余量
+const KUGOU_TIMEOUT_MS = 8000;
 
 // ============================================
 // 内部辅助函数
@@ -23,12 +26,13 @@ const KUGOU_API_BASE = "http://kgmapi:3000";
 async function fetchLyrics(hash: string): Promise<string | null> {
   try {
     // 第一步：搜索歌词获取 candidates
-    const searchRes = await fetch(
+    const searchRes = await fetchWithTimeout(
       `${KUGOU_API_BASE}/search/lyric?hash=${hash}`,
       {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       },
+      KUGOU_TIMEOUT_MS,
     );
 
     if (!searchRes.ok) return null;
@@ -45,12 +49,13 @@ async function fetchLyrics(hash: string): Promise<string | null> {
     if (!id || !accesskey) return null;
 
     // 第二步：获取解码后的歌词
-    const lyricRes = await fetch(
+    const lyricRes = await fetchWithTimeout(
       `${KUGOU_API_BASE}/lyric?id=${id}&accesskey=${accesskey}&decode=true&fmt=lrc`,
       {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       },
+      KUGOU_TIMEOUT_MS,
     );
 
     if (!lyricRes.ok) return null;
@@ -78,10 +83,14 @@ export const kugouProvider: MusicProvider = {
       pagesize: limit.toString(),
     });
 
-    const res = await fetch(`${KUGOU_API_BASE}/search?${params}`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
+    const res = await fetchWithTimeout(
+      `${KUGOU_API_BASE}/search?${params}`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+      KUGOU_TIMEOUT_MS,
+    );
 
     if (!res.ok) throw new Error(`酷狗 API 搜索失败: ${res.status}`);
 

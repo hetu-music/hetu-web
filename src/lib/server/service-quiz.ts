@@ -9,6 +9,7 @@ import {
   evaluate,
   getDimension,
   IMAGERY_ALIAS,
+  POOL_VERSION,
   QUESTIONS,
   type MatchReason,
   type PoolRows,
@@ -54,7 +55,7 @@ const loadQuizPool = unstable_cache(
     ]);
     return buildPool({ categories, imagery, occurrences, songs });
   },
-  ["quiz-pool-v1"],
+  [`quiz-pool-v${POOL_VERSION}`],
   { revalidate: 7200, tags: ["quiz-pool"] },
 );
 

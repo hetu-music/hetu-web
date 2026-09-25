@@ -138,9 +138,45 @@ describe("questions", () => {
 });
 
 describe("buildPool", () => {
-  it("只收原创/合作、非衍生版本、标注充足的歌曲", () => {
+  it("排除翻唱、衍生版本与标注不足的歌曲", () => {
     const pool = buildPool(makeRows());
     expect(pool.map((s) => s.id)).toEqual(DIMENSIONS.map((_, i) => 100 + i));
+  });
+
+  it("除翻唱、参与外的类型及未标类型的作品都入池", () => {
+    const rows = makeRows();
+    const leaf = rows.categories.find((c) => c.level === 3)?.id ?? 0;
+    const extra: Array<[number, string[] | null]> = [
+      [910, ["参与"]],
+      [911, ["文宣"]],
+      [912, ["商业"]],
+      [913, ["墨宝"]],
+      [914, null],
+      [915, ["合作", "翻唱"]],
+    ];
+    for (const [id, type] of extra) {
+      rows.songs.push({
+        id,
+        title: `作品${id}`,
+        artist: null,
+        album: null,
+        hascover: null,
+        has_audio: null,
+        type,
+      });
+      for (let c = 0; c < 12; c += 1) {
+        rows.occurrences.push({
+          song_id: id,
+          category_id: leaf,
+          imagery_id: 2,
+          lyric_timetag: null,
+        });
+      }
+    }
+    const ids = buildPool(rows).map((s) => s.id);
+    expect(ids).toEqual(expect.arrayContaining([911, 912, 913, 914]));
+    expect(ids).not.toContain(910);
+    expect(ids).not.toContain(915);
   });
 
   it("三级分类归入维度，别名归入招牌意象", () => {

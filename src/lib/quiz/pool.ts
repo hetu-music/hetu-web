@@ -31,8 +31,13 @@ export interface PoolRows {
   }>;
 }
 
-/** 进入候选池的作品类型 */
-export const POOL_TYPES: readonly string[] = ["原创", "合作"];
+/**
+ * 不进入候选池的作品类型：翻唱、参与的歌词并非河图的创作取向。
+ * 其余类型（原创、合作、文宣、商业、墨宝）以及未标类型的作品都参与匹配。
+ */
+export const EXCLUDED_TYPES: readonly string[] = ["翻唱", "参与"];
+/** 入池规则版本：修改排除类型、标注门槛等规则时递增，使服务端缓存失效 */
+export const POOL_VERSION = 2;
 /** 意象标注少于此数的歌曲不进入候选池，画像不可靠 */
 export const MIN_OCCURRENCES = 10;
 /** 「（纯歌版）」「(DJ版)」等衍生版本与原曲意象相同，不重复入池 */
@@ -73,7 +78,7 @@ export function buildPool(rows: PoolRows): PoolSong[] {
 
   const pool: PoolSong[] = [];
   for (const song of rows.songs) {
-    if (!song.type?.some((t) => POOL_TYPES.includes(t))) continue;
+    if (song.type?.some((t) => EXCLUDED_TYPES.includes(t))) continue;
     if (VARIANT_TITLE.test(song.title)) continue;
     const occs = occBySong.get(song.id) ?? [];
     if (occs.length < MIN_OCCURRENCES) continue;

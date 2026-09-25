@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@/lib/utils/utils-common";
+
 /**
  * Magic Number 定义 - 用于验证文件的真实类型
  * 通过读取文件的前几个字节来判断文件的真实格式
@@ -125,6 +127,9 @@ export interface UploadConfig {
   baseUrl: string; // 基础URL
 }
 
+// 要把整个文件体传完，比其他对外请求宽松得多
+const UPLOAD_TIMEOUT_MS = 30000;
+
 export const coverUploadConfig: UploadConfig = {
   maxFileSize: 100 * 1024 * 1024,
   allowedTypes: ["image/jpeg", "image/jpg"],
@@ -158,13 +163,17 @@ export async function uploadCoverFile(
     const uploadUrl = `${config.baseUrl}/${fileName}`;
 
     // 直接上传到R2存储
-    const response = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "image/jpeg",
+    const response = await fetchWithTimeout(
+      uploadUrl,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "image/jpeg",
+        },
+        body: new Uint8Array(buffer),
       },
-      body: new Uint8Array(buffer),
-    });
+      UPLOAD_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       // 尝试解析错误响应
@@ -220,13 +229,17 @@ export async function uploadScoreFile(
     const uploadUrl = `${config.baseUrl}/${fileName}`;
 
     // 直接上传到R2存储
-    const response = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "image/png",
+    const response = await fetchWithTimeout(
+      uploadUrl,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "image/png",
+        },
+        body: new Uint8Array(buffer),
       },
-      body: new Uint8Array(buffer),
-    });
+      UPLOAD_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       // 尝试解析错误响应

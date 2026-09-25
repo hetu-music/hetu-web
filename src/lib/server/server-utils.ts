@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import { cookies as nextCookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/lib/utils/utils-common";
+
+// 两家 CDN 的刷新接口串在发布流程的 Promise.all 上，卡住就卡住整个发布
+const PURGE_TIMEOUT_MS = 10000;
 
 const CSRF_COOKIE_NAME = "csrf-token";
 const CSRF_HEADER_NAME = "x-csrf-token";
@@ -161,7 +165,7 @@ export async function verifyTurnstileToken(
 
   try {
     // 调用 Cloudflare Turnstile API 验证
-    const verifyResponse = await fetch(
+    const verifyResponse = await fetchWithTimeout(
       "https://challenges.cloudflare.com/turnstile/v0/siteverify",
       {
         method: "POST",
@@ -173,6 +177,8 @@ export async function verifyTurnstileToken(
           response: token,
         }),
       },
+      // 用户正卡在表单提交上等这个结果
+      5000,
     );
 
     const verifyData = await verifyResponse.json();
@@ -219,7 +225,7 @@ export async function purgeCloudflareCache(paths: string[]) {
   });
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`,
       {
         method: "POST",
@@ -229,6 +235,7 @@ export async function purgeCloudflareCache(paths: string[]) {
         },
         body: JSON.stringify({ files: urls }),
       },
+      PURGE_TIMEOUT_MS,
     );
 
     if (!res.ok) {
@@ -324,19 +331,23 @@ export async function purgeEdgeOneCache(paths: string[]) {
     // 4. 构建 Authorization 头部
     const authorization = `TC3-HMAC-SHA256 Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
-    const res = await fetch(`https://${host}`, {
-      method: "POST",
-      headers: {
-        Authorization: authorization,
-        "Content-Type": "application/json; charset=utf-8",
-        Host: host,
-        "X-TC-Action": action,
-        "X-TC-Version": version,
-        "X-TC-Timestamp": String(timestamp),
-        "X-TC-Region": region,
+    const res = await fetchWithTimeout(
+      `https://${host}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: authorization,
+          "Content-Type": "application/json; charset=utf-8",
+          Host: host,
+          "X-TC-Action": action,
+          "X-TC-Version": version,
+          "X-TC-Timestamp": String(timestamp),
+          "X-TC-Region": region,
+        },
+        body: JSON.stringify(payload),
       },
-      body: JSON.stringify(payload),
-    });
+      PURGE_TIMEOUT_MS,
+    );
 
     const resData = await res.json();
     if (resData.Response?.Error) {

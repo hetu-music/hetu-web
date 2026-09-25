@@ -3,6 +3,7 @@ import type {
   SearchResponse,
   SearchResultItem,
 } from "@/lib/api/api-auto-complete";
+import { fetchWithTimeout } from "@/lib/utils/utils-common";
 import {
   type MusicProvider,
   msToSeconds,
@@ -15,6 +16,8 @@ import {
 // ============================================
 
 const HETU_API_BASE = "http://ncmapi:3000";
+// ncmapi 自己还要回源到网易云，留出比纯内网调用更宽的余量
+const NETEASE_TIMEOUT_MS = 8000;
 
 // ============================================
 // 内部辅助函数
@@ -30,10 +33,14 @@ async function fetchLyrics(id: number): Promise<{
   arranger: string[] | null;
 }> {
   try {
-    const res = await fetch(`${HETU_API_BASE}/lyric?id=${id}&randomCNIP=true`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
+    const res = await fetchWithTimeout(
+      `${HETU_API_BASE}/lyric?id=${id}&randomCNIP=true`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+      NETEASE_TIMEOUT_MS,
+    );
 
     if (!res.ok)
       return { lyric: null, lyricist: null, composer: null, arranger: null };
@@ -66,12 +73,13 @@ export const neteaseProvider: MusicProvider = {
       type: "1", // 单曲搜索
     });
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${HETU_API_BASE}/cloudsearch?${params}&randomCNIP=true`,
       {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       },
+      NETEASE_TIMEOUT_MS,
     );
 
     if (!res.ok) throw new Error(`Hetu API 搜索失败: ${res.status}`);

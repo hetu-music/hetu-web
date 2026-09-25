@@ -585,7 +585,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
                     {/* 普通歌词 */}
                     <div
                       className={cn(
-                        "leading-loose text-base sm:text-lg text-slate-700 dark:text-slate-300 font-light text-center",
+                        "text-base/loose sm:text-lg/loose text-slate-700 dark:text-slate-300 font-light text-center",
                         "transition-all duration-500 ease-in-out",
                         lyricsType === "normal"
                           ? "opacity-100 translate-y-0 relative"
@@ -609,7 +609,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
                     {/* LRC 歌词 */}
                     <div
                       className={cn(
-                        "leading-loose text-base sm:text-lg text-slate-700 dark:text-slate-300 font-light text-left font-mono",
+                        "text-base/loose sm:text-lg/loose text-slate-700 dark:text-slate-300 font-light text-left font-mono",
                         "transition-all duration-500 ease-in-out",
                         lyricsType === "lrc"
                           ? "opacity-100 translate-y-0 relative"
@@ -625,7 +625,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({ song }) => {
                           // 悬挂缩进：折行部分对齐到时间戳之后，而不是顶回最左侧
                           <p
                             key={i}
-                            className="text-balance pl-[10ch] -indent-[10ch]"
+                            className="text-balance pl-[10ch] indent-[-10ch]"
                           >
                             {line}
                           </p>

@@ -16,7 +16,8 @@
     "format:check": "prettier --check \"src/**/*.{js,ts,jsx,tsx,json,css,scss}\" \"scripts/**/*.{js,ts}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "quiz:diagnose": "tsx --env-file=.env.local scripts/quiz-diagnose.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

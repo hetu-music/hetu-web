@@ -2,7 +2,7 @@
 
 import { Link } from "@/i18n/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Scroll, Sparkles } from "lucide-react";
+import { Compass, Scroll, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useSyncExternalStore } from "react";
 
@@ -32,6 +32,16 @@ const FEATURE_ENTRANCES = [
     glow: "rgba(46,117,108,0.15)",
     offsetClass: "relative -left-[0.5px]",
   },
+  {
+    id: "quiz",
+    href: "/quiz",
+    icon: Compass,
+    textBase: "text-[#9A6B2F] dark:text-[#D4A259]",
+    textHover: "group-hover:text-[#6E4A1C] dark:group-hover:text-[#EACB94]",
+    haloBg: "bg-[#9A6B2F]/25 dark:bg-[#D4A259]/25",
+    glow: "rgba(154,107,47,0.15)",
+    offsetClass: "relative",
+  },
 ];
 
 export default function HeroSection({ songCount }: HeroSectionProps) {
@@ -50,12 +60,9 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
     () => false,
   );
 
-  const currentText =
-    hoveredId === "qjtx"
-      ? t("featureEntrances.qjtx.desc")
-      : hoveredId === "imagery"
-        ? t("featureEntrances.imagery.desc")
-        : t("defaultDesc");
+  const currentText = hoveredId
+    ? t(`featureEntrances.${hoveredId}.desc`)
+    : t("defaultDesc");
 
   return (
     <div

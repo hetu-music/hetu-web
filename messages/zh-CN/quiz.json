@@ -1,0 +1,29 @@
+{
+  "title": "寻曲",
+  "metaDescription": "十二问，从河图 {count} 首作品的意象里，寻一首懂你的歌。",
+  "resultMetaDescription": "我的气韵是「{motto}」。来寻一首懂你的河图作品。",
+  "intro": {
+    "eyebrow": "以意象问心",
+    "subtitle": "十二问，于 {count} 首歌中，寻一首懂你的",
+    "note": "题目没有对错。凭第一眼的直觉作答即可。",
+    "start": "启程"
+  },
+  "question": {
+    "progress": "第 {current} 问 · 共 {total} 问",
+    "prev": "上一问",
+    "finishing": "寻曲中……"
+  },
+  "result": {
+    "eyebrow": "你的气韵",
+    "secondary": "兼有 · {motto}",
+    "imagery": "你偏爱的意象",
+    "profile": "意象倾向",
+    "matches": "为你寻得",
+    "match": "契合",
+    "reasons": "同好：{reasons}",
+    "retry": "再寻一次",
+    "share": "复制结果链接",
+    "copied": "已复制",
+    "method": "根据河图作品中的意象标注计算，仅供娱乐。"
+  }
+}

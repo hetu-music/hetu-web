@@ -1,0 +1,114 @@
+import {
+  CATEGORY_TO_DIMENSION,
+  DIMENSION_KEYS,
+  IMAGERY_ALIAS,
+} from "./dimensions";
+import type { DimensionKey, PoolSong } from "./types";
+
+/** 候选池的原始数据行，字段与数据库表一致 */
+export interface PoolRows {
+  categories: Array<{
+    id: number;
+    name: string;
+    parent_id: number | null;
+    level: number | null;
+  }>;
+  imagery: Array<{ id: number; name: string }>;
+  occurrences: Array<{
+    song_id: number;
+    category_id: number;
+    imagery_id: number;
+    lyric_timetag: string[] | null;
+  }>;
+  songs: Array<{
+    id: number;
+    title: string;
+    artist: string[] | null;
+    album: string | null;
+    hascover: boolean | null;
+    has_audio: boolean | null;
+    type: string[] | null;
+  }>;
+}
+
+/** 进入候选池的作品类型 */
+export const POOL_TYPES: readonly string[] = ["原创", "合作"];
+/** 意象标注少于此数的歌曲不进入候选池，画像不可靠 */
+export const MIN_OCCURRENCES = 10;
+/** 「（纯歌版）」「(DJ版)」等衍生版本与原曲意象相同，不重复入池 */
+const VARIANT_TITLE = /[（(][^（）()]*版[）)]/;
+
+function emptyDimCounts(): Record<DimensionKey, number> {
+  return Object.fromEntries(DIMENSION_KEYS.map((k) => [k, 0])) as Record<
+    DimensionKey,
+    number
+  >;
+}
+
+/**
+ * 把意象标注聚合为候选池。意象挂在三级分类上，向上找到二级分类后映射到维度。
+ */
+export function buildPool(rows: PoolRows): PoolSong[] {
+  const categoryById = new Map(rows.categories.map((c) => [c.id, c]));
+  const dimOfCategory = new Map<number, DimensionKey | null>();
+  const resolveDim = (categoryId: number): DimensionKey | null => {
+    const cached = dimOfCategory.get(categoryId);
+    if (cached !== undefined) return cached;
+    let cat = categoryById.get(categoryId);
+    while (cat && (cat.level ?? 0) > 2 && cat.parent_id !== null) {
+      cat = categoryById.get(cat.parent_id);
+    }
+    const dim = cat ? (CATEGORY_TO_DIMENSION.get(cat.name) ?? null) : null;
+    dimOfCategory.set(categoryId, dim);
+    return dim;
+  };
+
+  const imageryName = new Map(rows.imagery.map((i) => [i.id, i.name]));
+  const occBySong = new Map<number, PoolRows["occurrences"]>();
+  for (const occ of rows.occurrences) {
+    const list = occBySong.get(occ.song_id);
+    if (list) list.push(occ);
+    else occBySong.set(occ.song_id, [occ]);
+  }
+
+  const pool: PoolSong[] = [];
+  for (const song of rows.songs) {
+    if (!song.type?.some((t) => POOL_TYPES.includes(t))) continue;
+    if (VARIANT_TITLE.test(song.title)) continue;
+    const occs = occBySong.get(song.id) ?? [];
+    if (occs.length < MIN_OCCURRENCES) continue;
+
+    const dimCounts = emptyDimCounts();
+    const imageryCounts: Record<string, number> = {};
+    const occurrences: PoolSong["occurrences"] = [];
+    for (const occ of occs) {
+      const dim = resolveDim(occ.category_id);
+      if (dim) dimCounts[dim] += 1;
+      const name = imageryName.get(occ.imagery_id) ?? "";
+      const signature = IMAGERY_ALIAS.get(name);
+      if (signature) {
+        imageryCounts[signature] = (imageryCounts[signature] ?? 0) + 1;
+      }
+      occurrences.push({
+        dim,
+        imagery: name,
+        timetag: occ.lyric_timetag?.[0] ?? null,
+      });
+    }
+
+    pool.push({
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      hascover: song.hascover,
+      hasAudio: song.has_audio ?? false,
+      total: occs.length,
+      dimCounts,
+      imageryCounts,
+      occurrences,
+    });
+  }
+
+  return pool.sort((a, b) => a.id - b.id);
+}

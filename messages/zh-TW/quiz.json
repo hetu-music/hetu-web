@@ -1,0 +1,29 @@
+{
+  "title": "尋曲",
+  "metaDescription": "十二問，從河圖 {count} 首作品的意象裡，尋一首懂你的歌。",
+  "resultMetaDescription": "我的氣韻是「{motto}」。來尋一首懂你的河圖作品。",
+  "intro": {
+    "eyebrow": "以意象問心",
+    "subtitle": "十二問，於 {count} 首歌中，尋一首懂你的",
+    "note": "題目沒有對錯。憑第一眼的直覺作答即可。",
+    "start": "啟程"
+  },
+  "question": {
+    "progress": "第 {current} 問 · 共 {total} 問",
+    "prev": "上一問",
+    "finishing": "尋曲中……"
+  },
+  "result": {
+    "eyebrow": "你的氣韻",
+    "secondary": "兼有 · {motto}",
+    "imagery": "你偏愛的意象",
+    "profile": "意象傾向",
+    "matches": "為你尋得",
+    "match": "契合",
+    "reasons": "同好：{reasons}",
+    "retry": "再尋一次",
+    "share": "複製結果連結",
+    "copied": "已複製",
+    "method": "根據河圖作品中的意象標註計算，僅供娛樂。"
+  }
+}

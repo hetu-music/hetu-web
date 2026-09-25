@@ -2,7 +2,7 @@
 
 import { Link } from "@/i18n/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Compass, Scroll, Sparkles } from "lucide-react";
+import { Scroll, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useSyncExternalStore } from "react";
 
@@ -32,16 +32,17 @@ const FEATURE_ENTRANCES = [
     glow: "rgba(46,117,108,0.15)",
     offsetClass: "relative -left-[0.5px]",
   },
-  {
-    id: "quiz",
-    href: "/quiz",
-    icon: Compass,
-    textBase: "text-[#9A6B2F] dark:text-[#D4A259]",
-    textHover: "group-hover:text-[#6E4A1C] dark:group-hover:text-[#EACB94]",
-    haloBg: "bg-[#9A6B2F]/25 dark:bg-[#D4A259]/25",
-    glow: "rgba(154,107,47,0.15)",
-    offsetClass: "relative",
-  },
+  // 寻曲测验内测中，暂不开放入口；上线时取消注释并在上方引入 Compass 图标
+  // {
+  //   id: "quiz",
+  //   href: "/quiz",
+  //   icon: Compass,
+  //   textBase: "text-[#9A6B2F] dark:text-[#D4A259]",
+  //   textHover: "group-hover:text-[#6E4A1C] dark:group-hover:text-[#EACB94]",
+  //   haloBg: "bg-[#9A6B2F]/25 dark:bg-[#D4A259]/25",
+  //   glow: "rgba(154,107,47,0.15)",
+  //   offsetClass: "relative",
+  // },
 ];
 
 export default function HeroSection({ songCount }: HeroSectionProps) {

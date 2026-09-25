@@ -18,6 +18,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    // 内测期间不进入搜索引擎索引，正式上线时移除
+    robots: { index: false, follow: true },
     alternates: {
       canonical: `https://hetu-music.com/${locale}/quiz`,
       languages: {

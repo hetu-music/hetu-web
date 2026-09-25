@@ -29,8 +29,10 @@ import { toTraditional } from "@/lib/utils/utils-convert";
  */
 const loadQuizPool = unstable_cache(
   async (): Promise<PoolSong[]> => {
+    // 失败时一律抛错而不返回空数组：unstable_cache 不缓存异常，
+    // 否则一次查询失败会让残缺的候选池被缓存 2 小时
     const supabase = getServiceClient();
-    if (!supabase) return [];
+    if (!supabase) throw new Error("Supabase 未配置");
     const [categories, imagery, occurrences, songs] = await Promise.all([
       fetchAll<PoolRows["categories"][number]>(
         supabase,
@@ -53,7 +55,16 @@ const loadQuizPool = unstable_cache(
         "id,title,artist,album,hascover,has_audio,type",
       ),
     ]);
-    return buildPool({ categories, imagery, occurrences, songs });
+    // fetchAll 出错时只记日志并返回已取到的部分，这里至少拦住整表为空的情况
+    const empty = Object.entries({ categories, imagery, occurrences, songs })
+      .filter(([, rows]) => rows.length === 0)
+      .map(([name]) => name);
+    if (empty.length > 0) {
+      throw new Error(`候选池数据为空：${empty.join(", ")}`);
+    }
+    const pool = buildPool({ categories, imagery, occurrences, songs });
+    if (pool.length === 0) throw new Error("候选池为空");
+    return pool;
   },
   [`quiz-pool-v${POOL_VERSION}`],
   { revalidate: 7200, tags: ["quiz-pool"] },

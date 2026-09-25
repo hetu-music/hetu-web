@@ -32,7 +32,11 @@ export const GET = withAuth(
 
       // 发送HEAD请求检查文件是否存在
       // 只取响应头，正常应在百毫秒级返回；后台编辑时这个请求是同步阻塞的
-      const response = await fetchWithTimeout(fileUrl, { method: "HEAD" }, 5000);
+      const response = await fetchWithTimeout(
+        fileUrl,
+        { method: "HEAD" },
+        5000,
+      );
 
       const exists = response.status === 200;
 

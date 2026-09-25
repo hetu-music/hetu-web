@@ -95,8 +95,8 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
           </AnimatePresence>
         </h2>
 
-        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 mt-auto -mb-1 lg:-mb-1.5 min-h-[24px]">
-          <span className="text-blue-600 dark:text-blue-500 font-mono text-lg leading-none relative top-[-0.5px] md:top-[-2px] select-none">
+        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 mt-auto -mb-1 lg:-mb-1.5 min-h-6">
+          <span className="text-blue-600 dark:text-blue-500 font-mono text-lg leading-none relative top-[-0.5px] md:-top-0.5 select-none">
             &gt;
           </span>
           <AnimatePresence mode="wait">
@@ -263,9 +263,9 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
           <div className="flex items-center w-full mt-2 mb-1 opacity-80">
             <div className="flex-1 h-px bg-linear-to-r from-transparent to-slate-300 dark:to-slate-700" />
             <div className="mx-4 flex items-center justify-center gap-1.5 text-slate-400 dark:text-slate-600">
-              <div className="h-[2px] w-[2px] rounded-full bg-current" />
-              <div className="h-[4px] w-[4px] rounded-xs bg-current rotate-45" />
-              <div className="h-[2px] w-[2px] rounded-full bg-current" />
+              <div className="h-0.5 w-0.5 rounded-full bg-current" />
+              <div className="h-1 w-1 rounded-xs bg-current rotate-45" />
+              <div className="h-0.5 w-0.5 rounded-full bg-current" />
             </div>
             <div className="flex-1 h-px bg-linear-to-l from-transparent to-slate-300 dark:to-slate-700" />
           </div>
@@ -294,20 +294,18 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
                     />
                     {/* 核心印章 */}
                     <div
-                      className={`h-1.5 w-1.5 border border-current transition-all duration-500 ${
-                        hoveredId === feature.id
+                      className={`h-1.5 w-1.5 border border-current transition-all duration-500 ${hoveredId === feature.id
                           ? `rotate-135 bg-current ${feature.textHover.replace(/group-hover:/g, "")}`
                           : `rotate-45 bg-transparent ${feature.textBase} group-active:rotate-135 group-active:bg-current`
-                      }`}
+                        }`}
                     />
                   </div>
                   {/* 标题 */}
                   <div
-                    className={`flex items-center text-[16px] font-calligraphy font-medium tracking-[0.5em] leading-none transition-all duration-500 ${
-                      hoveredId === feature.id
+                    className={`flex items-center text-[16px] font-calligraphy font-medium tracking-[0.5em] leading-none transition-all duration-500 ${hoveredId === feature.id
                         ? `${feature.textHover.replace(/group-hover:/g, "")}`
                         : `${feature.textBase} ${feature.textHover}`
-                    }`}
+                      }`}
                   >
                     {t(`featureEntrances.${feature.id}.label`)
                       .split("")

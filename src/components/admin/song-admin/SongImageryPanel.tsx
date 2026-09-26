@@ -3,7 +3,10 @@
 import { AlertCircle, Loader2, Pencil, Sparkles, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
-import type { ImagerySuggestion } from "@/lib/imagery/suggest";
+import {
+  type ImagerySuggestion,
+  RECOMMEND_THRESHOLD,
+} from "@/lib/imagery/suggest";
 import { MIN_OCCURRENCES } from "@/lib/quiz/pool";
 import type {
   CategoryOption,
@@ -107,6 +110,35 @@ function NameEditor({
   );
 }
 
+/** 历史标注情况：其他已标注的歌里，歌词含这个词的有几首、其中几首标注了它 */
+function HistoryBadge({ suggestion }: { suggestion: ImagerySuggestion }) {
+  const { name, seen, annotated, rate } = suggestion;
+  const threshold = Math.round(RECOMMEND_THRESHOLD * 100);
+  const coveredByLonger =
+    !suggestion.recommended &&
+    suggestion.categoryIds.length > 0 &&
+    (rate === null || rate >= RECOMMEND_THRESHOLD);
+  const title = [
+    rate === null
+      ? `其他已标注的歌里，歌词都没有出现「${name}」，无从参考`
+      : `其他已标注的歌里，歌词含「${name}」的有 ${seen} 首，其中 ${annotated} 首标注了它（${Math.round(rate * 100)}%）。达到 ${threshold}% 默认勾选`,
+    coveredByLonger &&
+      `这首歌里「${name}」每次都出现在更长的意象里（如「明月」之于「月」），所以默认不勾选`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return (
+    <span
+      title={title}
+      className="ml-auto shrink-0 text-[11px] text-slate-400 dark:text-slate-500"
+    >
+      {rate === null
+        ? "其他歌未出现"
+        : `出现 ${seen} 首 · 标注 ${annotated} 首`}
+    </span>
+  );
+}
+
 function SuggestionRow({
   suggestion,
   draft,
@@ -161,7 +193,7 @@ function SuggestionRow({
             listId={dictionaryListId}
             onCommit={onRename}
           />
-          {renamed ? (
+          {renamed && (
             <button
               type="button"
               onClick={() => onRename(suggestion.name)}
@@ -171,15 +203,6 @@ function SuggestionRow({
               <Undo2 size={11} />
               原：{suggestion.name}
             </button>
-          ) : (
-            <span
-              className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-              title="其他已标注歌曲中：歌词出现该意象的歌曲里，有多少首标注了它"
-            >
-              {suggestion.seen > 0
-                ? `历史 ${suggestion.annotated}/${suggestion.seen}`
-                : "无历史"}
-            </span>
           )}
           {!resolved && (
             <span
@@ -204,6 +227,8 @@ function SuggestionRow({
             labelById={labelById}
             onChange={(categoryId) => onUpdate({ categoryId })}
           />
+          {/* 统计的是原候选词；改名后不再适用 */}
+          {!renamed && <HistoryBadge suggestion={suggestion} />}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {suggestion.timetags.map((tag, i) => {
@@ -373,7 +398,7 @@ export default function SongImageryPanel({
             <>
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>
-                  推荐 {recommended.length} 个（按历史标注率默认勾选）
+                  推荐 {recommended.length} 个（其他歌里常被标注的默认勾选）
                 </span>
                 {recommended.length > 0 && (
                   <button
@@ -395,7 +420,8 @@ export default function SongImageryPanel({
               {others.length > 0 && (
                 <details className="group">
                   <summary className="cursor-pointer select-none text-xs text-slate-400 hover:text-slate-600">
-                    其他候选 {others.length} 个（历史上很少被标注，默认不勾选）
+                    其他候选 {others.length}{" "}
+                    个（其他歌里很少被标注，或被更长的意象包含，默认不勾选）
                   </summary>
                   <div className="mt-2 space-y-2">{renderRows(others)}</div>
                 </details>

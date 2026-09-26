@@ -16,6 +16,14 @@ export interface CategoryOption {
   label: string;
 }
 
+/** 词典条目，供审核时把候选改成另一个意象 */
+export interface DictionaryOption {
+  id: number;
+  name: string;
+  /** 历史上使用过的分类，按使用次数从多到少 */
+  categoryIds: number[];
+}
+
 export interface ImagerySuggestionsResult {
   /** 歌曲是否已发布到正式曲库；未发布时标注无法保存 */
   published: boolean;
@@ -23,6 +31,7 @@ export interface ImagerySuggestionsResult {
   suggestions: ImagerySuggestion[];
   /** 可挂载意象的叶子分类，用于候选改分类 */
   categories: CategoryOption[];
+  dictionary: DictionaryOption[];
 }
 
 type CategoryRow = {
@@ -117,5 +126,10 @@ export async function getImagerySuggestions(
       existingImageryIds,
     }),
     categories: toLeafOptions(categories),
+    dictionary: dictionary.map((d) => ({
+      id: d.id,
+      name: d.name,
+      categoryIds: priors.get(d.id)?.categoryIds ?? [],
+    })),
   };
 }

@@ -5,22 +5,28 @@ import { createOccurrencesBatch } from "@/lib/server/service-imagery";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { lyricTimetagPattern } from "@/lib/forms/imagery-form";
 
+const timetags = z.array(z.string().regex(lyricTimetagPattern)).max(50);
+
 const BatchSchema = z.object({
   song_id: z.number().int().positive(),
   items: z
     .array(
-      z.object({
-        imagery_id: z.number().int().positive(),
-        category_id: z.number().int().positive(),
-        lyric_timetag: z.array(z.string().regex(lyricTimetagPattern)).max(50),
-      }),
+      z.union([
+        z.object({
+          imagery_id: z.number().int().positive(),
+          category_id: z.number().int().positive(),
+          lyric_timetag: timetags,
+        }),
+        // 审核时改成了词典里没有的意象，保存时创建
+        z.object({
+          imagery_name: z.string().trim().min(1).max(50),
+          category_id: z.number().int().positive(),
+          lyric_timetag: timetags,
+        }),
+      ]),
     )
     .min(1)
-    .max(200)
-    .refine(
-      (items) => new Set(items.map((i) => i.imagery_id)).size === items.length,
-      "同一意象不能重复提交",
-    ),
+    .max(200),
 });
 
 /** 批量新增一首歌的意象标注：POST /api/admin/occurrences/batch */

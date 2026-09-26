@@ -1,5 +1,6 @@
 // Admin 管理页面 API 封装
 import type { Song, UserRecord, UserUpdatePayload } from "@/lib/types";
+import type { OccurrenceBatchItem } from "@/lib/server/service-imagery";
 import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
 
 // 新增歌曲
@@ -340,13 +341,9 @@ export async function apiGetImagerySuggestions(
 
 export async function apiCreateOccurrencesBatch(
   songId: number,
-  items: Array<{
-    imagery_id: number;
-    category_id: number;
-    lyric_timetag: string[];
-  }>,
+  items: OccurrenceBatchItem[],
   csrfToken: string,
-): Promise<{ created: number; skipped: number }> {
+): Promise<{ created: number; skipped: number; newImagery: number }> {
   const res = await fetch("/api/admin/occurrences/batch", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },

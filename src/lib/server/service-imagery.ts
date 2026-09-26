@@ -443,26 +443,99 @@ export async function createOccurrence(
   );
 }
 
+/** 批量标注的单项：imagery_id 指向已有意象，或 imagery_name 给出新意象名（保存时创建） */
+export type OccurrenceBatchItem = {
+  category_id: number;
+  lyric_timetag: string[];
+} & ({ imagery_id: number } | { imagery_name: string });
+
+function songNotPublished() {
+  return Object.assign(new Error("歌曲尚未发布，发布后才能保存意象标注"), {
+    code: "SONG_NOT_PUBLISHED",
+  });
+}
+
 /**
  * 为一首歌批量新增意象标注（预标注审核后一次提交）。
- * 该歌已标注过的意象会被跳过，避免重复提交或并发编辑产生重复行。
+ *
+ * - 新意象名若已存在同名意象则直接复用，否则创建；创建前先确认歌曲已发布，避免留下孤立意象
+ * - 解析后指向同一意象的多项合并为一条（时间标签取并集、分类取第一项）
+ * - 该歌已标注过的意象会被跳过，避免重复提交或并发编辑产生重复行
  */
 export async function createOccurrencesBatch(
   songId: number,
-  items: Array<{
-    imagery_id: number;
-    category_id: number;
-    lyric_timetag: string[];
-  }>,
+  items: OccurrenceBatchItem[],
   accessToken: string,
-): Promise<{ created: number; skipped: number }> {
-  if (items.length === 0) return { created: 0, skipped: 0 };
+): Promise<{ created: number; skipped: number; newImagery: number }> {
+  if (items.length === 0) return { created: 0, skipped: 0, newImagery: 0 };
   await assertLeafCategory(
     [...new Set(items.map((i) => i.category_id))],
     accessToken,
   );
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
+
+  const { data: song, error: songError } = await supabase
+    .from(TABLES.MUSIC)
+    .select("id")
+    .eq("id", songId)
+    .maybeSingle();
+  if (songError) throw songError;
+  if (!song) throw songNotPublished();
+
+  // ── 新意象名 → id ──
+  const names = [
+    ...new Set(
+      items.flatMap((i) => ("imagery_name" in i ? [i.imagery_name] : [])),
+    ),
+  ];
+  const idByName = new Map<string, number>();
+  let newImagery = 0;
+  if (names.length > 0) {
+    const { data: found, error: findError } = await supabase
+      .from(TABLES.IMAGERY)
+      .select("id,name")
+      .in("name", names);
+    if (findError) throw findError;
+    for (const row of (found ?? []) as { id: number; name: string }[]) {
+      idByName.set(row.name, row.id);
+    }
+    const missing = names.filter((n) => !idByName.has(n));
+    if (missing.length > 0) {
+      const { data: created, error: createError } = await supabase
+        .from(TABLES.IMAGERY)
+        .insert(missing.map((name) => ({ name })))
+        .select("id,name");
+      if (createError) throw createError;
+      for (const row of (created ?? []) as { id: number; name: string }[]) {
+        idByName.set(row.name, row.id);
+      }
+      newImagery = missing.length;
+    }
+  }
+
+  // ── 按意象合并 ──
+  const merged = new Map<
+    number,
+    { imagery_id: number; category_id: number; lyric_timetag: string[] }
+  >();
+  for (const item of items) {
+    const imageryId =
+      "imagery_id" in item ? item.imagery_id : idByName.get(item.imagery_name);
+    if (imageryId === undefined) throw new Error("意象创建失败");
+    const prev = merged.get(imageryId);
+    if (prev) {
+      prev.lyric_timetag = [
+        ...new Set([...prev.lyric_timetag, ...item.lyric_timetag]),
+      ];
+    } else {
+      merged.set(imageryId, {
+        imagery_id: imageryId,
+        category_id: item.category_id,
+        lyric_timetag: [...item.lyric_timetag],
+      });
+    }
+  }
 
   const { data: existing, error: existingError } = await supabase
     .from(TABLES.IMAGERY_OCC)
@@ -472,22 +545,21 @@ export async function createOccurrencesBatch(
   const taken = new Set(
     ((existing ?? []) as { imagery_id: number }[]).map((r) => r.imagery_id),
   );
-  const rows = items
+  const rows = [...merged.values()]
     .filter((item) => !taken.has(item.imagery_id))
     .map((item) => ({ ...item, song_id: songId, meaning_id: null }));
-  if (rows.length === 0) return { created: 0, skipped: items.length };
+  const skipped = merged.size - rows.length;
+  if (rows.length === 0) return { created: 0, skipped, newImagery };
 
   const { error } = await supabase.from(TABLES.IMAGERY_OCC).insert(rows);
   if (error) {
-    // song_id 外键指向正式曲库，只在暂存表里的新歌无法挂标注
+    // 上面已确认歌曲存在；这里兜底发布状态在两次请求之间变化的情况
     if (error.code === "23503" && error.message.includes("song_id")) {
-      throw Object.assign(new Error("歌曲尚未发布，发布后才能保存意象标注"), {
-        code: "SONG_NOT_PUBLISHED",
-      });
+      throw songNotPublished();
     }
     throw error;
   }
-  return { created: rows.length, skipped: items.length - rows.length };
+  return { created: rows.length, skipped, newImagery };
 }
 
 export async function updateOccurrence(

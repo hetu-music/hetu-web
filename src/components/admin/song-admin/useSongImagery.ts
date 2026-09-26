@@ -1,18 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   apiCreateOccurrencesBatch,
   apiGetImagerySuggestions,
   apiGetOccurrencesForSong,
 } from "@/lib/api/client-api";
 import type { ImagerySuggestion } from "@/lib/imagery/suggest";
-import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
+import type {
+  OccurrenceBatchItem,
+  OccurrenceWithSong,
+} from "@/lib/server/service-imagery";
+import type {
+  DictionaryOption,
+  ImagerySuggestionsResult,
+} from "@/lib/server/service-imagery-suggest";
 
 /** 单个候选的审核状态 */
 export interface SuggestionDraft {
   checked: boolean;
+  /** 保存时使用的意象名，默认为候选原名，审核时可改 */
+  name: string;
   categoryId: number | null;
   /** 取消勾选的时间标签 */
   excludedTags: string[];
@@ -23,10 +31,13 @@ export type PanelMessage = { type: "success" | "error"; text: string };
 function initialDraft(s: ImagerySuggestion): SuggestionDraft {
   return {
     checked: s.recommended,
+    name: s.name,
     categoryId: s.categoryIds[0] ?? null,
     excludedTags: [],
   };
 }
+
+const IMAGERY_NAME_MAX = 50;
 
 /**
  * 歌曲管理中单首歌的意象标注：加载已有标注、生成预标注候选、审核后批量保存。
@@ -116,30 +127,74 @@ export function useSongImagery(songId: number, csrfToken: string) {
     });
   }, []);
 
+  /** 意象名（小写）→ 词典条目；与预标注的匹配规则一致，大小写不敏感 */
+  const dictionaryByName = useMemo(
+    () =>
+      new Map((result?.dictionary ?? []).map((d) => [d.name.toLowerCase(), d])),
+    [result],
+  );
+  const resolveName = useCallback(
+    (name: string): DictionaryOption | null =>
+      dictionaryByName.get(name.trim().toLowerCase()) ?? null,
+    [dictionaryByName],
+  );
+  const existingImageryIds = useMemo(
+    () => new Set((existing ?? []).map((o) => o.imagery_id)),
+    [existing],
+  );
+
+  /**
+   * 把候选改成另一个意象。改成词典里已有的意象时，分类切换为它最常用的分类；
+   * 新意象或没有历史分类的意象沿用当前分类（改名多为近义替换，如「雪花」→「雪」）。
+   */
+  const rename = useCallback(
+    (imageryId: number, name: string) => {
+      const entry = resolveName(name);
+      setDrafts((current) => {
+        const draft = current[imageryId];
+        return {
+          ...current,
+          [imageryId]: {
+            ...draft,
+            name: name.trim(),
+            checked: true,
+            categoryId: entry?.categoryIds[0] ?? draft.categoryId,
+          },
+        };
+      });
+    },
+    [resolveName],
+  );
+
   const selected = (result?.suggestions ?? []).filter(
     (s) => drafts[s.imageryId]?.checked,
   );
 
   const save = useCallback(async () => {
     if (!result || saving) return;
-    const items: Array<{
-      imagery_id: number;
-      category_id: number;
-      lyric_timetag: string[];
-    }> = [];
+    const items: OccurrenceBatchItem[] = [];
     for (const s of selected) {
       const draft = drafts[s.imageryId];
       const tags = s.timetags.filter((t) => !draft.excludedTags.includes(t));
+      const name = draft.name.trim();
+      if (!name || name.length > IMAGERY_NAME_MAX) {
+        setMessage({
+          type: "error",
+          text: `「${s.name}」的意象名需为 1–${IMAGERY_NAME_MAX} 个字`,
+        });
+        return;
+      }
       if (draft.categoryId === null) {
-        setMessage({ type: "error", text: `「${s.name}」还没有选择分类` });
+        setMessage({ type: "error", text: `「${name}」还没有选择分类` });
         return;
       }
       if (tags.length === 0) {
-        setMessage({ type: "error", text: `「${s.name}」至少要保留一处歌词` });
+        setMessage({ type: "error", text: `「${name}」至少要保留一处歌词` });
         return;
       }
+      const entry = resolveName(name);
       items.push({
-        imagery_id: s.imageryId,
+        ...(entry ? { imagery_id: entry.id } : { imagery_name: name }),
         category_id: draft.categoryId,
         lyric_timetag: tags,
       });
@@ -149,23 +204,24 @@ export function useSongImagery(songId: number, csrfToken: string) {
     setSaving(true);
     setMessage(null);
     try {
-      const { created, skipped } = await apiCreateOccurrencesBatch(
+      const { created, skipped, newImagery } = await apiCreateOccurrencesBatch(
         songId,
         items,
         csrfToken,
       );
-      const saved = new Set(items.map((i) => i.imagery_id));
+      const saved = new Set(selected.map((s) => s.imageryId));
       setResult({
         ...result,
         suggestions: result.suggestions.filter((s) => !saved.has(s.imageryId)),
       });
       await loadExisting();
+      const notes = [
+        newImagery > 0 && `新建意象 ${newImagery} 个`,
+        skipped > 0 && `${skipped} 个此前已标注，已跳过`,
+      ].filter(Boolean);
       setMessage({
         type: "success",
-        text:
-          skipped > 0
-            ? `已保存 ${created} 个意象，${skipped} 个此前已标注，已跳过`
-            : `已保存 ${created} 个意象`,
+        text: [`已保存 ${created} 个意象`, ...notes].join("，"),
       });
     } catch (error) {
       setMessage({
@@ -175,7 +231,16 @@ export function useSongImagery(songId: number, csrfToken: string) {
     } finally {
       setSaving(false);
     }
-  }, [csrfToken, drafts, loadExisting, result, saving, selected, songId]);
+  }, [
+    csrfToken,
+    drafts,
+    loadExisting,
+    resolveName,
+    result,
+    saving,
+    selected,
+    songId,
+  ]);
 
   return {
     existing,
@@ -186,6 +251,9 @@ export function useSongImagery(songId: number, csrfToken: string) {
     message,
     selectedCount: selected.length,
     generate,
+    existingImageryIds,
+    resolveName,
+    rename,
     updateDraft,
     toggleTag,
     setChecked,

@@ -1,42 +1,46 @@
 "use client";
 
-import { AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { AlertCircle, Loader2, Pencil, Sparkles, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import type { ImagerySuggestion } from "@/lib/imagery/suggest";
 import { MIN_OCCURRENCES } from "@/lib/quiz/pool";
-import type { CategoryOption } from "@/lib/server/service-imagery-suggest";
+import type {
+  CategoryOption,
+  DictionaryOption,
+} from "@/lib/server/service-imagery-suggest";
 import { cn } from "@/lib/utils/utils";
 import { type SuggestionDraft, useSongImagery } from "./useSongImagery";
 
 function CategorySelect({
-  suggestion,
+  categoryIds,
   value,
   categories,
   labelById,
   onChange,
 }: {
-  suggestion: ImagerySuggestion;
+  /** 该意象用过的分类 */
+  categoryIds: number[];
   value: number | null;
   categories: CategoryOption[];
   labelById: Map<number, string>;
   onChange: (id: number | null) => void;
 }) {
-  // 全部叶子分类有数百项，逐行渲染会拖慢列表；默认只列该意象用过的分类
-  const [showAll, setShowAll] = useState(suggestion.categoryIds.length === 0);
+  // 全部叶子分类有数百项，逐行渲染会拖慢列表；默认只列该意象用过的分类和当前值
+  const [expanded, setExpanded] = useState(false);
+  const showAll = expanded || (categoryIds.length === 0 && value === null);
   const options = showAll
     ? categories
-    : suggestion.categoryIds.map((id) => ({
-        id,
-        label: labelById.get(id) ?? `分类 #${id}`,
-      }));
+    : [...new Set([...categoryIds, ...(value === null ? [] : [value])])].map(
+        (id) => ({ id, label: labelById.get(id) ?? `分类 #${id}` }),
+      );
 
   return (
     <select
       value={value ?? ""}
       onChange={(e) => {
         if (e.target.value === "__all") {
-          setShowAll(true);
+          setExpanded(true);
           return;
         }
         onChange(e.target.value ? Number(e.target.value) : null);
@@ -54,21 +58,86 @@ function CategorySelect({
   );
 }
 
+function NameEditor({
+  name,
+  listId,
+  onCommit,
+}: {
+  name: string;
+  listId: string;
+  onCommit: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="点击修改意象"
+        className="group/name flex items-center gap-1 font-semibold text-slate-900 hover:text-blue-600 dark:text-slate-100"
+      >
+        {name}
+        <Pencil
+          size={12}
+          className="text-slate-300 group-hover/name:text-blue-500"
+        />
+      </button>
+    );
+  }
+
+  const finish = (value: string) => {
+    setEditing(false);
+    if (value.trim() && value.trim() !== name) onCommit(value);
+  };
+  return (
+    <input
+      autoFocus
+      defaultValue={name}
+      list={listId}
+      maxLength={50}
+      aria-label="意象名"
+      onBlur={(e) => finish(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") finish(e.currentTarget.value);
+        if (e.key === "Escape") setEditing(false);
+      }}
+      className="w-28 rounded-md border border-blue-400 bg-white px-2 py-0.5 text-sm font-semibold text-slate-900 outline-none dark:bg-slate-900 dark:text-slate-100"
+    />
+  );
+}
+
 function SuggestionRow({
   suggestion,
   draft,
+  resolved,
+  alreadyAnnotated,
   categories,
   labelById,
+  dictionaryListId,
   onUpdate,
+  onRename,
   onToggleTag,
 }: {
   suggestion: ImagerySuggestion;
   draft: SuggestionDraft;
+  /** 当前意象名对应的词典条目；为 null 表示保存时新建 */
+  resolved: DictionaryOption | null;
+  /** 当前意象该歌已经标注过，保存时会被跳过 */
+  alreadyAnnotated: boolean;
   categories: CategoryOption[];
   labelById: Map<number, string>;
+  dictionaryListId: string;
   onUpdate: (patch: Partial<SuggestionDraft>) => void;
+  onRename: (name: string) => void;
   onToggleTag: (tag: string) => void;
 }) {
+  const renamed = draft.name !== suggestion.name;
+  const categoryIds =
+    renamed && resolved?.categoryIds.length
+      ? resolved.categoryIds
+      : suggestion.categoryIds;
+
   return (
     <div
       className={cn(
@@ -83,23 +152,53 @@ function SuggestionRow({
         checked={draft.checked}
         onChange={(e) => onUpdate({ checked: e.target.checked })}
         className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
-        aria-label={`标注「${suggestion.name}」`}
+        aria-label={`标注「${draft.name}」`}
       />
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-slate-900 dark:text-slate-100">
-            {suggestion.name}
-          </span>
-          <span
-            className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-            title="其他已标注歌曲中：歌词出现该意象的歌曲里，有多少首标注了它"
-          >
-            {suggestion.seen > 0
-              ? `历史 ${suggestion.annotated}/${suggestion.seen}`
-              : "无历史"}
-          </span>
+          <NameEditor
+            name={draft.name}
+            listId={dictionaryListId}
+            onCommit={onRename}
+          />
+          {renamed ? (
+            <button
+              type="button"
+              onClick={() => onRename(suggestion.name)}
+              title="恢复原意象"
+              className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-blue-600"
+            >
+              <Undo2 size={11} />
+              原：{suggestion.name}
+            </button>
+          ) : (
+            <span
+              className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              title="其他已标注歌曲中：歌词出现该意象的歌曲里，有多少首标注了它"
+            >
+              {suggestion.seen > 0
+                ? `历史 ${suggestion.annotated}/${suggestion.seen}`
+                : "无历史"}
+            </span>
+          )}
+          {!resolved && (
+            <span
+              className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+              title="词典中没有这个意象，保存时会新建"
+            >
+              新意象
+            </span>
+          )}
+          {alreadyAnnotated && (
+            <span
+              className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-600 dark:bg-red-900/20 dark:text-red-300"
+              title="这首歌已经标注过该意象，保存时会跳过"
+            >
+              已标注
+            </span>
+          )}
           <CategorySelect
-            suggestion={suggestion}
+            categoryIds={categoryIds}
             value={draft.categoryId}
             categories={categories}
             labelById={labelById}
@@ -155,18 +254,30 @@ export default function SongImageryPanel({
   const others = suggestions.filter((s) => !s.recommended);
   const canSave = Boolean(result?.published) && imagery.selectedCount > 0;
 
+  const dictionaryListId = `imagery-dictionary-${songId}`;
+
   const renderRows = (list: ImagerySuggestion[]) =>
-    list.map((s) => (
-      <SuggestionRow
-        key={s.imageryId}
-        suggestion={s}
-        draft={drafts[s.imageryId]}
-        categories={result?.categories ?? []}
-        labelById={labelById}
-        onUpdate={(patch) => imagery.updateDraft(s.imageryId, patch)}
-        onToggleTag={(tag) => imagery.toggleTag(s.imageryId, tag)}
-      />
-    ));
+    list.map((s) => {
+      const draft = drafts[s.imageryId];
+      const resolved = imagery.resolveName(draft.name);
+      return (
+        <SuggestionRow
+          key={s.imageryId}
+          suggestion={s}
+          draft={draft}
+          resolved={resolved}
+          alreadyAnnotated={
+            resolved !== null && imagery.existingImageryIds.has(resolved.id)
+          }
+          categories={result?.categories ?? []}
+          labelById={labelById}
+          dictionaryListId={dictionaryListId}
+          onUpdate={(patch) => imagery.updateDraft(s.imageryId, patch)}
+          onRename={(name) => imagery.rename(s.imageryId, name)}
+          onToggleTag={(tag) => imagery.toggleTag(s.imageryId, tag)}
+        />
+      );
+    });
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -238,6 +349,12 @@ export default function SongImageryPanel({
 
       {result && (
         <div className="mt-4 space-y-3">
+          {/* 改意象时的自动补全，整个面板共用一份 */}
+          <datalist id={dictionaryListId}>
+            {result.dictionary.map((d) => (
+              <option key={d.id} value={d.name} />
+            ))}
+          </datalist>
           {!result.published && (
             <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/10 dark:text-amber-300">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />

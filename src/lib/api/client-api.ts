@@ -1,5 +1,6 @@
 // Admin 管理页面 API 封装
 import type { Song, UserRecord, UserUpdatePayload } from "@/lib/types";
+import type { ReviewCandidate, ReviewResult } from "@/lib/imagery/review";
 import type { OccurrenceBatchItem } from "@/lib/server/service-imagery";
 import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
 
@@ -336,6 +337,29 @@ export async function apiGetImagerySuggestions(
     `/api/admin/occurrences/suggestions?song_id=${songId}`,
   );
   if (!res.ok) throw new Error("生成意象候选失败");
+  return res.json();
+}
+
+export async function apiReviewImagery(
+  songId: number,
+  candidates: ReviewCandidate[],
+  csrfToken: string,
+): Promise<ReviewResult> {
+  const res = await fetch("/api/admin/occurrences/review", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+    body: JSON.stringify({ song_id: songId, candidates }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    // 502/503 是 LLM 侧的问题，服务端给的信息可以直接展示
+    throw new Error(
+      (res.status === 502 || res.status === 503) &&
+        typeof body?.error === "string"
+        ? body.error
+        : "AI 校验失败",
+    );
+  }
   return res.json();
 }
 

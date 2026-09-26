@@ -5,16 +5,24 @@ import {
   TABLES,
 } from "@/lib/db/supabase-server";
 import {
+  buildReviewPrompt,
+  toLeafCategories,
+  parseReviewOutput,
+  REVIEW_OUTPUT_SCHEMA,
+  REVIEW_SYSTEM_PROMPT,
+  type ReviewCandidate,
+  type ReviewCategory,
+  type ReviewResult,
+} from "@/lib/imagery/review";
+import {
   buildPriors,
+  parseLrcLines,
   suggestImagery,
   type ImagerySuggestion,
 } from "@/lib/imagery/suggest";
+import { chatJson, isLlmConfigured, LlmError } from "@/lib/server/llm";
 
-export interface CategoryOption {
-  id: number;
-  /** 完整路径，如「自然 / 天象 / 月」 */
-  label: string;
-}
+export type { ReviewCategory as CategoryOption } from "@/lib/imagery/review";
 
 /** 词典条目，供审核时把候选改成另一个意象 */
 export interface DictionaryOption {
@@ -30,8 +38,10 @@ export interface ImagerySuggestionsResult {
   hasLyrics: boolean;
   suggestions: ImagerySuggestion[];
   /** 可挂载意象的叶子分类，用于候选改分类 */
-  categories: CategoryOption[];
+  categories: ReviewCategory[];
   dictionary: DictionaryOption[];
+  /** 是否配置了 LLM，决定界面是否提供 AI 校验 */
+  llmEnabled: boolean;
 }
 
 type CategoryRow = {
@@ -39,28 +49,6 @@ type CategoryRow = {
   name: string;
   parent_id: number | null;
 };
-
-function toLeafOptions(categories: CategoryRow[]): CategoryOption[] {
-  const byId = new Map(categories.map((c) => [c.id, c]));
-  const parents = new Set(categories.map((c) => c.parent_id));
-  const pathOf = (cat: CategoryRow): string => {
-    const names: string[] = [];
-    const visited = new Set<number>();
-    for (
-      let c: CategoryRow | undefined = cat;
-      c && !visited.has(c.id);
-      c = c.parent_id === null ? undefined : byId.get(c.parent_id)
-    ) {
-      visited.add(c.id);
-      names.unshift(c.name);
-    }
-    return names.join(" / ");
-  };
-  return categories
-    .filter((c) => !parents.has(c.id))
-    .map((c) => ({ id: c.id, label: pathOf(c) }))
-    .sort((a, b) => a.label.localeCompare(b.label, "zh-CN"));
-}
 
 /**
  * 为一首歌生成意象标注候选。歌词取自暂存表（管理员正在编辑的版本），
@@ -125,11 +113,60 @@ export async function getImagerySuggestions(
       priors,
       existingImageryIds,
     }),
-    categories: toLeafOptions(categories),
+    categories: toLeafCategories(categories),
     dictionary: dictionary.map((d) => ({
       id: d.id,
       name: d.name,
       categoryIds: priors.get(d.id)?.categoryIds ?? [],
     })),
+    llmEnabled: isLlmConfigured(),
   };
+}
+
+/**
+ * 用 LLM 校验一首歌的标注候选：逐个判断保留或剔除，并补充词典没匹配到的意象。
+ * 歌词取自暂存表，与生成候选时一致。歌曲不存在时返回 null。
+ */
+export async function reviewImagerySuggestions(
+  songId: number,
+  candidates: ReviewCandidate[],
+  accessToken: string,
+): Promise<ReviewResult | null> {
+  const userClient = getUserClient(accessToken);
+  const service = getServiceClient();
+  if (!userClient || !service) throw new Error("Supabase client unavailable");
+
+  const { data: song, error } = await userClient
+    .from(TABLES.ADMIN)
+    .select("id,title,lyrics")
+    .eq("id", songId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!song) return null;
+
+  const { title, lyrics } = song as { title: string; lyrics: string | null };
+  const lines = parseLrcLines(lyrics);
+  if (lines.length === 0) {
+    throw new LlmError("这首歌没有可用的歌词", "BAD_RESPONSE");
+  }
+  const categories = toLeafCategories(
+    await fetchAll<CategoryRow>(
+      service,
+      TABLES.IMAGERY_CAT,
+      "id,name,parent_id",
+    ),
+  );
+
+  const raw = await chatJson({
+    system: REVIEW_SYSTEM_PROMPT,
+    user: buildReviewPrompt({ title, lines, candidates, categories }),
+    schemaName: "imagery_review",
+    schema: REVIEW_OUTPUT_SCHEMA,
+  });
+  try {
+    return parseReviewOutput(raw, { lines, candidates, categories });
+  } catch (e) {
+    console.error("[reviewImagerySuggestions] 输出结构不符", e);
+    throw new LlmError("LLM 返回的结构不符合要求", "BAD_RESPONSE");
+  }
 }

@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "quiz:diagnose": "tsx --env-file=.env.local scripts/quiz-diagnose.ts"
+    "quiz:diagnose": "tsx --env-file=.env.local scripts/quiz-diagnose.ts",
+    "imagery:llm-check": "tsx --env-file=.env.local scripts/imagery-llm-check.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   apiCreateOccurrencesBatch,
   apiGetImagerySuggestions,
   apiGetOccurrencesForSong,
+  apiReviewImagery,
 } from "@/lib/api/client-api";
 import type { ImagerySuggestion } from "@/lib/imagery/suggest";
 import type {
@@ -28,6 +29,11 @@ export interface SuggestionDraft {
 
 export type PanelMessage = { type: "success" | "error"; text: string };
 
+/** AI 校验对某个候选的意见 */
+export type AiNote =
+  | { kind: "verdict"; keep: boolean; reason: string }
+  | { kind: "addition"; reason: string };
+
 function initialDraft(s: ImagerySuggestion): SuggestionDraft {
   return {
     checked: s.recommended,
@@ -49,6 +55,10 @@ export function useSongImagery(songId: number, csrfToken: string) {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<PanelMessage | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [aiNotes, setAiNotes] = useState<Record<number, AiNote>>({});
+  /** AI 补充的候选没有意象 id，用负数占位，保存时按名称解析 */
+  const nextSyntheticId = useRef(-1);
 
   const loadExisting = useCallback(async () => {
     try {
@@ -85,6 +95,7 @@ export function useSongImagery(songId: number, csrfToken: string) {
     try {
       const next = await apiGetImagerySuggestions(songId);
       setResult(next);
+      setAiNotes({});
       setDrafts(
         Object.fromEntries(
           next.suggestions.map((s) => [s.imageryId, initialDraft(s)]),
@@ -165,6 +176,97 @@ export function useSongImagery(songId: number, csrfToken: string) {
     },
     [resolveName],
   );
+
+  /**
+   * AI 校验：按模型意见改写勾选状态，并把补充的意象追加为新候选。
+   * 返回被 AI 勾选的低置信候选数，供界面决定是否展开折叠区。
+   */
+  const review = useCallback(async (): Promise<number> => {
+    if (!result || reviewing) return 0;
+    setReviewing(true);
+    setMessage(null);
+    try {
+      const { verdicts, additions } = await apiReviewImagery(
+        songId,
+        result.suggestions.map((s) => ({
+          imageryId: s.imageryId,
+          name: s.name,
+          rate: s.rate,
+        })),
+        csrfToken,
+      );
+
+      const notes: Record<number, AiNote> = {};
+      const recommendedById = new Map(
+        result.suggestions.map((s) => [s.imageryId, s.recommended]),
+      );
+      let dropped = 0;
+      let restored = 0;
+      let promotedHidden = 0;
+      for (const v of verdicts) {
+        notes[v.imageryId] = {
+          kind: "verdict",
+          keep: v.keep,
+          reason: v.reason,
+        };
+        const recommended = recommendedById.get(v.imageryId);
+        if (recommended && !v.keep) dropped += 1;
+        if (recommended === false && v.keep) {
+          restored += 1;
+          promotedHidden += 1;
+        }
+      }
+
+      const added: ImagerySuggestion[] = additions.map((a) => {
+        const imageryId = nextSyntheticId.current--;
+        notes[imageryId] = { kind: "addition", reason: a.reason };
+        return {
+          imageryId,
+          name: a.name,
+          timetags: a.timetags,
+          lines: a.lines,
+          categoryIds: a.categoryId === null ? [] : [a.categoryId],
+          seen: 0,
+          annotated: 0,
+          rate: null,
+          recommended: true,
+        };
+      });
+
+      setResult({ ...result, suggestions: [...result.suggestions, ...added] });
+      setDrafts((current) => {
+        const next = { ...current };
+        for (const v of verdicts) {
+          if (next[v.imageryId]) {
+            next[v.imageryId] = { ...next[v.imageryId], checked: v.keep };
+          }
+        }
+        for (const s of added) {
+          // 词典里已有的词优先用它的历史分类，比模型挑的更贴合现有标注习惯
+          const known = resolveName(s.name)?.categoryIds[0];
+          next[s.imageryId] = {
+            ...initialDraft(s),
+            categoryId: known ?? s.categoryIds[0] ?? null,
+          };
+        }
+        return next;
+      });
+      setAiNotes((current) => ({ ...current, ...notes }));
+      setMessage({
+        type: "success",
+        text: `AI 校验完成：取消勾选 ${dropped} 个，补勾 ${restored} 个，补充 ${added.length} 个`,
+      });
+      return promotedHidden;
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "AI 校验失败",
+      });
+      return 0;
+    } finally {
+      setReviewing(false);
+    }
+  }, [csrfToken, resolveName, result, reviewing, songId]);
 
   const selected = (result?.suggestions ?? []).filter(
     (s) => drafts[s.imageryId]?.checked,
@@ -247,10 +349,13 @@ export function useSongImagery(songId: number, csrfToken: string) {
     result,
     drafts,
     generating,
+    reviewing,
+    aiNotes,
     saving,
     message,
     selectedCount: selected.length,
     generate,
+    review,
     existingImageryIds,
     resolveName,
     rename,

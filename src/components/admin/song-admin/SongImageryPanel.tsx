@@ -1,6 +1,13 @@
 "use client";
 
-import { AlertCircle, Loader2, Pencil, Sparkles, Undo2 } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  Loader2,
+  Pencil,
+  Sparkles,
+  Undo2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import {
@@ -13,7 +20,11 @@ import type {
   DictionaryOption,
 } from "@/lib/server/service-imagery-suggest";
 import { cn } from "@/lib/utils/utils";
-import { type SuggestionDraft, useSongImagery } from "./useSongImagery";
+import {
+  type AiNote,
+  type SuggestionDraft,
+  useSongImagery,
+} from "./useSongImagery";
 
 function CategorySelect({
   categoryIds,
@@ -139,11 +150,42 @@ function HistoryBadge({ suggestion }: { suggestion: ImagerySuggestion }) {
   );
 }
 
+function AiChip({ note }: { note: AiNote }) {
+  const [label, className] =
+    note.kind === "addition"
+      ? [
+          "AI 补充",
+          "bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300",
+        ]
+      : note.keep
+        ? [
+            "AI 保留",
+            "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300",
+          ]
+        : [
+            "AI 剔除",
+            "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-300",
+          ];
+  return (
+    <span
+      title={note.reason}
+      className={cn(
+        "max-w-[16rem] truncate rounded-full px-2 py-0.5 text-[11px]",
+        className,
+      )}
+    >
+      {label}
+      {note.reason && ` · ${note.reason}`}
+    </span>
+  );
+}
+
 function SuggestionRow({
   suggestion,
   draft,
   resolved,
   alreadyAnnotated,
+  aiNote,
   categories,
   labelById,
   dictionaryListId,
@@ -157,6 +199,7 @@ function SuggestionRow({
   resolved: DictionaryOption | null;
   /** 当前意象该歌已经标注过，保存时会被跳过 */
   alreadyAnnotated: boolean;
+  aiNote: AiNote | undefined;
   categories: CategoryOption[];
   labelById: Map<number, string>;
   dictionaryListId: string;
@@ -220,6 +263,7 @@ function SuggestionRow({
               已标注
             </span>
           )}
+          {aiNote && <AiChip note={aiNote} />}
           <CategorySelect
             categoryIds={categoryIds}
             value={draft.categoryId}
@@ -269,6 +313,7 @@ export default function SongImageryPanel({
 }) {
   const imagery = useSongImagery(songId, csrfToken);
   const { existing, result, drafts } = imagery;
+  const [othersOpen, setOthersOpen] = useState(false);
 
   const labelById = useMemo(
     () => new Map((result?.categories ?? []).map((c) => [c.id, c.label])),
@@ -294,6 +339,7 @@ export default function SongImageryPanel({
           alreadyAnnotated={
             resolved !== null && imagery.existingImageryIds.has(resolved.id)
           }
+          aiNote={imagery.aiNotes[s.imageryId]}
           categories={result?.categories ?? []}
           labelById={labelById}
           dictionaryListId={dictionaryListId}
@@ -323,6 +369,25 @@ export default function SongImageryPanel({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {result?.llmEnabled && result.hasLyrics && (
+            <button
+              type="button"
+              onClick={async () => {
+                // AI 勾选了折叠区里的候选时展开，免得漏看
+                if ((await imagery.review()) > 0) setOthersOpen(true);
+              }}
+              disabled={imagery.reviewing || imagery.generating}
+              title="让 AI 逐个判断候选是否作为意象使用，并补充词典没匹配到的意象"
+              className="flex items-center gap-1.5 rounded-full border border-violet-200 px-4 py-1.5 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 disabled:opacity-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-900/20"
+            >
+              {imagery.reviewing ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Bot size={14} />
+              )}
+              {imagery.reviewing ? "AI 校验中…" : "AI 校验"}
+            </button>
+          )}
           <Link
             href="/admin/imagery"
             className="text-xs text-slate-400 hover:text-blue-600"
@@ -332,7 +397,7 @@ export default function SongImageryPanel({
           <button
             type="button"
             onClick={imagery.generate}
-            disabled={imagery.generating}
+            disabled={imagery.generating || imagery.reviewing}
             className="flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
           >
             {imagery.generating ? (
@@ -418,7 +483,10 @@ export default function SongImageryPanel({
               <div className="space-y-2">{renderRows(recommended)}</div>
 
               {others.length > 0 && (
-                <details className="group">
+                <details
+                  open={othersOpen}
+                  onToggle={(e) => setOthersOpen(e.currentTarget.open)}
+                >
                   <summary className="cursor-pointer select-none text-xs text-slate-400 hover:text-slate-600">
                     其他候选 {others.length}{" "}
                     个（其他歌里很少被标注，或被更长的意象包含，默认不勾选）

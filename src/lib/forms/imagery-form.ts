@@ -36,12 +36,14 @@ export const meaningFormSchema = z.object({
   description: z.preprocess(normalizeString, z.string()),
 });
 
+// LRC 时间戳字符串，支持 mm:ss、mm:ss.xx、mm:ss.xxx（分钟可为 1~2 位）
+export const lyricTimetagPattern = /^\d{1,2}:\d{2}(\.\d{2,3})?$/;
+
 // lyric_timetag 单项的 schema：每项是一个 LRC 时间戳字符串
-// 支持格式：mm:ss、mm:ss.xx、mm:ss.xxx（分钟可为 1~2 位）
 export const lyricTimetagItemSchema = z.object({
   value: z.string().superRefine((value, ctx) => {
     if (value.trim() === "") return; // 空项在提交时过滤掉
-    if (!/^\d{1,2}:\d{2}(\.\d{2,3})?$/.test(value.trim())) {
+    if (!lyricTimetagPattern.test(value.trim())) {
       ctx.addIssue({
         code: "custom",
         message: '格式应为 mm:ss、mm:ss.xx 或 mm:ss.xxx，如 "01:26.04"',

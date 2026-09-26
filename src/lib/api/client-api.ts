@@ -1,5 +1,8 @@
 // Admin 管理页面 API 封装
 import type { Song, UserRecord, UserUpdatePayload } from "@/lib/types";
+import type { ReviewCandidate, ReviewResult } from "@/lib/imagery/review";
+import type { OccurrenceBatchItem } from "@/lib/server/service-imagery";
+import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
 
 // 新增歌曲
 export async function apiCreateSong(song: Partial<Song>, csrfToken: string) {
@@ -108,7 +111,12 @@ export async function apiCheckFileExists(
 // ─── Songs Admin API ───────────────────────────────────────────────────────────
 
 export async function apiGetSongs(): Promise<
-  { id: number; title: string; album?: string | null }[]
+  {
+    id: number;
+    title: string;
+    album?: string | null;
+    lyrics?: string | null;
+  }[]
 > {
   const res = await fetch("/api/admin/edit");
   if (!res.ok) throw new Error("获取歌曲列表失败");
@@ -324,6 +332,60 @@ export async function apiCreateOccurrence(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("新增关系失败");
+  return res.json();
+}
+
+export async function apiGetImagerySuggestions(
+  songId: number,
+): Promise<ImagerySuggestionsResult> {
+  const res = await fetch(
+    `/api/admin/occurrences/suggestions?song_id=${songId}`,
+  );
+  if (!res.ok) throw new Error("生成意象候选失败");
+  return res.json();
+}
+
+export async function apiReviewImagery(
+  songId: number,
+  candidates: ReviewCandidate[],
+  csrfToken: string,
+): Promise<ReviewResult> {
+  const res = await fetch("/api/admin/occurrences/review", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+    body: JSON.stringify({ song_id: songId, candidates }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    // 502/503 是 LLM 侧的问题，服务端给的信息可以直接展示
+    throw new Error(
+      (res.status === 502 || res.status === 503) &&
+        typeof body?.error === "string"
+        ? body.error
+        : "AI 校验失败",
+    );
+  }
+  return res.json();
+}
+
+export async function apiCreateOccurrencesBatch(
+  songId: number,
+  items: OccurrenceBatchItem[],
+  csrfToken: string,
+): Promise<{ created: number; skipped: number; newImagery: number }> {
+  const res = await fetch("/api/admin/occurrences/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+    body: JSON.stringify({ song_id: songId, items }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(
+      res.status === 400 && typeof body?.error === "string" && !body.details
+        ? body.error
+        : "保存意象标注失败",
+    );
+  }
   return res.json();
 }
 

@@ -1,10 +1,10 @@
-import { Globe, Save, Wand2, X } from "lucide-react";
-import { FormProvider, type UseFormReturn } from "react-hook-form";
-import { songFields } from "@/lib/constants";
 import type { MusicProviderType } from "@/lib/api/api-auto-complete";
+import { songFields } from "@/lib/constants";
 import type { SongFormStateValues } from "@/lib/forms/song-form";
 import type { SongDetail } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
+import { Globe, Save, Wand2, X } from "lucide-react";
+import { FormProvider, type UseFormReturn } from "react-hook-form";
 import SongFormField from "./SongFormFields";
 import type { SongFormMode } from "./types";
 
@@ -171,7 +171,7 @@ export default function SongFormModal({
                 ) : (
                   <Save size={18} />
                 )}
-                {formMode === "add" ? "确认添加" : "保存修改"}
+                {formMode === "add" ? "确认添加" : "暂存修改"}
               </button>
             </div>
           </div>

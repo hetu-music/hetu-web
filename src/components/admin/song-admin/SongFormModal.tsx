@@ -1,10 +1,10 @@
-import { Globe, Save, Wand2, X } from "lucide-react";
-import { FormProvider, type UseFormReturn } from "react-hook-form";
-import { songFields } from "@/lib/constants";
 import type { MusicProviderType } from "@/lib/api/api-auto-complete";
+import { songFields } from "@/lib/constants";
 import type { SongFormStateValues } from "@/lib/forms/song-form";
 import type { SongDetail } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
+import { Globe, Save, Wand2, X } from "lucide-react";
+import { FormProvider, type UseFormReturn } from "react-hook-form";
 import SongFormField from "./SongFormFields";
 import type { SongFormMode } from "./types";
 
@@ -14,21 +14,21 @@ const PROVIDER_BUTTONS: {
   title: string;
   gradient: string;
 }[] = [
-  {
-    provider: "netease",
-    label: "网易云",
-    title: "从网易云音乐自动补全",
-    gradient:
-      "bg-linear-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 shadow-red-500/20 hover:shadow-red-500/30",
-  },
-  {
-    provider: "kugou",
-    label: "酷狗",
-    title: "从酷狗音乐自动补全",
-    gradient:
-      "bg-linear-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 shadow-blue-500/20 hover:shadow-blue-500/30",
-  },
-];
+    {
+      provider: "netease",
+      label: "网易云",
+      title: "从网易云音乐自动补全",
+      gradient:
+        "bg-linear-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 shadow-red-500/20 hover:shadow-red-500/30",
+    },
+    {
+      provider: "kugou",
+      label: "酷狗",
+      title: "从酷狗音乐自动补全",
+      gradient:
+        "bg-linear-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 shadow-blue-500/20 hover:shadow-blue-500/30",
+    },
+  ];
 
 function Spinner() {
   return (
@@ -171,7 +171,7 @@ export default function SongFormModal({
                 ) : (
                   <Save size={18} />
                 )}
-                {formMode === "add" ? "确认添加" : "保存修改"}
+                {formMode === "add" ? "确认添加" : "暂存修改"}
               </button>
             </div>
           </div>

@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const revalidatePathMock = vi.fn();
+const revalidateTagMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+  revalidateTag: (...args: unknown[]) => revalidateTagMock(...args),
 }));
 
 import { GET, POST } from "./route";
@@ -27,6 +29,7 @@ function makeRequest(
 
 beforeEach(() => {
   revalidatePathMock.mockClear();
+  revalidateTagMock.mockClear();
   process.env.REVALIDATE_SECRET = SECRET;
 });
 
@@ -35,6 +38,7 @@ describe("POST /api/public/revalidate — 鉴权", () => {
     const res = await POST(makeRequest("POST"));
     expect(res.status).toBe(401);
     expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(revalidateTagMock).not.toHaveBeenCalled();
   });
 
   it("密钥错误返回 401", async () => {
@@ -60,6 +64,16 @@ describe("POST /api/public/revalidate — 鉴权", () => {
     expect(paths).toContain("/zh-CN/imagery");
     expect(paths).toContain("/zh-CN/story/qjtx");
     expect(paths).toContain("/sitemap.xml");
+  });
+
+  it("同时刷新寻曲页面与候选池缓存", async () => {
+    const res = await POST(makeRequest("POST", { secretHeader: SECRET }));
+    expect(res.status).toBe(200);
+
+    const paths = revalidatePathMock.mock.calls.map((c) => c[0]);
+    expect(paths).toContain("/zh-CN/quiz");
+    expect(paths).toContain("/zh-TW/quiz");
+    expect(revalidateTagMock).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
   });
 
   it("服务端未配置密钥时一律拒绝", async () => {

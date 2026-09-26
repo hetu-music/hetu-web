@@ -1,6 +1,7 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { locales } from "@/i18n/config";
+import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
 import { safeCompareSecret } from "@/lib/server/server-utils";
 
 const SECRET_HEADER = "x-revalidate-secret";
@@ -32,17 +33,23 @@ export async function POST(request: NextRequest) {
       revalidatePath(`/${locale}`);
       revalidatePath(`/${locale}/imagery`);
       revalidatePath(`/${locale}/story/qjtx`);
+      revalidatePath(`/${locale}/quiz`);
     }
+
+    // 寻曲候选池由意象标注聚合并单独缓存；立即失效，让随后重新生成的
+    // /quiz 页面读到最新数据，而不是构建期（占位凭据）留下的空结果
+    revalidateTag(QUIZ_POOL_TAG, { expire: 0 });
 
     // 防范未命中重写路径的缓存，同时也刷新 sitemap
     revalidatePath("/");
     revalidatePath("/imagery");
     revalidatePath("/story/qjtx");
+    revalidatePath("/quiz");
     revalidatePath("/sitemap.xml");
 
     const timestamp = new Date().toISOString();
 
-    const response = `SUCCESS: Home page, imagery, story, and sitemap revalidated at ${timestamp}`;
+    const response = `SUCCESS: Home page, imagery, story, quiz, and sitemap revalidated at ${timestamp}`;
 
     return new NextResponse(response, {
       status: 200,

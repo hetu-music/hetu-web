@@ -38,6 +38,8 @@ export interface PoolRows {
 export const EXCLUDED_TYPES: readonly string[] = ["翻唱", "参与"];
 /** 入池规则版本：修改排除类型、标注门槛等规则时递增，使服务端缓存失效 */
 export const POOL_VERSION = 2;
+/** 候选池服务端缓存的标签，revalidate 接口据此刷新 */
+export const QUIZ_POOL_TAG = "quiz-pool";
 /** 意象标注少于此数的歌曲不进入候选池，画像不可靠 */
 export const MIN_OCCURRENCES = 10;
 /** 「（纯歌版）」「(DJ版)」等衍生版本与原曲意象相同，不重复入池 */

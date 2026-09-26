@@ -10,6 +10,7 @@ import {
   getDimension,
   IMAGERY_ALIAS,
   POOL_VERSION,
+  QUIZ_POOL_TAG,
   QUESTIONS,
   type MatchReason,
   type PoolRows,
@@ -67,7 +68,7 @@ const loadQuizPool = unstable_cache(
     return pool;
   },
   [`quiz-pool-v${POOL_VERSION}`],
-  { revalidate: 7200, tags: ["quiz-pool"] },
+  { revalidate: 7200, tags: [QUIZ_POOL_TAG] },
 );
 
 const getQuizModel = cache(async (): Promise<QuizModel> => {

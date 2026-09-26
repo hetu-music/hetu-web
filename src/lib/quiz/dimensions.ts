@@ -102,11 +102,11 @@ export const SIGNATURE_IMAGERY: readonly SignatureImagery[] = [
   { name: "酒", aliases: ["酒", "美酒", "浊酒"] },
   { name: "梦", aliases: ["梦", "梦境", "旧梦"] },
   { name: "山", aliases: ["山", "青山", "关山"] },
-  { name: "灯", aliases: ["灯", "灯火", "孤灯"] },
+  { name: "灯", aliases: ["灯", "灯火"] },
   { name: "柳", aliases: ["柳", "杨柳", "垂柳"] },
-  { name: "马", aliases: ["马", "白马", "骏马"] },
+  { name: "马", aliases: ["马", "白马"] },
   { name: "星辰", aliases: ["星辰", "星", "星河"] },
-  { name: "窗", aliases: ["窗", "轩窗", "窗前"] },
+  { name: "窗", aliases: ["窗", "轩窗"] },
 ];
 
 /** 数据库意象名 → 招牌意象名 */

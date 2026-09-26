@@ -45,6 +45,36 @@ export const MIN_OCCURRENCES = 10;
 /** 「（纯歌版）」「(DJ版)」等衍生版本与原曲意象相同，不重复入池 */
 const VARIANT_TITLE = /[（(][^（）()]*版[）)]/;
 
+/** 作品类型与标题是否允许入池（不看标注数量） */
+export function isPoolEligible(song: {
+  title: string;
+  type: string[] | null;
+}): boolean {
+  if (song.type?.some((t) => EXCLUDED_TYPES.includes(t))) return false;
+  return !VARIANT_TITLE.test(song.title);
+}
+
+/**
+ * 意象挂在三级分类上；返回把任意分类 id 映射到其二级分类名的函数（带缓存）。
+ */
+export function createLevel2Resolver(
+  categories: PoolRows["categories"],
+): (categoryId: number) => string | null {
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const cache = new Map<number, string | null>();
+  return (categoryId) => {
+    const cached = cache.get(categoryId);
+    if (cached !== undefined) return cached;
+    let cat = categoryById.get(categoryId);
+    while (cat && (cat.level ?? 0) > 2 && cat.parent_id !== null) {
+      cat = categoryById.get(cat.parent_id);
+    }
+    const name = cat && cat.level === 2 ? cat.name : null;
+    cache.set(categoryId, name);
+    return name;
+  };
+}
+
 function emptyDimCounts(): Record<DimensionKey, number> {
   return Object.fromEntries(DIMENSION_KEYS.map((k) => [k, 0])) as Record<
     DimensionKey,
@@ -56,18 +86,10 @@ function emptyDimCounts(): Record<DimensionKey, number> {
  * 把意象标注聚合为候选池。意象挂在三级分类上，向上找到二级分类后映射到维度。
  */
 export function buildPool(rows: PoolRows): PoolSong[] {
-  const categoryById = new Map(rows.categories.map((c) => [c.id, c]));
-  const dimOfCategory = new Map<number, DimensionKey | null>();
+  const level2Of = createLevel2Resolver(rows.categories);
   const resolveDim = (categoryId: number): DimensionKey | null => {
-    const cached = dimOfCategory.get(categoryId);
-    if (cached !== undefined) return cached;
-    let cat = categoryById.get(categoryId);
-    while (cat && (cat.level ?? 0) > 2 && cat.parent_id !== null) {
-      cat = categoryById.get(cat.parent_id);
-    }
-    const dim = cat ? (CATEGORY_TO_DIMENSION.get(cat.name) ?? null) : null;
-    dimOfCategory.set(categoryId, dim);
-    return dim;
+    const name = level2Of(categoryId);
+    return name === null ? null : (CATEGORY_TO_DIMENSION.get(name) ?? null);
   };
 
   const imageryName = new Map(rows.imagery.map((i) => [i.id, i.name]));
@@ -80,8 +102,7 @@ export function buildPool(rows: PoolRows): PoolSong[] {
 
   const pool: PoolSong[] = [];
   for (const song of rows.songs) {
-    if (song.type?.some((t) => EXCLUDED_TYPES.includes(t))) continue;
-    if (VARIANT_TITLE.test(song.title)) continue;
+    if (!isPoolEligible(song)) continue;
     const occs = occBySong.get(song.id) ?? [];
     if (occs.length < MIN_OCCURRENCES) continue;
 

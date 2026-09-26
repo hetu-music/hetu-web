@@ -101,6 +101,7 @@ async function main() {
       imageryId: s.imageryId,
       name: s.name,
       rate: s.rate,
+      recommended: s.recommended,
     }));
     const lines = parseLrcLines(song.lyrics);
 

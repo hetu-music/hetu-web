@@ -38,7 +38,7 @@ function post(body: unknown) {
 
 const body = {
   song_id: 5,
-  candidates: [{ imageryId: 1, name: "明月", rate: 0.5 }],
+  candidates: [{ imageryId: 1, name: "明月", rate: 0.5, recommended: true }],
 };
 
 beforeEach(() => {

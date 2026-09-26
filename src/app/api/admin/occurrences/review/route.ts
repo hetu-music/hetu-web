@@ -13,6 +13,7 @@ const ReviewSchema = z.object({
         imageryId: z.number().int(),
         name: z.string().trim().min(1).max(50),
         rate: z.number().min(0).max(1).nullable(),
+        recommended: z.boolean(),
       }),
     )
     .max(300),

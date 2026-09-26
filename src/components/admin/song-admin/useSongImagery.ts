@@ -192,6 +192,7 @@ export function useSongImagery(songId: number, csrfToken: string) {
           imageryId: s.imageryId,
           name: s.name,
           rate: s.rate,
+          recommended: s.recommended,
         })),
         csrfToken,
       );

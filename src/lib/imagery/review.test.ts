@@ -8,9 +8,9 @@ const lines = [
   { tag: "00:30.00", text: "登上九重宝塔" },
 ];
 const candidates = [
-  { imageryId: 11, name: "明月", rate: 0.77 },
-  { imageryId: 12, name: "风", rate: 0.49 },
-  { imageryId: -1, name: "天涯", rate: null },
+  { imageryId: 11, name: "明月", rate: 0.77, recommended: true },
+  { imageryId: 12, name: "风", rate: 0.49, recommended: true },
+  { imageryId: -1, name: "天涯", rate: null, recommended: false },
 ];
 const categories = [
   { id: 100, label: "天象 / 星相" },
@@ -24,8 +24,8 @@ describe("buildReviewPrompt", () => {
     expect(prompt).toContain("歌名：倾尽天下");
     expect(prompt).toContain("1. 明月照亮天涯\n2. 风流不假\n3. 登上九重宝塔");
     expect(prompt).not.toContain("4. ");
-    expect(prompt).toContain("1. 明月（历史标注率 77%）");
-    expect(prompt).toContain("3. 天涯（历史标注率 无参考）");
+    expect(prompt).toContain("1. 明月（默认勾选，历史标注率 77%）");
+    expect(prompt).toContain("3. 天涯（默认不勾选，历史标注率 无参考）");
     expect(prompt).toContain("200: 建筑 / 构筑");
   });
 });

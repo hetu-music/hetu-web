@@ -14,21 +14,21 @@ const PROVIDER_BUTTONS: {
   title: string;
   gradient: string;
 }[] = [
-    {
-      provider: "netease",
-      label: "网易云",
-      title: "从网易云音乐自动补全",
-      gradient:
-        "bg-linear-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 shadow-red-500/20 hover:shadow-red-500/30",
-    },
-    {
-      provider: "kugou",
-      label: "酷狗",
-      title: "从酷狗音乐自动补全",
-      gradient:
-        "bg-linear-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 shadow-blue-500/20 hover:shadow-blue-500/30",
-    },
-  ];
+  {
+    provider: "netease",
+    label: "网易云",
+    title: "从网易云音乐自动补全",
+    gradient:
+      "bg-linear-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 shadow-red-500/20 hover:shadow-red-500/30",
+  },
+  {
+    provider: "kugou",
+    label: "酷狗",
+    title: "从酷狗音乐自动补全",
+    gradient:
+      "bg-linear-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 shadow-blue-500/20 hover:shadow-blue-500/30",
+  },
+];
 
 function Spinner() {
   return (

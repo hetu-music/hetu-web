@@ -1,4 +1,3 @@
-import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
 
 export type Tab = "imagery" | "categories" | "meanings" | "occurrences";
@@ -17,15 +16,12 @@ export type ModalState =
       label: string;
     };
 
-export type RelationEditor =
-  | { type: "none" }
-  | { type: "add"; songId: number }
-  | { type: "edit"; songId: number; occurrence: OccurrenceWithSong };
-
 export type SongOption = {
   id: number;
   title: string;
   album?: string | null;
+  /** 暂存表中的 LRC 歌词，对照编辑时展示 */
+  lyrics?: string | null;
 };
 
 export type CategoryNode = ImageryCategory & {

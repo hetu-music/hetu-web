@@ -77,10 +77,14 @@ function isCreditLine(text: string): boolean {
 }
 
 /**
- * 解析 LRC，保留原始时间标签字符串；跳过元数据、空行和制作名单行。
+ * 解析 LRC，保留原始时间标签字符串；跳过元数据、空行，默认也跳过制作名单行
+ *（人工对照编辑时需要看到完整歌词，可传 includeCredits）。
  * 一行多个时间标签（副歌复用）时展开为多行。
  */
-export function parseLrcLines(lrc: string | null | undefined): LrcLine[] {
+export function parseLrcLines(
+  lrc: string | null | undefined,
+  options: { includeCredits?: boolean } = {},
+): LrcLine[] {
   if (!lrc) return [];
   const out: LrcLine[] = [];
   for (const raw of lrc.split("\n")) {
@@ -88,7 +92,8 @@ export function parseLrcLines(lrc: string | null | undefined): LrcLine[] {
     if (!line || METADATA.test(line)) continue;
     const tags = [...line.matchAll(TIMETAG)].map((m) => m[1]);
     const text = line.replace(TIMETAG, "").trim();
-    if (tags.length === 0 || !text || isCreditLine(text)) continue;
+    if (tags.length === 0 || !text) continue;
+    if (!options.includeCredits && isCreditLine(text)) continue;
     for (const tag of tags) out.push({ tag, text });
   }
   return out.sort((a, b) => tagToSeconds(a.tag) - tagToSeconds(b.tag));

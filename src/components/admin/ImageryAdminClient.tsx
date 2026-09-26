@@ -38,7 +38,8 @@ interface Props {
 export default function ImageryAdminClient({ initialCategories }: Props) {
   const { user } = useUserContext();
   const csrfToken = useCsrfToken();
-  const [activeTab, setActiveTab] = useState<Tab>("imagery");
+  // 关系管理是日常最常用的入口，默认打开
+  const [activeTab, setActiveTab] = useState<Tab>("occurrences");
   const [toast, setToast] = useState<{
     type: "success" | "error";
     text: string;
@@ -112,6 +113,12 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
 
   const tabs: { key: Tab; label: string; icon: ReactNode; hint: string }[] = [
     {
+      key: "occurrences",
+      label: "关系管理",
+      icon: <Layers size={14} />,
+      hint: "按歌曲对照编辑",
+    },
+    {
       key: "imagery",
       label: "意象管理",
       icon: <Tag size={14} />,
@@ -128,12 +135,6 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
       label: "含义管理",
       icon: <BookOpen size={14} />,
       hint: "全局含义库",
-    },
-    {
-      key: "occurrences",
-      label: "关系管理",
-      icon: <Layers size={14} />,
-      hint: "按歌曲维护",
     },
   ];
 
@@ -377,22 +378,15 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
               expandedSongId={occurrences.expandedSongId}
               occurrencesBySong={occurrences.occurrencesBySong}
               occurrenceLoadingSongId={occurrences.occurrenceLoadingSongId}
-              relationEditor={occurrences.relationEditor}
               occurrenceSubmitting={occurrences.occurrenceSubmitting}
               items={imagery.items}
-              categories={categories.categories}
               meanings={meanings.meanings}
               leafCategories={leafCategories}
               onPageChange={occurrences.setSongsPage}
               onToggleSongPanel={occurrences.toggleSongPanel}
-              onStartAddRelation={occurrences.startAddRelation}
-              onStartEditRelation={occurrences.startEditRelation}
-              onResetRelationEditor={occurrences.resetRelationEditor}
-              onSaveRelation={occurrences.handleSaveRelation}
+              onSaveRelation={occurrences.saveRelation}
               onDeleteRelation={occurrences.openDeleteOccurrenceModal}
-              getCategoryPath={(categoryId) =>
-                categories.getCategoryPathFn(categoryId)
-              }
+              getCategoryPath={categories.getCategoryPathFn}
             />
           )}
         </div>

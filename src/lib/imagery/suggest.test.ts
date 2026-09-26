@@ -35,6 +35,16 @@ describe("parseLrcLines", () => {
     ]);
   });
 
+  it("includeCredits 时保留制作名单行", () => {
+    const lines = parseLrcLines(
+      ["[00:01.00]词：河图", "[00:02.00]明月"].join("\n"),
+      {
+        includeCredits: true,
+      },
+    );
+    expect(lines.map((l) => l.text)).toEqual(["词：河图", "明月"]);
+  });
+
   it("空歌词返回空数组", () => {
     expect(parseLrcLines(null)).toEqual([]);
     expect(parseLrcLines("")).toEqual([]);

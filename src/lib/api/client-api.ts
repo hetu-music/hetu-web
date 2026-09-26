@@ -111,7 +111,12 @@ export async function apiCheckFileExists(
 // ─── Songs Admin API ───────────────────────────────────────────────────────────
 
 export async function apiGetSongs(): Promise<
-  { id: number; title: string; album?: string | null }[]
+  {
+    id: number;
+    title: string;
+    album?: string | null;
+    lyrics?: string | null;
+  }[]
 > {
   const res = await fetch("/api/admin/edit");
   if (!res.ok) throw new Error("获取歌曲列表失败");

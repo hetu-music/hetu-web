@@ -1,19 +1,27 @@
 "use client";
 
 import {
+  apiCreateImagery,
   apiCreateOccurrence,
   apiDeleteOccurrence,
   apiGetOccurrencesForSong,
   apiGetSongs,
   apiUpdateOccurrence,
 } from "@/lib/api/client-api";
-import { toRelationPayload } from "@/lib/forms/imagery-form";
-import type { RelationFormValues } from "@/lib/forms/imagery-form";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ModalState, RelationEditor, SongOption } from "./types";
+import type { ModalState, SongOption } from "./types";
 
 const SONG_PAGE_SIZE = 10;
+
+/** 对照编辑提交的一条关系；imageryId 为 null 表示词典里还没有，保存时新建 */
+export interface RelationDraft {
+  imageryId: number | null;
+  imageryName: string;
+  categoryId: number;
+  meaningId: number | null;
+  timetags: string[];
+}
 
 export function useOccurrencesTab(
   csrfToken: string,
@@ -25,9 +33,6 @@ export function useOccurrencesTab(
   const [songSearchTerm, setSongSearchTerm] = useState("");
   const [songsPage, setSongsPage] = useState(1);
   const [expandedSongId, setExpandedSongId] = useState<number | null>(null);
-  const [relationEditor, setRelationEditor] = useState<RelationEditor>({
-    type: "none",
-  });
   const [occurrencesBySong, setOccurrencesBySong] = useState<
     Record<number, OccurrenceWithSong[]>
   >({});
@@ -101,63 +106,64 @@ export function useOccurrencesTab(
   const toggleSongPanel = async (songId: number) => {
     if (expandedSongId === songId) {
       setExpandedSongId(null);
-      if (relationEditor.type !== "none" && relationEditor.songId === songId) {
-        setRelationEditor({ type: "none" });
-      }
       return;
     }
     setExpandedSongId(songId);
     await loadOccurrencesForSong(songId);
   };
 
-  const startAddRelation = async (songId: number) => {
-    setExpandedSongId(songId);
-    setRelationEditor({ type: "add", songId });
-    await loadOccurrencesForSong(songId);
-  };
-
-  const startEditRelation = (
-    songId: number,
-    occurrence: OccurrenceWithSong,
-  ) => {
-    setExpandedSongId(songId);
-    setRelationEditor({ type: "edit", songId, occurrence });
-  };
-
-  const resetRelationEditor = () => setRelationEditor({ type: "none" });
   const closeModal = () => setModal({ type: "none" });
 
-  const handleSaveRelation = async (values: RelationFormValues) => {
-    if (relationEditor.type === "none" || occurrenceSubmitting) return;
-    const payload = toRelationPayload(values);
-
+  /**
+   * 新建（occurrenceId 为 null）或更新一条关系。意象名不在词典中时先创建意象。
+   * 成功返回 true，供对照编辑区决定是否关闭编辑器。
+   */
+  const saveRelation = async (
+    songId: number,
+    occurrenceId: number | null,
+    draft: RelationDraft,
+  ): Promise<boolean> => {
+    if (occurrenceSubmitting) return false;
     setOccurrenceSubmitting(true);
     try {
-      if (relationEditor.type === "add") {
-        await apiCreateOccurrence(
-          { song_id: relationEditor.songId, ...payload },
+      let imageryId = draft.imageryId;
+      if (imageryId === null) {
+        const created = (await apiCreateImagery(
+          draft.imageryName,
           csrfToken,
-        );
-        showToast("success", "关系已创建");
-      } else {
-        await apiUpdateOccurrence(
-          relationEditor.occurrence.id,
-          payload,
-          csrfToken,
-        );
-        showToast("success", "关系已更新");
+        )) as { id: number };
+        imageryId = created.id;
       }
-
+      const payload = {
+        imagery_id: imageryId,
+        category_id: draft.categoryId,
+        meaning_id: draft.meaningId,
+        lyric_timetag: draft.timetags,
+      };
+      if (occurrenceId === null) {
+        await apiCreateOccurrence({ song_id: songId, ...payload }, csrfToken);
+      } else {
+        await apiUpdateOccurrence(occurrenceId, payload, csrfToken);
+      }
       await Promise.all([
-        loadOccurrencesForSong(relationEditor.songId),
+        loadOccurrencesForSong(songId),
         refreshImageryItems(),
       ]);
-      resetRelationEditor();
+      showToast(
+        "success",
+        draft.imageryId === null
+          ? `已新建意象「${draft.imageryName}」并保存关系`
+          : occurrenceId === null
+            ? "关系已创建"
+            : "关系已更新",
+      );
+      return true;
     } catch (error) {
       showToast(
         "error",
         error instanceof Error ? error.message : "保存关系失败",
       );
+      return false;
     } finally {
       setOccurrenceSubmitting(false);
     }
@@ -172,12 +178,6 @@ export function useOccurrencesTab(
         loadOccurrencesForSong(modal.songId),
         refreshImageryItems(),
       ]);
-      if (
-        relationEditor.type === "edit" &&
-        relationEditor.occurrence.id === modal.occurrenceId
-      ) {
-        resetRelationEditor();
-      }
       closeModal();
       showToast("success", "关系已删除");
     } catch (error) {
@@ -198,7 +198,6 @@ export function useOccurrencesTab(
     songsPage,
     setSongsPage,
     expandedSongId,
-    relationEditor,
     occurrencesBySong,
     occurrenceLoadingSongId,
     occurrenceSubmitting,
@@ -209,11 +208,8 @@ export function useOccurrencesTab(
     songsTotalPages,
     loadOccurrencesForSong,
     toggleSongPanel,
-    startAddRelation,
-    startEditRelation,
-    resetRelationEditor,
     closeModal,
-    handleSaveRelation,
+    saveRelation,
     handleDeleteRelation,
     /** 触发删除确认 modal */
     openDeleteOccurrenceModal: (

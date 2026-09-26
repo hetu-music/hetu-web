@@ -1,5 +1,6 @@
 // Admin 管理页面 API 封装
 import type { Song, UserRecord, UserUpdatePayload } from "@/lib/types";
+import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
 
 // 新增歌曲
 export async function apiCreateSong(song: Partial<Song>, csrfToken: string) {
@@ -324,6 +325,41 @@ export async function apiCreateOccurrence(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("新增关系失败");
+  return res.json();
+}
+
+export async function apiGetImagerySuggestions(
+  songId: number,
+): Promise<ImagerySuggestionsResult> {
+  const res = await fetch(
+    `/api/admin/occurrences/suggestions?song_id=${songId}`,
+  );
+  if (!res.ok) throw new Error("生成意象候选失败");
+  return res.json();
+}
+
+export async function apiCreateOccurrencesBatch(
+  songId: number,
+  items: Array<{
+    imagery_id: number;
+    category_id: number;
+    lyric_timetag: string[];
+  }>,
+  csrfToken: string,
+): Promise<{ created: number; skipped: number }> {
+  const res = await fetch("/api/admin/occurrences/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+    body: JSON.stringify({ song_id: songId, items }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(
+      res.status === 400 && typeof body?.error === "string" && !body.details
+        ? body.error
+        : "保存意象标注失败",
+    );
+  }
   return res.json();
 }
 

@@ -90,6 +90,11 @@ export function useSongAdmin(setSongs: SetSongs) {
     });
   }, []);
 
+  /** 展开行：新增或发布歌曲后直接露出意象标注区 */
+  const expandRow = useCallback((id: number) => {
+    setExpandedRows((prev) => new Set(prev).add(id));
+  }, []);
+
   const closeSongForm = useCallback(() => {
     setFormMode(null);
     setEditSong(null);
@@ -130,6 +135,7 @@ export function useSongAdmin(setSongs: SetSongs) {
       if (formMode === "add") {
         const created = await apiCreateSong(payload, csrfToken);
         setSongs((prev) => [...prev, created]);
+        expandRow(created.id);
         closeSongForm();
         notify({ type: "success", text: "创建成功" });
       } else if (formMode === "edit" && editSong) {
@@ -184,6 +190,7 @@ export function useSongAdmin(setSongs: SetSongs) {
       if (!approveRes.success) throw new Error(approveRes.error || "同步失败");
 
       setSongs((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      expandRow(updated.id);
       closeSongForm();
       notify({ type: "success", text: "发布成功" });
     } catch (err: unknown) {
@@ -198,6 +205,7 @@ export function useSongAdmin(setSongs: SetSongs) {
     closeSongForm,
     csrfToken,
     editSong,
+    expandRow,
     notify,
     requireCsrfToken,
     setSongs,

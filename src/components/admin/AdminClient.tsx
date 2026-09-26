@@ -224,6 +224,7 @@ export default function AdminClientComponent({
                     isExpanded={admin.expandedRows.has(song.id)}
                     toggleRowExpansion={admin.toggleRowExpansion}
                     handleEdit={admin.startEdit}
+                    csrfToken={admin.csrfToken}
                   />
                 ))}
               </div>

@@ -5,10 +5,17 @@ import type { SongDetail } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { formatField } from "@/lib/utils/utils-common";
 import { AdminCoverArt } from "./shared";
+import SongImageryPanel from "./SongImageryPanel";
 import { getMissingFields, isCriticalField, isFieldEmpty } from "./utils";
 
-/** 展开后的完整字段一览 */
-function ExpandedContent({ song }: { song: SongDetail }) {
+/** 展开后的完整字段一览与意象标注 */
+function ExpandedContent({
+  song,
+  csrfToken,
+}: {
+  song: SongDetail;
+  csrfToken: string;
+}) {
   const missing = getMissingFields(song);
 
   return (
@@ -101,6 +108,13 @@ function ExpandedContent({ song }: { song: SongDetail }) {
           );
         })}
       </div>
+
+      {/* 歌曲保存或发布后 updated_at 变化，重置候选（歌词和发布状态可能已变） */}
+      <SongImageryPanel
+        key={song.updated_at}
+        songId={song.id}
+        csrfToken={csrfToken}
+      />
     </div>
   );
 }
@@ -111,12 +125,14 @@ const SongListRow = React.memo(function SongListRow({
   isExpanded,
   toggleRowExpansion,
   handleEdit,
+  csrfToken,
 }: {
   song: SongDetail;
   idx: number;
   isExpanded: boolean;
   toggleRowExpansion: (id: number) => void;
   handleEdit: (song: SongDetail) => void;
+  csrfToken: string;
 }) {
   const missingFields = getMissingFields(song);
   const visibleMissingFields = missingFields.slice(0, 4);
@@ -233,7 +249,7 @@ const SongListRow = React.memo(function SongListRow({
       {/* Expanded Content */}
       {isExpanded && (
         <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-black/20 p-6 animate-in slide-in-from-top-2 duration-200">
-          <ExpandedContent song={song} />
+          <ExpandedContent song={song} csrfToken={csrfToken} />
         </div>
       )}
     </div>

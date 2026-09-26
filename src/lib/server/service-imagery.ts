@@ -393,7 +393,7 @@ export async function deleteMeaning(id: number, accessToken: string) {
  * 意象只允许挂载到叶子分类，以保证公开词云页面的层级着色逻辑正确。
  */
 async function assertLeafCategory(
-  categoryId: number,
+  categoryId: number | number[],
   accessToken: string,
 ): Promise<void> {
   const supabase = getUserClient(accessToken);
@@ -403,7 +403,7 @@ async function assertLeafCategory(
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_CAT)
     .select("id")
-    .eq("parent_id", categoryId)
+    .in("parent_id", Array.isArray(categoryId) ? categoryId : [categoryId])
     .limit(1);
 
   if (error) throw error;
@@ -441,6 +441,53 @@ export async function createOccurrence(
     (created as { id: number }).id,
     accessToken,
   );
+}
+
+/**
+ * 为一首歌批量新增意象标注（预标注审核后一次提交）。
+ * 该歌已标注过的意象会被跳过，避免重复提交或并发编辑产生重复行。
+ */
+export async function createOccurrencesBatch(
+  songId: number,
+  items: Array<{
+    imagery_id: number;
+    category_id: number;
+    lyric_timetag: string[];
+  }>,
+  accessToken: string,
+): Promise<{ created: number; skipped: number }> {
+  if (items.length === 0) return { created: 0, skipped: 0 };
+  await assertLeafCategory(
+    [...new Set(items.map((i) => i.category_id))],
+    accessToken,
+  );
+  const supabase = getUserClient(accessToken);
+  if (!supabase) throw new Error("Supabase client unavailable");
+
+  const { data: existing, error: existingError } = await supabase
+    .from(TABLES.IMAGERY_OCC)
+    .select("imagery_id")
+    .eq("song_id", songId);
+  if (existingError) throw existingError;
+  const taken = new Set(
+    ((existing ?? []) as { imagery_id: number }[]).map((r) => r.imagery_id),
+  );
+  const rows = items
+    .filter((item) => !taken.has(item.imagery_id))
+    .map((item) => ({ ...item, song_id: songId, meaning_id: null }));
+  if (rows.length === 0) return { created: 0, skipped: items.length };
+
+  const { error } = await supabase.from(TABLES.IMAGERY_OCC).insert(rows);
+  if (error) {
+    // song_id 外键指向正式曲库，只在暂存表里的新歌无法挂标注
+    if (error.code === "23503" && error.message.includes("song_id")) {
+      throw Object.assign(new Error("歌曲尚未发布，发布后才能保存意象标注"), {
+        code: "SONG_NOT_PUBLISHED",
+      });
+    }
+    throw error;
+  }
+  return { created: rows.length, skipped: items.length - rows.length };
 }
 
 export async function updateOccurrence(

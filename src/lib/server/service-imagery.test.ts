@@ -26,6 +26,7 @@ import {
   getOccurrencesForSong,
   getSongsForImagery,
   createOccurrence,
+  createOccurrencesBatch,
   getImageryWithCounts,
   updateImagery,
   updateImageryCategory,
@@ -288,6 +289,74 @@ describe("createOccurrence（叶子分类校验）", () => {
       "token",
     );
     expect(result).toMatchObject({ id: 7, song_title: "标题" });
+  });
+});
+
+describe("createOccurrencesBatch", () => {
+  const items = [
+    { imagery_id: 1, category_id: 10, lyric_timetag: ["00:01.00"] },
+    { imagery_id: 2, category_id: 10, lyric_timetag: ["00:02.00"] },
+  ];
+
+  it("跳过该歌已标注的意象，只插入其余的", async () => {
+    const insertBuilder = makeQueryBuilder({ data: null, error: null });
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: [], error: null }), // 叶子校验
+        makeQueryBuilder({ data: [{ imagery_id: 1 }], error: null }), // 已有标注
+        insertBuilder,
+      ]),
+    );
+    const result = await createOccurrencesBatch(5, items, "token");
+    expect(result).toEqual({ created: 1, skipped: 1 });
+    expect(insertBuilder.insert).toHaveBeenCalledWith([
+      {
+        imagery_id: 2,
+        category_id: 10,
+        lyric_timetag: ["00:02.00"],
+        song_id: 5,
+        meaning_id: null,
+      },
+    ]);
+  });
+
+  it("非叶子分类时拒绝整批", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: [{ id: 99 }], error: null }),
+      ]),
+    );
+    await expect(
+      createOccurrencesBatch(5, items, "token"),
+    ).rejects.toMatchObject({ code: "NOT_LEAF_CATEGORY" });
+  });
+
+  it("song_id 外键失败时提示先发布歌曲", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: [], error: null }),
+        makeQueryBuilder({ data: [], error: null }),
+        makeQueryBuilder({
+          data: null,
+          error: {
+            code: "23503",
+            message:
+              'insert or update on table "imagery_occurrences" violates foreign key constraint "imagery_occurrences_song_id_fkey"',
+          },
+        }),
+      ]),
+    );
+    await expect(
+      createOccurrencesBatch(5, items, "token"),
+    ).rejects.toMatchObject({ code: "SONG_NOT_PUBLISHED" });
+  });
+
+  it("空列表直接返回，不访问数据库", async () => {
+    expect(await createOccurrencesBatch(5, [], "token")).toEqual({
+      created: 0,
+      skipped: 0,
+    });
+    expect(getUserClient).not.toHaveBeenCalled();
   });
 });
 

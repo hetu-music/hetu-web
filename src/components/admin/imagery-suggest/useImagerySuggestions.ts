@@ -46,10 +46,26 @@ function initialDraft(s: ImagerySuggestion): SuggestionDraft {
 const IMAGERY_NAME_MAX = 50;
 
 /**
- * 歌曲管理中单首歌的意象标注：加载已有标注、生成预标注候选、审核后批量保存。
+ * 单首歌的意象预标注：生成候选（词典匹配）、AI 校验、审核后批量保存。
+ * 歌曲管理与关系管理共用。
+ *
+ * options.existing 由调用方提供该歌已有的关系时不再自行请求，
+ * 保存后改为调用 options.onSaved 让调用方刷新。
  */
-export function useSongImagery(songId: number, csrfToken: string) {
-  const [existing, setExisting] = useState<OccurrenceWithSong[] | null>(null);
+export function useImagerySuggestions(
+  songId: number,
+  csrfToken: string,
+  options: {
+    existing?: OccurrenceWithSong[];
+    onSaved?: () => Promise<unknown>;
+  } = {},
+) {
+  const { existing: externalExisting, onSaved } = options;
+  const hasExternalExisting = externalExisting !== undefined;
+  const [ownExisting, setOwnExisting] = useState<OccurrenceWithSong[] | null>(
+    null,
+  );
+  const existing = externalExisting ?? ownExisting;
   const [result, setResult] = useState<ImagerySuggestionsResult | null>(null);
   const [drafts, setDrafts] = useState<Record<number, SuggestionDraft>>({});
   const [generating, setGenerating] = useState(false);
@@ -61,21 +77,26 @@ export function useSongImagery(songId: number, csrfToken: string) {
   const nextSyntheticId = useRef(-1);
 
   const loadExisting = useCallback(async () => {
+    if (onSaved) {
+      await onSaved();
+      return;
+    }
     try {
-      setExisting(await apiGetOccurrencesForSong(songId));
+      setOwnExisting(await apiGetOccurrencesForSong(songId));
     } catch (error) {
       setMessage({
         type: "error",
         text: error instanceof Error ? error.message : "获取歌曲意象失败",
       });
     }
-  }, [songId]);
+  }, [onSaved, songId]);
 
   useEffect(() => {
+    if (hasExternalExisting) return;
     let cancelled = false;
     apiGetOccurrencesForSong(songId)
       .then((rows) => {
-        if (!cancelled) setExisting(rows);
+        if (!cancelled) setOwnExisting(rows);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -87,7 +108,7 @@ export function useSongImagery(songId: number, csrfToken: string) {
     return () => {
       cancelled = true;
     };
-  }, [songId]);
+  }, [hasExternalExisting, songId]);
 
   const generate = useCallback(async () => {
     setGenerating(true);
@@ -366,3 +387,4 @@ export function useSongImagery(songId: number, csrfToken: string) {
     save,
   };
 }
+export type ImagerySuggestionsState = ReturnType<typeof useImagerySuggestions>;

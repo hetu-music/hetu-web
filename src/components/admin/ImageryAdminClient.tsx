@@ -386,6 +386,13 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
               onToggleSongPanel={occurrences.toggleSongPanel}
               onSaveRelation={occurrences.saveRelation}
               onDeleteRelation={occurrences.openDeleteOccurrenceModal}
+              onReloadSong={(songId) =>
+                Promise.all([
+                  occurrences.loadOccurrencesForSong(songId),
+                  imagery.refreshItems(),
+                ])
+              }
+              csrfToken={csrfToken}
               getCategoryPath={categories.getCategoryPathFn}
             />
           )}

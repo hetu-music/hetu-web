@@ -2,9 +2,20 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  apiCreateOccurrencesBatch,
+  apiGetImagerySuggestions,
+} from "@/lib/api/client-api";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
 import SongRelationWorkbench from "./SongRelationWorkbench";
+
+vi.mock("@/lib/api/client-api", () => ({
+  apiGetImagerySuggestions: vi.fn(),
+  apiCreateOccurrencesBatch: vi.fn(),
+  apiGetOccurrencesForSong: vi.fn(),
+  apiReviewImagery: vi.fn(),
+}));
 
 const song = {
   id: 7,
@@ -48,6 +59,7 @@ function occurrence(
 
 const onSave = vi.fn();
 const onDelete = vi.fn();
+const onReload = vi.fn();
 
 function renderWorkbench(occurrences: OccurrenceWithSong[] = []) {
   return render(
@@ -60,8 +72,10 @@ function renderWorkbench(occurrences: OccurrenceWithSong[] = []) {
       meanings={[]}
       submitting={false}
       getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
+      csrfToken="csrf"
       onSave={onSave}
       onDelete={onDelete}
+      onReload={onReload}
     />,
   );
 }
@@ -73,6 +87,7 @@ const line = (container: HTMLElement, tag: string) =>
 beforeEach(() => {
   onSave.mockReset().mockResolvedValue(true);
   onDelete.mockReset();
+  onReload.mockReset().mockResolvedValue(undefined);
   Element.prototype.scrollIntoView = vi.fn();
 });
 
@@ -182,5 +197,61 @@ describe("SongRelationWorkbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "删除「明月」" }));
     expect(onDelete).toHaveBeenCalledWith(1, "明月");
     expect(screen.queryByText("编辑关系 #1")).toBeNull();
+  });
+
+  it("候选审核：生成候选后在歌词中标出，批量保存后刷新关系", async () => {
+    vi.mocked(apiGetImagerySuggestions).mockResolvedValue({
+      published: true,
+      hasLyrics: true,
+      llmEnabled: false,
+      suggestions: [
+        {
+          imageryId: 2,
+          name: "天涯",
+          timetags: ["00:10.00", "01:10.00"],
+          lines: ["明月照亮天涯", "明月照亮天涯"],
+          categoryIds: [200],
+          seen: 10,
+          annotated: 5,
+          rate: 0.5,
+          recommended: true,
+        },
+      ],
+      categories: [{ id: 200, label: "自然事物 / 地理 / 区域" }],
+      dictionary: [{ id: 2, name: "天涯", categoryIds: [200] }],
+    });
+    vi.mocked(apiCreateOccurrencesBatch).mockResolvedValue({
+      created: 1,
+      skipped: 0,
+      newImagery: 0,
+    });
+    const { container } = renderWorkbench([
+      occurrence({ id: 1, lyric_timetag: ["00:10.00"] }),
+    ]);
+
+    fireEvent.click(screen.getByRole("tab", { name: /候选审核/ }));
+    fireEvent.click(screen.getByRole("button", { name: "从歌词生成候选" }));
+    expect(
+      await screen.findByRole("tab", { name: "候选审核 1/1" }),
+    ).toBeTruthy();
+
+    // 已有关系与勾选的候选在同一行里各自高亮
+    const marks = [...line(container, "00:10.00").querySelectorAll("mark")];
+    expect(marks.map((m) => m.textContent)).toEqual(["明月", "天涯"]);
+    expect(marks[1].className).toContain("emerald");
+
+    fireEvent.click(screen.getByRole("button", { name: "保存选中" }));
+    await vi.waitFor(() => expect(onReload).toHaveBeenCalled());
+    expect(apiCreateOccurrencesBatch).toHaveBeenCalledWith(
+      7,
+      [
+        {
+          imagery_id: 2,
+          category_id: 200,
+          lyric_timetag: ["00:10.00", "01:10.00"],
+        },
+      ],
+      "csrf",
+    );
   });
 });

@@ -25,7 +25,9 @@ export default function OccurrencesTab({
   onToggleSongPanel,
   onSaveRelation,
   onDeleteRelation,
+  onReloadSong,
   getCategoryPath,
+  csrfToken,
 }: {
   songSearchTerm: string;
   songsLoading: boolean;
@@ -51,7 +53,10 @@ export default function OccurrencesTab({
     songId: number,
     label: string,
   ) => void;
+  /** 候选批量保存后刷新该歌的关系与意象列表 */
+  onReloadSong: (songId: number) => Promise<unknown>;
   getCategoryPath: (categoryId: number) => string;
+  csrfToken: string;
 }) {
   if (songsLoading) return <LoadingState text="加载歌曲中…" />;
   if (pagedSongs.length === 0) {
@@ -128,6 +133,8 @@ export default function OccurrencesTab({
                   meanings={meanings}
                   submitting={occurrenceSubmitting}
                   getCategoryPath={getCategoryPath}
+                  csrfToken={csrfToken}
+                  onReload={() => onReloadSong(song.id)}
                   onSave={(occurrenceId, draft) =>
                     onSaveRelation(song.id, occurrenceId, draft)
                   }

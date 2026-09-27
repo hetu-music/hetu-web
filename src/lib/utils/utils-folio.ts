@@ -205,6 +205,14 @@ function cleanExcerpt(text: string): string {
 }
 
 /**
+ * 摘句竖排时每个短语占一列。列数与每列字数在各尺寸屏幕上一致：
+ * 窄屏靠缩小字号放进封面旁的留白，列太多或太长就只能缩到看不清。
+ */
+const EXCERPT_MIN_CHARS = 4;
+const EXCERPT_MAX_COLUMNS = 3;
+const EXCERPT_MAX_COLUMN_CHARS = 9;
+
+/**
  * 卷首摘句：意象最密集、长度适合竖排的一句；同分取靠前者。
  * 没有意象标注时取第一句长度合适的歌词。
  */
@@ -213,8 +221,13 @@ export function pickExcerpt(
   marked: MarkedLine[],
 ): string | null {
   const fits = (text: string) => {
-    const len = Array.from(text.replace(/\s+/g, "")).length;
-    return len >= 4 && len <= 16;
+    const columns = text.split(" ").map((c) => Array.from(c).length);
+    const total = columns.reduce((a, b) => a + b, 0);
+    return (
+      total >= EXCERPT_MIN_CHARS &&
+      columns.length <= EXCERPT_MAX_COLUMNS &&
+      columns.every((n) => n <= EXCERPT_MAX_COLUMN_CHARS)
+    );
   };
   let best: string | null = null;
   let bestScore = -1;

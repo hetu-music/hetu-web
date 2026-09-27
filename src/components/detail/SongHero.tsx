@@ -67,31 +67,36 @@ export default function SongHero({
       id="info"
       className="relative grid gap-10 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-x-16 items-end pb-16 md:pb-20"
     >
-      {/* 封面 */}
-      <button
-        type="button"
-        onClick={() => !coverFailed && onOpenCover()}
-        aria-label={t("viewCover")}
-        className="group relative block w-56 sm:w-64 lg:w-full aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 shadow-[0_30px_60px_-20px_rgba(15,23,42,0.35)] dark:shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)] ring-1 ring-slate-900/5 dark:ring-white/10"
-      >
-        {coverFailed ? (
-          <span className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
-            <Disc size={40} className="mb-2 opacity-50" />
-            <span className="text-xs">{t("noCover")}</span>
-          </span>
-        ) : (
-          <Image
-            src={getCoverUrl(song)}
-            alt={song.title}
-            width={500}
-            height={500}
-            preload
-            onLoad={(e) => onCoverLoad(e.currentTarget)}
-            onError={() => setCoverFailed(true)}
-            className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover:scale-[1.03]"
-          />
+      {/* 封面；窄屏时右侧的留白放竖排摘句，宽屏时摘句移到标题栏右侧 */}
+      <div className="@container flex items-start justify-between gap-4 lg:block [--cover:min(62cqw,24rem)]">
+        <button
+          type="button"
+          onClick={() => !coverFailed && onOpenCover()}
+          aria-label={t("viewCover")}
+          className="group relative block shrink-0 w-(--cover) lg:w-full aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 shadow-[0_30px_60px_-20px_rgba(15,23,42,0.35)] dark:shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)] ring-1 ring-slate-900/5 dark:ring-white/10"
+        >
+          {coverFailed ? (
+            <span className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+              <Disc size={40} className="mb-2 opacity-50" />
+              <span className="text-xs">{t("noCover")}</span>
+            </span>
+          ) : (
+            <Image
+              src={getCoverUrl(song)}
+              alt={song.title}
+              width={500}
+              height={500}
+              preload
+              onLoad={(e) => onCoverLoad(e.currentTarget)}
+              onError={() => setCoverFailed(true)}
+              className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover:scale-[1.03]"
+            />
+          )}
+        </button>
+        {excerptColumns.length > 0 && (
+          <CompactExcerpt columns={excerptColumns} />
         )}
-      </button>
+      </div>
 
       <div className="relative min-w-0 lg:pr-36 lg:self-stretch lg:flex lg:flex-col lg:justify-end">
         {/* 类型 · 流派 · 年份 */}
@@ -122,22 +127,14 @@ export default function SongHero({
           </dl>
         )}
 
-        {/* 窄屏：摘句横排 */}
-        {excerpt && (
-          <p className="lg:hidden mt-8 flex items-center gap-3 font-kaiti text-lg text-slate-600 dark:text-slate-300">
-            <span className="w-6 h-px bg-(--tone)" aria-hidden />
-            {excerpt}
-          </p>
-        )}
-
-        {/* 意象题签 */}
+        {/* 意象题签；窄屏折行时间隔点会挂在行首，只在宽屏用间隔点 */}
         {stripMarks.length > 0 && (
-          <div className="mt-10 flex flex-wrap items-baseline gap-x-1 gap-y-3">
+          <div className="mt-10 flex flex-wrap items-baseline gap-x-5 gap-y-3 lg:gap-x-1">
             {stripMarks.map((mark, i) => (
               <React.Fragment key={mark.id}>
                 {i > 0 && (
                   <span
-                    className="text-slate-300 dark:text-slate-700 px-1.5"
+                    className="hidden lg:inline text-slate-300 dark:text-slate-700 px-1.5"
                     aria-hidden
                   >
                     ·
@@ -163,8 +160,10 @@ export default function SongHero({
               </React.Fragment>
             ))}
             {imageryTotal > stripMarks.length && (
-              <span className="ml-3 text-xs text-slate-400 dark:text-slate-500 tracking-wider">
-                {t("folio.imageryMore")} ·{" "}
+              <span className="basis-full lg:basis-auto lg:ml-3 text-xs text-slate-400 dark:text-slate-500 tracking-wider">
+                <span className="hidden lg:inline">
+                  {t("folio.imageryMore")} ·{" "}
+                </span>
                 {t("folio.imageryTotal", { count: imageryTotal })}
               </span>
             )}
@@ -189,7 +188,7 @@ export default function SongHero({
             className="hidden lg:flex absolute right-0 top-0 flex-row-reverse items-start gap-5"
           >
             <span className="w-px h-20 mt-1 bg-(--tone)/60" />
-            {excerptColumns.slice(0, 3).map((col, i) => (
+            {excerptColumns.map((col, i) => (
               <span
                 key={i}
                 className="font-calligraphy text-[1.7rem] leading-none tracking-[0.35em] text-slate-700/85 dark:text-slate-300/85 [writing-mode:vertical-rl]"
@@ -202,5 +201,50 @@ export default function SongHero({
         )}
       </div>
     </header>
+  );
+}
+
+/** 竖排摘句的字距与逐列错落，均以字号为单位 */
+const COMPACT_TRACKING = 0.3;
+const COMPACT_STAGGER = 1.5;
+const COMPACT_GAP = 0.55;
+
+/**
+ * 窄屏的竖排摘句，放在封面右侧的留白里。
+ * 字号纯用 CSS 算：既要让最长的一列（连同错落）不高于封面，
+ * 又要让所有列并排不宽于剩余空间，取两者与上限中的最小值。
+ */
+function CompactExcerpt({ columns }: { columns: string[] }) {
+  const heightEm = Math.max(
+    ...columns.map(
+      (col, i) =>
+        Array.from(col).length * (1 + COMPACT_TRACKING) + i * COMPACT_STAGGER,
+    ),
+  );
+  // 各列宽 1em，列间距与左侧细线各占一个间距
+  const widthEm = columns.length + columns.length * COMPACT_GAP;
+  return (
+    <div
+      aria-hidden
+      className="lg:hidden flex flex-row-reverse items-start"
+      style={{
+        gap: `${COMPACT_GAP}em`,
+        fontSize: `min(calc(var(--cover) / ${heightEm}), calc((100cqw - var(--cover) - 1rem) / ${widthEm}), 1.75rem)`,
+      }}
+    >
+      <span className="w-px h-[3em] bg-(--tone)/60" />
+      {columns.map((col, i) => (
+        <span
+          key={i}
+          className="font-calligraphy leading-none text-slate-700/85 dark:text-slate-300/85 [writing-mode:vertical-rl]"
+          style={{
+            letterSpacing: `${COMPACT_TRACKING}em`,
+            marginTop: `${i * COMPACT_STAGGER}em`,
+          }}
+        >
+          {col}
+        </span>
+      ))}
+    </div>
   );
 }

@@ -126,6 +126,21 @@ describe("pickExcerpt", () => {
     expect(pickExcerpt(lines.slice(1), marked.slice(1))).toBe("读罢《离骚》");
   });
 
+  it("列数或单列字数超出竖排限制的句子不选", () => {
+    const { lines } = buildFolio(
+      [
+        "[00:01.00]无妨愿者上钩随其缘且看", // 单列 11 字
+        "[00:04.00]一 二 三 四", // 4 列
+        "[00:07.00]钟爱枕草听牧笛 放鹤归山",
+      ].join("\n"),
+    );
+    const marked = markLines(lines, [
+      { id: 1, name: "钩", timetags: ["00:01.00"] },
+      { id: 2, name: "二", timetags: ["00:04.00"] },
+    ]);
+    expect(pickExcerpt(lines, marked)).toBe("钟爱枕草听牧笛 放鹤归山");
+  });
+
   it("没有标注时取第一句长度合适的歌词", () => {
     const { lines } = buildFolio("[00:01.00]啊\n[00:04.00]春风十里");
     expect(pickExcerpt(lines, markLines(lines, []))).toBe("春风十里");

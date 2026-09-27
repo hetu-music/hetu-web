@@ -1,5 +1,11 @@
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
-import type { CommentAnchor, SongComment } from "@/lib/types";
+import { getSongsByIds } from "@/lib/server/service-songs";
+import type {
+  CommentAnchor,
+  MyComment,
+  MyCommentGroup,
+  SongComment,
+} from "@/lib/types";
 import {
   COMMENT_BODY_MAX,
   COMMENT_QUOTE_MAX,
@@ -147,6 +153,110 @@ export async function listSongComments(
       editedAt: r.edited_at,
     };
   });
+}
+
+/**
+ * 个人页：自己写过的批注与回复，按歌分组，最近写过的歌在前。
+ * 自己的行用用户会话读（RLS 允许读自己的正常与待审批注）；
+ * 歌名、所回复的批注及其作者要跨用户读，走高权限客户端。
+ */
+export async function listMyComments(
+  supabase: SupabaseClient,
+  userId: string,
+  locale: string,
+): Promise<MyCommentGroup[]> {
+  const { data, error } = await supabase
+    .from(TABLES.COMMENTS)
+    .select(FIELDS + ", song_id")
+    .eq("user_id", userId)
+    .in("status", [STATUS.NORMAL, STATUS.PENDING])
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as (CommentRow & { song_id: number })[];
+  if (rows.length === 0) return [];
+
+  const db = getServiceClient();
+  const songIds = [...new Set(rows.map((r) => r.song_id))];
+  const parentIds = [
+    ...new Set(
+      rows.flatMap((r) => (r.parent_id === null ? [] : [r.parent_id])),
+    ),
+  ];
+
+  const [songs, parentsRes] = await Promise.all([
+    getSongsByIds(songIds, locale),
+    db && parentIds.length > 0
+      ? db
+          .from(TABLES.COMMENTS)
+          .select("id, user_id, body, status, anchor, anchor_quote")
+          .in("id", parentIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (parentsRes.error) throw parentsRes.error;
+  const parents = new Map(
+    (
+      (parentsRes.data ?? []) as {
+        id: number;
+        user_id: string;
+        body: string;
+        status: number;
+        anchor: CommentAnchor;
+        anchor_quote: string | null;
+      }[]
+    ).map((p) => [p.id, p]),
+  );
+
+  const authorIds = [...parents.values()].map((p) => p.user_id);
+  const names = new Map<string, string | null>();
+  if (db && authorIds.length > 0) {
+    const { data: users, error: usersError } = await db
+      .from(TABLES.USERS)
+      .select("id, name")
+      .in("id", [...new Set(authorIds)]);
+    if (usersError) throw usersError;
+    for (const u of (users ?? []) as { id: string; name: string | null }[]) {
+      names.set(u.id, u.name);
+    }
+  }
+
+  const songById = new Map(songs.map((s) => [s.id, s]));
+  const groups = new Map<number, MyCommentGroup>();
+  for (const r of rows) {
+    const song = songById.get(r.song_id);
+    if (!song) continue;
+    const parent = r.parent_id !== null ? parents.get(r.parent_id) : undefined;
+    const parentLive = parent && parent.status === STATUS.NORMAL;
+    const comment: MyComment = {
+      id: r.id,
+      anchor: (parent ? parent.anchor : r.anchor) ?? "song",
+      anchorQuote: parent ? parent.anchor_quote : r.anchor_quote,
+      body: r.body,
+      private: r.visibility === VISIBILITY.PRIVATE,
+      pending: r.status === STATUS.PENDING,
+      likeCount: r.like_count,
+      createdAt: r.created_at,
+      editedAt: r.edited_at,
+      isReply: r.parent_id !== null,
+      replyTo: parentLive
+        ? { author: names.get(parent.user_id) ?? null, body: parent.body }
+        : null,
+    };
+    const group = groups.get(r.song_id);
+    if (group) group.comments.push(comment);
+    else
+      groups.set(r.song_id, {
+        song: {
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          hascover: song.hascover ?? null,
+        },
+        comments: [comment],
+      });
+  }
+  // rows 已按时间倒序，Map 的插入顺序即「最近写过的歌在前」
+  return [...groups.values()];
 }
 
 // ─── 写入 ────────────────────────────────────────────────────────────────────

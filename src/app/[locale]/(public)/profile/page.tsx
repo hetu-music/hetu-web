@@ -6,6 +6,7 @@ import RequestsPanel from "@/components/admin/RequestsPanel";
 import FeedbackAndBenefitsPanel from "@/components/profile/FeedbackAndBenefitsPanel";
 import ProfileHeaderCard from "@/components/profile/ProfileHeaderCard";
 import FavoritesTabContent from "@/components/profile/FavoritesTabContent";
+import AnnotationsTabContent from "@/components/profile/AnnotationsTabContent";
 import AccountTabContent from "@/components/profile/AccountTabContent";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useUserContext } from "@/context/UserContext";
@@ -20,6 +21,7 @@ import {
   Home,
   Loader2,
   MessageSquare,
+  PenLine,
   Settings,
   Users,
 } from "lucide-react";
@@ -27,9 +29,16 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { Suspense, useCallback, useEffect } from "react";
 
 type TabType =
-  "favorites" | "account" | "feedback" | "users" | "logs" | "requests";
+  | "favorites"
+  | "annotations"
+  | "account"
+  | "feedback"
+  | "users"
+  | "logs"
+  | "requests";
 const PROFILE_TABS = [
   "favorites",
+  "annotations",
   "account",
   "feedback",
   "users",
@@ -138,6 +147,7 @@ function ProfileContent() {
               {(
                 [
                   "favorites",
+                  "annotations",
                   "account",
                   "feedback",
                   ...(user?.isAdmin ? (["requests"] as TabType[]) : []),
@@ -160,6 +170,7 @@ function ProfileContent() {
                       className={cn(activeTab === tab && "fill-current")}
                     />
                   )}
+                  {tab === "annotations" && <PenLine size={14} />}
                   {tab === "account" && <Settings size={14} />}
                   {tab === "feedback" && <MessageSquare size={14} />}
                   {tab === "requests" && <ClipboardList size={14} />}
@@ -175,6 +186,8 @@ function ProfileContent() {
           <div className="flex-1 w-full min-w-0">
             <div className="flex-1 flex flex-col">
               {activeTab === "favorites" && <FavoritesTabContent />}
+
+              {activeTab === "annotations" && <AnnotationsTabContent />}
 
               {activeTab === "account" && <AccountTabContent />}
 

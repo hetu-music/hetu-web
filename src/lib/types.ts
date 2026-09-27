@@ -111,6 +111,28 @@ export interface SongComment {
   editedAt: string | null;
 }
 
+// 个人页「我的批注」：按歌分组
+export interface MyComment {
+  id: number;
+  /** 回复的 anchor 取自所回复的批注 */
+  anchor: CommentAnchor;
+  anchorQuote: string | null;
+  body: string;
+  private: boolean;
+  pending: boolean;
+  likeCount: number;
+  createdAt: string;
+  editedAt: string | null;
+  /** 回复时，所回复的那则批注（已删则为 null） */
+  replyTo: { author: string | null; body: string } | null;
+  isReply: boolean;
+}
+
+export interface MyCommentGroup {
+  song: Pick<Song, "id" | "title" | "artist" | "hascover">;
+  comments: MyComment[];
+}
+
 // 筛选选项类型
 export interface FilterOptions {
   allTypes: string[];

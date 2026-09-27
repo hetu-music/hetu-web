@@ -16,6 +16,7 @@ import {
   createComment,
   createCommentSchema,
   likeComment,
+  listMyComments,
   listSongComments,
 } from "./service-comments";
 
@@ -244,5 +245,87 @@ describe("likeComment", () => {
         1,
       ),
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("listMyComments", () => {
+  beforeEach(() => vi.mocked(getServiceClient).mockReset());
+
+  it("按歌分组，回复带上所回复的批注；原批注已删时为 null", async () => {
+    const mine = makeQueryBuilder({
+      data: [
+        row({ id: 5, song_id: 2, parent_id: 1, anchor: null, user_id: "me" }),
+        row({
+          id: 4,
+          song_id: 3,
+          anchor: "lyrics",
+          anchor_quote: "我搁苍山一柄剑",
+          visibility: 1,
+          user_id: "me",
+        }),
+        row({ id: 3, song_id: 2, parent_id: 9, anchor: null, user_id: "me" }),
+      ],
+      error: null,
+    });
+    const parents = makeQueryBuilder({
+      data: [
+        {
+          id: 1,
+          user_id: "u2",
+          body: "原批",
+          status: 0,
+          anchor: "notes",
+          anchor_quote: "第一段",
+        },
+        {
+          id: 9,
+          user_id: "u2",
+          body: "",
+          status: 3,
+          anchor: "song",
+          anchor_quote: null,
+        },
+      ],
+      error: null,
+    });
+    const users = makeQueryBuilder({
+      data: [{ id: "u2", name: "他" }],
+      error: null,
+    });
+    const songs = makeQueryBuilder({
+      data: [
+        { id: 2, title: "甲", artist: ["河图"], hascover: true },
+        { id: 3, title: "乙", artist: null, hascover: false },
+      ],
+      error: null,
+    });
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([songs, parents, users]),
+    );
+
+    const groups = await listMyComments(
+      createMockSupabaseClient([mine]),
+      "me",
+      "zh-CN",
+    );
+    expect(mine.eq).toHaveBeenCalledWith("user_id", "me");
+    expect(groups.map((g) => [g.song.id, g.comments.map((c) => c.id)])).toEqual(
+      [
+        [2, [5, 3]],
+        [3, [4]],
+      ],
+    );
+    expect(groups[0].comments[0]).toMatchObject({
+      isReply: true,
+      anchor: "notes",
+      anchorQuote: "第一段",
+      replyTo: { author: "他", body: "原批" },
+    });
+    expect(groups[0].comments[1].replyTo).toBeNull();
+    expect(groups[1].comments[0]).toMatchObject({
+      isReply: false,
+      anchor: "lyrics",
+      private: true,
+    });
   });
 });

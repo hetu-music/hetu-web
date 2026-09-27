@@ -9,7 +9,7 @@ import { ArrowUpRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
-/** 这些角色已在署名与基本信息里，制作名单不再重复 */
+/** 这些角色已在署名与基本信息里，参与制作中不再重复 */
 const CREDIT_ROLES_SHOWN = new Set([
   "词",
   "作词",
@@ -26,7 +26,7 @@ interface SongColophonProps {
   credits: FolioCredit[];
 }
 
-/** 版记：基本信息、制作名单、收听渠道，排成书籍版权页的样子 */
+/** 版记：基本信息、参与制作、收听渠道，排成书籍版权页的样子 */
 export default function SongColophon({ song, credits }: SongColophonProps) {
   const t = useTranslations("song");
   const tCommon = useTranslations("common");

@@ -24,7 +24,7 @@
     }
   },
   "annotations": {
-    "summary": "共 {count} 则批注，涉及 {songs} 首歌",
+    "summary": "共 {count} 则批评，涉及 {songs} 首歌",
     "count": "{count} 则",
     "filter": {
       "all": "全部",

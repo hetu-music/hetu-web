@@ -101,7 +101,7 @@
     "collapse": "收起",
     "comments": {
       "intro": "批注写在字句旁；这里是对整首歌的评点。",
-      "count": "共 {count} 则批注",
+      "count": "共 {count} 则批评",
       "empty": "还没有人评点这首歌。",
       "anonymous": "佚名",
       "private": "私批",
@@ -121,7 +121,7 @@
       "annotateLine": "批注这一句",
       "annotateParagraph": "批注这一段",
       "annotateScore": "批注乐谱",
-      "markerLabel": "{count} 则批注",
+      "markerLabel": "{count} 则批评",
       "playFrom": "从此句播放",
       "inline": "夹批",
       "orphan": "原句已改：",

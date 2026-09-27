@@ -46,6 +46,13 @@ export async function proxy(request: NextRequest) {
   // 严格 CSP 里同时带 'strict-dynamic' 和这些 host：支持 CSP3 的浏览器会忽略
   // host 白名单只认 nonce，不支持的老浏览器则回退到 host 白名单——这是规范
   // 推荐的向后兼容写法，两者都要留。
+  // 开发服务器只有 http：用局域网 IP 在手机上调试时，升级成 https 的资源全都加载失败
+  // （localhost 被浏览器视为安全来源，不受影响，所以平时看不出来）
+  const httpsOnly = isDev
+    ? ""
+    : "block-all-mixed-content; upgrade-insecure-requests;";
+  // 开发模式下 React 要用 eval 还原调用栈，手机上的调试控制台也靠 eval 执行输入
+  const devEval = isDev ? "'unsafe-eval'" : "";
   let cspHeader = "";
 
   if (useNonce) {
@@ -63,15 +70,14 @@ export async function proxy(request: NextRequest) {
       form-action 'self';
       frame-ancestors 'none';
       frame-src 'self' https://challenges.cloudflare.com;
-      block-all-mixed-content;
-      upgrade-insecure-requests;
+      ${httpsOnly}
     `
       .replace(/\s{2,}/g, " ")
       .trim();
   } else {
     cspHeader = `
       default-src 'self';
-      script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com;
+      script-src 'self' 'unsafe-inline' ${devEval} https://challenges.cloudflare.com https://static.cloudflareinsights.com;
       worker-src 'self' blob:;
       style-src 'self' 'unsafe-inline';
       img-src 'self' blob: data: https://cover.hetu-music.com;
@@ -83,8 +89,7 @@ export async function proxy(request: NextRequest) {
       form-action 'self';
       frame-ancestors 'none';
       frame-src 'self' https://challenges.cloudflare.com;
-      block-all-mixed-content;
-      upgrade-insecure-requests;
+      ${httpsOnly}
     `
       .replace(/\s{2,}/g, " ")
       .trim();

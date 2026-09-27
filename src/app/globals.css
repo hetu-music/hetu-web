@@ -205,10 +205,9 @@
 
 /* 歌词中的意象：中文排版的着重号，颜色取意象一级分类色（--mark） */
 .imagery-mark {
-  --emphasis: color-mix(in oklab, var(--mark) 75%, transparent);
   cursor: pointer;
   text-emphasis: filled dot;
-  text-emphasis-color: var(--emphasis);
+  text-emphasis-color: color-mix(in oklab, var(--mark) 75%, transparent);
   text-emphasis-position: under right;
   transition: color 0.3s ease;
 
@@ -218,21 +217,13 @@
   }
 
   &[data-active="true"] {
-    --emphasis: var(--mark);
+    text-emphasis-color: var(--mark);
   }
 
   :where(.dark) &:hover,
   :where(.dark) &[data-active="true"] {
     color: color-mix(in oklab, var(--mark) 55%, white);
   }
-}
-
-/* Safari 只认带 -webkit- 前缀的着重号。构建时 lightningcss 会把同一规则里的
-   前缀写法并进无前缀的那条，所以另起一条选择器不同的规则 */
-:where(.imagery-mark) {
-  -webkit-text-emphasis: filled dot;
-  -webkit-text-emphasis-color: var(--emphasis);
-  -webkit-text-emphasis-position: under right;
 }
 
 /* Tooltip 出现 */

@@ -2,18 +2,20 @@
 
 import React, { useRef } from "react";
 import { Heart } from "lucide-react";
+import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import { useFavorites } from "@/context/FavoritesContext";
+import { cn } from "@/lib/utils/utils";
 
 interface FavoriteButtonProps {
   songId: number;
-  /** "icon" = 圆形浮动按钮风格，"inline" = 内联小按钮 */
-  variant?: "icon" | "inline";
+  /** "nav" = 顶栏图标按钮，"inline" = 内联小按钮 */
+  variant?: "nav" | "inline";
   className?: string;
 }
 
 const FavoriteButton: React.FC<FavoriteButtonProps> = ({
   songId,
-  variant = "icon",
+  variant = "nav",
   className = "",
 }) => {
   const { isFavorite, toggleFavorite, loaded, isLoggedIn } = useFavorites();
@@ -60,11 +62,14 @@ const FavoriteButton: React.FC<FavoriteButtonProps> = ({
       onClick={handleClick}
       aria-label={active ? "取消收藏" : "收藏"}
       title={active ? "取消收藏" : "收藏"}
-      className={`p-3 rounded-full bg-white dark:bg-slate-800 shadow-lg shadow-slate-200/50 dark:shadow-black/50 ring-1 ring-slate-900/5 dark:ring-white/10 hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center ${
+      aria-pressed={active}
+      className={cn(
+        NAV_BUTTON_CLASS,
         active
-          ? "text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-          : "text-slate-600 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-500 dark:hover:text-rose-400"
-      } ${className}`}
+          ? "text-rose-500 dark:text-rose-400"
+          : "hover:text-rose-500 dark:hover:text-rose-400",
+        className,
+      )}
     >
       <Heart size={20} className={active ? "fill-current" : ""} />
     </button>

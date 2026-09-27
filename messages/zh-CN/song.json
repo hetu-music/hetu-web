@@ -45,8 +45,7 @@
     "lyrics": "歌词",
     "score": "乐谱",
     "comment": "备注",
-    "toc": "目录导航",
-    "jumpTo": "跳转到{label}"
+    "toc": "目录导航"
   },
   "noLyrics": "暂无歌词",
   "noScore": "暂无乐谱",
@@ -72,6 +71,7 @@
       "arranger": "编",
       "artist": "唱"
     },
+    "toc": "目录",
     "sections": {
       "cover": "卷首",
       "text": "歌词",

@@ -5,7 +5,9 @@ import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
 import { useUserContext } from "@/context/UserContext";
 import { cn } from "@/lib/utils/utils";
 import MoreMenu from "@/components/shared/MoreMenu";
-import { Info, User } from "lucide-react";
+import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
+import { InstallButton } from "@/components/pwa/useInstallAction";
+import { Info, Share2, User } from "lucide-react";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import React, { forwardRef, useCallback } from "react";
 
@@ -13,12 +15,21 @@ interface AppNavbarProps {
   title: React.ReactNode;
   onTitleClick: () => void;
   onAboutClick?: () => void;
+  /** 分享本页：宽屏平铺在顶栏，窄屏收进「更多」 */
+  onShare?: () => void;
   titleTooltip?: string;
   className?: string;
 }
 
 const AppNavbar = forwardRef<HTMLElement, AppNavbarProps>(function AppNavbar(
-  { title, onTitleClick, onAboutClick, titleTooltip = "返回首页", className },
+  {
+    title,
+    onTitleClick,
+    onAboutClick,
+    onShare,
+    titleTooltip = "返回首页",
+    className,
+  },
   ref,
 ) {
   const router = useRouter();
@@ -81,15 +92,39 @@ const AppNavbar = forwardRef<HTMLElement, AppNavbarProps>(function AppNavbar(
             />
           </button>
 
-          {/* PC端显示的 语言 和 主题切换 */}
+          {/* PC端平铺 分享、安装、语言 和 主题切换 */}
           <div className="hidden md:flex items-center gap-2">
+            {onShare && (
+              <button
+                onClick={onShare}
+                className={NAV_BUTTON_CLASS}
+                title="分享"
+                aria-label="分享"
+              >
+                <Share2 size={20} />
+              </button>
+            )}
+            <InstallButton className={NAV_BUTTON_CLASS} />
             <LocaleSwitcher />
             <ThemeToggle />
           </div>
 
           {/* 移动端显示的“更多”下拉菜单 */}
           <div className="flex md:hidden relative">
-            <MoreMenu />
+            <MoreMenu
+              actions={
+                onShare
+                  ? [
+                      {
+                        key: "share",
+                        icon: Share2,
+                        label: "分享",
+                        onClick: onShare,
+                      },
+                    ]
+                  : []
+              }
+            />
           </div>
         </div>
       </div>

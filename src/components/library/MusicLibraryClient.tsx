@@ -335,6 +335,7 @@ export default function MusicLibraryClient({
         }
         onTitleClick={handleTitleReset}
         onAboutClick={() => setShowAbout(true)}
+        onShare={handleShare}
         titleTooltip={t("titleTooltip")}
       />
 
@@ -591,7 +592,6 @@ export default function MusicLibraryClient({
       <FloatingActionButtons
         showScrollTop={showScrollTop}
         onScrollToTop={scrollToTop}
-        onShare={handleShare}
       />
     </div>
   );

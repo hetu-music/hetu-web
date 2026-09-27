@@ -45,8 +45,7 @@
     "lyrics": "歌詞",
     "score": "樂譜",
     "comment": "備註",
-    "toc": "目錄導航",
-    "jumpTo": "跳轉到{label}"
+    "toc": "目錄導航"
   },
   "noLyrics": "暫無歌詞",
   "noScore": "暫無樂譜",
@@ -72,6 +71,7 @@
       "arranger": "編",
       "artist": "唱"
     },
+    "toc": "目錄",
     "sections": {
       "cover": "卷首",
       "text": "歌詞",

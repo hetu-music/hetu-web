@@ -23,7 +23,9 @@ export default function ImageryCaption({
   onClose,
 }: ImageryCaptionProps) {
   const t = useTranslations("song.folio");
-  const hasPlayer = usePlayerStore((s) => !!s.currentTrack);
+  const playerShown = usePlayerStore(
+    (s) => !!s.currentTrack && s.playerVisible,
+  );
 
   useEffect(() => {
     if (!mark) return;
@@ -45,8 +47,8 @@ export default function ImageryCaption({
           exit={{ opacity: 0, y: 16, filter: "blur(4px)" }}
           transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
           className={cn(
-            "fixed z-40 left-4 right-20 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-md",
-            hasPlayer ? "bottom-[112px]" : "bottom-8",
+            "fixed z-40 inset-x-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-md",
+            playerShown ? "bottom-[112px]" : "bottom-8",
           )}
         >
           <div className="flex items-center gap-4 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] px-5 py-4">

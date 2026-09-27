@@ -10,17 +10,22 @@ import RelatedWorks from "@/components/detail/RelatedWorks";
 import ScoreSection from "@/components/detail/ScoreSection";
 import SongColophon from "@/components/detail/SongColophon";
 import SongHero from "@/components/detail/SongHero";
-import TableOfContents, {
+import {
   type NavItem,
-} from "@/components/detail/TableOfContents";
+  ReadingProgress,
+  SectionNav,
+  SectionSheet,
+  useActiveSection,
+} from "@/components/detail/SectionNav";
+import { InstallButton } from "@/components/pwa/useInstallAction";
 import FavoriteButton from "@/components/shared/FavoriteButton";
-import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import ImageModal from "@/components/shared/ImageModal";
 import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
-import MoreMenu from "@/components/shared/MoreMenu";
+import MoreMenu, { type MoreMenuAction } from "@/components/shared/MoreMenu";
+import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
+import PlayerToggle from "@/components/shared/PlayerToggle";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useUserContext } from "@/context/UserContext";
-import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
@@ -36,7 +41,7 @@ import {
   NEUTRAL_TONE,
   toneFromImage,
 } from "@/lib/utils/utils-tone";
-import { ArrowLeft, Home, User } from "lucide-react";
+import { ArrowLeft, Home, Share2, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, {
   useCallback,
@@ -60,7 +65,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const { user, loaded: userLoaded } = useUserContext();
   const hasBenefits = userLoaded && !!user?.hasBenefits;
 
-  const { showScrollTop, scrollToTop } = useScrollTop();
   const [tone, setTone] = useState<CoverTone | null>(null);
   const [activeImagery, setActiveImagery] = useState<number | null>(null);
   const [imageModal, setImageModal] = useState<{
@@ -234,6 +238,23 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     return items;
   }, [song.nmn_status, imagery.related.length, notes, t]);
 
+  const activeSection = useActiveSection(tocItems);
+  const [tocOpen, setTocOpen] = useState(false);
+
+  const goHome = useCallback(() => router.push("/"), [router]);
+  const moreActions = useMemo<MoreMenuAction[]>(
+    () => [
+      {
+        key: "share",
+        icon: Share2,
+        label: t("actions.share"),
+        onClick: handleShare,
+      },
+      { key: "home", icon: Home, label: tNav("home"), onClick: goHome },
+    ],
+    [t, tNav, handleShare, goHome],
+  );
+
   const appliedTone = tone ?? NEUTRAL_TONE;
 
   return (
@@ -257,16 +278,15 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
       />
 
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#FAFAFA]/80 dark:bg-[#0B0F19]/80 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="flex items-center gap-1 -ml-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-1 -ml-2 shrink-0">
               <button
                 onClick={handleBack}
                 className={cn(
-                  "p-2 rounded-full transition-colors text-slate-600 dark:text-slate-400 group",
-                  isBackActive
-                    ? "bg-slate-200/50 dark:bg-slate-800"
-                    : "hover:bg-slate-200/50 dark:hover:bg-slate-800",
+                  NAV_BUTTON_CLASS,
+                  "group",
+                  isBackActive && "bg-slate-200/50 dark:bg-slate-800",
                 )}
                 title={tNav("back")}
               >
@@ -281,11 +301,11 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
                 />
               </button>
 
-              <div className="w-px h-4 bg-slate-300 dark:bg-slate-700 mx-0.5" />
-
+              {/* 窄屏放不下，回主页收进「更多」 */}
+              <div className="hidden md:block w-px h-4 bg-slate-300 dark:bg-slate-700 mx-0.5" />
               <button
-                onClick={() => router.push("/")}
-                className="p-2 rounded-full transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800 group"
+                onClick={goHome}
+                className={cn(NAV_BUTTON_CLASS, "group hidden md:inline-flex")}
                 title={tNav("home")}
               >
                 <Home
@@ -294,23 +314,23 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
                 />
               </button>
             </div>
-            <div
-              className={cn(
-                "text-lg font-semibold text-slate-900 dark:text-white tracking-tight hidden sm:block font-serif truncate transition-all duration-500",
-                titleOutOfView
-                  ? "opacity-100 translate-y-0"
-                  : "opacity-0 translate-y-1 pointer-events-none",
-              )}
-              aria-hidden={!titleOutOfView}
-            >
-              {song.title}
-            </div>
+
+            <SectionNav
+              items={tocItems}
+              active={activeSection}
+              title={song.title}
+              showTitle={titleOutOfView}
+              open={tocOpen}
+              onOpenChange={setTocOpen}
+            />
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
+            <FavoriteButton songId={song.id} />
+            <PlayerToggle className={NAV_BUTTON_CLASS} />
             <button
               onClick={() => openUserPanel("favorites")}
-              className="relative p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-400"
+              className={NAV_BUTTON_CLASS}
               title={user ? user.name : tNav("login")}
             >
               <User
@@ -319,18 +339,28 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
               />
             </button>
 
-            {/* PC端显示的 语言 和 主题切换 */}
+            {/* 宽屏平铺 分享、安装、语言 和 主题切换 */}
             <div className="hidden md:flex items-center gap-2">
+              <button
+                onClick={handleShare}
+                className={NAV_BUTTON_CLASS}
+                title={t("actions.share")}
+                aria-label={t("actions.share")}
+              >
+                <Share2 size={20} />
+              </button>
+              <InstallButton className={NAV_BUTTON_CLASS} />
               <LocaleSwitcher />
               <ThemeToggle />
             </div>
 
-            {/* 移动端显示的“更多”下拉菜单 */}
+            {/* 窄屏收进「更多」 */}
             <div className="flex md:hidden relative">
-              <MoreMenu />
+              <MoreMenu actions={moreActions} />
             </div>
           </div>
         </div>
+        <ReadingProgress />
       </nav>
 
       <CommentsProvider
@@ -407,14 +437,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         <CommentSheet />
       </CommentsProvider>
 
-      <FloatingActionButtons
-        showScrollTop={showScrollTop}
-        onScrollToTop={scrollToTop}
-        onShare={handleShare}
-      >
-        <FavoriteButton songId={song.id} variant="icon" />
-      </FloatingActionButtons>
-
       <ImageModal
         isOpen={imageModal !== null}
         onClose={() => setImageModal(null)}
@@ -423,7 +445,12 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         title={imageModal?.title ?? ""}
       />
 
-      <TableOfContents items={tocItems} />
+      <SectionSheet
+        items={tocItems}
+        active={activeSection}
+        open={tocOpen}
+        onOpenChange={setTocOpen}
+      />
     </div>
   );
 };

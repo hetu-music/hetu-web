@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { buildFolio, markLines, parseNotes, pickExcerpt } from "./utils-folio";
 
+/** parseNotes 的非空版本：用例里的备注都不为空 */
+function notesOf(text: string) {
+  const notes = parseNotes(text);
+  if (!notes) throw new Error("parseNotes 意外返回 null");
+  return notes;
+}
+
 const LRC = [
   "[ti:闲看波澜生]",
   "[00:00.00]闲看波澜生 - 河图",
@@ -230,9 +237,9 @@ describe("pickExcerpt", () => {
 
 describe("parseNotes", () => {
   it("按空行分段，段内换行保留，落款行单独标出", () => {
-    const notes = parseNotes(
+    const notes = notesOf(
       "山海为证，青鸟为引，指向瑶宫去\r\n-记《穆天子传》西王母 周穆王\r\n\r\n《说书先生·上》是原创音乐合辑。",
-    )!;
+    );
     expect(notes.paragraphs).toEqual([
       [
         { text: "山海为证，青鸟为引，指向瑶宫去", signature: false },
@@ -243,13 +250,13 @@ describe("parseNotes", () => {
   });
 
   it("接在句末的落款拆成单独一行", () => {
-    const notes = parseNotes(
+    const notes = notesOf(
       [
         "人间天上明月照，也照滩涂生荒草。2025年最后一首歌。 ——Finale",
         "诗言意 歌长言 神人以和。 -- 《史记·五帝本纪》",
         "表面冰冷，内中滚烫——暮日流年",
       ].join("\n"),
-    )!;
+    );
     expect(notes.paragraphs[0]).toEqual([
       {
         text: "人间天上明月照，也照滩涂生荒草。2025年最后一首歌。",
@@ -272,19 +279,19 @@ describe("parseNotes", () => {
       "陈鹏杰——重量级国风歌手倾情加盟。",
       "为大家带来的第四张音乐CD——《NL不分》",
     ];
-    const notes = parseNotes(lines.join("\n"))!;
+    const notes = notesOf(lines.join("\n"));
     expect(notes.paragraphs[0]).toEqual(
       lines.map((text) => ({ text, signature: false })),
     );
   });
 
   it("独占一行的落款", () => {
-    const notes = parseNotes("——《天岁城志·墨离传》\n——Finale楼")!;
+    const notes = notesOf("——《天岁城志·墨离传》\n——Finale楼");
     expect(notes.paragraphs[0].every((l) => l.signature)).toBe(true);
   });
 
   it("字数不计落款与空白", () => {
-    const notes = parseNotes("春风 十里\n\n——某某")!;
+    const notes = notesOf("春风 十里\n\n——某某");
     expect(notes.length).toBe(4);
   });
 

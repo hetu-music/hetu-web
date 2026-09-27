@@ -57,7 +57,9 @@ export default function SongHero({
       ["arranger", song.arranger],
       ["artist", song.artist],
     ] as const
-  ).filter(([, names]) => names && names.length > 0);
+  ).flatMap(([key, names]) =>
+    names && names.length > 0 ? [[key, names] as const] : [],
+  );
 
   // 竖排摘句按空格分列，每一列是一个短语
   const excerptColumns = excerpt?.split(/\s+/).filter(Boolean) ?? [];
@@ -120,7 +122,7 @@ export default function SongHero({
                   {t(`folio.credits.${key}`)}
                 </dt>
                 <dd className="text-slate-800 dark:text-slate-200">
-                  {names!.join(" / ")}
+                  {names.join(" / ")}
                 </dd>
               </div>
             ))}

@@ -274,6 +274,7 @@ const FolioRow = memo(function FolioRow({
   const carriesActive = focused && marked.ids.includes(activeImagery);
   const activeMark =
     activeImagery !== null ? markById.get(activeImagery) : undefined;
+  const seekTime = seekable ? line.time : null;
   // 行内找不到对应文字时，用行首的小圆点提示这一句写到了该意象
   const activeHasText =
     carriesActive && marked.segments.some((s) => s.ids.includes(activeImagery));
@@ -368,8 +369,8 @@ const FolioRow = memo(function FolioRow({
 
         {selected && (
           <div className="lg:hidden flex items-center gap-5 pb-2 text-xs tracking-widest text-(--tone)">
-            {seekable && (
-              <button type="button" onClick={() => onSeek(line.time!)}>
+            {seekTime !== null && (
+              <button type="button" onClick={() => onSeek(seekTime)}>
                 {t("playFrom")}
               </button>
             )}

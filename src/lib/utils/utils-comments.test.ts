@@ -13,6 +13,13 @@ import {
 } from "./utils-comments";
 import { buildFolio, parseNotes } from "./utils-folio";
 
+/** parseNotes 的非空版本：用例里的备注都不为空 */
+function notesOf(text: string) {
+  const notes = parseNotes(text);
+  if (!notes) throw new Error("parseNotes 意外返回 null");
+  return notes;
+}
+
 const { lines } = buildFolio(
   [
     "[00:10.00]我搁苍山一柄剑",
@@ -21,7 +28,7 @@ const { lines } = buildFolio(
     "[00:44.00]轻舟拢岸归鄙野",
   ].join("\n"),
 );
-const notes = parseNotes("第一段\n——某某\n\n第二段")!;
+const notes = notesOf("第一段\n——某某\n\n第二段");
 const ctx = { lines, paragraphs: notes.paragraphs };
 
 function comment(overrides: Partial<SongComment>): SongComment {
@@ -154,7 +161,7 @@ describe("groupComments", () => {
       ],
       ctx,
     );
-    const song = grouped.get("song")!;
+    const song = grouped.get("song") ?? [];
     expect(song.map((t) => t.comment.id)).toEqual([2, 3, 1]);
     expect(song[2].replies.map((r) => r.id)).toEqual([5, 4]);
     expect(countThreads(song)).toBe(5);
@@ -169,7 +176,7 @@ describe("groupComments", () => {
       ],
       ctx,
     );
-    const song = grouped.get("song")!;
+    const song = grouped.get("song") ?? [];
     expect(song.map((t) => t.comment.id)).toEqual([2]);
     expect(countThreads(song)).toBe(1);
   });
@@ -186,6 +193,6 @@ describe("groupComments", () => {
       ],
       ctx,
     );
-    expect(grouped.get("song")![0].orphanQuote).toBe("旧句");
+    expect((grouped.get("song") ?? [])[0].orphanQuote).toBe("旧句");
   });
 });

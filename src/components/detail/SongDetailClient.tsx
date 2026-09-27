@@ -121,7 +121,8 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     return imagery.marks
       .filter((m) => lineStats.has(m.id))
       .sort((a, b) => {
-        const diff = lineStats.get(b.id)!.count - lineStats.get(a.id)!.count;
+        const diff =
+          (lineStats.get(b.id)?.count ?? 0) - (lineStats.get(a.id)?.count ?? 0);
         return diff !== 0 ? diff : a.songCount - b.songCount;
       })
       .slice(0, STRIP_LIMIT);

@@ -351,9 +351,61 @@ const EXCERPT_MIN_CHARS = 4;
 const EXCERPT_MAX_COLUMNS = 3;
 const EXCERPT_MAX_COLUMN_CHARS = 9;
 
+/** 折句时宜断在其后的字：结构助词与方位词 */
+const BREAK_AFTER = new Set("的里裡裏中上下外旁前后後间間边邊");
+/** 宜断在其前的字：副词、介词、连词、指代与数量 */
+const BREAK_BEFORE = new Set(
+  "正已却卻只仍还還又也都早未不似如像在至于於与與和同把被将將为為某一几幾每这這那",
+);
+/** 不宜断在其前的字：动态助词、补语标记，须跟着前面的动词 */
+const NO_BREAK_BEFORE = new Set("着著了过過得");
+
+/**
+ * 放不进一列的长句折成两列：两列都不超过列长上限，断点越靠中间越好，
+ * 落在虚词边界上加分，切开分词得到的词或落在助词之前扣分。
+ * Intl.Segmenter 的分词随运行环境的词典而异，只在服务端调用，免得前后端断法不一。
+ */
+function foldInHalf(text: string): string | null {
+  const chars = Array.from(text);
+  const n = chars.length;
+  if (text.includes(" ") || n > EXCERPT_MAX_COLUMN_CHARS * 2) return null;
+
+  // 落在多字词内部的断点
+  const insideWord = new Set<number>();
+  let pos = 0;
+  for (const { segment } of new Intl.Segmenter("zh", {
+    granularity: "word",
+  }).segment(text)) {
+    const length = Array.from(segment).length;
+    for (let k = 1; k < length; k++) insideWord.add(pos + k);
+    pos += length;
+  }
+
+  let best = -1;
+  let bestScore = -Infinity;
+  for (let p = 1; p < n; p++) {
+    if (p > EXCERPT_MAX_COLUMN_CHARS || n - p > EXCERPT_MAX_COLUMN_CHARS)
+      continue;
+    let score = -Math.abs(p - n / 2);
+    if (BREAK_AFTER.has(chars[p - 1]) || BREAK_BEFORE.has(chars[p]))
+      score += 2.5;
+    if (insideWord.has(p)) score -= 3;
+    if (NO_BREAK_BEFORE.has(chars[p])) score -= 3;
+    // 同分取靠前者：前一列短些，竖排时右起一列更利落
+    if (score > bestScore) {
+      best = p;
+      bestScore = score;
+    }
+  }
+  if (best < 0) return null;
+  return `${chars.slice(0, best).join("")} ${chars.slice(best).join("")}`;
+}
+
 /**
  * 卷首摘句：意象最密集、长度适合竖排的一句；同分取靠前者。
  * 没有意象标注时取第一句长度合适的歌词。
+ * 一句都放不下时（每句都是不带空格的长句），把长句折成两列再挑。
+ * 折句要用 Intl.Segmenter，须在服务端调用，结果作为 props 传给页面。
  */
 export function pickExcerpt(
   lines: FolioLine[],
@@ -368,18 +420,21 @@ export function pickExcerpt(
       columns.every((n) => n <= EXCERPT_MAX_COLUMN_CHARS)
     );
   };
-  let best: string | null = null;
-  let bestScore = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const text = cleanExcerpt(lines[i].text);
-    if (!fits(text)) continue;
-    const score = new Set(marked[i]?.ids ?? []).size;
-    if (score > bestScore) {
-      best = text;
-      bestScore = score;
+  const pick = (shape: (text: string) => string | null) => {
+    let best: string | null = null;
+    let bestScore = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const text = shape(cleanExcerpt(lines[i].text));
+      if (text === null || !fits(text)) continue;
+      const score = new Set(marked[i]?.ids ?? []).size;
+      if (score > bestScore) {
+        best = text;
+        bestScore = score;
+      }
     }
-  }
-  return best;
+    return best;
+  };
+  return pick((text) => text) ?? pick(foldInHalf);
 }
 
 // ─── 创作手记 ────────────────────────────────────────────────────────────────

@@ -92,7 +92,7 @@
     "listen": "收聽",
     "shared": "共有",
     "readMode": {
-      "poem": "歌詞",
+      "poem": "正文",
       "lrc": "LRC"
     },
     "seekHint": "跳到這一句",
@@ -106,7 +106,7 @@
       "anonymous": "佚名",
       "private": "私批",
       "pending": "待審",
-      "edited": "改過",
+      "edited": "修改",
       "like": "讚",
       "reply": "回覆",
       "replies": "{count} 則回覆",
@@ -134,6 +134,7 @@
       },
       "privateToggle": "僅自己可見",
       "submit": "批註",
+      "submitSong": "呈評",
       "submitReply": "回覆",
       "save": "儲存",
       "cancel": "取消",

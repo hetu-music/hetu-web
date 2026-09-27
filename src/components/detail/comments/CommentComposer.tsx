@@ -5,11 +5,15 @@ import { cn } from "@/lib/utils/utils";
 import { COMMENT_BODY_MAX } from "@/lib/utils/utils-comments";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useComments } from "./CommentsContext";
 
 /** 字数接近上限时才显示计数 */
 const SHOW_COUNT_FROM = COMMENT_BODY_MAX - 200;
+
+/** 不支持 field-sizing 的浏览器（Safari）用脚本让输入框随内容长高 */
+const supportsFieldSizing = () =>
+  typeof CSS !== "undefined" && CSS.supports("field-sizing", "content");
 
 interface CommentComposerProps {
   placeholder: string;
@@ -48,6 +52,14 @@ export default function CommentComposer({
     if (autoFocus && loggedIn)
       textareaRef.current?.focus({ preventScroll: true });
   }, [autoFocus, loggedIn]);
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el || supportsFieldSizing()) return;
+    el.style.height = "auto";
+    // scrollHeight 不含边框，而高度按 border-box 算
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+  }, [body, loggedIn]);
 
   if (!loggedIn) {
     return (
@@ -104,8 +116,8 @@ export default function CommentComposer({
           }
         }}
         placeholder={placeholder}
-        rows={2}
-        className="block w-full resize-none field-sizing-content min-h-[3.6em] max-h-[16em] bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:border-(--tone) focus:outline-none px-0 py-1.5 font-kaiti text-[15px] leading-[1.8] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors"
+        rows={1}
+        className="block w-full resize-none field-sizing-content max-h-[16em] bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:border-(--tone) focus:outline-none px-0 py-1.5 font-kaiti text-[15px] leading-[1.8] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors"
       />
       <div className="mt-2.5 flex items-center gap-4 text-xs">
         {allowPrivate && (

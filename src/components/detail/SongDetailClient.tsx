@@ -1,15 +1,13 @@
 "use client";
 
-import CommentSheet from "@/components/detail/comments/CommentSheet";
 import { CommentsProvider } from "@/components/detail/comments/CommentsContext";
+import CommentSheet from "@/components/detail/comments/CommentSheet";
 import CommentsSection from "@/components/detail/comments/CommentsSection";
 import CreatorNotes from "@/components/detail/CreatorNotes";
 import ImageryCaption from "@/components/detail/ImageryCaption";
 import LyricsFolio from "@/components/detail/LyricsFolio";
 import RelatedWorks from "@/components/detail/RelatedWorks";
 import ScoreSection from "@/components/detail/ScoreSection";
-import SongColophon from "@/components/detail/SongColophon";
-import SongHero from "@/components/detail/SongHero";
 import {
   type NavItem,
   ReadingProgress,
@@ -17,25 +15,22 @@ import {
   SectionSheet,
   useActiveSection,
 } from "@/components/detail/SectionNav";
+import SongColophon from "@/components/detail/SongColophon";
+import SongHero from "@/components/detail/SongHero";
 import { InstallButton } from "@/components/pwa/useInstallAction";
 import FavoriteButton from "@/components/shared/FavoriteButton";
+import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import ImageModal from "@/components/shared/ImageModal";
 import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
 import MoreMenu, { type MoreMenuAction } from "@/components/shared/MoreMenu";
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
-import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useUserContext } from "@/context/UserContext";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
-import {
-  buildFolio,
-  markLines,
-  parseNotes,
-  pickExcerpt,
-} from "@/lib/utils/utils-folio";
+import { buildFolio, markLines, parseNotes } from "@/lib/utils/utils-folio";
 import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
 import {
   type CoverTone,
@@ -58,6 +53,7 @@ const STRIP_LIMIT = 7;
 const SongDetailClient: React.FC<SongDetailClientProps> = ({
   song,
   imagery,
+  excerpt,
 }) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -97,10 +93,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const markById = useMemo(
     () => new Map(imagery.marks.map((m) => [m.id, m])),
     [imagery.marks],
-  );
-  const excerpt = useMemo(
-    () => pickExcerpt(folio.lines, marked),
-    [folio.lines, marked],
   );
 
   // 每个意象在本曲写到的句数与首次出现位置
@@ -273,7 +265,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
       {/* 封面取色铺底：取到颜色后缓缓晕开 */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[900px] transition-opacity duration-[1400ms] ease-out"
+        className="pointer-events-none absolute inset-x-0 top-0 h-225 transition-opacity duration-1400 ease-out"
         style={{
           opacity: tone ? 1 : 0,
           background: `radial-gradient(ellipse 70% 55% at 18% 0%, ${appliedTone.wash}, transparent 70%), radial-gradient(ellipse 50% 40% at 95% 10%, ${appliedTone.wash}, transparent 70%)`,

@@ -24,7 +24,7 @@
     }
   },
   "annotations": {
-    "summary": "共 {count} 则批注，涉及 {songs} 首歌",
+    "summary": "共 {count} 则批评，涉及 {songs} 首歌",
     "count": "{count} 则",
     "filter": {
       "all": "全部",
@@ -42,7 +42,7 @@
     "anonymous": "佚名",
     "private": "私批",
     "pending": "待审",
-    "edited": "改过",
+    "edited": "修改",
     "likes": "{count} 赞",
     "open": "查看",
     "delete": "删除",

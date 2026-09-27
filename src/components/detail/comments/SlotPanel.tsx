@@ -26,7 +26,8 @@ export default function SlotPanel({
   const composer = (
     <CommentComposer
       placeholder={t(`placeholder.${slot.section}`)}
-      submitLabel={t("submit")}
+      // 对整首歌的是评点，其余位置是批注
+      submitLabel={t(slot.section === "song" ? "submitSong" : "submit")}
       allowPrivate
       autoFocus={autoFocus}
       onSubmit={(body, isPrivate) => create(slot, body, isPrivate)}

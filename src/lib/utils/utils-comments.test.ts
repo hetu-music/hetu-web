@@ -133,11 +133,11 @@ describe("anchorForSlot", () => {
 });
 
 describe("groupComments", () => {
-  it("回复挂到批注下，同处按赞数、再按新旧排序", () => {
+  it("回复挂到批注下；同处自己的在前，其余新的在前，与赞数无关", () => {
     const grouped = groupComments(
       [
-        comment({ id: 1, likeCount: 0, createdAt: "2026-09-01T00:00:00Z" }),
-        comment({ id: 2, likeCount: 3, createdAt: "2026-09-02T00:00:00Z" }),
+        comment({ id: 1, likeCount: 9, createdAt: "2026-09-01T00:00:00Z" }),
+        comment({ id: 2, mine: true, createdAt: "2026-09-02T00:00:00Z" }),
         comment({ id: 3, likeCount: 0, createdAt: "2026-09-03T00:00:00Z" }),
         comment({
           id: 4,

@@ -102,7 +102,7 @@ export function resolveSlot(
 }
 
 /**
- * 同一处的批注排序：赞多的在前，同赞时新的在前。
+ * 同一处的批注排序：自己的在前，其余按时间，新的在前。
  * 回复按时间顺排。已删且没有回复的批注不显示（服务端通常已滤掉）。
  */
 export function groupComments(
@@ -137,7 +137,7 @@ export function groupComments(
   for (const list of bySlot.values()) {
     list.sort(
       (a, b) =>
-        b.comment.likeCount - a.comment.likeCount ||
+        Number(b.comment.mine) - Number(a.comment.mine) ||
         b.comment.createdAt.localeCompare(a.comment.createdAt),
     );
   }

@@ -133,30 +133,22 @@ describe("pickExcerpt", () => {
 });
 
 describe("parseNotes", () => {
-  it("首段短句带落款时作题词", () => {
+  it("按空行分段，段内换行保留，落款行单独标出", () => {
     const notes = parseNotes(
       "山海为证，青鸟为引，指向瑶宫去\r\n-记《穆天子传》西王母 周穆王\r\n\r\n《说书先生·上》是原创音乐合辑。",
     )!;
-    expect(notes.epigraph).toEqual([
-      { text: "山海为证，青鸟为引，指向瑶宫去", signature: false },
-      { text: "-记《穆天子传》西王母 周穆王", signature: true },
+    expect(notes.paragraphs).toEqual([
+      [
+        { text: "山海为证，青鸟为引，指向瑶宫去", signature: false },
+        { text: "-记《穆天子传》西王母 周穆王", signature: true },
+      ],
+      [{ text: "《说书先生·上》是原创音乐合辑。", signature: false }],
     ]);
-    expect(notes.paragraphs).toHaveLength(1);
   });
 
-  it("首段较长时不提题词，段内换行保留", () => {
-    const long = "梦里常看到幼时玩耍的那条老酒街，".repeat(4);
-    const notes = parseNotes(`${long}\n第二行\n\n——某某`)!;
-    expect(notes.epigraph).toBeNull();
-    expect(notes.paragraphs[0].map((l) => l.text)).toEqual([long, "第二行"]);
-    expect(notes.paragraphs[1]).toEqual([{ text: "——某某", signature: true }]);
-  });
-
-  it("只有一段的短备注整段作题词", () => {
-    const notes = parseNotes("我要千金散尽赴酒盏 落日流霞烧不完")!;
-    expect(notes.epigraph).not.toBeNull();
-    expect(notes.paragraphs).toEqual([]);
-    expect(notes.length).toBe(0);
+  it("字数不计落款与空白", () => {
+    const notes = parseNotes("春风 十里\n\n——某某")!;
+    expect(notes.length).toBe(4);
   });
 
   it("空备注返回 null", () => {

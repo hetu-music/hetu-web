@@ -23,9 +23,10 @@ import ImageModal from "@/components/shared/ImageModal";
 import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
 import MoreMenu, { type MoreMenuAction } from "@/components/shared/MoreMenu";
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
-import PlayerToggle from "@/components/shared/PlayerToggle";
+import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useUserContext } from "@/context/UserContext";
+import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
@@ -65,6 +66,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const { user, loaded: userLoaded } = useUserContext();
   const hasBenefits = userLoaded && !!user?.hasBenefits;
 
+  const { showScrollTop, scrollToTop } = useScrollTop();
   const [tone, setTone] = useState<CoverTone | null>(null);
   const [activeImagery, setActiveImagery] = useState<number | null>(null);
   const [imageModal, setImageModal] = useState<{
@@ -327,7 +329,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
           <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
             <FavoriteButton songId={song.id} />
-            <PlayerToggle className={NAV_BUTTON_CLASS} />
             <button
               onClick={() => openUserPanel("favorites")}
               className={NAV_BUTTON_CLASS}
@@ -436,6 +437,11 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
         <CommentSheet />
       </CommentsProvider>
+
+      <FloatingActionButtons
+        showScrollTop={showScrollTop}
+        onScrollToTop={scrollToTop}
+      />
 
       <ImageModal
         isOpen={imageModal !== null}

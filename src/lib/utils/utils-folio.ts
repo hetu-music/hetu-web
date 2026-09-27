@@ -244,17 +244,44 @@ export interface Notes {
   length: number;
 }
 
-const SIGNATURE_LINE = /^(——|—|--|-)\s*\S/;
+/**
+ * 落款：破折号后跟一个短名字（人名、书名、「题记」），名字里不带句读与引号。
+ * 带句读的是正文里的破折号（「——她告诉我，……」），不算落款。
+ */
+const SIGNER = String.raw`[^，。！？、；：,.!?;:“”"‘’\s—][^，。！？、；：,.!?;:“”"‘’—]{0,19}`;
+/** 独占一行的落款：「——《天岁城志》」「-记《穆天子传》西王母 周穆王」 */
+const STANDALONE_SIGNATURE = new RegExp(
+  String.raw`^(?:——|—|--|-)\s*${SIGNER}$`,
+);
+/** 接在句末的落款：「……2025年最后一首歌。 ——Finale」；单个连字符太常见，不认 */
+const TRAILING_SIGNATURE = new RegExp(
+  String.raw`^(.*\S)(\s*)((?:——|--)\s*(${SIGNER}))$`,
+);
+/** 句末标点或右括号、右引号：其后的破折号是另起的落款，而非正文里的同位语 */
+const SENTENCE_END = /[。！？!?.~～”」』）)\]】]$/;
 
 function toNoteLines(paragraph: string): NoteLine[] {
   return paragraph
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean)
-    .map((text) => ({
-      text,
-      signature: SIGNATURE_LINE.test(text) && Array.from(text).length <= 40,
-    }));
+    .flatMap((text): NoteLine[] => {
+      if (STANDALONE_SIGNATURE.test(text)) return [{ text, signature: true }];
+      const m = text.match(TRAILING_SIGNATURE);
+      // 破折号紧贴正文且后接书名（「第四张音乐CD——《NL不分》」）是同位语，不是落款
+      const appositive =
+        m !== null &&
+        m[2] === "" &&
+        !SENTENCE_END.test(m[1]) &&
+        m[4].startsWith("《");
+      if (m && !appositive && !/[—-]$/.test(m[1])) {
+        return [
+          { text: m[1], signature: false },
+          { text: m[3], signature: true },
+        ];
+      }
+      return [{ text, signature: false }];
+    });
 }
 
 function charCount(lines: NoteLine[]): number {

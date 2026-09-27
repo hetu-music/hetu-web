@@ -146,6 +146,47 @@ describe("parseNotes", () => {
     ]);
   });
 
+  it("接在句末的落款拆成单独一行", () => {
+    const notes = parseNotes(
+      [
+        "人间天上明月照，也照滩涂生荒草。2025年最后一首歌。 ——Finale",
+        "诗言意 歌长言 神人以和。 -- 《史记·五帝本纪》",
+        "表面冰冷，内中滚烫——暮日流年",
+      ].join("\n"),
+    )!;
+    expect(notes.paragraphs[0]).toEqual([
+      {
+        text: "人间天上明月照，也照滩涂生荒草。2025年最后一首歌。",
+        signature: false,
+      },
+      { text: "——Finale", signature: true },
+      { text: "诗言意 歌长言 神人以和。", signature: false },
+      { text: "-- 《史记·五帝本纪》", signature: true },
+      { text: "表面冰冷，内中滚烫", signature: false },
+      { text: "——暮日流年", signature: true },
+    ]);
+  });
+
+  it("正文里的破折号不当作落款", () => {
+    const lines = [
+      "——她告诉我，我所在的世界，只是一本书。",
+      "——以歌咏志，以音诉情——",
+      "“杉木橹啊——”",
+      "中日音乐合辑——",
+      "陈鹏杰——重量级国风歌手倾情加盟。",
+      "为大家带来的第四张音乐CD——《NL不分》",
+    ];
+    const notes = parseNotes(lines.join("\n"))!;
+    expect(notes.paragraphs[0]).toEqual(
+      lines.map((text) => ({ text, signature: false })),
+    );
+  });
+
+  it("独占一行的落款", () => {
+    const notes = parseNotes("——《天岁城志·墨离传》\n——Finale楼")!;
+    expect(notes.paragraphs[0].every((l) => l.signature)).toBe(true);
+  });
+
   it("字数不计落款与空白", () => {
     const notes = parseNotes("春风 十里\n\n——某某")!;
     expect(notes.length).toBe(4);

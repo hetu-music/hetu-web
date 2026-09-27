@@ -92,7 +92,7 @@
     "listen": "收听",
     "shared": "共有",
     "readMode": {
-      "poem": "歌词",
+      "poem": "正文",
       "lrc": "LRC"
     },
     "seekHint": "跳到这一句",

@@ -11,13 +11,18 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 });
 
 import { getServiceClient } from "@/lib/db/supabase-server";
+import { NextRequest } from "next/server";
 import {
   CommentError,
+  commentIdFromUrl,
   createComment,
   createCommentSchema,
+  deleteComment,
+  editComment,
   likeComment,
   listMyComments,
   listSongComments,
+  unlikeComment,
 } from "./service-comments";
 
 function row(overrides: Record<string, unknown>) {
@@ -128,6 +133,71 @@ describe("listSongComments", () => {
   });
 });
 
+describe("listSongComments 边界", () => {
+  beforeEach(() => vi.mocked(getServiceClient).mockReset());
+
+  it("Supabase 未配置时返回空列表", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(null);
+    expect(await listSongComments(7, null)).toEqual([]);
+  });
+
+  it("查询出错时抛出", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: null, error: { message: "boom" } }),
+      ]),
+    );
+    await expect(listSongComments(7, null)).rejects.toMatchObject({
+      message: "boom",
+    });
+  });
+
+  it("只剩已删且无回复的批注时直接返回空，不再查作者", async () => {
+    const comments = makeQueryBuilder({
+      data: [row({ id: 1, status: 3, body: "" })],
+      error: null,
+    });
+    const client = createMockSupabaseClient([comments]);
+    vi.mocked(getServiceClient).mockReturnValue(client);
+
+    expect(await listSongComments(7, "me")).toEqual([]);
+    expect(client.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("作者或点赞查询出错时抛出", async () => {
+    const comments = () =>
+      makeQueryBuilder({ data: [row({ id: 1 })], error: null });
+    const ok = makeQueryBuilder({ data: [], error: null });
+    const bad = makeQueryBuilder({ data: null, error: { message: "bad" } });
+
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([comments(), bad, ok]),
+    );
+    await expect(listSongComments(7, "me")).rejects.toMatchObject({
+      message: "bad",
+    });
+
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([comments(), ok, bad]),
+    );
+    await expect(listSongComments(7, "me")).rejects.toMatchObject({
+      message: "bad",
+    });
+  });
+});
+
+describe("commentIdFromUrl", () => {
+  it("取 /comments/ 后面的正整数，否则为 null", () => {
+    const at = (path: string) =>
+      commentIdFromUrl(new NextRequest(`http://localhost${path}`));
+    expect(at("/api/public/comments/12")).toBe(12);
+    expect(at("/api/public/comments/12/like")).toBe(12);
+    expect(at("/api/public/comments/abc")).toBeNull();
+    expect(at("/api/public/comments/0")).toBeNull();
+    expect(at("/api/public/comments/1.5")).toBeNull();
+  });
+});
+
 describe("createCommentSchema", () => {
   it("顶层批注必须有位置；回复只需父批注", () => {
     expect(
@@ -225,6 +295,92 @@ describe("createComment", () => {
   });
 });
 
+describe("createComment 边界", () => {
+  const counted = () =>
+    makeQueryBuilder({ data: null, error: null, count: 0 } as never);
+
+  it("回复只写父批注与内容，不带位置与私批", async () => {
+    const insert = makeQueryBuilder({ data: { id: 11 }, error: null });
+    const supabase = createMockSupabaseClient([counted(), insert]);
+
+    expect(
+      await createComment(supabase, "me", {
+        songId: 1,
+        parentId: 3,
+        body: "同感",
+      }),
+    ).toBe(11);
+    expect(insert.insert).toHaveBeenCalledWith({
+      song_id: 1,
+      user_id: "me",
+      parent_id: 3,
+      body: "同感",
+    });
+  });
+
+  it("计数出错或写入出现其他错误时原样抛出", async () => {
+    const input = { songId: 1, parentId: 3, body: "好" };
+    const countFailed = makeQueryBuilder({
+      data: null,
+      error: { message: "count" },
+    });
+    await expect(
+      createComment(createMockSupabaseClient([countFailed]), "me", input),
+    ).rejects.toMatchObject({ message: "count" });
+
+    const insertFailed = makeQueryBuilder({
+      data: null,
+      error: { code: "XX000", message: "insert" },
+    });
+    const err = await createComment(
+      createMockSupabaseClient([counted(), insertFailed]),
+      "me",
+      input,
+    ).catch((e) => e);
+    expect(err).not.toBeInstanceOf(CommentError);
+    expect(err).toMatchObject({ message: "insert" });
+  });
+});
+
+describe("editComment / deleteComment", () => {
+  function rpcClient(error: unknown) {
+    const rpc = vi.fn().mockResolvedValue({ error });
+    return { rpc, client: { rpc } as never };
+  }
+
+  it("调用对应的 RPC", async () => {
+    const edit = rpcClient(null);
+    await editComment(edit.client, 5, "改过");
+    expect(edit.rpc).toHaveBeenCalledWith("edit_comment", {
+      p_id: 5,
+      p_body: "改过",
+    });
+
+    const del = rpcClient(null);
+    await deleteComment(del.client, 5);
+    expect(del.rpc).toHaveBeenCalledWith("delete_comment", { p_id: 5 });
+  });
+
+  it("不存在返回 404，内容不合要求返回 400，其余原样抛出", async () => {
+    await expect(
+      editComment(rpcClient({ code: "P0002" }).client, 5, "x"),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      editComment(rpcClient({ code: "23514" }).client, 5, "x"),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      deleteComment(rpcClient({ code: "P0002" }).client, 5),
+    ).rejects.toBeInstanceOf(CommentError);
+
+    const err = await deleteComment(
+      rpcClient({ code: "XX000", message: "rpc" }).client,
+      5,
+    ).catch((e) => e);
+    expect(err).not.toBeInstanceOf(CommentError);
+    expect(err).toMatchObject({ message: "rpc" });
+  });
+});
+
 describe("likeComment", () => {
   it("重复点赞视为成功，赞不了的批注返回 404", async () => {
     await expect(
@@ -245,6 +401,56 @@ describe("likeComment", () => {
         1,
       ),
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("likeComment 边界", () => {
+  it("写入成功；批注不存在返回 404；其余错误原样抛出", async () => {
+    const insert = makeQueryBuilder({ data: null, error: null });
+    await likeComment(createMockSupabaseClient([insert]), "me", 3);
+    expect(insert.insert).toHaveBeenCalledWith({
+      comment_id: 3,
+      user_id: "me",
+    });
+
+    await expect(
+      likeComment(
+        createMockSupabaseClient([
+          makeQueryBuilder({ data: null, error: { code: "23503" } }),
+        ]),
+        "me",
+        3,
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+
+    const err = await likeComment(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: null, error: { code: "XX000" } }),
+      ]),
+      "me",
+      3,
+    ).catch((e) => e);
+    expect(err).not.toBeInstanceOf(CommentError);
+  });
+});
+
+describe("unlikeComment", () => {
+  it("只删自己对这则批注的赞，出错时抛出", async () => {
+    const del = makeQueryBuilder({ data: null, error: null });
+    await unlikeComment(createMockSupabaseClient([del]), "me", 3);
+    expect(del.delete).toHaveBeenCalled();
+    expect(del.eq).toHaveBeenCalledWith("comment_id", 3);
+    expect(del.eq).toHaveBeenCalledWith("user_id", "me");
+
+    await expect(
+      unlikeComment(
+        createMockSupabaseClient([
+          makeQueryBuilder({ data: null, error: { message: "gone" } }),
+        ]),
+        "me",
+        3,
+      ),
+    ).rejects.toMatchObject({ message: "gone" });
   });
 });
 
@@ -327,5 +533,83 @@ describe("listMyComments", () => {
       anchor: "lyrics",
       private: true,
     });
+  });
+});
+
+describe("listMyComments 边界", () => {
+  beforeEach(() => vi.mocked(getServiceClient).mockReset());
+
+  it("没有批注时直接返回空；查询出错时抛出", async () => {
+    expect(
+      await listMyComments(
+        createMockSupabaseClient([makeQueryBuilder({ data: [], error: null })]),
+        "me",
+        "zh-CN",
+      ),
+    ).toEqual([]);
+
+    await expect(
+      listMyComments(
+        createMockSupabaseClient([
+          makeQueryBuilder({ data: null, error: { message: "mine" } }),
+        ]),
+        "me",
+        "zh-CN",
+      ),
+    ).rejects.toMatchObject({ message: "mine" });
+  });
+
+  it("所回复的批注或其作者查询出错时抛出", async () => {
+    const mine = () =>
+      makeQueryBuilder({
+        data: [row({ id: 5, song_id: 2, parent_id: 1, user_id: "me" })],
+        error: null,
+      });
+    const songs = () =>
+      makeQueryBuilder({
+        data: [{ id: 2, title: "甲", artist: null, hascover: false }],
+        error: null,
+      });
+    const parents = makeQueryBuilder({
+      data: [
+        {
+          id: 1,
+          user_id: "u2",
+          body: "原批",
+          status: 0,
+          anchor: "song",
+          anchor_quote: null,
+        },
+      ],
+      error: null,
+    });
+    const bad = makeQueryBuilder({ data: null, error: { message: "bad" } });
+
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([songs(), bad]),
+    );
+    await expect(
+      listMyComments(createMockSupabaseClient([mine()]), "me", "zh-CN"),
+    ).rejects.toMatchObject({ message: "bad" });
+
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([songs(), parents, bad]),
+    );
+    await expect(
+      listMyComments(createMockSupabaseClient([mine()]), "me", "zh-CN"),
+    ).rejects.toMatchObject({ message: "bad" });
+  });
+
+  it("歌曲已不存在的批注略去", async () => {
+    const mine = makeQueryBuilder({
+      data: [row({ id: 4, song_id: 404, anchor: "song", user_id: "me" })],
+      error: null,
+    });
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([makeQueryBuilder({ data: [], error: null })]),
+    );
+    expect(
+      await listMyComments(createMockSupabaseClient([mine]), "me", "zh-CN"),
+    ).toEqual([]);
   });
 });

@@ -114,8 +114,9 @@ function SectionList({
 }
 
 /**
- * 顶栏里的章节指示：卷首时显示「目录」，滚过题名后显示「歌名 · 当前章节」
- * （窄屏只显示章节）。点开后宽屏在下方展开目录，窄屏由 SectionSheet 从底部拉出。
+ * 顶栏里的章节指示：宽屏常驻「歌名 · 当前章节」；窄屏放不下歌名，
+ * 卷首时显示「目录」，滚过题名后显示当前章节。
+ * 点开后宽屏在下方展开目录，窄屏由 SectionSheet 从底部拉出。
  */
 export function SectionNav({
   items,
@@ -128,7 +129,7 @@ export function SectionNav({
   items: NavItem[];
   active: string;
   title: string;
-  /** 卷首的大标题已滚出视口 */
+  /** 卷首的大标题已滚出视口（只影响窄屏） */
   showTitle: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -161,28 +162,29 @@ export function SectionNav({
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={t("sections.toc")}
-        className={cn(
-          "flex min-w-0 max-w-full items-baseline gap-2 rounded-full px-3 py-1.5 transition-colors",
-          open
-            ? "bg-slate-200/50 dark:bg-slate-800"
-            : "hover:bg-slate-200/50 dark:hover:bg-slate-800",
-        )}
+        className="group flex min-w-0 max-w-full items-baseline gap-2 px-2 py-1.5"
       >
-        {showTitle && (
-          <>
-            <span className="hidden sm:block min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
-              {title}
-            </span>
-            <span
-              aria-hidden
-              className="hidden sm:block text-slate-300 dark:text-slate-600"
-            >
-              ·
-            </span>
-          </>
-        )}
-        <span className="shrink-0 whitespace-nowrap font-serif text-sm tracking-wider text-slate-500 dark:text-slate-400">
-          {showTitle && activeLabel ? activeLabel : t("folio.toc")}
+        <span className="hidden sm:block min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+          {title}
+        </span>
+        <span
+          aria-hidden
+          className="hidden sm:block text-slate-300 dark:text-slate-600"
+        >
+          ·
+        </span>
+        <span
+          className={cn(
+            "shrink-0 whitespace-nowrap font-serif text-sm tracking-wider transition-colors",
+            open
+              ? "text-slate-900 dark:text-slate-100"
+              : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100",
+          )}
+        >
+          <span className="hidden sm:inline">{activeLabel}</span>
+          <span className="sm:hidden">
+            {showTitle && activeLabel ? activeLabel : t("folio.toc")}
+          </span>
         </span>
         <ChevronDown
           size={14}
@@ -200,7 +202,7 @@ export function SectionNav({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-            className="hidden md:block absolute left-0 top-full mt-3 w-52 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] px-4 py-2"
+            className="hidden md:block absolute z-10 left-0 top-full mt-3 w-52 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] px-4 py-2"
           >
             <SectionList
               items={items}

@@ -53,6 +53,34 @@ export interface MusicLibraryClientProps {
 // 歌曲详情客户端组件属性
 export interface SongDetailClientProps {
   song: SongDetail;
+  imagery: SongImageryView;
+}
+
+// 歌曲详情页的意象视图
+export interface SongImageryMark {
+  id: number;
+  name: string;
+  /** 一级 → 末级分类名 */
+  path: string[];
+  /** 一级分类配色 */
+  accent: string;
+  timetags: string[];
+  /** 全库写到该意象的作品数（含本曲） */
+  songCount: number;
+}
+
+export interface RelatedSong {
+  id: number;
+  title: string;
+  artist: string[] | null;
+  hascover: boolean | null;
+  /** 共享的意象，越少见越靠前 */
+  shared: string[];
+}
+
+export interface SongImageryView {
+  marks: SongImageryMark[];
+  related: RelatedSong[];
 }
 
 // 筛选选项类型

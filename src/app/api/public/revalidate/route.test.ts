@@ -74,6 +74,9 @@ describe("POST /api/public/revalidate — 鉴权", () => {
     expect(paths).toContain("/zh-CN/quiz");
     expect(paths).toContain("/zh-TW/quiz");
     expect(revalidateTagMock).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("song-imagery", {
+      expire: 0,
+    });
   });
 
   it("服务端未配置密钥时一律拒绝", async () => {

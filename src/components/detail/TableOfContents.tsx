@@ -1,23 +1,26 @@
 "use client";
 
-import { SongDetail } from "@/lib/types";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-interface TableOfContentsProps {
-  song: SongDetail;
-}
-
-interface NavItem {
+export interface NavItem {
   id: string;
   label: string;
 }
 
-const TableOfContents: React.FC<TableOfContentsProps> = ({ song }) => {
+interface TableOfContentsProps {
+  /** 章节列表；调用方需保持引用稳定，否则观察器会反复重建 */
+  items: NavItem[];
+}
+
+const TableOfContents: React.FC<TableOfContentsProps> = ({
+  items: navItems,
+}) => {
   const t = useTranslations("song");
-  const [activeId, setActiveId] = useState<string>("info");
-  const [displayedActiveId, setDisplayedActiveId] = useState<string>("info");
-  const displayedActiveIdRef = useRef<string>("info");
+  const firstId = navItems[0]?.id ?? "";
+  const [activeId, setActiveId] = useState<string>(firstId);
+  const [displayedActiveId, setDisplayedActiveId] = useState<string>(firstId);
+  const displayedActiveIdRef = useRef<string>(firstId);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [showActiveLabel, setShowActiveLabel] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
@@ -38,17 +41,6 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ song }) => {
     mediaQuery.addEventListener("change", checkTouch);
     return () => mediaQuery.removeEventListener("change", checkTouch);
   }, []);
-
-  // 构建导航项 - 移除备注，只保留基本信息、歌词、乐谱
-  const getNavItems = useCallback((): NavItem[] => {
-    const items: NavItem[] = [{ id: "info", label: t("sections.basicInfo") }];
-    items.push({ id: "lyrics", label: t("sections.lyrics") });
-    if (song.nmn_status)
-      items.push({ id: "score", label: t("sections.score") });
-    return items;
-  }, [song.nmn_status, t]);
-
-  const navItems = getNavItems();
 
   // 防抖：只有滚动停止后才更新显示的 activeId 和显示标签
   useEffect(() => {

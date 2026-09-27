@@ -75,14 +75,12 @@ const UserReview: React.FC<UserReviewProps> = ({ songId }) => {
   return (
     <div
       id="my-review"
-      className="p-6 rounded-2xl bg-slate-100/70 dark:bg-slate-800/30 border border-slate-200/60 dark:border-slate-800"
+      className="border-l border-slate-200 dark:border-slate-800 pl-5"
     >
       {/* 标题行 */}
-      <div className="flex items-center gap-2 mb-4 text-slate-400">
-        <FileText size={16} />
-        <h2 className="text-xs font-bold uppercase tracking-wider">
-          My Review
-        </h2>
+      <div className="flex items-center gap-2 mb-3 text-slate-400 dark:text-slate-500">
+        <FileText size={13} />
+        <h2 className="text-xs tracking-[0.3em]">My Review</h2>
       </div>
 
       {/* 内容区 */}
@@ -92,7 +90,7 @@ const UserReview: React.FC<UserReviewProps> = ({ songId }) => {
             value={review}
             onChange={(e) => setReview(e.target.value)}
             placeholder="写下你对这首歌的想法..."
-            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 resize-y min-h-[100px] transition-shadow"
+            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-(--tone)/30 focus:border-(--tone)/50 resize-y min-h-[100px] transition-shadow"
           />
           {/* 操作按钮组 */}
           <div className="flex items-center justify-end gap-2">
@@ -107,7 +105,7 @@ const UserReview: React.FC<UserReviewProps> = ({ songId }) => {
               disabled={isSavingReview}
               className={cn(
                 "px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95",
-                "bg-blue-500 hover:bg-blue-600 text-white shadow-sm shadow-blue-500/20",
+                "bg-(--tone) hover:opacity-90 text-white dark:text-slate-950",
                 "disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100",
                 "flex items-center gap-1.5",
               )}
@@ -129,15 +127,10 @@ const UserReview: React.FC<UserReviewProps> = ({ songId }) => {
             {review || <span className="text-slate-400 italic">暂无评论</span>}
           </p>
           {/* 添加/编辑按钮 — 右对齐 */}
-          <div className="flex justify-end">
+          <div className="flex">
             <button
               onClick={() => setIsEditingReview(true)}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95",
-                "text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800",
-                "border border-slate-200 dark:border-slate-700",
-                "hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600",
-              )}
+              className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-(--tone) transition-colors"
             >
               {review ? (
                 <>

@@ -64,5 +64,37 @@
   "copyError": "复制失败",
   "shareCancel": "分享取消或失败",
   "shareText": "来听听河图的这首歌：{title}{artist}",
-  "shareTitle": "歌曲详情"
+  "shareTitle": "歌曲详情",
+  "folio": {
+    "credits": {
+      "lyricist": "词",
+      "composer": "曲",
+      "arranger": "编",
+      "artist": "唱"
+    },
+    "sections": {
+      "cover": "卷首",
+      "text": "正文",
+      "appendix": "附录",
+      "colophon": "版记",
+      "related": "同有此意象"
+    },
+    "imageryTotal": "本曲共 {count} 个意象",
+    "imageryMore": "等",
+    "caption": {
+      "lines": "本曲 {count} 句",
+      "songs": "{count} 首作品写到",
+      "explore": "意象图谱",
+      "close": "关闭"
+    },
+    "production": "制作名单",
+    "listen": "收听",
+    "shared": "共有",
+    "readMode": {
+      "poem": "正文",
+      "lrc": "LRC"
+    },
+    "seekHint": "跳到这一句",
+    "nowPlaying": "正在播放"
+  }
 }

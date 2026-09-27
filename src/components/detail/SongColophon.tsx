@@ -26,7 +26,7 @@ interface SongColophonProps {
   credits: FolioCredit[];
 }
 
-/** 版记：基本信息、制作名单、收听渠道、备注，排成书籍版权页的样子 */
+/** 版记：基本信息、制作名单、收听渠道，排成书籍版权页的样子 */
 export default function SongColophon({ song, credits }: SongColophonProps) {
   const t = useTranslations("song");
   const tCommon = useTranslations("common");
@@ -91,7 +91,7 @@ export default function SongColophon({ song, credits }: SongColophonProps) {
                 <dt className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
                   {row.label}
                 </dt>
-                <dd className="mt-1.5 text-sm text-slate-800 dark:text-slate-200 break-words">
+                <dd className="mt-1.5 text-sm text-slate-800 dark:text-slate-200 wrap-break-word">
                   {row.value}
                 </dd>
               </div>
@@ -116,20 +116,6 @@ export default function SongColophon({ song, credits }: SongColophonProps) {
                 ))}
               </dl>
             </div>
-          )}
-
-          {song.comment && (
-            <blockquote
-              id="remarks"
-              className="border-l border-(--tone)/50 pl-5"
-            >
-              <p className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500 mb-2">
-                {t("sections.comment")}
-              </p>
-              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 whitespace-pre-line">
-                {song.comment}
-              </p>
-            </blockquote>
           )}
 
           <UserReview songId={song.id} />

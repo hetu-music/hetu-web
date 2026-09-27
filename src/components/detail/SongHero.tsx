@@ -3,7 +3,6 @@
 import NaviPlayer from "@/components/detail/NaviPlayer";
 import type { SongDetail, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
-import { formatDate } from "@/lib/utils/utils-common";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { Disc } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -60,7 +59,6 @@ export default function SongHero({
     ] as const
   ).filter(([, names]) => names && names.length > 0);
 
-  const date = song.date ? formatDate(song.date) : null;
   // 竖排摘句按空格分列，每一列是一个短语
   const excerptColumns = excerpt?.split(/\s+/).filter(Boolean) ?? [];
 
@@ -122,14 +120,6 @@ export default function SongHero({
               </div>
             ))}
           </dl>
-        )}
-
-        {(song.album || date) && (
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-            {song.album && <span>《{song.album}》</span>}
-            {song.album && date && <span className="mx-2">·</span>}
-            {date && <span>{date}</span>}
-          </p>
         )}
 
         {/* 窄屏：摘句横排 */}

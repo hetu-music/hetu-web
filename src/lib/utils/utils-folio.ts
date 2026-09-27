@@ -216,3 +216,69 @@ export function pickExcerpt(
   }
   return best;
 }
+
+// ─── 创作手记 ────────────────────────────────────────────────────────────────
+
+export interface NoteLine {
+  text: string;
+  /** 落款行（「——Finale」「-记《穆天子传》」），右对齐排 */
+  signature: boolean;
+}
+
+export interface Notes {
+  /** 开头的短句，作题词单独排 */
+  epigraph: NoteLine[] | null;
+  paragraphs: NoteLine[][];
+  /** 正文总字数，用于决定是否折叠 */
+  length: number;
+}
+
+const SIGNATURE_LINE = /^(——|—|--|-)\s*\S/;
+const EPIGRAPH_MAX = 48;
+const SOLE_EPIGRAPH_MAX = 80;
+
+function toNoteLines(paragraph: string): NoteLine[] {
+  return paragraph
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((text) => ({
+      text,
+      signature: SIGNATURE_LINE.test(text) && Array.from(text).length <= 40,
+    }));
+}
+
+function charCount(lines: NoteLine[]): number {
+  return lines
+    .filter((l) => !l.signature)
+    .reduce((n, l) => n + Array.from(l.text.replace(/\s+/g, "")).length, 0);
+}
+
+/**
+ * 备注是作者的创作手记：常以一句题词开头（可带落款），其后是自述或小故事。
+ * 按空行分段，段内换行保留；首段足够短时提出来作题词。
+ */
+export function parseNotes(comment: string | null | undefined): Notes | null {
+  const text = comment?.replace(/\r\n?/g, "\n").trim();
+  if (!text) return null;
+
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map(toNoteLines)
+    .filter((p) => p.length > 0);
+  if (paragraphs.length === 0) return null;
+
+  const first = paragraphs[0];
+  const firstLen = charCount(first);
+  const isEpigraph =
+    firstLen > 0 &&
+    (firstLen <= EPIGRAPH_MAX ||
+      (paragraphs.length === 1 && firstLen <= SOLE_EPIGRAPH_MAX));
+
+  const body = isEpigraph ? paragraphs.slice(1) : paragraphs;
+  return {
+    epigraph: isEpigraph ? first : null,
+    paragraphs: body,
+    length: body.reduce((n, p) => n + charCount(p), 0),
+  };
+}

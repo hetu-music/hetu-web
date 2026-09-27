@@ -77,7 +77,8 @@
       "text": "正文",
       "appendix": "附錄",
       "colophon": "版記",
-      "related": "同有此意象"
+      "related": "同有此意象",
+      "notes": "創作手記"
     },
     "imageryTotal": "本曲共 {count} 個意象",
     "imageryMore": "等",
@@ -95,6 +96,8 @@
       "lrc": "LRC"
     },
     "seekHint": "跳到這一句",
-    "nowPlaying": "正在播放"
+    "nowPlaying": "正在播放",
+    "expand": "展開全文",
+    "collapse": "收起"
   }
 }

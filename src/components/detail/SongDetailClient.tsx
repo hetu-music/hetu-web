@@ -1,5 +1,6 @@
 "use client";
 
+import CreatorNotes from "@/components/detail/CreatorNotes";
 import ImageryCaption from "@/components/detail/ImageryCaption";
 import LyricsFolio from "@/components/detail/LyricsFolio";
 import RelatedWorks from "@/components/detail/RelatedWorks";
@@ -20,7 +21,12 @@ import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
-import { buildFolio, markLines, pickExcerpt } from "@/lib/utils/utils-folio";
+import {
+  buildFolio,
+  markLines,
+  parseNotes,
+  pickExcerpt,
+} from "@/lib/utils/utils-folio";
 import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
 import {
   type CoverTone,
@@ -65,6 +71,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
   // ── 正文与意象 ──────────────────────────────────────────────────────────
   const folio = useMemo(() => buildFolio(song.lyrics), [song.lyrics]);
+  const notes = useMemo(() => parseNotes(song.comment), [song.comment]);
   const marked = useMemo(
     () => markLines(folio.lines, imagery.marks),
     [folio.lines, imagery.marks],
@@ -203,17 +210,16 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   }, []);
 
   const tocItems = useMemo<NavItem[]>(() => {
-    const items: NavItem[] = [
-      { id: "info", label: t("folio.sections.cover") },
-      { id: "lyrics", label: t("folio.sections.text") },
-    ];
+    const items: NavItem[] = [{ id: "info", label: t("folio.sections.cover") }];
+    if (notes) items.push({ id: "notes", label: t("folio.sections.notes") });
+    items.push({ id: "lyrics", label: t("folio.sections.text") });
     if (song.nmn_status)
       items.push({ id: "score", label: t("folio.sections.appendix") });
     items.push({ id: "colophon", label: t("folio.sections.colophon") });
     if (imagery.related.length > 0)
       items.push({ id: "related", label: t("folio.sections.related") });
     return items;
-  }, [song.nmn_status, imagery.related.length, t]);
+  }, [song.nmn_status, imagery.related.length, notes, t]);
 
   const appliedTone = tone ?? NEUTRAL_TONE;
 
@@ -333,6 +339,8 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
             })
           }
         />
+
+        {notes && <CreatorNotes notes={notes} />}
 
         <LyricsFolio
           songId={song.id}

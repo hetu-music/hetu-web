@@ -2,7 +2,7 @@ import { processLyrics } from "@/lib/utils/utils-lyrics";
 
 /**
  * 把 LRC 歌词整理成详情页正文所需的结构：
- * - 抽走开头的「歌名 - 歌手」与「词：某某」「混音：某某」等署名行，放进版记；
+ * - 抽走开头的署名区（标题行、「作词：某某」等署名、版权声明），放进版记；
  * - 按大段间奏推断分段（LRC 本身不保留空行）；
  * - 把意象标注（按时间标签）定位到具体的行与字。
  */
@@ -23,32 +23,170 @@ export interface FolioCredit {
 export interface Folio {
   lines: FolioLine[];
   credits: FolioCredit[];
+  /** 署名区里的声明与副题（「版权所有……」「-某某专辑 Track01-」） */
+  notices: string[];
 }
 
-const CREDIT_LINE = /^([^：:\s]{1,8})\s*[：:]\s*(.+)$/;
+export interface FolioOptions {
+  /** 歌名：用来认出开头的标题行 */
+  title?: string | null;
+  /**
+   * 歌词从哪个时间标签开始（如 "00:23.97"）。
+   * 自动识别出错的歌由后台手动指定：此前的行全部算署名区。
+   */
+  lyricsStart?: string | null;
+}
+
+/**
+ * 署名行「角色：姓名」。角色可以合写（「作曲/编曲/演唱」）或中英对照
+ * （「编曲 Arranger」「DJ 版制作」），但不含句读；
+ * 姓名里有中文句读的是对白（「王耀：恩，现今天下太平盛世。」），不是署名。
+ */
+const CREDIT_LINE = /^([^：:，。！？,.!?“”"]{1,30}?)\s*[：:]\s*(.+)$/;
+const DIALOGUE = /[，。！？；]/;
+
+function parseCredit(text: string): FolioCredit | null {
+  const m = text.match(CREDIT_LINE);
+  if (!m || DIALOGUE.test(m[2])) return null;
+  const role = cleanRole(m[1]);
+  return role ? { role, names: m[2].trim() } : null;
+}
+
+const HAS_CJK = /[㐀-鿿]/;
+
+/**
+ * 自动识别时，角色名须像一项职务或乐器；
+ * 对唱的「男：」「女：」、角色台词「明月心：」都不含这些字，不会被当成署名。
+ * 不在此列的冷门角色，由后台手动指定歌词起点兜底。
+ */
+const ROLE_WORD =
+  /[词詞曲编編唱声聲音混缩縮轨軌制製策划劃监監筹籌琴笛箫簫萧蕭埙塤鼓筝箏胡弦键鍵贝貝录錄修美画畫绘繪书書题題剪排协協鸣鳴谢謝]|母带|母帶|出品|发行|發行|吉他|琵琶|尺八|设计|設計|封面|海报|海報|视频|視頻|视觉|視覺|映像|分镜|分鏡|文案|故事|人设|人設|原著|支持|推广|推廣|宣传|宣傳|营销|營銷|后期|後期|念白|旁白|朗诵|朗誦|童|和声|和聲|伴|工程|团队|團隊|演奏|乐|樂|师|師|版权|版權|单位|單位|平台|調教|调教|指导|指導|素材|立绘|立繪|插画|插畫|^(?:OP|SP|PV|PS|MV|DJ|bass)(?![a-z])/i;
+
+/** 中英对照的角色只留中文：「编曲 Arranger」→「编曲」，「古琴监制/Guqin」→「古琴监制」 */
+function cleanRole(role: string): string {
+  const parts = role
+    .split("/")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.some((p) => HAS_CJK.test(p))) return parts.join("/");
+  return parts
+    .filter((p) => HAS_CJK.test(p))
+    .map((p) => p.replace(/\s*[A-Za-z][A-Za-z .&']*$/, "").trim())
+    .filter(Boolean)
+    .join("/");
+}
+
+/** 「歌名 - 歌手」 */
 const TITLE_LINE = /\s[-—]\s/;
+/**
+ * 署名区里夹着的声明：整行用「」『』括起、用 -…- 包起的专辑信息、
+ * 以——引出的副题，或含版权、翻唱授权字样的行。
+ */
+const NOTICE_LINE =
+  /^(?:[「『].*[」』]|-.+-|——.+)$|版权|翻唱|授权|二次上传|Track\s*\d/i;
+
+/** 比较歌名时忽略大小写、空白、间隔号与全半角括号 */
+function normalizeTitle(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s·・]/g, "")
+    .replace(/（/g, "(")
+    .replace(/）/g, ")");
+}
+
+/** 标题行：「歌名 - 歌手」，或以歌名开头（「偷个闲-河图」「陌上花早」） */
+function isTitleLine(text: string, title: string): boolean {
+  if (TITLE_LINE.test(text)) return true;
+  return title !== "" && normalizeTitle(text).startsWith(title);
+}
 
 /** 段落间隔：至少 8 秒，且明显长于常规行距 */
 const MIN_STANZA_GAP = 8;
 const STANZA_GAP_RATIO = 2.2;
 
-export function buildFolio(lyrics: string | null | undefined): Folio {
-  if (!lyrics) return { lines: [], credits: [] };
+type TimedLine = { time: number; text: string };
+
+interface Header {
+  /** 正文从第几行开始 */
+  bodyStart: number;
+  credits: FolioCredit[];
+  notices: string[];
+}
+
+/**
+ * 自动识别署名区：可选的标题行之后，连续的署名行，其间可夹声明行，
+ * 以及混在署名中间又重复一遍的歌名。没有任何署名时，只去掉标题行。
+ */
+function detectHeader(timed: TimedLine[], title: string): Header {
+  const start = timed[0] && isTitleLine(timed[0].text, title) ? 1 : 0;
+  const credits: FolioCredit[] = [];
+  const notices: string[] = [];
+  let i = start;
+  for (; i < timed.length; i++) {
+    const text = timed[i].text;
+    const credit = parseCredit(text);
+    if (credit && ROLE_WORD.test(credit.role)) credits.push(credit);
+    else if (NOTICE_LINE.test(text)) notices.push(text);
+    else if (title === "" || normalizeTitle(text) !== title) break;
+  }
+  if (credits.length === 0) return { bodyStart: start, credits, notices: [] };
+  return { bodyStart: i, credits, notices };
+}
+
+/** 手动指定了歌词起点：此前的行，有冒号的是署名，标题行略去，其余算声明 */
+function splitHeader(
+  timed: TimedLine[],
+  title: string,
+  startTime: number,
+): Header {
+  const bodyStart = timed.findIndex((l) => l.time >= startTime - 0.005);
+  const head = bodyStart < 0 ? timed : timed.slice(0, bodyStart);
+  const credits: FolioCredit[] = [];
+  const notices: string[] = [];
+  head.forEach((line, i) => {
+    const credit = parseCredit(line.text);
+    if (credit) credits.push(credit);
+    else if (
+      !(i === 0 && isTitleLine(line.text, title)) &&
+      normalizeTitle(line.text) !== title
+    )
+      notices.push(line.text);
+  });
+  return {
+    bodyStart: bodyStart < 0 ? timed.length : bodyStart,
+    credits,
+    notices,
+  };
+}
+
+/** 同一角色写了两遍的（署名区重复一次），只留第一次 */
+function dedupeCredits(credits: FolioCredit[]): FolioCredit[] {
+  const seen = new Set<string>();
+  return credits.filter((c) => {
+    if (seen.has(c.role)) return false;
+    seen.add(c.role);
+    return true;
+  });
+}
+
+export function buildFolio(
+  lyrics: string | null | undefined,
+  options: FolioOptions = {},
+): Folio {
+  if (!lyrics) return { lines: [], credits: [], notices: [] };
 
   const timed = processLyrics(lyrics).lines;
   if (timed.length === 0) return buildPlainFolio(lyrics);
 
-  // 开头的署名区：标题行只可能出现在最前面，其后是连续的「角色：姓名」
-  const credits: FolioCredit[] = [];
-  let start = 0;
-  if (timed[0] && TITLE_LINE.test(timed[0].text)) start = 1;
-  while (start < timed.length) {
-    const m = timed[start].text.match(CREDIT_LINE);
-    if (!m) break;
-    credits.push({ role: m[1], names: m[2].trim() });
-    start += 1;
-  }
-  const body = timed.slice(start);
+  const title = normalizeTitle(options.title ?? "");
+  const startTime = options.lyricsStart
+    ? timetagToSeconds(options.lyricsStart)
+    : null;
+  const header =
+    startTime !== null
+      ? splitHeader(timed, title, startTime)
+      : detectHeader(timed, title);
+  const body = timed.slice(header.bodyStart);
 
   const gaps = body.slice(1).map((l, i) => l.time - body[i].time);
   const sorted = [...gaps].sort((a, b) => a - b);
@@ -56,7 +194,8 @@ export function buildFolio(lyrics: string | null | undefined): Folio {
   const threshold = Math.max(MIN_STANZA_GAP, median * STANZA_GAP_RATIO);
 
   return {
-    credits,
+    credits: dedupeCredits(header.credits),
+    notices: header.notices,
     lines: body.map((l, i) => ({
       time: l.time,
       text: l.text,
@@ -77,7 +216,7 @@ function buildPlainFolio(lyrics: string): Folio {
     lines.push({ time: null, text, stanzaStart: pendingBreak });
     pendingBreak = false;
   }
-  return { lines, credits: [] };
+  return { lines, credits: [], notices: [] };
 }
 
 // ─── 意象定位 ────────────────────────────────────────────────────────────────

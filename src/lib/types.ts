@@ -35,6 +35,8 @@ export type SongDetail = Song & {
   discnumber?: number | null;
   disctotal?: number | null;
   lyrics?: string | null;
+  /** 歌词从哪个时间标签开始；自动识别署名区出错时由后台指定 */
+  lyrics_start?: string | null;
   normalLyrics?: string | null;
   track?: number | null;
   tracktotal?: number | null;
@@ -204,6 +206,7 @@ export type SongFormFieldKey =
   | "albumartist"
   | "comment"
   | "lyrics"
+  | "lyrics_start"
   | "nmn_status"
   | "track"
   | "tracktotal"
@@ -223,6 +226,8 @@ export type SongFieldConfig = {
   min?: number;
   isUrl?: boolean;
   arrayMaxLength?: number;
+  /** 输入框提示；缺省为「请输入某某」 */
+  placeholder?: string;
 };
 
 // 用户记录类型（管理员用户管理面板）

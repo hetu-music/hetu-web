@@ -8,25 +8,49 @@ import { ArrowUpRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
-/** 这些角色已在署名与基本信息里，参与制作中不再重复 */
+/** 这些角色已在卷首署名里（取自作词、作曲、编曲、演唱字段），参与制作中不再重复 */
 const CREDIT_ROLES_SHOWN = new Set([
   "词",
   "作词",
+  "填词",
   "曲",
   "作曲",
+  "谱曲",
+  "词曲",
+  "编",
   "编曲",
+  "唱",
   "演唱",
   "歌手",
   "原唱",
 ]);
 
+/**
+ * 合写的角色（「作曲/编曲/演唱」「编曲/混音」）拆开来看：
+ * 卷首已有的去掉，剩下的保留；全都已有就整行不列。
+ */
+function productionCredits(credits: FolioCredit[]): FolioCredit[] {
+  return credits.flatMap((c) => {
+    const rest = c.role
+      .split(/[/／、]/)
+      .filter((r) => r && !CREDIT_ROLES_SHOWN.has(r));
+    return rest.length > 0 ? [{ role: rest.join("/"), names: c.names }] : [];
+  });
+}
+
 interface SongColophonProps {
   song: SongDetail;
   credits: FolioCredit[];
+  /** 署名区里的声明与副题 */
+  notices: string[];
 }
 
 /** 版记：基本信息、参与制作、收听渠道，排成书籍版权页的样子 */
-export default function SongColophon({ song, credits }: SongColophonProps) {
+export default function SongColophon({
+  song,
+  credits,
+  notices,
+}: SongColophonProps) {
   const t = useTranslations("song");
   const tCommon = useTranslations("common");
   const tEnum = useTranslations("enums");
@@ -41,7 +65,7 @@ export default function SongColophon({ song, credits }: SongColophonProps) {
     ];
   }, [song, t, tCommon, tEnum]);
 
-  const production = credits.filter((c) => !CREDIT_ROLES_SHOWN.has(c.role));
+  const production = productionCredits(credits);
 
   const links = [
     { href: song.nelink, label: t("actions.netease") },
@@ -114,6 +138,14 @@ export default function SongColophon({ song, credits }: SongColophonProps) {
                   </div>
                 ))}
               </dl>
+            </div>
+          )}
+
+          {notices.length > 0 && (
+            <div className="space-y-1 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+              {notices.map((notice, i) => (
+                <p key={i}>{notice}</p>
+              ))}
             </div>
           )}
         </div>

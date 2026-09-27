@@ -23,6 +23,11 @@ const SongSchema = z.object({
   discnumber: z.number().int().min(1).nullable().optional(),
   disctotal: z.number().int().min(1).nullable().optional(),
   lyrics: z.string().max(10000).nullable().optional(),
+  lyrics_start: z
+    .string()
+    .regex(/^\d{1,2}:\d{2}(?:\.\d{2,3})?$/)
+    .nullable()
+    .optional(),
   track: z.number().int().min(1).nullable().optional(),
   tracktotal: z.number().int().min(1).nullable().optional(),
   kugolink: z.url().max(200).nullable().optional(),

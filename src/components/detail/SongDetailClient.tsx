@@ -71,7 +71,14 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const [isBackActive, setIsBackActive] = useState(false);
 
   // ── 正文与意象 ──────────────────────────────────────────────────────────
-  const folio = useMemo(() => buildFolio(song.lyrics), [song.lyrics]);
+  const folio = useMemo(
+    () =>
+      buildFolio(song.lyrics, {
+        title: song.title,
+        lyricsStart: song.lyrics_start,
+      }),
+    [song.lyrics, song.title, song.lyrics_start],
+  );
   const notes = useMemo(() => parseNotes(song.comment), [song.comment]);
   const anchorCtx = useMemo(
     () => ({ lines: folio.lines, paragraphs: notes?.paragraphs ?? [] }),
@@ -378,7 +385,11 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
           <CommentsSection />
 
-          <SongColophon song={song} credits={folio.credits} />
+          <SongColophon
+            song={song}
+            credits={folio.credits}
+            notices={folio.notices}
+          />
 
           <RelatedWorks songs={imagery.related} />
         </main>

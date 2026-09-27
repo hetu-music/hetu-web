@@ -257,7 +257,7 @@ export default function SongFormField({
                 )
               }
               className={baseClass}
-              placeholder={`请输入${field.label}`}
+              placeholder={field.placeholder ?? `请输入${field.label}`}
             />
             <FieldErrorMessage className="mt-1" message={errorMessage} />
           </>

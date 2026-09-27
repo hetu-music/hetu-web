@@ -98,10 +98,10 @@ export default function LyricsFolio({
       activeImagery === null
         ? null
         : new Set(
-          marked.flatMap((m, i) =>
-            m.ids.includes(activeImagery) ? [slots[i].key] : [],
+            marked.flatMap((m, i) =>
+              m.ids.includes(activeImagery) ? [slots[i].key] : [],
+            ),
           ),
-        ),
     [activeImagery, marked, slots],
   );
 
@@ -308,7 +308,7 @@ const FolioRow = memo(function FolioRow({
               : "text-slate-700 dark:text-slate-300",
             focused && !carriesActive && "opacity-[0.18]",
             seekable &&
-            "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
+              "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
           )}
         >
           {/* 宽屏：悬停时在句前浮出「批」，在左栏就地写批注 */}

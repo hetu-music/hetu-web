@@ -50,6 +50,87 @@ describe("buildFolio", () => {
     expect(folio.credits).toEqual([]);
     expect(folio.lines).toHaveLength(2);
   });
+
+  it("以歌名开头的标题行（横杠无空格、只有歌名、全半角括号不同）", () => {
+    for (const [first, title] of [
+      ["偷个闲-河图", "偷个闲"],
+      ["陌上花早", "陌上花早"],
+      ["偷个闲(DJ 版)-河图", "偷个闲（DJ版）"],
+      ["which heaven is mine", "Which Heaven is Mine"],
+    ]) {
+      const folio = buildFolio(
+        `[00:00.00]${first}\n[00:02.00]作词：某某\n[00:20.00]第一句`,
+        { title },
+      );
+      expect(folio.credits).toEqual([{ role: "作词", names: "某某" }]);
+      expect(folio.lines.map((l) => l.text)).toEqual(["第一句"]);
+    }
+  });
+
+  it("署名区里夹着或跟着的声明归入版记", () => {
+    const folio = buildFolio(
+      [
+        "[00:00.00]风月叩关河-墨明棋妙/河图",
+        "[00:03.99]作词: 东方千月",
+        "[00:05.00]歌曲版权归某某所有，仅开放翻唱授权",
+        "[00:07.00]混音/和声: 小吴太太",
+        "[00:19.97]-墨明棋妙二十周年纪念专辑《墨明棋妙这个村》Track01-",
+        "[00:21.97]「版权所有未经许可请勿翻唱」",
+        "[00:23.97]我守着城池残破",
+      ].join("\n"),
+      { title: "风月叩关河" },
+    );
+    expect(folio.credits.map((c) => c.role)).toEqual(["作词", "混音/和声"]);
+    expect(folio.notices).toHaveLength(3);
+    expect(folio.lines.map((l) => l.text)).toEqual(["我守着城池残破"]);
+  });
+
+  it("署名中间重复的歌名略过，同一角色只留第一次", () => {
+    const folio = buildFolio(
+      [
+        "[00:00.00]作词 : 择荇",
+        "[00:00.81]一笑相逢在翠微",
+        "[00:03.56]演唱：河图、少司命",
+        "[00:06.55]作词：择荇",
+        "[00:10.62]司：",
+        "[00:15.84]就定于鳞羽竞渡的仲春，",
+      ].join("\n"),
+      { title: "一笑相逢在翠微" },
+    );
+    expect(folio.credits).toEqual([
+      { role: "作词", names: "择荇" },
+      { role: "演唱", names: "河图、少司命" },
+    ]);
+    expect(folio.notices).toEqual([]);
+    expect(folio.lines[0].text).toBe("司：");
+  });
+
+  it("没有署名时，形似声明的首句仍是歌词", () => {
+    const folio = buildFolio("[00:01.00]「春风十里」\n[00:04.00]不如你", {
+      title: "某歌",
+    });
+    expect(folio.lines.map((l) => l.text)).toEqual(["「春风十里」", "不如你"]);
+    expect(folio.notices).toEqual([]);
+  });
+
+  it("手动指定歌词起点：此前全算署名区，有冒号的是署名，其余是声明", () => {
+    const folio = buildFolio(
+      [
+        "[00:00.00]某歌 - 河图",
+        "[00:02.00]词：某某",
+        "[00:04.00]本曲献给某某",
+        "[00:06.00]男：第一句",
+        "[00:09.00]女：第二句",
+      ].join("\n"),
+      { title: "某歌", lyricsStart: "00:06.00" },
+    );
+    expect(folio.credits).toEqual([{ role: "词", names: "某某" }]);
+    expect(folio.notices).toEqual(["本曲献给某某"]);
+    expect(folio.lines.map((l) => l.text)).toEqual([
+      "男：第一句",
+      "女：第二句",
+    ]);
+  });
 });
 
 describe("markLines", () => {

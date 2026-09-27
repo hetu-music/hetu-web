@@ -21,6 +21,7 @@ export const NON_CRITICAL_FIELD_KEYS: readonly SongFormFieldKey[] = [
   "qmlink",
   "nelink",
   "comment",
+  "lyrics_start",
 ];
 
 /** 待完善标签上与 songFields.label 不一致的显示名 */

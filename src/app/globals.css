@@ -203,6 +203,29 @@
   animation-play-state: running !important;
 }
 
+/* 歌词中的意象：中文排版的着重号，颜色取意象一级分类色（--mark） */
+.imagery-mark {
+  cursor: pointer;
+  text-emphasis: filled dot;
+  text-emphasis-color: color-mix(in oklab, var(--mark) 75%, transparent);
+  text-emphasis-position: under right;
+  transition: color 0.3s ease;
+
+  &:hover,
+  &[data-active="true"] {
+    color: var(--mark);
+  }
+
+  &[data-active="true"] {
+    text-emphasis-color: var(--mark);
+  }
+
+  :where(.dark) &:hover,
+  :where(.dark) &[data-active="true"] {
+    color: color-mix(in oklab, var(--mark) 55%, white);
+  }
+}
+
 /* Tooltip 出现 */
 @keyframes tooltip-appear {
   from {

@@ -7,7 +7,6 @@ import EnqueueButton from "@/components/shared/EnqueueButton";
 import { Heart, Loader2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "@/i18n/navigation";
-import { useCallback, useState } from "react";
 
 export default function FavoritesTabContent() {
   const router = useRouter();
@@ -17,47 +16,6 @@ export default function FavoritesTabContent() {
     clearFavorites,
     loaded: favoritesLoaded,
   } = useFavorites();
-
-  const [expandedReviews, setExpandedReviews] = useState<Map<number, boolean>>(
-    new Map(),
-  );
-  // Lazy-loaded review texts: songId -> review text (or "loading")
-  const [reviewTexts, setReviewTexts] = useState<Map<number, string | null>>(
-    new Map(),
-  );
-
-  const toggleReview = useCallback(
-    async (id: number, e: React.MouseEvent) => {
-      e.stopPropagation();
-      setExpandedReviews((prev) => {
-        const next = new Map(prev);
-        const isExpanding = !next.get(id);
-        next.set(id, isExpanding);
-
-        if (isExpanding && !reviewTexts.has(id)) {
-          // Lazy-load review text on first expand
-          fetch(`/api/public/collections/review?songId=${id}`)
-            .then((res) => res.json())
-            .then((data) => {
-              setReviewTexts((rt) => {
-                const nextRt = new Map(rt);
-                nextRt.set(id, data.review || "");
-                return nextRt;
-              });
-            })
-            .catch(() => {
-              setReviewTexts((rt) => {
-                const nextRt = new Map(rt);
-                nextRt.set(id, null);
-                return nextRt;
-              });
-            });
-        }
-        return next;
-      });
-    },
-    [reviewTexts],
-  );
 
   if (!favoritesLoaded) {
     return (
@@ -139,14 +97,6 @@ export default function FavoritesTabContent() {
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 sm:pt-0 border-t border-slate-100 dark:border-slate-800/40 sm:border-0">
-                {!!song.collectionInfo?.review && (
-                  <button
-                    onClick={(e) => toggleReview(song.id, e)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    {expandedReviews.get(song.id) ? "隐藏评论" : "查看评论"}
-                  </button>
-                )}
                 <div className="flex items-center gap-1.5">
                   <PlayButton
                     songId={song.id}
@@ -175,25 +125,6 @@ export default function FavoritesTabContent() {
                 </div>
               </div>
             </div>
-
-            {/* Expanded Review — lazy-loaded */}
-            {!!song.collectionInfo?.review && expandedReviews.get(song.id) && (
-              <div className="px-3.5 pb-3.5 pt-0.5">
-                <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-lg border border-slate-100/60 dark:border-slate-800/60">
-                  {!reviewTexts.has(song.id) ? (
-                    <p className="text-sm text-slate-400 animate-pulse">
-                      加载评论中...
-                    </p>
-                  ) : (
-                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
-                      {reviewTexts.get(song.id) ||
-                        song.collectionInfo.review ||
-                        "暂无内容"}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         ))}
       </div>

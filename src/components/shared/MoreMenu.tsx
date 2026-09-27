@@ -1,7 +1,14 @@
 "use client";
 
 import { cn } from "@/lib/utils/utils";
-import { MoreHorizontal, Sun, Moon } from "lucide-react";
+import { useInstallAction } from "@/components/pwa/useInstallAction";
+import {
+  Download,
+  type LucideIcon,
+  MoreHorizontal,
+  Moon,
+  Sun,
+} from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { runThemeTransition } from "@/lib/theme-transition";
@@ -11,12 +18,36 @@ import LanguageOptions, {
   MenuSectionLabel,
 } from "@/components/shared/LanguageOptions";
 
+export interface MoreMenuAction {
+  key: string;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}
+
 /**
- * 移动端的"更多设置"二级菜单：把语言切换和主题切换收进一个下拉里，
- * 避免窄屏下导航栏按钮过多。桌面端仍然平铺 LocaleSwitcher / ThemeToggle。
+ * 移动端的"更多设置"二级菜单：把页面操作（分享等）、安装应用、语言切换和主题切换
+ * 收进一个下拉里，避免窄屏下导航栏按钮过多。桌面端这些都平铺在顶栏上。
  */
-export default function MoreMenu() {
+export default function MoreMenu({
+  actions = [],
+}: {
+  /** 当前页面的操作，排在菜单最上面 */
+  actions?: MoreMenuAction[];
+}) {
   const [isOpen, setIsOpen] = useState(false);
+  const install = useInstallAction();
+  const items: MoreMenuAction[] = install.available
+    ? [
+        ...actions,
+        {
+          key: "install",
+          icon: Download,
+          label: "安装为应用",
+          onClick: install.start,
+        },
+      ]
+    : actions;
   const dropdownRef = useRef<HTMLDivElement>(null);
   const switcher = useLocaleSwitch();
   const { setTheme, resolvedTheme } = useTheme();
@@ -69,6 +100,29 @@ export default function MoreMenu() {
 
       {isOpen && (
         <div role="menu" className={MENU_PANEL_CLASS}>
+          {items.length > 0 && (
+            <>
+              <div className="flex flex-col gap-1">
+                {items.map(({ key, icon: Icon, label, onClick }) => (
+                  <button
+                    key={key}
+                    role="menuitem"
+                    onClick={() => {
+                      setIsOpen(false);
+                      onClick();
+                    }}
+                    className="w-full px-2.5 py-2 rounded-xl text-left text-xs font-semibold flex items-center gap-3 transition-colors cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-slate-200/30 dark:hover:bg-slate-900/50"
+                  >
+                    <Icon size={16} className="shrink-0" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="border-t border-slate-200/50 dark:border-slate-800/40" />
+            </>
+          )}
+
           {/* 主题切换（卡片选项组） */}
           <div className="flex flex-col gap-1.5">
             <MenuSectionLabel>外观主题 / Theme</MenuSectionLabel>
@@ -115,6 +169,8 @@ export default function MoreMenu() {
           />
         </div>
       )}
+
+      {install.prompt}
     </div>
   );
 }

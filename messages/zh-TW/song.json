@@ -45,8 +45,7 @@
     "lyrics": "歌詞",
     "score": "樂譜",
     "comment": "備註",
-    "toc": "目錄導航",
-    "jumpTo": "跳轉到{label}"
+    "toc": "目錄導航"
   },
   "noLyrics": "暫無歌詞",
   "noScore": "暫無樂譜",
@@ -64,5 +63,89 @@
   "copyError": "複製失敗",
   "shareCancel": "分享取消或失敗",
   "shareText": "來聽聽河圖的這首歌：{title}{artist}",
-  "shareTitle": "歌曲詳情"
+  "shareTitle": "歌曲詳情",
+  "folio": {
+    "credits": {
+      "lyricist": "詞",
+      "composer": "曲",
+      "arranger": "編",
+      "artist": "唱"
+    },
+    "toc": "目錄",
+    "sections": {
+      "cover": "卷首",
+      "text": "歌詞",
+      "colophon": "版記",
+      "related": "同有此意",
+      "notes": "創作手記",
+      "comments": "評點"
+    },
+    "imageryTotal": "本曲共 {count} 個意象",
+    "imageryMore": "等",
+    "caption": {
+      "lines": "本曲 {count} 句",
+      "songs": "{count} 首作品寫到",
+      "explore": "意象詞雲",
+      "close": "關閉"
+    },
+    "production": "參與製作",
+    "listen": "收聽",
+    "shared": "共有",
+    "readMode": {
+      "poem": "歌詞",
+      "lrc": "LRC"
+    },
+    "seekHint": "跳到這一句",
+    "nowPlaying": "正在播放",
+    "expand": "展開全文",
+    "collapse": "收起",
+    "comments": {
+      "intro": "批註寫在字句旁；這裡是對整首歌的評點。",
+      "count": "共 {count} 則批註",
+      "empty": "還沒有人評點這首歌。",
+      "anonymous": "佚名",
+      "private": "私批",
+      "pending": "待審",
+      "edited": "改過",
+      "like": "讚",
+      "reply": "回覆",
+      "replies": "{count} 則回覆",
+      "edit": "編輯",
+      "delete": "刪除",
+      "confirmDelete": "確認刪除",
+      "deleted": "此批已刪",
+      "more": "另 {count} 則",
+      "fold": "收起",
+      "add": "批",
+      "annotate": "批註",
+      "annotateLine": "批註這一句",
+      "annotateParagraph": "批註這一段",
+      "annotateScore": "批註樂譜",
+      "markerLabel": "{count} 則批註",
+      "playFrom": "從此句播放",
+      "inline": "夾批",
+      "orphan": "原句已改：",
+      "placeholder": {
+        "song": "寫下對這首歌的評點……",
+        "lyrics": "批這一句……",
+        "notes": "批這一段……",
+        "score": "批樂譜……",
+        "reply": "回覆……"
+      },
+      "privateToggle": "僅自己可見",
+      "submit": "批註",
+      "submitReply": "回覆",
+      "save": "儲存",
+      "cancel": "取消",
+      "login": "登入後可以批註",
+      "error": "沒能儲存，請稍後重試",
+      "close": "關閉",
+      "slot": {
+        "song": "總評",
+        "lyrics": "批歌詞",
+        "notes": "批手記",
+        "score": "批樂譜"
+      }
+    }
+  }
 }

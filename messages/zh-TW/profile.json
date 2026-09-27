@@ -2,6 +2,7 @@
   "title": "個人中心",
   "tabs": {
     "favorites": "我的收藏",
+    "annotations": "我的批註",
     "account": "帳戶設定",
     "feedback": "建議回饋",
     "requests": "回饋管理",
@@ -21,5 +22,33 @@
       "title": "操作日誌",
       "description": "資料庫稽核記錄，僅供查閱"
     }
+  },
+  "annotations": {
+    "summary": "共 {count} 則批註，涉及 {songs} 首歌",
+    "count": "{count} 則",
+    "filter": {
+      "all": "全部",
+      "public": "公開",
+      "private": "私批"
+    },
+    "anchor": {
+      "song": "總評",
+      "lyrics": "歌詞",
+      "notes": "手記",
+      "score": "樂譜"
+    },
+    "reply": "回覆",
+    "replyToDeleted": "原批註已刪除",
+    "anonymous": "佚名",
+    "private": "私批",
+    "pending": "待審",
+    "edited": "改過",
+    "likes": "{count} 讚",
+    "open": "查看",
+    "delete": "刪除",
+    "confirmDelete": "確認刪除",
+    "empty": "還沒有寫過批註",
+    "emptyHint": "在歌曲頁的字句旁、手記旁或評點裡都可以批註",
+    "emptyFiltered": "這一類下還沒有批註"
   }
 }

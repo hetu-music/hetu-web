@@ -17,7 +17,6 @@ export type Song = {
   has_audio?: boolean;
   collectionInfo?: {
     created_at: string;
-    review: string | null;
     snippet: string | null;
   };
 };
@@ -36,6 +35,8 @@ export type SongDetail = Song & {
   discnumber?: number | null;
   disctotal?: number | null;
   lyrics?: string | null;
+  /** 歌词从哪个时间标签开始；自动识别署名区出错时由后台指定 */
+  lyrics_start?: string | null;
   normalLyrics?: string | null;
   track?: number | null;
   tracktotal?: number | null;
@@ -53,6 +54,85 @@ export interface MusicLibraryClientProps {
 // 歌曲详情客户端组件属性
 export interface SongDetailClientProps {
   song: SongDetail;
+  imagery: SongImageryView;
+}
+
+// 歌曲详情页的意象视图
+export interface SongImageryMark {
+  id: number;
+  name: string;
+  /** 一级 → 末级分类名 */
+  path: string[];
+  /** 一级分类配色 */
+  accent: string;
+  timetags: string[];
+  /** 全库写到该意象的作品数（含本曲） */
+  songCount: number;
+}
+
+export interface RelatedSong {
+  id: number;
+  title: string;
+  artist: string[] | null;
+  hascover: boolean | null;
+  /** 共享的意象，越少见越靠前 */
+  shared: string[];
+}
+
+export interface SongImageryView {
+  marks: SongImageryMark[];
+  related: RelatedSong[];
+}
+
+// 评点：详情页上的批注
+/** song 总评 / notes 创作手记某段 / lyrics 某句歌词 / score 乐谱 */
+export type CommentAnchor = "song" | "notes" | "lyrics" | "score";
+
+export interface SongComment {
+  id: number;
+  parentId: number | null;
+  /** 回复没有自己的位置，跟随所回复的批注 */
+  anchor: CommentAnchor | null;
+  anchorIndex: number | null;
+  anchorTime: number | null;
+  /** 被批的原文，用来在原文改动后重新定位 */
+  anchorQuote: string | null;
+  body: string;
+  /** 私批：仅自己可见 */
+  private: boolean;
+  /** 待审：仅自己可见 */
+  pending: boolean;
+  /** 已删但仍有回复，只留一个空位 */
+  deleted: boolean;
+  likeCount: number;
+  liked: boolean;
+  mine: boolean;
+  /** 已删的批注不显示作者 */
+  author: string | null;
+  createdAt: string;
+  editedAt: string | null;
+}
+
+// 个人页「我的批注」：按歌分组
+export interface MyComment {
+  id: number;
+  /** 回复的 anchor 取自所回复的批注 */
+  anchor: CommentAnchor;
+  anchorQuote: string | null;
+  body: string;
+  private: boolean;
+  pending: boolean;
+  likeCount: number;
+  createdAt: string;
+  editedAt: string | null;
+  /** 回复时，所回复的那则批注（已删则为 null） */
+  replyTo: { author: string | null; body: string } | null;
+  isReply: boolean;
+}
+
+export interface MyCommentGroup {
+  song: Pick<Song, "id" | "title" | "artist" | "hascover">;
+  comments: MyComment[];
 }
 
 // 筛选选项类型
@@ -126,6 +206,7 @@ export type SongFormFieldKey =
   | "albumartist"
   | "comment"
   | "lyrics"
+  | "lyrics_start"
   | "nmn_status"
   | "track"
   | "tracktotal"
@@ -145,6 +226,8 @@ export type SongFieldConfig = {
   min?: number;
   isUrl?: boolean;
   arrayMaxLength?: number;
+  /** 输入框提示；缺省为「请输入某某」 */
+  placeholder?: string;
 };
 
 // 用户记录类型（管理员用户管理面板）

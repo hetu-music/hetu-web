@@ -535,7 +535,7 @@ export function mapAndSortSongs(data: SongDetail[]): SongDetail[] {
   });
 }
 
-export function getCoverUrl(song: Song | SongDetail): string {
+export function getCoverUrl(song: Pick<Song, "id" | "hascover">): string {
   if (song.hascover === true) {
     return `https://cover.hetu-music.com/cover/${song.id}.jpg`;
   } else if (song.hascover === false) {

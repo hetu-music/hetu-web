@@ -26,6 +26,7 @@ export function makeQueryBuilder<T = unknown>(result: MockResult<T>): any {
     neq: vi.fn(() => builder),
     in: vi.fn(() => builder),
     not: vi.fn(() => builder),
+    or: vi.fn(() => builder),
     ilike: vi.fn(() => builder),
     like: vi.fn(() => builder),
     gte: vi.fn(() => builder),

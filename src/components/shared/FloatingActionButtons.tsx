@@ -1,193 +1,131 @@
 "use client";
 
-import IOSInstallPrompt from "@/components/pwa/IOSInstallPrompt";
-import { usePWAInstall } from "@/components/pwa/PWARegistration";
-import { usePlayerStore } from "@/store/player-store";
+import PlayerToggle from "@/components/shared/PlayerToggle";
 import { cn } from "@/lib/utils/utils";
-import {
-  ArrowUp,
-  ArrowDown,
-  Disc3,
-  Download,
-  Plus,
-  Share2,
-} from "lucide-react";
-import React, { useState } from "react";
+import { usePlayerStore } from "@/store/player-store";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 interface FloatingActionButtonsProps {
+  /** 已滚下去：跳转按钮指向顶部，否则指向底部 */
   showScrollTop: boolean;
   onScrollToTop: () => void;
-  onShare?: () => void;
   className?: string;
-  children?: React.ReactNode;
 }
 
+/** 停止滚动多久后收起跳转按钮 */
+const IDLE_MS = 2000;
+
+const BUTTON_CLASS =
+  "size-11 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10 active:bg-slate-900/10 dark:active:bg-white/15 transition-colors";
+
+/** 页面正在滚动，停下 IDLE_MS 后复位 */
+function useScrolling() {
+  const [scrolling, setScrolling] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      setScrolling(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setScrolling(false), IDLE_MS);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+  return scrolling;
+}
+
+function scrollToBottom() {
+  window.scrollTo({
+    top: document.documentElement.scrollHeight,
+    behavior: "smooth",
+  });
+}
+
+/**
+ * 页面右下角的竖向胶囊：播放条开关（有曲目时常驻）与跳转按钮。
+ * 跳转按钮只在滚动时出现，停下一会儿后收起；指针停在胶囊上时不收。
+ * 没滚下去时指向底部，滚下去后指向顶部。
+ * 两者都不显示时整条隐去；只剩一个时胶囊收成圆形。
+ */
 const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
   showScrollTop,
   onScrollToTop,
-  onShare,
   className,
-  children,
 }) => {
-  const { isInstallable, install, isIOS, isStandalone } = usePWAInstall();
-  const [showIOSPrompt, setShowIOSPrompt] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  // 播放器开关
-  const { currentTrack, isPlaying, playerVisible, setPlayerVisible } =
-    usePlayerStore();
-  const hasPlayer = !!currentTrack;
-
-  const showInstallButton = isInstallable || (isIOS && !isStandalone);
-  const hasSecondaryActions =
-    Boolean(children) || showInstallButton || Boolean(onShare);
-
-  const handleInstallClick = () => {
-    if (isIOS) setShowIOSPrompt(true);
-    else install();
-    setIsMenuOpen(false);
-  };
-
-  const handleShareClick = () => {
-    onShare?.();
-    setIsMenuOpen(false);
-  };
-
-  const buttonClass =
-    "p-3 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 shadow-lg shadow-slate-200/50 dark:shadow-black/50 ring-1 ring-slate-900/5 dark:ring-white/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center";
+  const hasPlayer = usePlayerStore((s) => !!s.currentTrack);
+  // 播放条展开时让到它上方
+  const playerShown = usePlayerStore(
+    (s) => !!s.currentTrack && s.playerVisible,
+  );
+  const scrolling = useScrolling();
+  const [held, setHeld] = useState(false);
+  const showJump = scrolling || held;
+  const visible = hasPlayer || showJump;
 
   return (
-    <>
-      <IOSInstallPrompt
-        isOpen={showIOSPrompt}
-        onClose={() => setShowIOSPrompt(false)}
-      />
+    <div
+      onPointerEnter={(e) => e.pointerType === "mouse" && setHeld(true)}
+      onPointerLeave={() => setHeld(false)}
+      // 只有键盘聚焦才留住；鼠标点过后按钮仍带焦点，不能因此一直不收
+      onFocus={(e) => e.target.matches(":focus-visible") && setHeld(true)}
+      onBlur={() => setHeld(false)}
+      className={cn(
+        "fixed right-4 sm:right-6 z-50 flex flex-col overflow-hidden rounded-full",
+        "bg-white/90 dark:bg-slate-900/85 backdrop-blur-xl",
+        "ring-1 ring-slate-900/[0.06] dark:ring-white/10",
+        "shadow-[0_10px_28px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_10px_28px_-12px_rgba(0,0,0,0.6)]",
+        "transition-[bottom,opacity,translate] duration-300 ease-out",
+        playerShown ? "bottom-[112px]" : "bottom-6 sm:bottom-8",
+        !visible && "opacity-0 translate-y-3 pointer-events-none",
+        className,
+      )}
+    >
+      <PlayerToggle className={BUTTON_CLASS} />
 
+      {/* 跳转：不显示时高度收起，胶囊随之缩短 */}
       <div
         className={cn(
-          "fixed right-6 z-50 flex flex-col gap-3 items-center transition-all duration-300",
-          hasPlayer ? "bottom-[112px] sm:bottom-8" : "bottom-8",
-          className,
+          "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+          showJump ? "grid-rows-[1fr]" : "grid-rows-[0fr] opacity-0",
         )}
       >
-        {/* 1. 二级菜单 (移到最顶部：当点击展开时，向上弹出的子菜单会飘入空旷区域，绝不遮挡其他按钮) */}
-        {hasSecondaryActions && (
-          <div className="relative flex flex-col items-center gap-3">
-            <div
-              className={cn(
-                "flex flex-col gap-3 absolute bottom-full mb-3 transition-all duration-300 origin-bottom right-0 items-center overflow-visible",
-                isMenuOpen
-                  ? "scale-100 opacity-100 pointer-events-auto translate-y-0"
-                  : "scale-50 opacity-0 pointer-events-none translate-y-8",
-              )}
-            >
-              {children}
-
-              {showInstallButton && (
-                <button
-                  onClick={handleInstallClick}
-                  className={buttonClass}
-                  title="安装为PWA应用"
-                  aria-label="安装为PWA应用"
-                >
-                  <Download size={20} />
-                </button>
-              )}
-
-              {onShare && (
-                <button
-                  onClick={handleShareClick}
-                  className={buttonClass}
-                  title="分享"
-                  aria-label="分享"
-                >
-                  <Share2 size={20} />
-                </button>
-              )}
-            </div>
-
-            <button
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-              className={buttonClass}
-              title="更多操作"
-              aria-label="更多操作"
-            >
-              <Plus
-                size={20}
-                className={cn(
-                  "transition-transform duration-300",
-                  isMenuOpen && "rotate-45",
-                )}
-              />
-            </button>
-          </div>
-        )}
-
-        {/* 2. 播放器开关按钮：有播放曲目时显示 (放在中间) */}
-        {hasPlayer && (
+        <div className="min-h-0 overflow-hidden">
+          {hasPlayer && (
+            <div className="mx-auto h-px w-5 bg-slate-200 dark:bg-slate-700" />
+          )}
           <button
-            onClick={() => setPlayerVisible(!playerVisible)}
-            className={cn(
-              buttonClass,
-              playerVisible &&
-                "bg-blue-500 dark:bg-blue-500 text-white dark:text-white hover:bg-blue-600 dark:hover:bg-blue-600 ring-blue-500/30",
-            )}
-            title={playerVisible ? "收起播放器" : "展开播放器"}
-            aria-label={playerVisible ? "收起播放器" : "展开播放器"}
+            type="button"
+            onClick={showScrollTop ? onScrollToTop : scrollToBottom}
+            className={cn(BUTTON_CLASS, "relative")}
+            title={showScrollTop ? "返回顶部" : "一键到底"}
+            aria-label={showScrollTop ? "返回顶部" : "一键到底"}
+            aria-hidden={!showJump}
+            tabIndex={showJump ? 0 : -1}
           >
-            <Disc3
-              size={20}
+            <ArrowUp
+              size={18}
+              strokeWidth={2.25}
               className={cn(
-                "transition-transform",
-                isPlaying && "animate-spin animation-duration-[3s]",
+                "absolute transition-[opacity,rotate] duration-300",
+                showScrollTop ? "opacity-100" : "opacity-0 -rotate-90",
+              )}
+            />
+            <ArrowDown
+              size={18}
+              strokeWidth={2.25}
+              className={cn(
+                "absolute transition-[opacity,rotate] duration-300",
+                showScrollTop ? "opacity-0 rotate-90" : "opacity-100",
               )}
             />
           </button>
-        )}
-
-        {/* 3. 返回顶部 / 一键到底 */}
-        <div className="relative w-11 h-11 shrink-0">
-          {/* 返回顶部 */}
-          <button
-            onClick={onScrollToTop}
-            className={cn(
-              buttonClass,
-              "absolute inset-0 transition-all duration-300 transform",
-              showScrollTop
-                ? "scale-100 opacity-100 rotate-0"
-                : "scale-50 opacity-0 pointer-events-none rotate-90",
-            )}
-            title="返回顶部"
-            aria-label="返回顶部"
-          >
-            <ArrowUp size={20} />
-          </button>
-
-          {/* 一键到底 */}
-          <button
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                window.scrollTo({
-                  top: document.documentElement.scrollHeight,
-                  behavior: "smooth",
-                });
-              }
-            }}
-            className={cn(
-              buttonClass,
-              "absolute inset-0 transition-all duration-300 transform",
-              !showScrollTop
-                ? "scale-100 opacity-100 rotate-0"
-                : "scale-50 opacity-0 pointer-events-none -rotate-90",
-            )}
-            title="一键到底"
-            aria-label="一键到底"
-          >
-            <ArrowDown size={20} />
-          </button>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

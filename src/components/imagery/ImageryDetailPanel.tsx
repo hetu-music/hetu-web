@@ -13,6 +13,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
+import type { PaletteEntry } from "@/lib/imagery/palette";
 import type { ImageryItem, SongRef } from "@/lib/types";
 import { ChevronRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
@@ -21,14 +22,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── shared types ─────────────────────────────────────────────────────────────
-
-export interface PaletteEntry {
-  text: string;
-  ring: string;
-  dot: string;
-  activeBg: string;
-  accent: string;
-}
 
 export type SongResult = SongRef;
 

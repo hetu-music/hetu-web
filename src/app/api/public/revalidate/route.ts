@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { locales } from "@/i18n/config";
 import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
 import { safeCompareSecret } from "@/lib/server/server-utils";
+import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
 
 const SECRET_HEADER = "x-revalidate-secret";
 
@@ -39,6 +40,8 @@ export async function POST(request: NextRequest) {
     // 寻曲候选池由意象标注聚合并单独缓存；立即失效，让随后重新生成的
     // /quiz 页面读到最新数据，而不是构建期（占位凭据）留下的空结果
     revalidateTag(QUIZ_POOL_TAG, { expire: 0 });
+    // 详情页的意象标注与相关作品来自单独缓存的意象索引
+    revalidateTag(SONG_IMAGERY_TAG, { expire: 0 });
 
     // 防范未命中重写路径的缓存，同时也刷新 sitemap
     revalidatePath("/");

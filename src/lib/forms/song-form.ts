@@ -69,6 +69,18 @@ const makeOptionalUrlSchema = (label: string) =>
       ),
   );
 
+/** 歌词起点：LRC 时间标签，如 00:23.97；留空则自动识别 */
+const lyricsStartSchema = z.preprocess(
+  normalizeString,
+  z
+    .string()
+    .trim()
+    .regex(
+      /^$|^\d{1,2}:\d{2}(?:\.\d{2,3})?$/,
+      "歌词起点须为时间标签，如 00:23.97",
+    ),
+);
+
 export const songFormSchema = z.object({
   title: z.preprocess(
     normalizeString,
@@ -87,6 +99,7 @@ export const songFormSchema = z.object({
   albumartist: makeOptionalArraySchema("出品发行", 30),
   comment: makeOptionalTextSchema("备注", 10000),
   lyrics: makeOptionalTextSchema("LRC歌词", 10000),
+  lyrics_start: lyricsStartSchema,
   nmn_status: z.preprocess(normalizeNullableBoolean, z.boolean().nullable()),
   track: makeOptionalIntegerSchema("曲号", 1),
   tracktotal: makeOptionalIntegerSchema("曲总数", 1),
@@ -115,6 +128,7 @@ export const songFormStateSchema = z.object({
   albumartist: z.array(makeArrayFieldItemSchema("出品发行", 30)),
   comment: makeOptionalTextSchema("备注", 10000),
   lyrics: makeOptionalTextSchema("LRC歌词", 10000),
+  lyrics_start: lyricsStartSchema,
   nmn_status: z.preprocess(normalizeNullableBoolean, z.boolean().nullable()),
   track: makeOptionalIntegerSchema("曲号", 1),
   tracktotal: makeOptionalIntegerSchema("曲总数", 1),
@@ -149,6 +163,7 @@ export function createEmptySongForm(): SongFormValues {
     albumartist: [],
     comment: "",
     lyrics: "",
+    lyrics_start: "",
     nmn_status: null,
     track: null,
     tracktotal: null,
@@ -197,6 +212,7 @@ export function toSongFormValues(song: Partial<SongDetail>): SongFormValues {
     albumartist: normalizeStringArray(song.albumartist),
     comment: normalizeString(song.comment),
     lyrics: normalizeString(song.lyrics),
+    lyrics_start: normalizeString(song.lyrics_start),
     nmn_status: typeof song.nmn_status === "boolean" ? song.nmn_status : null,
     track:
       typeof song.track === "number" && Number.isFinite(song.track)

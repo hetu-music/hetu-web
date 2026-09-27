@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import SongDetailClient from "@/components/detail/SongDetailClient";
 import { getSongById } from "@/lib/server/service-songs";
+import { getSongImagery } from "@/lib/server/service-song-imagery";
 import { TABLES } from "@/lib/db/supabase-server";
 
 type PageProps = {
@@ -87,8 +88,12 @@ export default async function SongDetailPage({
   }
 
   let song;
+  let imagery;
   try {
-    song = await getSongById(songId, TABLES.MUSIC, undefined, locale);
+    [song, imagery] = await Promise.all([
+      getSongById(songId, TABLES.MUSIC, undefined, locale),
+      getSongImagery(songId, locale),
+    ]);
   } catch (error) {
     console.error("Error in SongDetailPage:", error);
     notFound();
@@ -98,7 +103,7 @@ export default async function SongDetailPage({
     notFound();
   }
 
-  return <SongDetailClient song={song} />;
+  return <SongDetailClient song={song} imagery={imagery} />;
 }
 
 // 生成静态参数

@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
       },
     ],
     minimumCacheTTL: 3600,
+    // 本地网络下 cover.hetu-music.com 会解析到内网地址，图片优化器默认拒绝；
+    // 只在开发环境放开，生产环境保留 SSRF 防护
+    dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",
     // 优化图片处理以减少内存占用
   },
   // 压缩配置

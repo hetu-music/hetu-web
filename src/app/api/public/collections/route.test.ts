@@ -82,14 +82,13 @@ describe("GET /api/public/collections", () => {
     expect(getSongsByIds).not.toHaveBeenCalled();
   });
 
-  it("有收藏时把收藏行信息（review/snippet等）合并进对应歌曲", async () => {
+  it("有收藏时把收藏行信息（收藏时间/snippet）合并进对应歌曲", async () => {
     mockFromBuilders = [
       makeQueryBuilder({
         data: [
           {
             song_id: 1,
             created_at: "2024-01-01",
-            review: "很好听",
             snippet: null,
           },
         ],
@@ -105,7 +104,7 @@ describe("GET /api/public/collections", () => {
     expect(body.songIds).toEqual([1]);
     expect(body.songs[0]).toMatchObject({
       id: 1,
-      collectionInfo: { review: "很好听" },
+      collectionInfo: { created_at: "2024-01-01" },
     });
   });
 });

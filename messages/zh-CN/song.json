@@ -45,8 +45,7 @@
     "lyrics": "歌词",
     "score": "乐谱",
     "comment": "备注",
-    "toc": "目录导航",
-    "jumpTo": "跳转到{label}"
+    "toc": "目录导航"
   },
   "noLyrics": "暂无歌词",
   "noScore": "暂无乐谱",
@@ -64,5 +63,89 @@
   "copyError": "复制失败",
   "shareCancel": "分享取消或失败",
   "shareText": "来听听河图的这首歌：{title}{artist}",
-  "shareTitle": "歌曲详情"
+  "shareTitle": "歌曲详情",
+  "folio": {
+    "credits": {
+      "lyricist": "词",
+      "composer": "曲",
+      "arranger": "编",
+      "artist": "唱"
+    },
+    "toc": "目录",
+    "sections": {
+      "cover": "卷首",
+      "text": "歌词",
+      "colophon": "版记",
+      "related": "同有此意",
+      "notes": "创作手记",
+      "comments": "评点"
+    },
+    "imageryTotal": "本曲共 {count} 个意象",
+    "imageryMore": "等",
+    "caption": {
+      "lines": "本曲 {count} 句",
+      "songs": "{count} 首作品写到",
+      "explore": "意象词云",
+      "close": "关闭"
+    },
+    "production": "参与制作",
+    "listen": "收听",
+    "shared": "共有",
+    "readMode": {
+      "poem": "歌词",
+      "lrc": "LRC"
+    },
+    "seekHint": "跳到这一句",
+    "nowPlaying": "正在播放",
+    "expand": "展开全文",
+    "collapse": "收起",
+    "comments": {
+      "intro": "批注写在字句旁；这里是对整首歌的评点。",
+      "count": "共 {count} 则批注",
+      "empty": "还没有人评点这首歌。",
+      "anonymous": "佚名",
+      "private": "私批",
+      "pending": "待审",
+      "edited": "改过",
+      "like": "赞",
+      "reply": "回复",
+      "replies": "{count} 则回复",
+      "edit": "编辑",
+      "delete": "删除",
+      "confirmDelete": "确认删除",
+      "deleted": "此批已删",
+      "more": "另 {count} 则",
+      "fold": "收起",
+      "add": "批",
+      "annotate": "批注",
+      "annotateLine": "批注这一句",
+      "annotateParagraph": "批注这一段",
+      "annotateScore": "批注乐谱",
+      "markerLabel": "{count} 则批注",
+      "playFrom": "从此句播放",
+      "inline": "夹批",
+      "orphan": "原句已改：",
+      "placeholder": {
+        "song": "写下对这首歌的评点……",
+        "lyrics": "批这一句……",
+        "notes": "批这一段……",
+        "score": "批乐谱……",
+        "reply": "回复……"
+      },
+      "privateToggle": "仅自己可见",
+      "submit": "批注",
+      "submitReply": "回复",
+      "save": "保存",
+      "cancel": "取消",
+      "login": "登录后可以批注",
+      "error": "没能保存，请稍后重试",
+      "close": "关闭",
+      "slot": {
+        "song": "总评",
+        "lyrics": "批歌词",
+        "notes": "批手记",
+        "score": "批乐谱"
+      }
+    }
+  }
 }

@@ -30,6 +30,13 @@ export const songFields: SongFieldConfig[] = [
   { key: "albumartist", label: "出品发行", type: "array", arrayMaxLength: 30 },
   { key: "comment", label: "备注", type: "textarea", maxLength: 10000 },
   { key: "lyrics", label: "LRC歌词", type: "textarea", maxLength: 10000 },
+  {
+    key: "lyrics_start",
+    label: "歌词起点",
+    type: "text",
+    maxLength: 12,
+    placeholder: "留空自动识别；识别有误时填正文首句的时间，如 00:23.97",
+  },
   { key: "nmn_status", label: "乐谱", type: "boolean" },
   { key: "track", label: "曲号", type: "number", min: 1 },
   { key: "tracktotal", label: "曲总数", type: "number", min: 1 },

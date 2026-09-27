@@ -351,9 +351,19 @@ const EXCERPT_MIN_CHARS = 4;
 const EXCERPT_MAX_COLUMNS = 3;
 const EXCERPT_MAX_COLUMN_CHARS = 9;
 
+/** 放不进一列的长句从中间折成两列；前一列取短的一半，多为「五 / 六」的断法 */
+function foldInHalf(text: string): string | null {
+  const chars = Array.from(text);
+  if (text.includes(" ") || chars.length > EXCERPT_MAX_COLUMN_CHARS * 2)
+    return null;
+  const half = Math.floor(chars.length / 2);
+  return `${chars.slice(0, half).join("")} ${chars.slice(half).join("")}`;
+}
+
 /**
  * 卷首摘句：意象最密集、长度适合竖排的一句；同分取靠前者。
  * 没有意象标注时取第一句长度合适的歌词。
+ * 一句都放不下时（每句都是不带空格的长句），把长句从中间折成两列再挑。
  */
 export function pickExcerpt(
   lines: FolioLine[],
@@ -368,18 +378,21 @@ export function pickExcerpt(
       columns.every((n) => n <= EXCERPT_MAX_COLUMN_CHARS)
     );
   };
-  let best: string | null = null;
-  let bestScore = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const text = cleanExcerpt(lines[i].text);
-    if (!fits(text)) continue;
-    const score = new Set(marked[i]?.ids ?? []).size;
-    if (score > bestScore) {
-      best = text;
-      bestScore = score;
+  const pick = (shape: (text: string) => string | null) => {
+    let best: string | null = null;
+    let bestScore = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const text = shape(cleanExcerpt(lines[i].text));
+      if (text === null || !fits(text)) continue;
+      const score = new Set(marked[i]?.ids ?? []).size;
+      if (score > bestScore) {
+        best = text;
+        bestScore = score;
+      }
     }
-  }
-  return best;
+    return best;
+  };
+  return pick((text) => text) ?? pick(foldInHalf);
 }
 
 // ─── 创作手记 ────────────────────────────────────────────────────────────────

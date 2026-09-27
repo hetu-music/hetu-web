@@ -233,6 +233,29 @@ describe("pickExcerpt", () => {
     const { lines } = buildFolio("[00:01.00]啊\n[00:04.00]春风十里");
     expect(pickExcerpt(lines, markLines(lines, []))).toBe("春风十里");
   });
+
+  it("每句都放不进一列时，把意象最多的长句从中间折成两列", () => {
+    const { lines } = buildFolio(
+      [
+        "[00:01.00]绢帛里工笔被风干成标本",
+        "[00:02.00]你睫毛下的湖泊结着薄冰",
+        "[00:03.00]一二三四五六七八九十一二三四五六七八九",
+      ].join("\n"),
+    );
+    const marked = markLines(lines, [
+      { id: 1, name: "湖泊", timetags: ["00:02.00"] },
+    ]);
+    expect(pickExcerpt(lines, marked)).toBe("你睫毛下的 湖泊结着薄冰");
+    // 超过两列容量的长句不折
+    expect(pickExcerpt(lines.slice(2), marked.slice(2))).toBeNull();
+  });
+
+  it("有能直接放下的句子时不折长句", () => {
+    const { lines } = buildFolio(
+      "[00:01.00]你睫毛下的湖泊结着薄冰\n[00:02.00]春风十里",
+    );
+    expect(pickExcerpt(lines, markLines(lines, []))).toBe("春风十里");
+  });
 });
 
 describe("parseNotes", () => {

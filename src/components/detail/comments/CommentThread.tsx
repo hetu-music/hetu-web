@@ -16,11 +16,9 @@ function formatDate(iso: string): string {
 /** 一则批注或回复：正文楷体，下面一行小字落款与操作 */
 function CommentItem({
   comment,
-  isReply,
   onReply,
 }: {
   comment: SongComment;
-  isReply: boolean;
   onReply?: () => void;
 }) {
   const t = useTranslations("song.folio.comments");
@@ -75,13 +73,8 @@ function CommentItem({
         {comment.body}
       </p>
       <footer className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 dark:text-slate-500">
-        <span>
-          <span className="text-slate-500 dark:text-slate-400">
-            {comment.author || t("anonymous")}
-          </span>
-          <span className="ml-1 text-(--tone)">
-            {isReply ? t("replyVerb") : t("verb")}
-          </span>
+        <span className="text-slate-500 dark:text-slate-400">
+          {comment.author || t("anonymous")}
         </span>
         {comment.private && (
           <span className="px-1 rounded-sm ring-1 ring-current text-[10px] leading-4">
@@ -161,13 +154,12 @@ export default function CommentThread({ thread }: { thread: Thread }) {
       )}
       <CommentItem
         comment={comment}
-        isReply={false}
         onReply={canReply ? () => setReplying((v) => !v) : undefined}
       />
       {(replies.length > 0 || replying) && (
         <div className="mt-3 ml-1 pl-4 border-l border-(--tone)/30 space-y-3">
           {replies.map((r) => (
-            <CommentItem key={r.id} comment={r} isReply />
+            <CommentItem key={r.id} comment={r} />
           ))}
           {replying && (
             <CommentComposer

@@ -74,7 +74,7 @@
     },
     "sections": {
       "cover": "卷首",
-      "text": "正文",
+      "text": "歌词",
       "colophon": "版记",
       "related": "同有此意象",
       "notes": "创作手记",
@@ -92,7 +92,7 @@
     "listen": "收听",
     "shared": "共有",
     "readMode": {
-      "poem": "正文",
+      "poem": "歌词",
       "lrc": "LRC"
     },
     "seekHint": "跳到这一句",
@@ -103,8 +103,6 @@
       "intro": "批注写在字句旁；这里是对整首歌的评点。",
       "count": "共 {count} 则批注",
       "empty": "还没有人评点这首歌。",
-      "verb": "批",
-      "replyVerb": "复",
       "anonymous": "佚名",
       "private": "私批",
       "pending": "待审",
@@ -144,7 +142,7 @@
       "close": "关闭",
       "slot": {
         "song": "总评",
-        "lyrics": "批正文",
+        "lyrics": "批歌词",
         "notes": "批手记",
         "score": "批乐谱"
       }

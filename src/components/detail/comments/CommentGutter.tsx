@@ -201,7 +201,6 @@ function SideNote({
         {!lead.comment.deleted && (
           <>
             {lead.comment.author || t("anonymous")}
-            <span className="ml-1 text-(--tone)">{t("verb")}</span>
             {lead.comment.private && (
               <span className="ml-2 px-1 rounded-sm ring-1 ring-current text-[10px] leading-4">
                 {t("private")}

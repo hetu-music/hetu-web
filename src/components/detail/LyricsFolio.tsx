@@ -439,12 +439,7 @@ function InlineNotes({
         >
           {comment.deleted ? t("deleted") : comment.body}
           <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">
-            {!comment.deleted && (
-              <>
-                {comment.author || t("anonymous")}
-                <span className="text-(--tone)">{t("verb")}</span>
-              </>
-            )}
+            {!comment.deleted && (comment.author || t("anonymous"))}
             {replies.length > 0 &&
               ` · ${t("replies", { count: replies.length })}`}
           </span>

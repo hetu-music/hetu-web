@@ -11,7 +11,7 @@
 
 @import "tailwindcss";
 @import "tw-animate-css";
-@variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* ── 2. 主题 Token ──────────────────────────────────────────────────────────── */
 
@@ -69,7 +69,7 @@
     font-family: var(--font-serif);
     font-weight: 700;
 
-    & > span {
+    &>span {
       position: relative;
       top: 0.05em;
     }
@@ -93,6 +93,7 @@
 /* ── 4. 工具类 ──────────────────────────────────────────────────────────────── */
 
 @utility no-transitions {
+
   &,
   & *,
   & *::before,
@@ -111,13 +112,11 @@
 }
 
 @utility mask-linear-fade-edges {
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    black 12px,
-    black calc(100% - 12px),
-    transparent
-  );
+  mask-image: linear-gradient(to right,
+      transparent,
+      black 12px,
+      black calc(100% - 12px),
+      transparent);
 }
 
 /* ── 5. 业务动画 ─────────────────────────────────────────────────────────────── */
@@ -141,6 +140,7 @@
 
 /* 功能入口字符浮动 */
 @keyframes feature-drift {
+
   0%,
   100% {
     transform: translateY(0);
@@ -174,6 +174,7 @@
 
 /* 词云词语呼吸浮动 */
 @keyframes word-breathe {
+
   0%,
   100% {
     transform: translateY(0);
@@ -205,9 +206,10 @@
 
 /* 歌词中的意象：中文排版的着重号，颜色取意象一级分类色（--mark） */
 .imagery-mark {
+  --emphasis: color-mix(in oklab, var(--mark) 75%, transparent);
   cursor: pointer;
   text-emphasis: filled dot;
-  text-emphasis-color: color-mix(in oklab, var(--mark) 75%, transparent);
+  text-emphasis-color: var(--emphasis);
   text-emphasis-position: under right;
   transition: color 0.3s ease;
 
@@ -217,13 +219,21 @@
   }
 
   &[data-active="true"] {
-    text-emphasis-color: var(--mark);
+    --emphasis: var(--mark);
   }
 
   :where(.dark) &:hover,
   :where(.dark) &[data-active="true"] {
     color: color-mix(in oklab, var(--mark) 55%, white);
   }
+}
+
+/* Safari 只认带 -webkit- 前缀的着重号。构建时 lightningcss 会把同一规则里的
+   前缀写法并进无前缀的那条，所以另起一条选择器不同的规则 */
+:where(.imagery-mark) {
+  -webkit-text-emphasis: filled dot;
+  -webkit-text-emphasis-color: var(--emphasis);
+  -webkit-text-emphasis-position: under right;
 }
 
 /* Tooltip 出现 */

@@ -1,8 +1,8 @@
 # <img src="public/icons/icon-192x192.png" width="32" height="32" style="vertical-align: middle;" /> [河图作品勘鉴](https://hetu-music.com/)
 
 [![Website](https://img.shields.io/badge/Website-hetu--music.com-brightgreen?style=flat-square)](https://hetu-music.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-16.2.6-black?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.2.6-blue?style=flat-square&logo=react)](https://react.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.3.6-black?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.3.0-blue?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0.3-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database-emerald?style=flat-square&logo=supabase)](https://supabase.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)

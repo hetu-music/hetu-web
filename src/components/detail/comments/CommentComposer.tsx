@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils/utils";
 import { COMMENT_BODY_MAX } from "@/lib/utils/utils-comments";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useComments } from "./CommentsContext";
 
 /** 字数接近上限时才显示计数 */
@@ -40,6 +40,14 @@ export default function CommentComposer({
   const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 不用原生 autoFocus：旁批刚挂上时还没排到所批的那一行，
+  // 聚焦会把页面滚到它的临时位置；这里聚焦但不滚动
+  useEffect(() => {
+    if (autoFocus && loggedIn)
+      textareaRef.current?.focus({ preventScroll: true });
+  }, [autoFocus, loggedIn]);
 
   if (!loggedIn) {
     return (
@@ -76,6 +84,7 @@ export default function CommentComposer({
   return (
     <div className={className}>
       <textarea
+        ref={textareaRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={(e) => {
@@ -89,7 +98,6 @@ export default function CommentComposer({
           }
         }}
         placeholder={placeholder}
-        autoFocus={autoFocus}
         rows={2}
         className="block w-full resize-none field-sizing-content min-h-[3.6em] max-h-[16em] bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:border-(--tone) focus:outline-none px-0 py-1.5 font-kaiti text-[15px] leading-[1.8] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors"
       />

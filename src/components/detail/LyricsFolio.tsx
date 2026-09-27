@@ -60,7 +60,7 @@ export default function LyricsFolio({
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [inline, setInline] = useState(false);
   const isLarge = useMediaQuery("(min-width: 1024px)");
-  const { threads, setOpenSlot, setSheetSlot } = useComments();
+  const { threads, openSlot, setOpenSlot, setSheetSlot } = useComments();
   const bodyRef = useRef<HTMLDivElement>(null);
   const isCurrentTrack = usePlayerStore(
     (s) => s.currentTrack?.songId === songId,
@@ -98,10 +98,10 @@ export default function LyricsFolio({
       activeImagery === null
         ? null
         : new Set(
-            marked.flatMap((m, i) =>
-              m.ids.includes(activeImagery) ? [slots[i].key] : [],
-            ),
+          marked.flatMap((m, i) =>
+            m.ids.includes(activeImagery) ? [slots[i].key] : [],
           ),
+        ),
     [activeImagery, marked, slots],
   );
 
@@ -182,7 +182,7 @@ export default function LyricsFolio({
       )}
 
       {mode === "lrc" ? (
-        <pre className="mt-12 lg:ml-[26rem] font-mono text-sm leading-7 text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-words">
+        <pre className="mt-12 lg:ml-104 font-mono text-sm leading-7 text-slate-600 dark:text-slate-400 whitespace-pre-wrap wrap-break-word">
           {rawLyrics}
         </pre>
       ) : (
@@ -201,6 +201,9 @@ export default function LyricsFolio({
               marked={marked[i]}
               notes={notesByLine[i]}
               stanzaNumber={stanzaNumbers[i]}
+              numeralMuted={
+                openSlot === slots[i].key && threads.has(slots[i].key)
+              }
               markById={markById}
               activeImagery={activeImagery}
               isCurrent={isCurrentTrack && currentIndex === i}
@@ -229,6 +232,8 @@ interface FolioRowProps {
   marked: MarkedLine;
   notes: number[];
   stanzaNumber: number;
+  /** 这一句的旁批展开时，「收起」落在序号的位置，序号先淡去 */
+  numeralMuted: boolean;
   markById: Map<number, SongImageryMark>;
   activeImagery: number | null;
   isCurrent: boolean;
@@ -251,6 +256,7 @@ const FolioRow = memo(function FolioRow({
   marked,
   notes,
   stanzaNumber,
+  numeralMuted,
   markById,
   activeImagery,
   isCurrent,
@@ -280,7 +286,10 @@ const FolioRow = memo(function FolioRow({
       )}
     >
       <div
-        className="hidden lg:block text-right font-serif text-xs tracking-[0.3em] leading-[2.2] text-(--tone)/70 select-none"
+        className={cn(
+          "hidden lg:block text-right font-serif text-xs tracking-[0.3em] leading-[2.2] text-(--tone)/70 select-none transition-opacity duration-300",
+          numeralMuted && "opacity-0",
+        )}
         aria-hidden
       >
         {stanzaNumber > 0 && toChineseNumeral(stanzaNumber)}
@@ -299,7 +308,7 @@ const FolioRow = memo(function FolioRow({
               : "text-slate-700 dark:text-slate-300",
             focused && !carriesActive && "opacity-[0.18]",
             seekable &&
-              "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
+            "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
           )}
         >
           {/* 宽屏：悬停时在句前浮出「批」，在左栏就地写批注 */}

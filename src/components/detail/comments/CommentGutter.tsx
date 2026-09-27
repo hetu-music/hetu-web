@@ -7,7 +7,13 @@ import {
   countThreads,
 } from "@/lib/utils/utils-comments";
 import { useTranslations } from "next-intl";
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useComments } from "./CommentsContext";
 import SlotPanel from "./SlotPanel";
 
@@ -46,6 +52,17 @@ export default function CommentGutter({
 
   const noteRefs = useRef(new Map<string, HTMLDivElement>());
   const [tops, setTops] = useState<Record<string, number>>({});
+  // 已经在原位显示过一帧的旁批：之后被推挤时才用过渡，
+  // 新出现的旁批直接落在所批的那一行，不从顶上滑下来
+  const [settled, setSettled] = useState<ReadonlySet<string>>(new Set());
+
+  useEffect(() => {
+    const placed = Object.keys(tops);
+    if (placed.every((k) => settled.has(k)) && settled.size === placed.length)
+      return;
+    const frame = requestAnimationFrame(() => setSettled(new Set(placed)));
+    return () => cancelAnimationFrame(frame);
+  }, [tops, settled]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -128,7 +145,10 @@ export default function CommentGutter({
             else noteRefs.current.delete(slot.key);
           }}
           className={cn(
-            "absolute inset-x-0 transition-[top,opacity] duration-300",
+            "absolute inset-x-0 duration-300",
+            settled.has(slot.key)
+              ? "transition-[top,opacity]"
+              : "transition-opacity",
             slot.key === openSlot && "z-10",
             tops[slot.key] === undefined && "opacity-0 pointer-events-none",
             focusKeys &&
@@ -157,21 +177,25 @@ function SideNote({
 
   if (slot.key === openSlot) {
     return (
-      <div className="-mx-4 -my-3 px-4 py-3 rounded-lg bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm">
-        <div className="flex justify-end -mt-1 mb-2">
-          <button
-            type="button"
-            onClick={() => setOpenSlot(null)}
-            className="text-xs tracking-widest text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-          >
-            {t("fold")}
-          </button>
-        </div>
+      // 「收起」放在旁批右侧的页边空白里，与第一则批注的首行平齐，
+      // 不占批注的宽度，展开后批注的位置与换行都不变
+      <div className="relative -mx-4 -my-3 px-4 py-3 rounded-lg bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm">
         <SlotPanel
           slot={slot}
           autoFocus={list.length === 0}
           onCancel={list.length === 0 ? () => setOpenSlot(null) : undefined}
         />
+        {list.length > 0 && (
+          <span className="absolute left-full top-3 ml-2 font-kaiti text-[15px] leading-[1.85] whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => setOpenSlot(null)}
+              className="font-sans text-xs tracking-widest text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            >
+              {t("fold")}
+            </button>
+          </span>
+        )}
       </div>
     );
   }

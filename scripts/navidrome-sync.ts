@@ -14,60 +14,17 @@
  * 之后的同步会保留仍然有效的现有映射，不会覆盖。
  */
 import { createClient } from "@supabase/supabase-js";
-import crypto from "crypto";
 import {
-  planSync,
-  type DbSong,
-  type MappingRow,
-  type NavSong,
-} from "../src/lib/navidrome/sync";
-
-const PAGE_SIZE = 1000;
-const NAV_PAGE_SIZE = 500;
+  fetchNavidromeLibrary,
+  navidromeConfigFromEnv,
+} from "../src/lib/navidrome/client";
+import { applySyncPlan, loadSyncState } from "../src/lib/navidrome/store";
+import { planSync, type DbSong, type NavSong } from "../src/lib/navidrome/sync";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`缺少环境变量 ${name}`);
   return value;
-}
-
-async function fetchNavidromeSongs(): Promise<NavSong[]> {
-  const base = requireEnv("NAVIDROME_URL").replace(/\/$/, "");
-  const user = requireEnv("NAVIDROME_USER");
-  const password = requireEnv("NAVIDROME_PASSWORD");
-
-  const songs: NavSong[] = [];
-  for (let offset = 0; ; offset += NAV_PAGE_SIZE) {
-    const salt = crypto.randomBytes(8).toString("hex");
-    const params = new URLSearchParams({
-      u: user,
-      t: crypto
-        .createHash("md5")
-        .update(password + salt)
-        .digest("hex"),
-      s: salt,
-      v: "1.16.1",
-      c: "hetu-web-sync",
-      f: "json",
-      // Navidrome 对空查询返回全部曲目，用于全量同步
-      query: "",
-      artistCount: "0",
-      albumCount: "0",
-      songCount: String(NAV_PAGE_SIZE),
-      songOffset: String(offset),
-    });
-    const res = await fetch(`${base}/rest/search3?${params}`, {
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) throw new Error(`Navidrome 请求失败：HTTP ${res.status}`);
-    const body = (await res.json())["subsonic-response"];
-    if (body?.status !== "ok") {
-      throw new Error(`Navidrome 返回错误：${JSON.stringify(body?.error)}`);
-    }
-    const page: NavSong[] = body.searchResult3?.song ?? [];
-    songs.push(...page);
-    if (page.length < NAV_PAGE_SIZE) return songs;
-  }
 }
 
 function describeSong(s: DbSong): string {
@@ -110,27 +67,14 @@ async function main() {
     { auth: { persistSession: false } },
   );
 
-  async function fetchAll<T>(table: string, select: string): Promise<T[]> {
-    const out: T[] = [];
-    for (let from = 0; ; from += PAGE_SIZE) {
-      const { data, error } = await supabase
-        .from(table)
-        .select(select)
-        .order("id")
-        .range(from, from + PAGE_SIZE - 1);
-      if (error) throw error;
-      out.push(...(data as T[]));
-      if (data.length < PAGE_SIZE) return out;
-    }
+  const config = navidromeConfigFromEnv();
+  if (!config) {
+    throw new Error("缺少 NAVIDROME_URL / NAVIDROME_USER / NAVIDROME_PASSWORD");
   }
 
-  const [navSongs, songs, existing] = await Promise.all([
-    fetchNavidromeSongs(),
-    fetchAll<DbSong>(
-      "music",
-      "id,title,album,discnumber,track,length,has_audio",
-    ),
-    fetchAll<MappingRow>("navid_song", "id,navid_id"),
+  const [navSongs, { songs, mappings: existing }] = await Promise.all([
+    fetchNavidromeLibrary(config),
+    loadSyncState(supabase),
   ]);
   // 曲库为空多半是账号或库配置有误；此时执行会把所有映射当作失效删掉
   if (navSongs.length === 0) {
@@ -145,11 +89,20 @@ async function main() {
   );
 
   section(`保持不变 ${plan.unchanged}`);
+  for (const s of plan.suspicious) {
+    console.log(`  ! 时长不符 ${describeSong(s.song)} ↔ ${describeNav(s.nav)}`);
+  }
 
-  section(`新增/替换映射 ${plan.upserts.length}`);
-  for (const u of plan.upserts) {
+  // 宽松匹配排在最前，方便核对
+  const upserts = [...plan.upserts].sort(
+    (a, b) => Number(b.loose) - Number(a.loose),
+  );
+  section(
+    `新增/替换映射 ${upserts.length}（其中宽松匹配 ${upserts.filter((u) => u.loose).length}）`,
+  );
+  for (const u of upserts) {
     console.log(
-      `  ${describeSong(u.song)} → ${u.nav.id}${u.previous ? `（原 ${u.previous}）` : ""}`,
+      `  ${u.loose ? "≈ " : ""}${describeSong(u.song)} → ${u.loose ? describeNav(u.nav) : u.nav.id}${u.previous ? `（原 ${u.previous}）` : ""}`,
     );
   }
 
@@ -179,37 +132,10 @@ async function main() {
   }
 
   section("执行");
-  if (plan.upserts.length > 0) {
-    const { error } = await supabase.from("navid_song").upsert(
-      plan.upserts.map((u) => ({ id: u.song.id, navid_id: u.nav.id })),
-      { onConflict: "id" },
-    );
-    if (error) throw error;
-    console.log(`  ✓ 写入映射 ${plan.upserts.length}`);
-  }
-  if (plan.deletes.length > 0) {
-    const { error } = await supabase
-      .from("navid_song")
-      .delete()
-      .in(
-        "id",
-        plan.deletes.map((d) => d.id),
-      );
-    if (error) throw error;
-    console.log(`  ✓ 删除映射 ${plan.deletes.length}`);
-  }
-  for (const next of [true, false]) {
-    const ids = plan.hasAudioChanges
-      .filter((c) => c.next === next)
-      .map((c) => c.song.id);
-    if (ids.length === 0) continue;
-    const { error } = await supabase
-      .from("music")
-      .update({ has_audio: next })
-      .in("id", ids);
-    if (error) throw error;
-    console.log(`  ✓ has_audio → ${next}：${ids.length}`);
-  }
+  const result = await applySyncPlan(supabase, plan);
+  console.log(
+    `  ✓ 写入映射 ${result.upserted}，删除映射 ${result.deleted}，has_audio 变化 ${result.hasAudioChanged.length}`,
+  );
   if (plan.hasAudioChanges.length > 0) await revalidateSite();
 }
 

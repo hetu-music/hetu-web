@@ -1,25 +1,21 @@
 "use client";
 
-import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useUserContext } from "@/context/UserContext";
 import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import type { ImageryCategory } from "@/lib/types";
 import {
   BookOpen,
-  Home,
   Layers,
   ListTree,
-  Music,
   Plus,
   Search,
   Tag,
-  User,
   XCircle,
 } from "lucide-react";
-import { Link } from "@/i18n/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 import CategoriesTab from "./imagery-admin/CategoriesTab";
+import AdminNavbar from "./song-admin/AdminNavbar";
 import ImageryAdminModals from "./imagery-admin/ImageryAdminModals";
 import ImageryTab from "./imagery-admin/ImageryTab";
 import MeaningsTab from "./imagery-admin/MeaningsTab";
@@ -140,49 +136,12 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans transition-colors duration-500 dark:bg-[#0B0F19]">
-      <nav className="fixed left-0 right-0 top-0 z-50 border-b border-slate-200/50 bg-[#FAFAFA]/80 backdrop-blur-md dark:border-slate-800/50 dark:bg-[#0B0F19]/80">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-6">
-          <div className="shrink-0 flex items-center gap-1.5 bg-slate-200/50 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/30 dark:border-slate-800/60 rounded-full p-1 shadow-inner relative">
-            {/* 歌曲管理 (当前未激活态) */}
-            <Link
-              href="/admin"
-              className="group relative flex items-center gap-2 px-3 sm:px-5 py-2 rounded-full text-sm font-medium tracking-wide text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/40 hover:shadow-xs transition-all duration-300"
-            >
-              <Music
-                size={14}
-                className="text-slate-400 dark:text-slate-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors duration-300 group-hover:scale-110 shrink-0"
-              />
-              <span className="hidden sm:inline">歌曲管理</span>
-            </Link>
-
-            {/* 意象管理 (当前激活态 - 紫色主题) */}
-            <span className="relative flex items-center gap-2 px-3 sm:px-5 py-2 rounded-full text-sm font-medium tracking-wide bg-linear-to-r from-violet-600 to-fuchsia-600 dark:from-violet-500 dark:to-fuchsia-500 text-white shadow-md shadow-violet-500/20 dark:shadow-violet-500/10 transition-all select-none">
-              <Tag size={14} className="sm:animate-pulse shrink-0" />
-              <span className="hidden sm:inline">意象管理</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Link
-              href="/"
-              className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800"
-              title="返回主页"
-            >
-              <Home size={18} />
-            </Link>
-            <Link
-              href="/profile"
-              className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800"
-              title={user?.name ?? "个人中心"}
-            >
-              <User
-                size={18}
-                className={user ? "text-blue-500 dark:text-blue-400" : ""}
-              />
-            </Link>
-            <ThemeToggle className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800" />
-          </div>
-        </div>
-      </nav>
+      <AdminNavbar
+        active="imagery"
+        userName={user?.name}
+        isLoggedIn={Boolean(user)}
+        isSuper={user?.isSuper}
+      />
 
       <main className="pt-24 pb-20 max-w-7xl mx-auto px-6">
         {/* Header & Stats */}

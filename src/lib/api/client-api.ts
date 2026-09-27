@@ -3,6 +3,9 @@ import type { Song, UserRecord, UserUpdatePayload } from "@/lib/types";
 import type { ReviewCandidate, ReviewResult } from "@/lib/imagery/review";
 import type { OccurrenceBatchItem } from "@/lib/server/service-imagery";
 import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
+import type { AudioOverview } from "@/lib/server/service-navidrome";
+import type { ApplyResult } from "@/lib/navidrome/store";
+import type { NavSong } from "@/lib/navidrome/sync";
 
 // 新增歌曲
 export async function apiCreateSong(song: Partial<Song>, csrfToken: string) {
@@ -505,4 +508,43 @@ export async function apiReplyRequest(
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "操作失败");
   return data;
+}
+
+// ─── Audio (Navidrome) API ────────────────────────────────────────────────────
+
+async function readError(res: Response, fallback: string): Promise<Error> {
+  const d = await res.json().catch(() => ({}));
+  return new Error((d as { error?: string }).error || fallback);
+}
+
+export async function apiGetAudioOverview(): Promise<AudioOverview> {
+  const res = await fetch("/api/admin/audio", { cache: "no-store" });
+  if (!res.ok) throw await readError(res, "获取音频数据失败");
+  return res.json();
+}
+
+export async function apiRunAudioSync(csrfToken: string): Promise<ApplyResult> {
+  const res = await fetch("/api/admin/audio/sync", {
+    method: "POST",
+    headers: { "x-csrf-token": csrfToken },
+  });
+  if (!res.ok) throw await readError(res, "同步失败");
+  return res.json();
+}
+
+export async function apiUpdateAudioMapping(
+  songId: number,
+  navidId: string | null,
+  csrfToken: string,
+): Promise<{ nav: NavSong | null }> {
+  const res = await fetch("/api/admin/audio/mapping", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "x-csrf-token": csrfToken,
+    },
+    body: JSON.stringify({ songId, navidId }),
+  });
+  if (!res.ok) throw await readError(res, "更新关联失败");
+  return res.json();
 }

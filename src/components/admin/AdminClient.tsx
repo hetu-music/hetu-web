@@ -100,8 +100,10 @@ export default function AdminClientComponent({
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 font-sans">
       <AdminNavbar
+        active="songs"
         userName={user?.name}
         isLoggedIn={Boolean(user)}
+        isSuper={user?.isSuper}
         onOpenNotification={() => admin.setShowNotification(true)}
       />
 

@@ -36,12 +36,19 @@ export type ReviewItem = {
 };
 
 export type SyncPlan = {
-  /** 新增或替换失效 ID 的映射 */
-  upserts: { song: DbSong; nav: NavSong; previous: string | null }[];
+  /** 新增或替换失效 ID 的映射；loose 表示靠去括号标题+时长配上的宽松匹配 */
+  upserts: {
+    song: DbSong;
+    nav: NavSong;
+    previous: string | null;
+    loose: boolean;
+  }[];
   /** 指向已不存在曲目、且没有找到替代的映射 */
   deletes: MappingRow[];
   /** 现有映射仍然有效，保持不动 */
   unchanged: number;
+  /** 保留下来但时长对不上的映射（不改动，只提示） */
+  suspicious: { song: DbSong; nav: NavSong }[];
   /** 需要人工确认的歌曲（不会自动写入） */
   review: ReviewItem[];
   /** Navidrome 中找不到任何候选的歌曲 */
@@ -64,6 +71,15 @@ export function normalize(text: string | null | undefined): string {
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
+/** 去掉括号里的版本说明（剧情版、纯歌版、Live……）后再归一化 */
+export function baseTitle(text: string | null | undefined): string {
+  if (!text) return "";
+  return normalize(text.replace(/[（(【[][^）)】\]]*[）)】\]]/g, ""));
+}
+
+/** 宽松匹配要求的最短基础标题长度，避免单字标题到处命中 */
+const MIN_LOOSE_TITLE = 2;
+
 function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V) {
   const list = map.get(key);
   if (list) list.push(value);
@@ -82,12 +98,13 @@ function durationMismatch(song: DbSong, nav: NavSong): boolean {
 }
 
 type Candidate =
-  | { kind: "match"; nav: NavSong }
+  | { kind: "match"; nav: NavSong; loose: boolean }
   | { kind: "review"; reason: string; candidates: NavSong[] }
   | { kind: "missing" };
 
 function findCandidate(
   song: DbSong,
+  navSongs: NavSong[],
   byTitle: Map<string, NavSong[]>,
   byPosition: Map<string, NavSong[]>,
 ): Candidate {
@@ -117,9 +134,38 @@ function findCandidate(
     if (durationMismatch(song, nav)) {
       return { kind: "review", reason: "时长不符", candidates: [nav] };
     }
-    return { kind: "match", nav };
+    return { kind: "match", nav, loose: false };
   }
 
+  // 曲库把单曲归进「河图单曲2009-2012」这类合集，专辑名对不上是常态。
+  // 同名且时长吻合的只有一首时可以放心配对；无法校验时长则交给人确认
+  if (song.length != null) {
+    const sameDuration = sameTitle.filter(
+      (n) => n.duration != null && !durationMismatch(song, n),
+    );
+    if (sameDuration.length === 1) {
+      return { kind: "match", nav: sameDuration[0], loose: false };
+    }
+
+    // 标签里的标题常和数据库差一个版本后缀：数据库的「卫玠辞」对应曲库的
+    // 「卫玠辞（剧情版）」，「卫玠辞（纯歌版）」反而对应曲库的「卫玠辞」。
+    // 这时标题反而会误导，以时长为准：去括号后互相包含、且时长唯一吻合才配对
+    const base = baseTitle(song.title);
+    if (base.length >= MIN_LOOSE_TITLE) {
+      const loose = navSongs.filter((n) => {
+        const navBase = baseTitle(n.title);
+        return (
+          navBase.length >= MIN_LOOSE_TITLE &&
+          (navBase.includes(base) || base.includes(navBase)) &&
+          n.duration != null &&
+          !durationMismatch(song, n)
+        );
+      });
+      if (loose.length === 1) {
+        return { kind: "match", nav: loose[0], loose: true };
+      }
+    }
+  }
   // 标题对不上：同专辑同曲序的曲目多半是标签里标题写法不同，交给人确认
   const samePosition =
     byPosition.get(positionKey(album, song.discnumber, song.track)) ?? [];
@@ -160,7 +206,8 @@ export function planSync(
 
   const review: ReviewItem[] = [];
   const missing: DbSong[] = [];
-  const matches: { song: DbSong; nav: NavSong }[] = [];
+  type Match = { song: DbSong; nav: NavSong; loose: boolean };
+  const matches: Match[] = [];
   const kept = new Map<number, string>(); // 仍然有效、保持不动的映射
 
   for (const song of songs) {
@@ -170,8 +217,9 @@ export function planSync(
       kept.set(song.id, current);
       continue;
     }
-    const result = findCandidate(song, byTitle, byPosition);
-    if (result.kind === "match") matches.push({ song, nav: result.nav });
+    const result = findCandidate(song, navSongs, byTitle, byPosition);
+    if (result.kind === "match")
+      matches.push({ song, nav: result.nav, loose: result.loose });
     else if (result.kind === "review")
       review.push({
         song,
@@ -181,26 +229,32 @@ export function planSync(
     else missing.push(song);
   }
 
-  // 一个文件只能对应一首歌：被多首歌抢到，或已被保留的映射占用，都转人工
+  // 一个文件只能对应一首歌。被已保留的映射占用、或被多首歌抢到时转人工；
+  // 唯一的精确匹配优先于宽松匹配，输掉的宽松匹配单独转人工
   const claimed = new Set(kept.values());
-  const byNav = new Map<string, { song: DbSong; nav: NavSong }[]>();
+  const byNav = new Map<string, Match[]>();
   for (const m of matches) pushTo(byNav, m.nav.id, m);
   const upserts: SyncPlan["upserts"] = [];
+  const toReview = (m: Match, reason: string) =>
+    review.push({ song: m.song, reason, candidates: [m.nav] });
   for (const [navId, group] of byNav) {
-    if (group.length > 1 || claimed.has(navId)) {
-      for (const m of group) {
-        review.push({
-          song: m.song,
-          reason: claimed.has(navId)
-            ? "候选曲目已被其他歌曲的映射占用"
-            : "多首歌匹配到同一曲目",
-          candidates: [m.nav],
-        });
-      }
+    if (claimed.has(navId)) {
+      for (const m of group) toReview(m, "候选曲目已被其他歌曲的映射占用");
       continue;
     }
-    const m = group[0];
-    upserts.push({ ...m, previous: existingById.get(m.song.id) ?? null });
+    const exact = group.filter((m) => !m.loose);
+    const winner =
+      exact.length === 1 ? exact[0] : group.length === 1 ? group[0] : null;
+    for (const m of group) {
+      if (m === winner) {
+        upserts.push({ ...m, previous: existingById.get(m.song.id) ?? null });
+      } else {
+        toReview(
+          m,
+          winner ? "候选曲目已被精确匹配占用" : "多首歌匹配到同一曲目",
+        );
+      }
+    }
   }
 
   const upserted = new Set(upserts.map((u) => u.song.id));
@@ -213,6 +267,15 @@ export function planSync(
     .filter((s) => (s.has_audio ?? false) !== finalMapped.has(s.id))
     .map((song) => ({ song, next: finalMapped.has(song.id) }));
 
+  const songById = new Map(songs.map((s) => [s.id, s]));
+  const suspicious: SyncPlan["suspicious"] = [];
+  for (const [songId, navId] of kept) {
+    const song = songById.get(songId);
+    const nav = navById.get(navId);
+    if (song && nav && durationMismatch(song, nav))
+      suspicious.push({ song, nav });
+  }
+
   const used = new Set([...kept.values(), ...upserts.map((u) => u.nav.id)]);
   const unusedNav = navSongs.filter((n) => !used.has(n.id));
 
@@ -220,6 +283,7 @@ export function planSync(
     upserts,
     deletes,
     unchanged: kept.size,
+    suspicious,
     review,
     missing,
     hasAudioChanges,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { normalize, planSync, type DbSong, type NavSong } from "./sync";
+import {
+  baseTitle,
+  normalize,
+  planSync,
+  type DbSong,
+  type NavSong,
+} from "./sync";
 
 function song(id: number, over: Partial<DbSong> = {}): DbSong {
   return {
@@ -131,20 +137,46 @@ describe("planSync", () => {
   it("标题不同但专辑和曲序相同时转人工，不自动写入", () => {
     const plan = planSync(
       [song(1, { title: "我们的墨明棋妙", track: 4 })],
-      [nav("x", { title: "我们的墨明棋妙（2012版）", track: 4 })],
+      [nav("x", { title: "Track 04", track: 4 })],
       [],
     );
     expect(plan.upserts).toEqual([]);
     expect(plan.review[0].reason).toBe("同专辑同曲序，但标题不同");
   });
 
-  it("同名曲目只在其他专辑时转人工", () => {
+  it("专辑不同但同名且时长唯一吻合时自动配对（单曲合集）", () => {
     const plan = planSync(
+      [song(1, { title: "回家", album: "回家", length: 266 })],
+      [
+        nav("x", {
+          title: "回家",
+          album: "河图单曲2008 & 之前",
+          duration: 265,
+        }),
+        nav("y", { title: "回家", album: "某合辑", duration: 300 }),
+      ],
+      [],
+    );
+    expect(plan.upserts.map((u) => u.nav.id)).toEqual(["x"]);
+  });
+
+  it("同名曲目只在其他专辑且时长无法唯一确定时转人工", () => {
+    const ambiguous = planSync(
       [song(1, { title: "歌", album: "A" })],
+      [
+        nav("x", { title: "歌", album: "B" }),
+        nav("y", { title: "歌", album: "C" }),
+      ],
+      [],
+    );
+    expect(ambiguous.review[0].reason).toBe("同名曲目在其他专辑");
+
+    const noLength = planSync(
+      [song(1, { title: "歌", album: "A", length: null })],
       [nav("x", { title: "歌", album: "B" })],
       [],
     );
-    expect(plan.review[0].reason).toBe("同名曲目在其他专辑");
+    expect(noLength.review[0].reason).toBe("同名曲目在其他专辑");
   });
 
   it("多首歌匹配到同一曲目时都转人工", () => {
@@ -192,5 +224,97 @@ describe("planSync", () => {
     expect(plan.hasAudioChanges).toEqual([
       { song: expect.objectContaining({ id: 1 }), next: true },
     ]);
+  });
+});
+
+describe("baseTitle", () => {
+  it("去掉全角/半角括号里的版本说明", () => {
+    expect(baseTitle("卫玠辞（剧情版）")).toBe("卫玠辞");
+    expect(baseTitle("NL不分 (Live)")).toBe("nl不分");
+    expect(baseTitle("归墟·终极")).toBe("归墟终极");
+  });
+});
+
+describe("planSync 宽松匹配", () => {
+  it("版本后缀对不上时以时长为准（卫玠辞的两个版本）", () => {
+    const plan = planSync(
+      [
+        song(96, { title: "卫玠辞", album: "卫玠辞", length: 440 }),
+        song(97, { title: "卫玠辞（纯歌版）", album: "卫玠辞", length: 232 }),
+      ],
+      [
+        nav("pure", { title: "卫玠辞", album: "单曲2016", duration: 231 }),
+        nav("story", {
+          title: "卫玠辞（剧情版）",
+          album: "单曲2016",
+          duration: 439,
+        }),
+      ],
+      [],
+    );
+    expect(plan.upserts.map((u) => [u.song.id, u.nav.id, u.loose])).toEqual([
+      [96, "story", true],
+      [97, "pure", true],
+    ]);
+    expect(plan.review).toEqual([]);
+  });
+
+  it("标题互相包含且时长唯一吻合时配对", () => {
+    const plan = planSync(
+      [song(1, { title: "古风抒情歌曲指南", length: 315 })],
+      [nav("x", { title: "古风抒情歌曲", album: "合集", duration: 315 })],
+      [],
+    );
+    expect(plan.upserts.map((u) => [u.nav.id, u.loose])).toEqual([["x", true]]);
+  });
+
+  it("时长吻合的宽松候选不止一个时不配对", () => {
+    const plan = planSync(
+      [song(1, { title: "花蛮", album: "A", length: 350 })],
+      [
+        nav("x", { title: "花蛮（剧情版）", album: "B", duration: 349 }),
+        nav("y", { title: "花蛮（Live）", album: "C", duration: 351 }),
+      ],
+      [],
+    );
+    expect(plan.upserts).toEqual([]);
+    expect(plan.missing.map((s) => s.id)).toEqual([1]);
+  });
+
+  it("单字标题不做宽松匹配", () => {
+    const plan = planSync(
+      [song(1, { title: "烬", album: "A", length: 200 })],
+      [nav("x", { title: "余烬", album: "B", duration: 200 })],
+      [],
+    );
+    expect(plan.upserts).toEqual([]);
+  });
+
+  it("精确匹配优先，抢同一曲目的宽松匹配转人工", () => {
+    const plan = planSync(
+      [
+        song(1, { title: "卫玠辞（纯歌版）", album: "A", length: 231 }),
+        song(2, { title: "卫玠辞", album: "单曲2016", length: 231 }),
+      ],
+      [nav("x", { title: "卫玠辞", album: "单曲2016", duration: 231 })],
+      [],
+    );
+    expect(plan.upserts.map((u) => [u.song.id, u.loose])).toEqual([[2, false]]);
+    expect(plan.review).toEqual([
+      expect.objectContaining({
+        song: expect.objectContaining({ id: 1 }),
+        reason: "候选曲目已被精确匹配占用",
+      }),
+    ]);
+  });
+
+  it("保留下来但时长对不上的映射标为可疑", () => {
+    const plan = planSync(
+      [song(1, { length: 200 })],
+      [nav("x", { title: "别的歌", duration: 300 })],
+      [{ id: 1, navid_id: "x" }],
+    );
+    expect(plan.unchanged).toBe(1);
+    expect(plan.suspicious.map((s) => s.nav.id)).toEqual(["x"]);
   });
 });

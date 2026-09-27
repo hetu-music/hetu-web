@@ -51,7 +51,13 @@ export default function CommentComposer({
 
   if (!loggedIn) {
     return (
-      <p className={cn("text-xs tracking-wider text-slate-400", className)}>
+      // 行高取旁批正文的行高（15px × 1.85），宽屏旁批里才与所批的那一行对齐
+      <p
+        className={cn(
+          "text-xs leading-[27.75px] tracking-wider text-slate-400",
+          className,
+        )}
+      >
         <Link
           href={loginHref}
           className="text-(--tone) hover:underline underline-offset-4"

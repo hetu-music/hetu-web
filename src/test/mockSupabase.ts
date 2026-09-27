@@ -19,6 +19,7 @@ export function makeQueryBuilder<T = unknown>(result: MockResult<T>): any {
   const builder: any = {
     select: vi.fn(() => builder),
     insert: vi.fn(() => builder),
+    upsert: vi.fn(() => builder),
     update: vi.fn(() => builder),
     delete: vi.fn(() => builder),
     eq: vi.fn(() => builder),

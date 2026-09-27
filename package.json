@@ -19,7 +19,8 @@
     "test:coverage": "vitest run --coverage",
     "quiz:diagnose": "tsx --env-file=.env.local scripts/quiz-diagnose.ts",
     "quiz:check": "tsx --env-file=.env.local scripts/quiz-check.ts",
-    "imagery:llm-check": "tsx --env-file=.env.local scripts/imagery-llm-check.ts"
+    "imagery:llm-check": "tsx --env-file=.env.local scripts/imagery-llm-check.ts",
+    "navidrome:sync": "tsx --env-file=.env.local scripts/navidrome-sync.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

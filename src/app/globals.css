@@ -69,7 +69,7 @@
     font-family: var(--font-serif);
     font-weight: 700;
 
-    &>span {
+    & > span {
       position: relative;
       top: 0.05em;
     }
@@ -93,7 +93,6 @@
 /* ── 4. 工具类 ──────────────────────────────────────────────────────────────── */
 
 @utility no-transitions {
-
   &,
   & *,
   & *::before,
@@ -112,11 +111,13 @@
 }
 
 @utility mask-linear-fade-edges {
-  mask-image: linear-gradient(to right,
-      transparent,
-      black 12px,
-      black calc(100% - 12px),
-      transparent);
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 12px,
+    black calc(100% - 12px),
+    transparent
+  );
 }
 
 /* ── 5. 业务动画 ─────────────────────────────────────────────────────────────── */
@@ -140,7 +141,6 @@
 
 /* 功能入口字符浮动 */
 @keyframes feature-drift {
-
   0%,
   100% {
     transform: translateY(0);
@@ -174,7 +174,6 @@
 
 /* 词云词语呼吸浮动 */
 @keyframes word-breathe {
-
   0%,
   100% {
     transform: translateY(0);

@@ -5,6 +5,7 @@ import SongDetailClient from "@/components/detail/SongDetailClient";
 import { getSongById } from "@/lib/server/service-songs";
 import { getSongImagery } from "@/lib/server/service-song-imagery";
 import { TABLES } from "@/lib/db/supabase-server";
+import { buildFolio, markLines, pickExcerpt } from "@/lib/utils/utils-folio";
 
 type PageProps = {
   params: Promise<{ id: string; locale: string }>;
@@ -103,7 +104,14 @@ export default async function SongDetailPage({
     notFound();
   }
 
-  return <SongDetailClient song={song} imagery={imagery} />;
+  // 摘句在服务端挑定：折长句用到的分词随运行环境而异，前后端各算一遍可能不一致
+  const { lines } = buildFolio(song.lyrics, {
+    title: song.title,
+    lyricsStart: song.lyrics_start,
+  });
+  const excerpt = pickExcerpt(lines, markLines(lines, imagery.marks));
+
+  return <SongDetailClient song={song} imagery={imagery} excerpt={excerpt} />;
 }
 
 // 生成静态参数

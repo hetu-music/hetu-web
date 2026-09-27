@@ -55,6 +55,8 @@ export interface MusicLibraryClientProps {
 export interface SongDetailClientProps {
   song: SongDetail;
   imagery: SongImageryView;
+  /** 卷首竖排摘句，按空格分列；在服务端挑好，见 pickExcerpt */
+  excerpt: string | null;
 }
 
 // 歌曲详情页的意象视图

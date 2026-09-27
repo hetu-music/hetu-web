@@ -132,7 +132,7 @@ export default function SongColophon({
                     <dt className="text-slate-400 dark:text-slate-500 shrink-0">
                       {c.role}
                     </dt>
-                    <dd className="text-slate-600 dark:text-slate-400 truncate">
+                    <dd className="min-w-0 text-slate-600 dark:text-slate-400 wrap-break-word">
                       {c.names}
                     </dd>
                   </div>

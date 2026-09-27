@@ -38,6 +38,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   IMAGERY / _CAT / _OCC → getServiceClient (公开只读)
 //   USERS              → getUserClient    (用户本人读写，RLS 隔离)
 //   COLLECTIONS        → getUserClient    (用户本人读写，RLS 隔离)
+//   COMMENTS / _LIKES  → 读：getServiceClient（需连带作者名）；写：用户会话（RLS + RPC）
 export const TABLES = {
   // 核心业务表
   MUSIC: "music", // 正式歌曲库
@@ -53,6 +54,8 @@ export const TABLES = {
   // 用户与互动表
   USERS: "users",
   COLLECTIONS: "collections",
+  COMMENTS: "comments",
+  COMMENT_LIKES: "comment_likes",
 
   // 故事页专用表
   STORY_QJTX: "story_qjtx",

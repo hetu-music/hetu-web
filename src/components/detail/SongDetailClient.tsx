@@ -1,10 +1,13 @@
 "use client";
 
+import CommentSheet from "@/components/detail/comments/CommentSheet";
+import { CommentsProvider } from "@/components/detail/comments/CommentsContext";
+import CommentsSection from "@/components/detail/comments/CommentsSection";
 import CreatorNotes from "@/components/detail/CreatorNotes";
 import ImageryCaption from "@/components/detail/ImageryCaption";
 import LyricsFolio from "@/components/detail/LyricsFolio";
 import RelatedWorks from "@/components/detail/RelatedWorks";
-import SectionHeading from "@/components/detail/SectionHeading";
+import ScoreSection from "@/components/detail/ScoreSection";
 import SongColophon from "@/components/detail/SongColophon";
 import SongHero from "@/components/detail/SongHero";
 import TableOfContents, {
@@ -35,7 +38,6 @@ import {
 } from "@/lib/utils/utils-tone";
 import { ArrowLeft, Home, User } from "lucide-react";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
 import React, {
   useCallback,
   useEffect,
@@ -66,12 +68,15 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     alt: string;
     title: string;
   } | null>(null);
-  const [scoreFailed, setScoreFailed] = useState(false);
   const [isBackActive, setIsBackActive] = useState(false);
 
   // ── 正文与意象 ──────────────────────────────────────────────────────────
   const folio = useMemo(() => buildFolio(song.lyrics), [song.lyrics]);
   const notes = useMemo(() => parseNotes(song.comment), [song.comment]);
+  const anchorCtx = useMemo(
+    () => ({ lines: folio.lines, paragraphs: notes?.paragraphs ?? [] }),
+    [folio.lines, notes],
+  );
   const marked = useMemo(
     () => markLines(folio.lines, imagery.marks),
     [folio.lines, imagery.marks],
@@ -215,6 +220,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     items.push({ id: "lyrics", label: t("folio.sections.text") });
     if (song.nmn_status)
       items.push({ id: "score", label: t("sections.score") });
+    items.push({ id: "comments", label: t("folio.sections.comments") });
     items.push({ id: "colophon", label: t("folio.sections.colophon") });
     if (imagery.related.length > 0)
       items.push({ id: "related", label: t("folio.sections.related") });
@@ -320,91 +326,75 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         </div>
       </nav>
 
-      <main className="relative pt-32 md:pt-40 pb-32 max-w-6xl mx-auto px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <SongHero
-          song={song}
-          titleRef={titleRef}
-          stripMarks={stripMarks}
-          imageryTotal={visibleImageryCount}
-          excerpt={excerpt}
-          activeImagery={activeImagery}
-          showPlayer={hasBenefits}
-          onSelectImagery={selectFromStrip}
-          onCoverLoad={handleCoverLoad}
-          onOpenCover={() =>
-            setImageModal({
-              src: getCoverUrl(song),
-              alt: song.album || song.title,
-              title: `${song.title} - 封面`,
-            })
+      <CommentsProvider
+        songId={song.id}
+        anchorCtx={anchorCtx}
+        onSheetOpen={closeCaption}
+      >
+        <main className="relative pt-32 md:pt-40 pb-32 max-w-6xl mx-auto px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <SongHero
+            song={song}
+            titleRef={titleRef}
+            stripMarks={stripMarks}
+            imageryTotal={visibleImageryCount}
+            excerpt={excerpt}
+            activeImagery={activeImagery}
+            showPlayer={hasBenefits}
+            onSelectImagery={selectFromStrip}
+            onCoverLoad={handleCoverLoad}
+            onOpenCover={() =>
+              setImageModal({
+                src: getCoverUrl(song),
+                alt: song.album || song.title,
+                title: `${song.title} - 封面`,
+              })
+            }
+          />
+
+          {notes && <CreatorNotes notes={notes} />}
+
+          <LyricsFolio
+            songId={song.id}
+            rawLyrics={song.lyrics}
+            lines={folio.lines}
+            marked={marked}
+            markById={markById}
+            activeImagery={activeImagery}
+            onSelectImagery={selectImagery}
+          />
+
+          {song.nmn_status && (
+            <ScoreSection
+              song={song}
+              onOpen={() =>
+                setImageModal({
+                  src: getNmnUrl(song),
+                  alt: `${song.title} - 乐谱`,
+                  title: "乐谱",
+                })
+              }
+            />
+          )}
+
+          <CommentsSection />
+
+          <SongColophon song={song} credits={folio.credits} />
+
+          <RelatedWorks songs={imagery.related} />
+        </main>
+
+        <ImageryCaption
+          mark={activeMark}
+          lineCount={
+            activeImagery !== null
+              ? (lineStats.get(activeImagery)?.count ?? 0)
+              : 0
           }
+          onClose={closeCaption}
         />
 
-        {notes && <CreatorNotes notes={notes} />}
-
-        <LyricsFolio
-          songId={song.id}
-          rawLyrics={song.lyrics}
-          lines={folio.lines}
-          marked={marked}
-          markById={markById}
-          activeImagery={activeImagery}
-          onSelectImagery={selectImagery}
-        />
-
-        {song.nmn_status && (
-          <section id="score" className="py-16 md:py-20">
-            <SectionHeading label={t("sections.score")} />
-            <div className="mt-12 lg:ml-[26rem]">
-              {scoreFailed ? (
-                <p className="py-16 text-center text-sm text-slate-400">
-                  {t("scoreLoadError")}
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setImageModal({
-                      src: getNmnUrl(song),
-                      alt: `${song.title} - 乐谱`,
-                      title: "乐谱",
-                    })
-                  }
-                  className="group relative block w-full max-h-[28rem] overflow-hidden rounded-md bg-white ring-1 ring-slate-900/5 dark:ring-white/10"
-                >
-                  <Image
-                    src={getNmnUrl(song)}
-                    alt="Score"
-                    width={800}
-                    height={600}
-                    className="w-full h-auto dark:opacity-90"
-                    onError={() => setScoreFailed(true)}
-                  />
-                  <span className="absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-5">
-                    <span className="text-xs tracking-[0.3em] text-slate-500 group-hover:text-slate-900 transition-colors">
-                      {t("zoomScore")}
-                    </span>
-                  </span>
-                </button>
-              )}
-            </div>
-          </section>
-        )}
-
-        <SongColophon song={song} credits={folio.credits} />
-
-        <RelatedWorks songs={imagery.related} />
-      </main>
-
-      <ImageryCaption
-        mark={activeMark}
-        lineCount={
-          activeImagery !== null
-            ? (lineStats.get(activeImagery)?.count ?? 0)
-            : 0
-        }
-        onClose={closeCaption}
-      />
+        <CommentSheet />
+      </CommentsProvider>
 
       <FloatingActionButtons
         showScrollTop={showScrollTop}

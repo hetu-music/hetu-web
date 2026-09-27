@@ -1,14 +1,30 @@
 "use client";
 
+import CommentGutter from "@/components/detail/comments/CommentGutter";
+import { useComments } from "@/components/detail/comments/CommentsContext";
+import SlotMarker from "@/components/detail/comments/SlotMarker";
 import SectionHeading from "@/components/detail/SectionHeading";
 import { usePlayerTime } from "@/hooks/player/usePlayerTime";
+import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import type { SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
+import {
+  type CommentSlot,
+  type CommentThread,
+  lyricsSlot,
+} from "@/lib/utils/utils-comments";
 import type { FolioLine, MarkedLine } from "@/lib/utils/utils-folio";
 import { usePlayerStore } from "@/store/player-store";
 import { FileText } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { memo, useEffect, useMemo, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 const NUMERALS = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
 
@@ -40,6 +56,12 @@ export default function LyricsFolio({
   const t = useTranslations("song");
   const [mode, setMode] = useState<"poem" | "lrc">("poem");
   const [currentIndex, setCurrentIndex] = useState(-1);
+  // 窄屏：点一句选中，句下展开操作栏；「夹批」开关把批注插在各句之下
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const [inline, setInline] = useState(false);
+  const isLarge = useMediaQuery("(min-width: 1024px)");
+  const { threads, setOpenSlot, setSheetSlot } = useComments();
+  const bodyRef = useRef<HTMLDivElement>(null);
   const isCurrentTrack = usePlayerStore(
     (s) => s.currentTrack?.songId === songId,
   );
@@ -68,6 +90,41 @@ export default function LyricsFolio({
 
   const seekable = isCurrentTrack && lines.some((l) => l.time !== null);
 
+  const slots = useMemo(() => lines.map((_, i) => lyricsSlot(i)), [lines]);
+  const hasLineComments = slots.some((s) => threads.has(s.key));
+  // 聚焦意象时，只有写到该意象的句子旁的批注保持清晰
+  const focusKeys = useMemo(
+    () =>
+      activeImagery === null
+        ? null
+        : new Set(
+            marked.flatMap((m, i) =>
+              m.ids.includes(activeImagery) ? [slots[i].key] : [],
+            ),
+          ),
+    [activeImagery, marked, slots],
+  );
+
+  // 宽屏点句跳转播放；窄屏点句先选中，由操作栏决定播放还是批注
+  const tapLine = useCallback(
+    (i: number) => {
+      const time = lines[i].time;
+      if (isLarge) {
+        if (seekable && time !== null) seek(time);
+        return;
+      }
+      setSelectedLine((prev) => (prev === i ? null : i));
+    },
+    [isLarge, lines, seek, seekable],
+  );
+  const annotate = useCallback(
+    (i: number) => {
+      if (isLarge) setOpenSlot(`lyrics:${i}`);
+      else setSheetSlot(lyricsSlot(i));
+    },
+    [isLarge, setOpenSlot, setSheetSlot],
+  );
+
   if (!rawLyrics || lines.length === 0) {
     return (
       <section id="lyrics" className="py-16">
@@ -84,6 +141,24 @@ export default function LyricsFolio({
     <section id="lyrics" className="py-16 md:py-20">
       <SectionHeading label={t("folio.sections.text")}>
         <div className="flex items-center gap-3 text-xs tracking-widest">
+          {mode === "poem" && hasLineComments && (
+            <>
+              <button
+                type="button"
+                onClick={() => setInline((v) => !v)}
+                aria-pressed={inline}
+                className={cn(
+                  "lg:hidden transition-colors",
+                  inline
+                    ? "text-(--tone)"
+                    : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300",
+                )}
+              >
+                {t("folio.comments.inline")}
+              </button>
+              <span className="lg:hidden w-px h-3 bg-slate-300 dark:bg-slate-700" />
+            </>
+          )}
           {(["poem", "lrc"] as const).map((m) => (
             <button
               key={m}
@@ -111,10 +186,17 @@ export default function LyricsFolio({
           {rawLyrics}
         </pre>
       ) : (
-        <div className="mt-12 md:mt-14">
+        <div ref={bodyRef} className="relative mt-12 md:mt-14">
+          <CommentGutter
+            slots={slots}
+            containerRef={bodyRef}
+            focusKeys={focusKeys}
+          />
           {lines.map((line, i) => (
             <FolioRow
               key={i}
+              slot={slots[i]}
+              index={i}
               line={line}
               marked={marked[i]}
               notes={notesByLine[i]}
@@ -124,7 +206,11 @@ export default function LyricsFolio({
               isCurrent={isCurrentTrack && currentIndex === i}
               seekable={seekable && line.time !== null}
               seekHint={t("folio.seekHint")}
+              selected={!isLarge && selectedLine === i}
+              inlineThreads={inline ? threads.get(slots[i].key) : undefined}
               onSeek={seek}
+              onTap={tapLine}
+              onAnnotate={annotate}
               onSelectImagery={onSelectImagery}
             />
           ))}
@@ -137,6 +223,8 @@ export default function LyricsFolio({
 // ─── 单行 ─────────────────────────────────────────────────────────────────────
 
 interface FolioRowProps {
+  slot: CommentSlot;
+  index: number;
   line: FolioLine;
   marked: MarkedLine;
   notes: number[];
@@ -146,11 +234,19 @@ interface FolioRowProps {
   isCurrent: boolean;
   seekable: boolean;
   seekHint: string;
+  /** 窄屏选中：句下展开操作栏 */
+  selected: boolean;
+  /** 夹批模式下插在句下的批注 */
+  inlineThreads: CommentThread[] | undefined;
   onSeek: (time: number) => void;
+  onTap: (index: number) => void;
+  onAnnotate: (index: number) => void;
   onSelectImagery: (id: number | null) => void;
 }
 
 const FolioRow = memo(function FolioRow({
+  slot,
+  index,
   line,
   marked,
   notes,
@@ -160,9 +256,14 @@ const FolioRow = memo(function FolioRow({
   isCurrent,
   seekable,
   seekHint,
+  selected,
+  inlineThreads,
   onSeek,
+  onTap,
+  onAnnotate,
   onSelectImagery,
 }: FolioRowProps) {
+  const t = useTranslations("song.folio.comments");
   const focused = activeImagery !== null;
   const carriesActive = focused && marked.ids.includes(activeImagery);
   const activeMark =
@@ -174,7 +275,7 @@ const FolioRow = memo(function FolioRow({
   return (
     <div
       className={cn(
-        "md:grid md:grid-cols-[minmax(0,1fr)_9rem] md:gap-x-10 lg:grid-cols-[22rem_minmax(0,1fr)_10rem] lg:gap-x-16",
+        "group/row md:grid md:grid-cols-[minmax(0,1fr)_9rem] md:gap-x-10 lg:grid-cols-[22rem_minmax(0,1fr)_10rem] lg:gap-x-16",
         line.stanzaStart && "mt-9 md:mt-11",
       )}
     >
@@ -185,59 +286,97 @@ const FolioRow = memo(function FolioRow({
         {stanzaNumber > 0 && toChineseNumeral(stanzaNumber)}
       </div>
 
-      <p
-        data-folio-line
-        onClick={seekable ? () => onSeek(line.time!) : undefined}
-        title={seekable ? seekHint : undefined}
-        className={cn(
-          "relative font-serif text-[17px] sm:text-lg leading-[2.2] text-balance transition-[opacity,color] duration-500",
-          isCurrent
-            ? "text-slate-950 dark:text-white"
-            : "text-slate-700 dark:text-slate-300",
-          focused && !carriesActive && "opacity-[0.18]",
-          seekable &&
-            "cursor-pointer hover:text-slate-950 dark:hover:text-white",
-        )}
-      >
-        <span
-          aria-hidden
+      <div className="min-w-0">
+        <p
+          data-folio-line
+          data-comment-slot={slot.key}
+          onClick={() => onTap(index)}
+          title={seekable ? seekHint : undefined}
           className={cn(
-            "absolute -left-5 top-1/2 h-px bg-(--tone) transition-all duration-500",
-            isCurrent ? "w-3 opacity-100" : "w-0 opacity-0",
+            "relative font-serif text-[17px] sm:text-lg leading-[2.2] text-balance transition-[opacity,color] duration-500 max-lg:cursor-pointer",
+            isCurrent || selected
+              ? "text-slate-950 dark:text-white"
+              : "text-slate-700 dark:text-slate-300",
+            focused && !carriesActive && "opacity-[0.18]",
+            seekable &&
+              "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
           )}
-        />
-        {carriesActive && !activeHasText && activeMark && (
-          <span
-            aria-hidden
-            className="absolute -left-4 top-1/2 -translate-y-1/2 size-1.5 rounded-full"
-            style={{ backgroundColor: activeMark.accent }}
-          />
-        )}
-        {marked.segments.map((seg, k) => {
-          if (seg.ids.length === 0) return <span key={k}>{seg.text}</span>;
-          const primary =
-            activeImagery !== null && seg.ids.includes(activeImagery)
-              ? activeImagery
-              : seg.ids[0];
-          const mark = markById.get(primary);
-          return (
+        >
+          {/* 宽屏：悬停时在句前浮出「批」，在左栏就地写批注 */}
+          <span className="absolute -left-12 top-0 hidden lg:flex h-[2.2em] items-center">
             <button
-              key={k}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onSelectImagery(primary === activeImagery ? null : primary);
+                onAnnotate(index);
               }}
-              className="imagery-mark"
-              data-active={primary === activeImagery}
-              style={{ "--mark": mark?.accent } as React.CSSProperties}
-              aria-label={mark?.name}
+              aria-label={t("annotateLine")}
+              className="font-kaiti text-sm text-(--tone) opacity-0 group-hover/row:opacity-60 hover:opacity-100! focus-visible:opacity-100 transition-opacity"
             >
-              {seg.text}
+              {t("add")}
             </button>
-          );
-        })}
-      </p>
+          </span>
+          <span
+            aria-hidden
+            className={cn(
+              "absolute -left-5 top-1/2 h-px bg-(--tone) transition-all duration-500",
+              isCurrent ? "w-3 opacity-100" : "w-0 opacity-0",
+            )}
+          />
+          {carriesActive && !activeHasText && activeMark && (
+            <span
+              aria-hidden
+              className="absolute -left-4 top-1/2 -translate-y-1/2 size-1.5 rounded-full"
+              style={{ backgroundColor: activeMark.accent }}
+            />
+          )}
+          {marked.segments.map((seg, k) => {
+            if (seg.ids.length === 0) return <span key={k}>{seg.text}</span>;
+            const primary =
+              activeImagery !== null && seg.ids.includes(activeImagery)
+                ? activeImagery
+                : seg.ids[0];
+            const mark = markById.get(primary);
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectImagery(primary === activeImagery ? null : primary);
+                }}
+                className="imagery-mark"
+                data-active={primary === activeImagery}
+                style={{ "--mark": mark?.accent } as React.CSSProperties}
+                aria-label={mark?.name}
+              >
+                {seg.text}
+              </button>
+            );
+          })}
+          {!inlineThreads && <SlotMarker slot={slot} />}
+        </p>
+
+        {selected && (
+          <div className="lg:hidden flex items-center gap-5 pb-2 text-xs tracking-widest text-(--tone)">
+            {seekable && (
+              <button type="button" onClick={() => onSeek(line.time!)}>
+                {t("playFrom")}
+              </button>
+            )}
+            <button type="button" onClick={() => onAnnotate(index)}>
+              {t("annotate")}
+            </button>
+          </div>
+        )}
+
+        {inlineThreads && inlineThreads.length > 0 && (
+          <InlineNotes
+            threads={inlineThreads}
+            onOpen={() => onAnnotate(index)}
+          />
+        )}
+      </div>
 
       <div
         className={cn(
@@ -275,6 +414,45 @@ const FolioRow = memo(function FolioRow({
     </div>
   );
 });
+
+// ─── 夹批 ────────────────────────────────────────────────────────────────────
+
+/** 窄屏夹批：批注缩进插在句下，只列顶层批注，点开看回复 */
+function InlineNotes({
+  threads,
+  onOpen,
+}: {
+  threads: CommentThread[];
+  onOpen: () => void;
+}) {
+  const t = useTranslations("song.folio.comments");
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="lg:hidden block w-full text-left mb-3 mt-0.5 pl-3 border-l border-(--tone)/40 space-y-1.5"
+    >
+      {threads.map(({ comment, replies }) => (
+        <span
+          key={comment.id}
+          className="block font-kaiti text-sm leading-[1.8] text-slate-500 dark:text-slate-400"
+        >
+          {comment.deleted ? t("deleted") : comment.body}
+          <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">
+            {!comment.deleted && (
+              <>
+                {comment.author || t("anonymous")}
+                <span className="text-(--tone)">{t("verb")}</span>
+              </>
+            )}
+            {replies.length > 0 &&
+              ` · ${t("replies", { count: replies.length })}`}
+          </span>
+        </span>
+      ))}
+    </button>
+  );
+}
 
 // ─── 播放同步 ────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,6 @@
 "use client";
 
 import SectionHeading from "@/components/detail/SectionHeading";
-import UserReview from "@/components/detail/UserReview";
 import type { SongDetail } from "@/lib/types";
 import type { FolioCredit } from "@/lib/utils/utils-folio";
 import { calculateSongInfo } from "@/lib/utils/utils-song";
@@ -117,8 +116,6 @@ export default function SongColophon({ song, credits }: SongColophonProps) {
               </dl>
             </div>
           )}
-
-          <UserReview songId={song.id} />
         </div>
       </div>
     </section>

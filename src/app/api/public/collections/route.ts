@@ -12,7 +12,7 @@ export const GET = withAuth(
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from(TABLES.COLLECTIONS)
-      .select("song_id, created_at, review, snippet")
+      .select("song_id, created_at, snippet")
       .eq("user_id", user.id)
       .eq("target_type", TARGET_TYPE_FAVORITE)
       .order("created_at", { ascending: false });
@@ -39,7 +39,6 @@ export const GET = withAuth(
         r.song_id,
         {
           created_at: r.created_at,
-          review: r.review,
           snippet: r.snippet,
         },
       ]),

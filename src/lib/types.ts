@@ -17,7 +17,6 @@ export type Song = {
   has_audio?: boolean;
   collectionInfo?: {
     created_at: string;
-    review: string | null;
     snippet: string | null;
   };
 };
@@ -81,6 +80,35 @@ export interface RelatedSong {
 export interface SongImageryView {
   marks: SongImageryMark[];
   related: RelatedSong[];
+}
+
+// 评点：详情页上的批注
+/** song 总评 / notes 创作手记某段 / lyrics 某句歌词 / score 乐谱 */
+export type CommentAnchor = "song" | "notes" | "lyrics" | "score";
+
+export interface SongComment {
+  id: number;
+  parentId: number | null;
+  /** 回复没有自己的位置，跟随所回复的批注 */
+  anchor: CommentAnchor | null;
+  anchorIndex: number | null;
+  anchorTime: number | null;
+  /** 被批的原文，用来在原文改动后重新定位 */
+  anchorQuote: string | null;
+  body: string;
+  /** 私批：仅自己可见 */
+  private: boolean;
+  /** 待审：仅自己可见 */
+  pending: boolean;
+  /** 已删但仍有回复，只留一个空位 */
+  deleted: boolean;
+  likeCount: number;
+  liked: boolean;
+  mine: boolean;
+  /** 已删的批注不显示作者 */
+  author: string | null;
+  createdAt: string;
+  editedAt: string | null;
 }
 
 // 筛选选项类型

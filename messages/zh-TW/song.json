@@ -75,7 +75,6 @@
     "sections": {
       "cover": "卷首",
       "text": "正文",
-      "appendix": "附錄",
       "colophon": "版記",
       "related": "同有此意象",
       "notes": "創作手記"
@@ -85,7 +84,7 @@
     "caption": {
       "lines": "本曲 {count} 句",
       "songs": "{count} 首作品寫到",
-      "explore": "意象圖譜",
+      "explore": "意象詞雲",
       "close": "關閉"
     },
     "production": "參與製作",

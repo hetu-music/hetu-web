@@ -214,7 +214,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     if (notes) items.push({ id: "notes", label: t("folio.sections.notes") });
     items.push({ id: "lyrics", label: t("folio.sections.text") });
     if (song.nmn_status)
-      items.push({ id: "score", label: t("folio.sections.appendix") });
+      items.push({ id: "score", label: t("sections.score") });
     items.push({ id: "colophon", label: t("folio.sections.colophon") });
     if (imagery.related.length > 0)
       items.push({ id: "related", label: t("folio.sections.related") });
@@ -354,9 +354,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
         {song.nmn_status && (
           <section id="score" className="py-16 md:py-20">
-            <SectionHeading
-              label={`${t("folio.sections.appendix")} · ${t("sections.score")}`}
-            />
+            <SectionHeading label={t("sections.score")} />
             <div className="mt-12 lg:ml-[26rem]">
               {scoreFailed ? (
                 <p className="py-16 text-center text-sm text-slate-400">

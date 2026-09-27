@@ -2,8 +2,6 @@
 
 import { Link } from "@/i18n/navigation";
 import type { SongImageryMark } from "@/lib/types";
-import { cn } from "@/lib/utils/utils";
-import { usePlayerStore } from "@/store/player-store";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -16,16 +14,18 @@ interface ImageryCaptionProps {
   onClose: () => void;
 }
 
-/** 聚焦某个意象时浮在页面底部的说明条 */
+const EASE = [0.23, 1, 0.32, 1] as const;
+
+/**
+ * 聚焦某个意象时，从顶栏下沿展开的一条书眉：意象名、分类、本曲与全库的数目。
+ * 放在顶栏里而不是浮在底部，免得与右下角按钮、播放条和底部抽屉挤在一起。
+ */
 export default function ImageryCaption({
   mark,
   lineCount,
   onClose,
 }: ImageryCaptionProps) {
   const t = useTranslations("song.folio");
-  const playerShown = usePlayerStore(
-    (s) => !!s.currentTrack && s.playerVisible,
-  );
 
   useEffect(() => {
     if (!mark) return;
@@ -37,61 +37,69 @@ export default function ImageryCaption({
   }, [mark, onClose]);
 
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {mark && (
         <motion.div
           key="caption"
           role="status"
-          initial={{ opacity: 0, y: 16, filter: "blur(4px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: 16, filter: "blur(4px)" }}
-          transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-          className={cn(
-            "fixed z-40 left-4 right-20 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-md",
-            playerShown ? "bottom-[112px]" : "bottom-6 sm:bottom-8",
-          )}
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.35, ease: EASE }}
+          className="overflow-hidden"
         >
-          <div className="flex items-center gap-4 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] px-5 py-4">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={mark.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2 }}
-                className="font-calligraphy text-4xl leading-none shrink-0"
-                style={{ color: mark.accent }}
+          <div className="border-t border-slate-200/50 dark:border-slate-800/50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={mark.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex min-w-0 flex-1 items-center gap-4"
+                >
+                  <span
+                    aria-hidden
+                    className="w-0.5 self-stretch rounded-full"
+                    style={{ backgroundColor: mark.accent }}
+                  />
+                  <span
+                    className="shrink-0 font-calligraphy text-3xl leading-none"
+                    style={{ color: mark.accent }}
+                  >
+                    {mark.name}
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="font-serif text-xs tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                      {mark.path.join(" · ")}
+                    </p>
+                    <p className="font-kaiti text-sm text-slate-600 dark:text-slate-300">
+                      {t("caption.lines", { count: lineCount })}
+                      <span className="mx-2 text-slate-300 dark:text-slate-600">
+                        ·
+                      </span>
+                      {t("caption.songs", { count: mark.songCount })}
+                      <Link
+                        href="/imagery"
+                        className="ml-3 inline-flex items-center gap-0.5 whitespace-nowrap font-sans text-xs tracking-wider text-(--tone) hover:underline underline-offset-4"
+                      >
+                        {t("caption.explore")}
+                        <ArrowUpRight size={12} />
+                      </Link>
+                    </p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t("caption.close")}
+                className="shrink-0 p-2 -mr-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
-                {mark.name}
-              </motion.span>
-            </AnimatePresence>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-slate-400 dark:text-slate-500 truncate tracking-wide">
-                {mark.path.join(" › ")}
-              </p>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 truncate">
-                {t("caption.lines", { count: lineCount })}
-                <span className="mx-1.5 text-slate-300 dark:text-slate-600">
-                  ·
-                </span>
-                {t("caption.songs", { count: mark.songCount })}
-              </p>
+                <X size={18} />
+              </button>
             </div>
-            <Link
-              href="/imagery"
-              className="hidden sm:flex items-center gap-0.5 text-xs text-(--tone) whitespace-nowrap hover:underline underline-offset-4"
-            >
-              {t("caption.explore")}
-              <ArrowUpRight size={13} />
-            </Link>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t("caption.close")}
-              className="p-1 -mr-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-            >
-              <X size={16} />
-            </button>
           </div>
         </motion.div>
       )}

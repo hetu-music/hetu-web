@@ -173,9 +173,10 @@ export function SectionNav({
         >
           ·
         </span>
+        {/* 章节名与三角标自成一组居中对齐；整组再按基线与歌名对齐 */}
         <span
           className={cn(
-            "shrink-0 whitespace-nowrap font-serif text-sm tracking-wider transition-colors",
+            "flex shrink-0 items-center gap-1.5 whitespace-nowrap font-serif text-sm tracking-wider transition-colors",
             open
               ? "text-slate-900 dark:text-slate-100"
               : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100",
@@ -185,14 +186,14 @@ export function SectionNav({
           <span className="sm:hidden">
             {showTitle && activeLabel ? activeLabel : t("folio.toc")}
           </span>
+          <ChevronDown
+            size={14}
+            className={cn(
+              "shrink-0 text-slate-400 transition-transform duration-300",
+              open && "rotate-180",
+            )}
+          />
         </span>
-        <ChevronDown
-          size={14}
-          className={cn(
-            "shrink-0 self-center text-slate-400 transition-transform duration-300",
-            open && "rotate-180",
-          )}
-        />
       </button>
 
       <AnimatePresence>

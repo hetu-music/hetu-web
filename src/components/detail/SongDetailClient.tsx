@@ -361,6 +361,15 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
             </div>
           </div>
         </div>
+        <ImageryCaption
+          mark={activeMark}
+          lineCount={
+            activeImagery !== null
+              ? (lineStats.get(activeImagery)?.count ?? 0)
+              : 0
+          }
+          onClose={closeCaption}
+        />
         <ReadingProgress />
       </nav>
 
@@ -424,16 +433,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
           <RelatedWorks songs={imagery.related} />
         </main>
-
-        <ImageryCaption
-          mark={activeMark}
-          lineCount={
-            activeImagery !== null
-              ? (lineStats.get(activeImagery)?.count ?? 0)
-              : 0
-          }
-          onClose={closeCaption}
-        />
 
         <CommentSheet />
       </CommentsProvider>

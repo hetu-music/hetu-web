@@ -7,7 +7,7 @@ import { getCoverUrl } from "@/lib/utils/utils-song";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
-/** 同有此意象：按意象相似度推荐的作品 */
+/** 同有此意：按意象相似度推荐的作品 */
 export default function RelatedWorks({ songs }: { songs: RelatedSong[] }) {
   const t = useTranslations("song.folio");
   if (songs.length === 0) return null;

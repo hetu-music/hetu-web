@@ -17,15 +17,28 @@ import React, {
 import { useComments } from "./CommentsContext";
 import SlotPanel from "./SlotPanel";
 
-/** 相邻两则旁批之间的最小间距 */
-const NOTE_GAP = 14;
+/**
+ * 相邻两则旁批之间的最小间距。须小于歌词行高与旁批行高之差（39.6 − 27.75），
+ * 连续几句都有批注时才不会越推越低。
+ */
+const NOTE_GAP = 8;
 /** 旁批正文的行高（15px × 1.85），用来与所批那一行的首行对齐 */
 const NOTE_LINE_HEIGHT = 27.75;
+/** 收起时最多显示的行数（乐谱这类很高的位置） */
+const MAX_PREVIEW_LINES = 6;
+
+function sameRecord(a: Record<string, number>, b: Record<string, number>) {
+  const keys = Object.keys(b);
+  return (
+    Object.keys(a).length === keys.length && keys.every((k) => a[k] === b[k])
+  );
+}
 
 /**
  * 宽屏左栏的旁批：每一处批注的顶端对齐它所批的那一行（带 data-comment-slot 的元素）。
  * 上下挤在一起时后面的依次往下推，推到容器外时撑高容器。
- * 每处只露一则，点开后在原处展开全部批注与输入框；同一时间只展开一处。
+ * 每处只露一则，且不高于所批的文字（一句歌词只露一行），免得把下面的旁批推离原位；
+ * 点开后在原处展开全部批注与输入框；同一时间只展开一处。
  * 所批的文字被折叠遮住时（祖先带 data-comment-clip），旁批也先不显示。
  */
 export default function CommentGutter({
@@ -52,6 +65,8 @@ export default function CommentGutter({
 
   const noteRefs = useRef(new Map<string, HTMLDivElement>());
   const [tops, setTops] = useState<Record<string, number>>({});
+  // 收起时可用的行数，由所批文字的高度决定
+  const [lines, setLines] = useState<Record<string, number>>({});
   // 已经在原位显示过一帧的旁批：之后被推挤时才用过渡，
   // 新出现的旁批直接落在所批的那一行，不从顶上滑下来
   const [settled, setSettled] = useState<ReadonlySet<string>>(new Set());
@@ -94,9 +109,17 @@ export default function CommentGutter({
           const offset = Number.isFinite(lineHeight)
             ? Math.max(0, (lineHeight - NOTE_LINE_HEIGHT) / 2)
             : 0;
+          const rect = anchor.getBoundingClientRect();
           return {
             key: slot.key,
-            anchorTop: anchor.getBoundingClientRect().top - base + offset,
+            anchorTop: rect.top - base + offset,
+            lines: Math.min(
+              MAX_PREVIEW_LINES,
+              Math.max(
+                1,
+                Math.floor((rect.height - offset + 2) / NOTE_LINE_HEIGHT),
+              ),
+            ),
             height: note.offsetHeight,
           };
         })
@@ -104,19 +127,17 @@ export default function CommentGutter({
         .sort((a, b) => a.anchorTop - b.anchorTop);
 
       const next: Record<string, number> = {};
+      const nextLines: Record<string, number> = {};
       let bottom = -Infinity;
       for (const item of items) {
         const top = Math.max(item.anchorTop, bottom + NOTE_GAP);
         next[item.key] = Math.round(top);
+        nextLines[item.key] = item.lines;
         bottom = top + item.height;
       }
       container.style.minHeight = bottom > 0 ? `${Math.ceil(bottom)}px` : "";
-      setTops((prev) => {
-        const same =
-          Object.keys(prev).length === Object.keys(next).length &&
-          Object.entries(next).every(([k, v]) => prev[k] === v);
-        return same ? prev : next;
-      });
+      setTops((prev) => (sameRecord(prev, next) ? prev : next));
+      setLines((prev) => (sameRecord(prev, nextLines) ? prev : nextLines));
     };
 
     layout();
@@ -158,7 +179,11 @@ export default function CommentGutter({
           )}
           style={{ top: tops[slot.key] ?? 0 }}
         >
-          <SideNote slot={slot} list={threads.get(slot.key) ?? []} />
+          <SideNote
+            slot={slot}
+            list={threads.get(slot.key) ?? []}
+            lines={lines[slot.key] ?? 1}
+          />
         </div>
       ))}
     </div>
@@ -168,9 +193,12 @@ export default function CommentGutter({
 function SideNote({
   slot,
   list,
+  lines,
 }: {
   slot: CommentSlot;
   list: CommentThread[];
+  /** 收起时可用的行数 */
+  lines: number;
 }) {
   const t = useTranslations("song.folio.comments");
   const { openSlot, setOpenSlot } = useComments();
@@ -205,6 +233,53 @@ function SideNote({
   const total = countThreads(list);
   const shown = lead.comment.deleted ? 0 : 1;
 
+  const body = lead.comment.deleted ? t("deleted") : lead.comment.body;
+  const bodyTone = lead.comment.deleted
+    ? "text-slate-400 dark:text-slate-600"
+    : "text-slate-500 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200";
+  const meta = (
+    <>
+      {!lead.comment.deleted && (
+        <>
+          {lead.comment.author || t("anonymous")}
+          {lead.comment.private && (
+            <span className="ml-2 px-1 rounded-sm ring-1 ring-current text-[10px] leading-4">
+              {t("private")}
+            </span>
+          )}
+        </>
+      )}
+      {total > shown && (
+        <span className="ml-2 group-hover:text-(--tone) transition-colors">
+          {t("more", { count: total - shown })}
+        </span>
+      )}
+    </>
+  );
+
+  // 只有一行的位置（一句歌词）：正文截断，署名与条数跟在同一行
+  if (lines <= 1) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpenSlot(slot.key)}
+        className="group flex w-full items-baseline gap-2 text-left"
+      >
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate font-kaiti text-[15px] leading-[1.85] transition-colors",
+            bodyTone,
+          )}
+        >
+          {body}
+        </span>
+        <span className="shrink-0 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">
+          {meta}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -213,31 +288,19 @@ function SideNote({
     >
       <p
         className={cn(
-          "font-kaiti text-[15px] leading-[1.85] line-clamp-3 transition-colors",
-          lead.comment.deleted
-            ? "text-slate-400 dark:text-slate-600"
-            : "text-slate-500 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200",
+          "font-kaiti text-[15px] leading-[1.85] transition-colors",
+          bodyTone,
         )}
+        style={{
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: lines - 1,
+          overflow: "hidden",
+        }}
       >
-        {lead.comment.deleted ? t("deleted") : lead.comment.body}
+        {body}
       </p>
-      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-        {!lead.comment.deleted && (
-          <>
-            {lead.comment.author || t("anonymous")}
-            {lead.comment.private && (
-              <span className="ml-2 px-1 rounded-sm ring-1 ring-current text-[10px] leading-4">
-                {t("private")}
-              </span>
-            )}
-          </>
-        )}
-        {total > shown && (
-          <span className="ml-2 group-hover:text-(--tone) transition-colors">
-            {t("more", { count: total - shown })}
-          </span>
-        )}
-      </p>
+      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{meta}</p>
     </button>
   );
 }

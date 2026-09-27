@@ -115,6 +115,17 @@ describe("pickExcerpt", () => {
     expect(pickExcerpt(lines, marked)).toBe("飞花纷蝶欲迷眼");
   });
 
+  it("去掉句末与各短语末尾的标点，保留成对符号", () => {
+    const { lines } = buildFolio(
+      "[00:01.00]寄情山水悠长， 四时变幻。\n[00:04.00]读罢《离骚》！",
+    );
+    const marked = markLines(lines, [
+      { id: 1, name: "山水", timetags: ["00:01.00"] },
+    ]);
+    expect(pickExcerpt(lines, marked)).toBe("寄情山水悠长 四时变幻");
+    expect(pickExcerpt(lines.slice(1), marked.slice(1))).toBe("读罢《离骚》");
+  });
+
   it("没有标注时取第一句长度合适的歌词", () => {
     const { lines } = buildFolio("[00:01.00]啊\n[00:04.00]春风十里");
     expect(pickExcerpt(lines, markLines(lines, []))).toBe("春风十里");

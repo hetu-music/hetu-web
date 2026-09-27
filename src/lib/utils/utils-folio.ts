@@ -192,6 +192,18 @@ function sameIds(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
+/** 短语末尾的标点；书名号、引号等成对符号不在此列，去掉会只剩半边 */
+const TRAILING_PUNCTUATION = /[，。、；：！？,.;:!?…~～—·-]+$/u;
+
+/** 摘句按空格分成几个短语竖排，每个短语末尾的标点都去掉 */
+function cleanExcerpt(text: string): string {
+  return text
+    .split(/\s+/)
+    .map((phrase) => phrase.replace(TRAILING_PUNCTUATION, ""))
+    .filter(Boolean)
+    .join(" ");
+}
+
 /**
  * 卷首摘句：意象最密集、长度适合竖排的一句；同分取靠前者。
  * 没有意象标注时取第一句长度合适的歌词。
@@ -207,10 +219,11 @@ export function pickExcerpt(
   let best: string | null = null;
   let bestScore = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (!fits(lines[i].text)) continue;
+    const text = cleanExcerpt(lines[i].text);
+    if (!fits(text)) continue;
     const score = new Set(marked[i]?.ids ?? []).size;
     if (score > bestScore) {
-      best = lines[i].text;
+      best = text;
       bestScore = score;
     }
   }

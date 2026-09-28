@@ -45,7 +45,7 @@ export default function LocaleSwitcher({ className }: { className?: string }) {
           "w-9 h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer",
           "text-slate-600 dark:text-slate-400",
           isOpen
-            ? "bg-slate-200/60 dark:bg-slate-800 text-blue-600 dark:text-blue-400"
+            ? "bg-slate-200/60 dark:bg-slate-800 text-(--tone)"
             : "hover:bg-slate-200/50 dark:hover:bg-slate-800",
           isPending && "opacity-40 cursor-wait animate-pulse",
         )}

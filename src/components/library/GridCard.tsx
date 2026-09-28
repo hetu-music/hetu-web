@@ -1,7 +1,7 @@
 "use client";
 
 import { useFavorites } from "@/context/FavoritesContext";
-import { FILTER_OPTION_UNKNOWN, getTypeTagStyle } from "@/lib/constants";
+import { FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import type { Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
@@ -33,6 +33,11 @@ export default function GridCard({
   const t = useTranslations("song");
   const tEnum = useTranslations("enums");
   const active = isFavorite(song.id);
+  // 单曲的专辑名多半就是歌名，再写一遍是重复；这时改写演唱者
+  const subtitle =
+    song.album && song.album !== song.title
+      ? song.album
+      : song.artist?.join(" / ") || t("labels.single");
 
   return (
     <div
@@ -114,29 +119,23 @@ export default function GridCard({
           <h3
             className={cn(
               "line-clamp-1 min-w-0 flex-1 text-xl leading-tight text-slate-900 transition-colors dark:text-slate-100",
-              isActive
-                ? "text-blue-600 dark:text-blue-400"
-                : "group-hover:text-blue-600 dark:group-hover:text-blue-400",
+              isActive ? "text-(--tone)" : "group-hover:text-(--tone)",
             )}
             title={song.title}
           >
             {song.title}
           </h3>
-          <span className="shrink-0 text-xs font-mono text-slate-400">
+          <span className="shrink-0 text-xs tabular-nums tracking-wider text-slate-400 dark:text-slate-500">
             {song.year || FILTER_OPTION_UNKNOWN}
           </span>
         </div>
         <p className="flex items-center gap-2 overflow-hidden text-sm font-light text-slate-500 dark:text-slate-400">
-          <span className="truncate">{song.album || t("labels.single")}</span>
+          <span className="truncate">{subtitle}</span>
           {song.type?.[0] && (
             <>
               <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600" />
-              <span
-                className={cn(
-                  "shrink-0 text-sm font-light uppercase tracking-wider",
-                  getTypeTagStyle(song.type[0]),
-                )}
-              >
+              {/* 类型只作文字说明，不再逐类上色（各类的解释见「关于」） */}
+              <span className="shrink-0 text-sm font-light tracking-wider text-slate-400 dark:text-slate-500">
                 {tEnum.has(`type.${song.type[0]}`)
                   ? tEnum(`type.${song.type[0]}`)
                   : song.type[0]}

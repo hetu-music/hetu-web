@@ -23,7 +23,7 @@ export default function PlayerToggle({ className }: { className?: string }) {
       <Disc3
         size={20}
         className={cn(
-          playerVisible && "text-blue-500 dark:text-blue-400",
+          playerVisible && "text-(--tone)",
           isPlaying && "animate-spin animation-duration-[3s]",
         )}
       />

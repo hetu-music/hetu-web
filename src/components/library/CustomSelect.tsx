@@ -141,12 +141,10 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             "px-3 text-sm",
             "text-slate-600 dark:text-slate-300",
             "transition-all duration-200",
-            "hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-900/10",
+            "hover:border-(--tone)/60 hover:bg-(--tone)/10",
             "focus:outline-none",
-            open && "border-blue-400 dark:border-blue-500",
-            hasSelection &&
-              !open &&
-              "border-blue-400/60 dark:border-blue-600/60",
+            open && "border-(--tone)/60",
+            hasSelection && !open && "border-(--tone)/60",
             "disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
@@ -244,17 +242,15 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                   onSelect={toggleSelectAll}
                   className={cn(
                     "flex items-center gap-2 font-medium cursor-pointer border-b border-slate-100 dark:border-slate-800 mb-1 pb-2 rounded-b-none",
-                    isAllSelected &&
-                      "bg-blue-50/60 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
-                    isIndeterminate &&
-                      "text-blue-700 dark:text-blue-300 font-medium",
+                    isAllSelected && "bg-(--tone)/10 text-(--tone)",
+                    isIndeterminate && "text-(--tone) font-medium",
                   )}
                 >
                   <div
                     className={cn(
                       "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                       isAllSelected || isIndeterminate
-                        ? "border-blue-500 bg-blue-500 text-white"
+                        ? "border-(--tone)/60 bg-(--tone) text-white dark:text-slate-900"
                         : "border-slate-300 dark:border-slate-600 bg-transparent",
                     )}
                   >
@@ -277,15 +273,14 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                     value={option.value}
                     onSelect={() => toggleOption(option.value)}
                     className={cn(
-                      isSelected &&
-                        "bg-blue-50/60 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium",
+                      isSelected && "bg-(--tone)/10 text-(--tone) font-medium",
                     )}
                   >
                     <div
                       className={cn(
                         "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                         isSelected
-                          ? "border-blue-500 bg-blue-500 text-white"
+                          ? "border-(--tone)/60 bg-(--tone) text-white dark:text-slate-900"
                           : "border-slate-300 dark:border-slate-600 bg-transparent",
                       )}
                     >

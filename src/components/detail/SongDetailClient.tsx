@@ -328,10 +328,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
               className={NAV_BUTTON_CLASS}
               title={user ? user.name : tNav("login")}
             >
-              <User
-                size={20}
-                className={user ? "text-blue-500 dark:text-blue-400" : ""}
-              />
+              <User size={20} className={user ? "text-(--tone)" : ""} />
             </button>
 
             {/* 宽屏平铺 分享、安装、语言 和 主题切换 */}

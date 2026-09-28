@@ -1,6 +1,7 @@
 "use client";
 
 import AppNavbar from "@/components/shared/AppNavbar";
+import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import Pagination from "@/components/shared/Pagination";
 import { useFavorites } from "@/context/FavoritesContext";
@@ -26,7 +27,6 @@ import {
   encodeFilterParam,
 } from "@/lib/utils/utils-song";
 import {
-  Disc,
   LayoutGrid,
   List,
   Mic2,
@@ -49,7 +49,11 @@ const VIEW_MODE_ICONS: Record<MusicLibraryViewMode, React.ReactNode> = {
   list: <List size={18} />,
 };
 
-function FilterPill({
+/** 类型标签：文字切换，当前项下方一道强调色短线（同个人中心的目录） */
+const TYPE_TAB_CLASS =
+  "relative flex h-full shrink-0 items-center whitespace-nowrap font-serif text-[15px] tracking-wider transition-colors select-none";
+
+function TypeTab({
   label,
   active,
   onClick,
@@ -60,16 +64,34 @@ function FilterPill({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        "whitespace-nowrap rounded-full border px-4 py-1.5 text-sm transition-all duration-300 select-none",
+        TYPE_TAB_CLASS,
         active
-          ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
-          : "border-slate-200 bg-transparent text-slate-600 hover:border-blue-400 hover:bg-blue-50/50 dark:border-slate-700 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:bg-blue-900/10",
+          ? "text-slate-900 dark:text-slate-100"
+          : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
       )}
     >
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) transition-opacity",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      />
       {label}
     </button>
+  );
+}
+
+/** 工具栏的图标按钮：同顶栏，选中只变色 */
+function toolButtonClass(active: boolean) {
+  return cn(
+    NAV_BUTTON_CLASS,
+    "shrink-0",
+    active && "text-(--tone) dark:text-(--tone)",
   );
 }
 
@@ -330,7 +352,7 @@ export default function MusicLibraryClient({
         title={
           <>
             {t("logo.part1")}
-            <span className="mx-2 h-5 w-0.5 translate-y-[1.5px] rounded-full bg-blue-600" />
+            <span className="mx-2 h-5 w-0.5 translate-y-[1.5px] rounded-full bg-(--tone)" />
             {t("logo.part2")}
           </>
         }
@@ -347,163 +369,148 @@ export default function MusicLibraryClient({
           </div>
         </section>
 
-        <section className="sticky top-20 z-40 -mx-6 mb-8 border-y border-transparent bg-[#FAFAFA]/95 px-6 py-4 backdrop-blur-sm dark:bg-[#0B0F19]/95 data-[scrolled=true]:border-slate-100">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col-reverse justify-between gap-4 md:flex-row md:items-center">
-              {/*
-                overflow-x-auto 会让 overflow-y 从 visible 计算成 auto，
-                即这一行在垂直方向同样会裁切（裁在 padding box 上）。
-                原先桌面端 md:pb-0 让胶囊的 border box 与内容盒严丝合缝，
-                裁切线正好落在圆角边框的抗锯齿像素上，Chrome 把合成滚动层的
-                裁切矩形对齐到整数设备像素后就会削掉底部一行 —— 位置取决于
-                元素落在设备像素网格的哪一档，所以 sticky 吸顶前后表现不同。
-                这里上下都留出余量，再用负 margin 抵掉，视觉盒尺寸保持不变。
-              */}
-              <div
-                ref={containerRef}
-                {...dragHandlers}
-                className="no-scrollbar -my-1 flex w-full cursor-grab items-center gap-2 overflow-x-auto pt-1 pb-3 active:cursor-grabbing md:w-auto md:pb-1"
-              >
-                {filterOptions.allTypes.map((type) => {
-                  if (type === FILTER_OPTION_ALL && isAnyFilterActive) {
-                    return (
-                      <button
-                        key="reset"
-                        onClick={(event) => {
-                          if (hasDraggedRef.current) {
-                            event.preventDefault();
-                            return;
-                          }
-                          resetAllFilters();
-                          scrollToTop();
-                        }}
-                        className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-4 py-1.5 text-sm text-red-600 transition-all duration-300 hover:border-red-300 hover:bg-red-100 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
-                      >
-                        <RotateCcw size={12} />
-                        {t("reset")}
-                      </button>
-                    );
-                  }
-
-                  const pillLabel = (() => {
-                    if (type === FILTER_OPTION_ALL) return tCommon("all");
-                    if (type === FILTER_OPTION_UNKNOWN)
-                      return tCommon("unknown");
-                    return tEnum.has(`type.${type}`)
-                      ? tEnum(`type.${type}`)
-                      : type;
-                  })();
-
+        {/* 曲目工具栏：吸顶，底下只有一道细线。标签、搜索、按钮都放在等高的
+            一行里竖直居中，当前标签与聚焦的搜索框在细线上亮一段强调色。
+            窄屏分两行：上面搜索与按钮，下面类型标签 */}
+        <section className="sticky top-20 z-40 -mx-6 mb-10 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95">
+          <div className="flex flex-col-reverse border-b border-slate-200/70 dark:border-slate-800 md:h-12 md:flex-row md:gap-8">
+            <div
+              ref={containerRef}
+              {...dragHandlers}
+              className="no-scrollbar flex h-12 min-w-0 cursor-grab gap-6 overflow-x-auto active:cursor-grabbing md:h-full"
+            >
+              {filterOptions.allTypes.map((type) => {
+                if (type === FILTER_OPTION_ALL && isAnyFilterActive) {
                   return (
-                    <FilterPill
-                      key={type}
-                      label={pillLabel}
-                      active={filterType === type}
-                      onClick={() => {
-                        if (hasDraggedRef.current) return;
-                        setFilterType(type);
+                    <button
+                      key="reset"
+                      type="button"
+                      onClick={(event) => {
+                        if (hasDraggedRef.current) {
+                          event.preventDefault();
+                          return;
+                        }
+                        resetAllFilters();
+                        scrollToTop();
                       }}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="flex w-full items-center gap-2 md:w-auto">
-                <div className="group relative flex-1 md:w-64">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    size={16}
-                  />
-                  <input
-                    type="text"
-                    placeholder={
-                      lyricsState === "ready"
-                        ? t("search.placeholderWithLyrics")
-                        : t("search.placeholderNoLyrics")
-                    }
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm outline-none transition-colors focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900"
-                  />
-                  {searchQuery ? (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-slate-500"
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  ) : lyricsState === "loading" ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <span className="block h-3 w-3 animate-spin rounded-full border border-indigo-400/60 border-t-indigo-500" />
-                    </span>
-                  ) : lyricsState === "ready" ? (
-                    <Mic2
-                      size={13}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-400/60"
-                    />
-                  ) : null}
-                </div>
-
-                <button
-                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  className={cn(
-                    "shrink-0 rounded-lg border p-2 transition-all duration-300",
-                    showAdvancedFilters
-                      ? "border-blue-600 bg-blue-600 text-white shadow-md"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-400 hover:bg-blue-50/50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:bg-blue-900/10",
-                  )}
-                  title={t("advancedFilter")}
-                >
-                  {showAdvancedFilters ? (
-                    <X size={16} />
-                  ) : (
-                    <SlidersHorizontal size={16} />
-                  )}
-                </button>
-
-                <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 md:block" />
-
-                <div className="flex shrink-0 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800/50">
-                  {MUSIC_LIBRARY_VIEW_MODES.map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => setViewMode(mode)}
                       className={cn(
-                        "rounded-md p-1.5 transition-all",
-                        viewMode === mode
-                          ? "bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400"
-                          : "text-slate-400 hover:text-slate-600",
+                        TYPE_TAB_CLASS,
+                        "gap-1.5 text-(--tone) hover:opacity-75",
                       )}
-                      title={mode === "grid" ? t("view.grid") : t("view.list")}
                     >
-                      {VIEW_MODE_ICONS[mode]}
+                      <RotateCcw size={13} />
+                      {t("reset")}
                     </button>
-                  ))}
-                </div>
-              </div>
+                  );
+                }
+
+                const tabLabel = (() => {
+                  if (type === FILTER_OPTION_ALL) return tCommon("all");
+                  if (type === FILTER_OPTION_UNKNOWN) return tCommon("unknown");
+                  return tEnum.has(`type.${type}`)
+                    ? tEnum(`type.${type}`)
+                    : type;
+                })();
+
+                return (
+                  <TypeTab
+                    key={type}
+                    label={tabLabel}
+                    active={filterType === type}
+                    onClick={() => {
+                      if (hasDraggedRef.current) return;
+                      setFilterType(type);
+                    }}
+                  />
+                );
+              })}
             </div>
 
-            {showAdvancedFilters && (
-              <div className="animate-in slide-in-from-top-2 fade-in duration-300">
-                <SongFilters
-                  yearRangeIndices={yearRangeIndices}
-                  setYearRangeIndices={setYearRangeIndices}
-                  sliderYears={sliderYears}
-                  selectedGenre={filterGenre}
-                  setSelectedGenre={setFilterGenre}
-                  selectedArtist={filterArtist}
-                  setSelectedArtist={setFilterArtist}
-                  selectedLyricist={filterLyricist}
-                  setSelectedLyricist={setFilterLyricist}
-                  selectedComposer={filterComposer}
-                  setSelectedComposer={setFilterComposer}
-                  selectedArranger={filterArranger}
-                  setSelectedArranger={setFilterArranger}
-                  filterOptions={filterOptions}
+            <div className="flex h-11 items-center gap-1 md:ml-auto md:h-full">
+              {/* 搜索：平时没有边框，只靠放大镜与占位字辨认；聚焦时细线上亮一段强调色 */}
+              <label className="group relative mr-2 flex h-full min-w-0 flex-1 items-center gap-2 md:w-60 md:flex-none">
+                <Search size={15} className="shrink-0 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={
+                    lyricsState === "ready"
+                      ? t("search.placeholderWithLyrics")
+                      : t("search.placeholderNoLyrics")
+                  }
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="h-full min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
                 />
-              </div>
-            )}
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="shrink-0 p-1 text-slate-300 transition-colors hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
+                  >
+                    <XCircle size={14} />
+                  </button>
+                ) : lyricsState === "loading" ? (
+                  <span className="block h-3 w-3 shrink-0 animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600" />
+                ) : lyricsState === "ready" ? (
+                  <Mic2
+                    size={13}
+                    className="shrink-0 text-(--tone) opacity-50"
+                  />
+                ) : null}
+                <span
+                  aria-hidden
+                  className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) opacity-0 transition-opacity group-focus-within:opacity-100"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                aria-pressed={showAdvancedFilters}
+                className={toolButtonClass(showAdvancedFilters)}
+                title={t("advancedFilter")}
+              >
+                {showAdvancedFilters ? (
+                  <X size={18} />
+                ) : (
+                  <SlidersHorizontal size={18} />
+                )}
+              </button>
+              {MUSIC_LIBRARY_VIEW_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode)}
+                  aria-pressed={viewMode === mode}
+                  className={toolButtonClass(viewMode === mode)}
+                  title={mode === "grid" ? t("view.grid") : t("view.list")}
+                >
+                  {VIEW_MODE_ICONS[mode]}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {showAdvancedFilters && (
+            <div className="animate-in slide-in-from-top-2 fade-in py-5 duration-300">
+              <SongFilters
+                yearRangeIndices={yearRangeIndices}
+                setYearRangeIndices={setYearRangeIndices}
+                sliderYears={sliderYears}
+                selectedGenre={filterGenre}
+                setSelectedGenre={setFilterGenre}
+                selectedArtist={filterArtist}
+                setSelectedArtist={setFilterArtist}
+                selectedLyricist={filterLyricist}
+                setSelectedLyricist={setFilterLyricist}
+                selectedComposer={filterComposer}
+                setSelectedComposer={setFilterComposer}
+                selectedArranger={filterArranger}
+                setSelectedArranger={setFilterArranger}
+                filterOptions={filterOptions}
+              />
+            </div>
+          )}
         </section>
 
         <section
@@ -539,7 +546,7 @@ export default function MusicLibraryClient({
                   key={`list-page-${safePage}-${mountKey}`}
                   className="flex flex-col gap-2"
                 >
-                  <div className="mb-2 hidden border-b border-slate-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 md:flex">
+                  <div className="mb-2 hidden px-4 py-2 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500 md:flex">
                     <div className="mr-6 w-16">{t("listHeader.cover")}</div>
                     <div className="grow">{t("listHeader.title")}</div>
                     <div className="ml-8 w-8" />
@@ -580,10 +587,9 @@ export default function MusicLibraryClient({
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-              <Disc size={48} className="mb-4 opacity-20" />
-              <p className="font-light">{t("noFilteredSongs")}</p>
-            </div>
+            <p className="py-20 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+              {t("noFilteredSongs")}
+            </p>
           )}
         </section>
       </main>

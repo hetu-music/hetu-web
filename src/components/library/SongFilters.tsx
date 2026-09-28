@@ -44,10 +44,10 @@ const YearRangeSlider = ({
     <div className="px-1 py-1 select-none">
       {/* Selected range labels */}
       <div className="flex justify-between mb-3">
-        <span className="text-xs font-mono font-semibold text-blue-500 dark:text-blue-400">
+        <span className="text-xs font-semibold tabular-nums text-(--tone)">
           {values[range[0]]}
         </span>
-        <span className="text-xs font-mono font-semibold text-blue-500 dark:text-blue-400">
+        <span className="text-xs font-semibold tabular-nums text-(--tone)">
           {values[range[1]]}
         </span>
       </div>

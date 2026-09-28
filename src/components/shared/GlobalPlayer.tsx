@@ -311,7 +311,7 @@ export default function GlobalPlayer() {
             <div className="h-1 bg-slate-200 dark:bg-slate-700/50 rounded-t-2xl overflow-hidden group-hover/prog:h-1.5 transition-all duration-150">
               <div
                 ref={progressBarRef}
-                className="h-full bg-blue-500 rounded-r-full"
+                className="h-full bg-(--tone) rounded-r-full"
               />
             </div>
           </div>
@@ -336,7 +336,7 @@ export default function GlobalPlayer() {
                 />
               ) : isLoading ? (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 size={16} className="animate-spin text-blue-500" />
+                  <Loader2 size={16} className="animate-spin text-(--tone)" />
                 </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -348,7 +348,7 @@ export default function GlobalPlayer() {
             <div className="min-w-0 flex-1">
               <Link
                 href={`/song/${currentTrack.songId}`}
-                className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate leading-tight hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate leading-tight hover:text-(--tone) transition-colors"
               >
                 {currentTrack.title}
               </Link>
@@ -363,7 +363,7 @@ export default function GlobalPlayer() {
                 ) : currentLrcText ? (
                   <p
                     key={currentLrcIndex}
-                    className="text-[11px] font-medium text-blue-500 dark:text-blue-400 truncate animate-in fade-in slide-in-from-bottom-1 duration-300"
+                    className="text-[11px] font-medium text-(--tone) truncate animate-in fade-in slide-in-from-bottom-1 duration-300"
                   >
                     {currentLrcText}
                   </p>
@@ -397,11 +397,11 @@ export default function GlobalPlayer() {
               aria-label={isPlaying ? "暂停" : "播放"}
               className={cn(
                 "w-10 h-10 rounded-full flex items-center justify-center transition-all",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--tone)/50",
                 isLoading
                   ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
                   : isPlaying
-                    ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25 hover:bg-blue-600 active:scale-95"
+                    ? "bg-(--tone) text-white dark:text-slate-900 shadow-lg hover:bg-(--tone)/90 active:scale-95"
                     : "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95",
               )}
             >
@@ -460,7 +460,7 @@ export default function GlobalPlayer() {
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       播放队列
                     </span>
-                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 dark:bg-blue-950/30 text-blue-500 dark:text-blue-400 border border-blue-100/30 dark:border-blue-800/10">
+                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-(--tone)/10 text-(--tone) border border-(--tone)/20">
                       {queue.length}
                     </span>
                   </div>
@@ -490,7 +490,7 @@ export default function GlobalPlayer() {
                       className={cn(
                         "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all group/item select-none border-b border-slate-50/50 dark:border-slate-800/5 last:border-b-0",
                         i === currentIndex
-                          ? "bg-blue-500/5 dark:bg-blue-500/10"
+                          ? "bg-(--tone)/10"
                           : "hover:bg-slate-50/60 dark:hover:bg-slate-800/30",
                       )}
                     >
@@ -516,7 +516,7 @@ export default function GlobalPlayer() {
                                 {[60, 100, 40].map((h, j) => (
                                   <span
                                     key={j}
-                                    className="w-0.5 bg-blue-400 rounded-full"
+                                    className="w-0.5 bg-(--tone) rounded-full"
                                     style={{
                                       height: `${h}%`,
                                       animation: `gpBounce 0.8s ease-in-out ${j * 0.2}s infinite`,
@@ -537,7 +537,7 @@ export default function GlobalPlayer() {
                           className={cn(
                             "text-xs truncate",
                             i === currentIndex
-                              ? "font-bold text-blue-600 dark:text-blue-400"
+                              ? "font-bold text-(--tone)"
                               : "font-medium text-slate-700 dark:text-slate-200 group-hover/item:text-slate-900 dark:group-hover/item:text-white transition-colors",
                           )}
                         >
@@ -571,8 +571,7 @@ export default function GlobalPlayer() {
                   "p-2 rounded-full transition-colors",
                   "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300",
                   "hover:bg-slate-100 dark:hover:bg-slate-800/80",
-                  showQueue &&
-                    "bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400",
+                  showQueue && "bg-(--tone)/10 text-(--tone)",
                 )}
               >
                 <svg
@@ -614,7 +613,7 @@ export default function GlobalPlayer() {
                   />
                 ) : isLoading ? (
                   <div className="w-full h-full flex items-center justify-center">
-                    <Loader2 size={14} className="animate-spin text-blue-500" />
+                    <Loader2 size={14} className="animate-spin text-(--tone)" />
                   </div>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -662,7 +661,7 @@ export default function GlobalPlayer() {
                 disabled={isLoading}
                 aria-label={isPlaying ? "暂停" : "播放"}
                 className={cn(
-                  "w-8.5 h-8.5 rounded-full flex items-center justify-center transition-all bg-blue-500 text-white shadow-md active:scale-90",
+                  "w-8.5 h-8.5 rounded-full flex items-center justify-center transition-all bg-(--tone) text-white dark:text-slate-900 shadow-md active:scale-90",
                   isLoading && "bg-slate-100 dark:bg-slate-800 text-slate-400",
                 )}
               >
@@ -712,7 +711,7 @@ export default function GlobalPlayer() {
                       <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         播放队列
                       </span>
-                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 dark:bg-blue-950/30 text-blue-500 dark:text-blue-400 border border-blue-100/30 dark:border-blue-800/10">
+                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-(--tone)/10 text-(--tone) border border-(--tone)/20">
                         {queue.length}
                       </span>
                     </div>
@@ -741,9 +740,7 @@ export default function GlobalPlayer() {
                         onClick={() => controls.jumpTo(i)}
                         className={cn(
                           "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all active:bg-slate-50/50 dark:active:bg-slate-800/20 select-none border-b border-slate-50/50 dark:border-slate-800/5 last:border-b-0",
-                          i === currentIndex
-                            ? "bg-blue-500/5 dark:bg-blue-500/10"
-                            : "",
+                          i === currentIndex ? "bg-(--tone)/10" : "",
                         )}
                       >
                         {/* 封面与播放指示器 */}
@@ -768,7 +765,7 @@ export default function GlobalPlayer() {
                                   {[60, 100, 40].map((h, j) => (
                                     <span
                                       key={j}
-                                      className="w-0.5 bg-blue-400 rounded-full"
+                                      className="w-0.5 bg-(--tone) rounded-full"
                                       style={{
                                         height: `${h}%`,
                                         animation: `gpBounce 0.8s ease-in-out ${j * 0.2}s infinite`,
@@ -789,7 +786,7 @@ export default function GlobalPlayer() {
                             className={cn(
                               "text-xs truncate",
                               i === currentIndex
-                                ? "font-bold text-blue-600 dark:text-blue-400"
+                                ? "font-bold text-(--tone)"
                                 : "font-medium text-slate-700 dark:text-slate-200",
                             )}
                           >
@@ -821,7 +818,7 @@ export default function GlobalPlayer() {
                   aria-label="播放列表"
                   className={cn(
                     "p-1.5 rounded-full text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors",
-                    showQueue && "text-blue-500 dark:text-blue-400",
+                    showQueue && "text-(--tone)",
                   )}
                 >
                   <svg
@@ -848,10 +845,10 @@ export default function GlobalPlayer() {
 
           {/* 第二排：移动端专属歌词舱（仅在有歌词时动态滑出，提供完整宽度空间） */}
           {currentLrcText && (
-            <div className="w-full mt-2 h-4.5 overflow-hidden relative flex items-center justify-center select-none bg-blue-50/40 dark:bg-blue-950/20 rounded-lg px-2 border border-blue-100/10 dark:border-blue-900/10">
+            <div className="w-full mt-2 h-4.5 overflow-hidden relative flex items-center justify-center select-none bg-(--tone)/10 rounded-lg px-2 border border-(--tone)/20">
               <p
                 key={currentLrcIndex}
-                className="text-[10px] font-semibold text-blue-500 dark:text-blue-400 truncate text-center w-full animate-in fade-in slide-in-from-bottom-1 duration-300"
+                className="text-[10px] font-semibold text-(--tone) truncate text-center w-full animate-in fade-in slide-in-from-bottom-1 duration-300"
               >
                 {currentLrcText}
               </p>

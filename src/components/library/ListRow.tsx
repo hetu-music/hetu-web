@@ -7,7 +7,7 @@ import type { Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { formatTime } from "@/lib/utils/utils-common";
 import { getCoverUrl } from "@/lib/utils/utils-song";
-import { Calendar, Clock, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 import type React from "react";
 import CoverArt from "./CoverArt";
 import MultiTagDisplay from "./MultiTagDisplay";
@@ -54,9 +54,7 @@ export default function ListRow({
         <h3
           className={cn(
             "truncate text-lg text-slate-900 transition-colors dark:text-slate-100",
-            isActive
-              ? "text-blue-600 dark:text-blue-400"
-              : "group-hover:text-blue-600 dark:group-hover:text-blue-400",
+            isActive ? "text-(--tone)" : "group-hover:text-(--tone)",
           )}
         >
           {song.title}
@@ -67,10 +65,9 @@ export default function ListRow({
           {song.composer?.join(" ") || "-"}
         </p>
         {song.year && (
-          <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 md:hidden">
-            <Calendar size={11} className="opacity-60" />
-            <span className="font-mono leading-none">{song.year}</span>
-          </div>
+          <p className="mt-1 text-[11px] leading-none tabular-nums text-slate-400 dark:text-slate-500 md:hidden">
+            {song.year}
+          </p>
         )}
         {lyricsSnippet && (
           <div className="mt-1 border-l-2 border-slate-200 pl-2 dark:border-slate-700">
@@ -126,14 +123,13 @@ export default function ListRow({
         )}
         <MultiTagDisplay tags={song.type} type="type" />
         <MultiTagDisplay tags={song.genre} type="genre" />
-        <div className="flex w-16 items-center gap-2 font-mono text-xs opacity-70">
-          <Calendar size={14} />
+        {/* 表头已写明年份、时长，这里不再配图标 */}
+        <span className="w-16 text-xs tabular-nums text-slate-400 dark:text-slate-500">
           {song.year || "-"}
-        </div>
-        <div className="flex w-16 items-center gap-2 font-mono text-xs opacity-70">
-          <Clock size={14} />
+        </span>
+        <span className="w-16 text-xs tabular-nums text-slate-400 dark:text-slate-500">
           {formatTime(song.length)}
-        </div>
+        </span>
       </div>
 
       {isLoggedIn && (

@@ -5,9 +5,9 @@ import {
   FIELD_CLASS,
   FIELD_ERROR_CLASS,
   FIELD_LABEL_CLASS,
-  PRIMARY_BUTTON_CLASS,
   TEXTAREA_CLASS,
 } from "@/components/profile/profile-ui";
+import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
 import { useUserContext } from "@/context/UserContext";
 import { useAutoGrow } from "@/hooks/ui";
 import { useCsrfToken } from "@/hooks/utils/useCsrfToken";

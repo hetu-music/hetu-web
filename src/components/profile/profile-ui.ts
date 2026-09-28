@@ -26,14 +26,6 @@ export const TEXTAREA_CLASS = `${FIELD_CLASS} resize-none field-sizing-content m
 export const FIELD_ERROR_CLASS =
   "border-rose-400 dark:border-rose-500/70 focus:border-rose-500";
 
-/** 次要文字按钮 */
-export const TEXT_BUTTON_CLASS =
-  "text-xs tracking-widest text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors disabled:opacity-40";
-
-/** 主操作文字按钮 */
-export const PRIMARY_BUTTON_CLASS =
-  "inline-flex items-center gap-1.5 text-xs tracking-widest text-(--tone) hover:opacity-75 transition-opacity disabled:opacity-40";
-
 /** 2026.9.28 这样的短日期 */
 export function formatDate(iso: string): string {
   const d = new Date(iso);

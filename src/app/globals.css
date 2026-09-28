@@ -313,3 +313,18 @@
     opacity: 1;
   }
 }
+
+/* 加载屏：一小段强调色沿细线从左划到右，同歌曲页顶栏的阅读进度 */
+@keyframes folio-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+.folio-sweep-anim {
+  animation: folio-sweep 1.6s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}

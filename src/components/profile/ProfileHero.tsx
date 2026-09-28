@@ -3,7 +3,7 @@
 import {
   PRIMARY_BUTTON_CLASS,
   TEXT_BUTTON_CLASS,
-} from "@/components/profile/profile-ui";
+} from "@/components/shared/text-button";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useUserContext } from "@/context/UserContext";
 import { Link } from "@/i18n/navigation";

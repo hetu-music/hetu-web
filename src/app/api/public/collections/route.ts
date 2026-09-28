@@ -4,17 +4,14 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getSongsByIds } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
 
-const TARGET_TYPE_FAVORITE = 0;
-
 // GET /api/public/collections — 获取当前用户的收藏，返回 songIds 和完整 songs 数据
 export const GET = withAuth(
   async (_request: NextRequest, user: AuthenticatedUser) => {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from(TABLES.COLLECTIONS)
-      .select("song_id, created_at, snippet")
+      .select("song_id, created_at")
       .eq("user_id", user.id)
-      .eq("target_type", TARGET_TYPE_FAVORITE)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -35,13 +32,7 @@ export const GET = withAuth(
 
     // 从数据行转为映射
     const idToCol = Object.fromEntries(
-      data.map((r) => [
-        r.song_id,
-        {
-          created_at: r.created_at,
-          snippet: r.snippet,
-        },
-      ]),
+      data.map((r) => [r.song_id, { created_at: r.created_at }]),
     );
 
     // 按 songIds 的顺序（收藏时间倒序）重排，与此前行为一致
@@ -71,7 +62,6 @@ export const POST = withAuth(
     const { error } = await supabase.from(TABLES.COLLECTIONS).insert({
       user_id: user.id,
       song_id: songId,
-      target_type: TARGET_TYPE_FAVORITE,
     });
 
     if (error) {
@@ -102,8 +92,7 @@ export const DELETE = withAuth(
       .from(TABLES.COLLECTIONS)
       .delete()
       .eq("user_id", user.id)
-      .eq("song_id", songId)
-      .eq("target_type", TARGET_TYPE_FAVORITE);
+      .eq("song_id", songId);
 
     if (error) {
       console.error("DELETE collections error:", error);

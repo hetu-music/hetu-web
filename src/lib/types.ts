@@ -17,7 +17,6 @@ export type Song = {
   has_audio?: boolean;
   collectionInfo?: {
     created_at: string;
-    snippet: string | null;
   };
 };
 

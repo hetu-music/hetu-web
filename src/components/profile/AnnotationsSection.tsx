@@ -134,7 +134,7 @@ export default function AnnotationsSection() {
                         alt=""
                         width={40}
                         height={40}
-                        className="w-full h-full object-cover grayscale-[35%] transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
+                        className="w-full h-full object-cover grayscale-35 transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
                       />
                     </span>
                     <span className="min-w-0 flex-1">

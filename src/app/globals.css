@@ -328,3 +328,24 @@
 .folio-sweep-anim {
   animation: folio-sweep 1.6s cubic-bezier(0.23, 1, 0.32, 1) infinite;
 }
+
+/* 登录页封面墙：每列封面重复两遍，平移半个自身高度即可无缝循环 */
+@keyframes cover-drift-up {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes cover-drift-down {
+  from {
+    transform: translateY(-50%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}

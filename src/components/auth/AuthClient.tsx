@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  CoverStrip,
+  CoverWall,
+  GalleryQuote,
+  useQuoteCycle,
+} from "@/components/auth/AuthGallery";
 import OtpStep from "@/components/auth/OtpStep";
 import {
   FIELD_CLASS,
@@ -8,8 +14,10 @@ import {
 } from "@/components/shared/form-field";
 import PageTopBar from "@/components/shared/PageTopBar";
 import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
+import { useMounted } from "@/hooks/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { getCsrfToken } from "@/lib/api/csrf";
+import type { GallerySong } from "@/lib/auth-gallery";
 import {
   createAuthFormSchema,
   createAuthFormValues,
@@ -33,18 +41,29 @@ interface AuthClientProps {
   mode: "login" | "register";
   /** 登录、注册后跳回的站内路径，已在服务端校验 */
   next: string;
+  /** 封面墙与轮换摘句；取不到时为空，页面只剩表单 */
+  gallery: GallerySong[];
 }
 
 /**
- * 登录与注册：宽屏左栏卷首（站名、题名、一句说明），右栏表单。
- * 注册多一步邮箱验证码；输入框只有一道底线，按钮都是文字按钮。
+ * 登录与注册：宽屏左半边是缓缓漂移的封面墙，墙下轮换一句歌词，
+ * 轮到哪首，墙上那张封面就恢复原色；右半边是题名与表单。
+ * 窄屏封面收成顶部两行相向滚动的小图。注册多一步邮箱验证码。
  */
-export default function AuthClient({ nonce, mode, next }: AuthClientProps) {
+export default function AuthClient({
+  nonce,
+  mode,
+  next,
+  gallery,
+}: AuthClientProps) {
   const t = useTranslations("auth");
   const tSite = useTranslations("common.site");
   const router = useRouter();
   const queryClient = useQueryClient();
   const { resolvedTheme } = useTheme();
+  const mounted = useMounted();
+  const quote = useQuoteCycle(gallery);
+  const hasGallery = gallery.length > 0;
   const [step, setStep] = useState<Step>("credentials");
   const [turnstileInstanceKey, setTurnstileInstanceKey] = useState(0);
 
@@ -131,7 +150,7 @@ export default function AuthClient({ nonce, mode, next }: AuthClientProps) {
 
   return (
     <div
-      className="relative min-h-screen flex flex-col overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
+      className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
       style={
         {
           "--tone-light": INK_TONE.light,
@@ -141,146 +160,204 @@ export default function AuthClient({ nonce, mode, next }: AuthClientProps) {
     >
       <PageTopBar />
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-6 pt-32 md:pt-40 pb-16 grid gap-12 content-start lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-x-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {/* 卷首 */}
-        <header className="min-w-0">
-          <p className="text-xs tracking-[0.35em] text-(--tone) mb-5">
-            {tSite("name")}
-          </p>
-          <h1 className="font-serif text-5xl md:text-6xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50">
-            {heading}
-          </h1>
-          <p className="mt-6 font-kaiti text-[15px] leading-[2.05] text-slate-600 dark:text-slate-400">
-            {subtitle}
-          </p>
-          {step !== "credentials" && (
-            <p className="mt-1 font-serif text-base text-slate-900 dark:text-slate-100 wrap-break-word">
-              {email}
-            </p>
+      <div
+        className={cn(
+          "lg:grid lg:min-h-screen",
+          hasGallery && "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]",
+        )}
+      >
+        {/* 宽屏左半边：封面墙，墙脚一句歌词；随页面固定，不跟着表单滚 */}
+        {hasGallery && (
+          <aside className="relative hidden lg:block lg:sticky lg:top-0 lg:h-screen">
+            <CoverWall songs={gallery} activeId={quote?.id ?? null} />
+            <div className="absolute inset-x-0 bottom-0 px-12 pb-16 xl:px-16">
+              <GalleryQuote song={quote} size="lg" />
+            </div>
+          </aside>
+        )}
+
+        <div className="flex min-h-screen flex-col">
+          {/* 窄屏：顶部两行封面，下面一句歌词 */}
+          {hasGallery && (
+            <div className="lg:hidden pt-24 animate-in fade-in duration-700">
+              <CoverStrip songs={gallery} activeId={quote?.id ?? null} />
+              <div className="px-6 pt-6">
+                <GalleryQuote song={quote} size="sm" />
+              </div>
+            </div>
           )}
-        </header>
 
-        <div className="min-w-0 max-w-[26rem] lg:pt-2">
-          {step === "credentials" && (
-            <form onSubmit={submit} noValidate className="space-y-8">
-              <label className="block">
-                <span className={FIELD_LABEL_CLASS}>{t("email")}</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  placeholder={t("emailPlaceholder")}
-                  {...form.register("email")}
-                  className={cn(
-                    FIELD_CLASS,
-                    "mt-2",
-                    errors.email && FIELD_ERROR_CLASS,
-                  )}
-                />
-                {errors.email && (
-                  <span className="mt-1.5 block text-xs text-rose-500">
-                    {errors.email.message}
-                  </span>
+          <main
+            className={cn(
+              "flex flex-1 items-start lg:items-center px-6 pb-16 sm:px-10 animate-in fade-in slide-in-from-bottom-4 duration-700",
+              hasGallery
+                ? "pt-10 lg:px-16 lg:pt-28 xl:px-24"
+                : "pt-32 md:pt-40 lg:justify-center",
+            )}
+          >
+            <div className="w-full max-w-[26rem]">
+              <header>
+                <p className="text-xs tracking-[0.35em] text-(--tone) mb-5">
+                  {tSite("name")}
+                </p>
+                <h1 className="font-serif text-5xl md:text-6xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50">
+                  {heading}
+                </h1>
+                <p className="mt-5 font-kaiti text-[15px] leading-[2.05] text-slate-600 dark:text-slate-400">
+                  {subtitle}
+                </p>
+                {step !== "credentials" && (
+                  <p className="mt-1 font-serif text-base text-slate-900 dark:text-slate-100 wrap-break-word">
+                    {email}
+                  </p>
                 )}
-              </label>
+              </header>
 
-              <label className="block">
-                <span className={FIELD_LABEL_CLASS}>{t("password")}</span>
-                <input
-                  type="password"
-                  autoComplete={isLogin ? "current-password" : "new-password"}
-                  placeholder={
-                    isLogin ? undefined : t("register.passwordPlaceholder")
-                  }
-                  {...form.register("password")}
-                  className={cn(
-                    FIELD_CLASS,
-                    "mt-2",
-                    errors.password && FIELD_ERROR_CLASS,
-                  )}
-                />
-                {errors.password && (
-                  <span className="mt-1.5 block text-xs text-rose-500">
-                    {errors.password.message}
-                  </span>
+              <div className="mt-12">
+                {step === "credentials" && (
+                  <form onSubmit={submit} noValidate className="space-y-8">
+                    <label className="block">
+                      <span className={FIELD_LABEL_CLASS}>{t("email")}</span>
+                      <input
+                        type="email"
+                        autoComplete="email"
+                        placeholder={t("emailPlaceholder")}
+                        {...form.register("email")}
+                        className={cn(
+                          FIELD_CLASS,
+                          "mt-2",
+                          errors.email && FIELD_ERROR_CLASS,
+                        )}
+                      />
+                      {errors.email && (
+                        <span className="mt-1.5 block text-xs text-rose-500">
+                          {errors.email.message}
+                        </span>
+                      )}
+                    </label>
+
+                    <label className="block">
+                      <span className={FIELD_LABEL_CLASS}>{t("password")}</span>
+                      <input
+                        type="password"
+                        autoComplete={
+                          isLogin ? "current-password" : "new-password"
+                        }
+                        placeholder={
+                          isLogin
+                            ? undefined
+                            : t("register.passwordPlaceholder")
+                        }
+                        {...form.register("password")}
+                        className={cn(
+                          FIELD_CLASS,
+                          "mt-2",
+                          errors.password && FIELD_ERROR_CLASS,
+                        )}
+                      />
+                      {errors.password && (
+                        <span className="mt-1.5 block text-xs text-rose-500">
+                          {errors.password.message}
+                        </span>
+                      )}
+                    </label>
+
+                    {/* 人机验证是第三方小窗，改不了样式；主题跟随站点而不是系统。
+                  站点主题只在浏览器里读得到，挂载后再渲染，否则水合不一致 */}
+                    <div className="min-h-[65px]">
+                      {mounted && (
+                        <Turnstile
+                          key={turnstileInstanceKey}
+                          siteKey={
+                            process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""
+                          }
+                          onSuccess={setTurnstileToken}
+                          onError={() =>
+                            form.setError("root", {
+                              message: t("captchaFailed"),
+                            })
+                          }
+                          onExpire={() => setTurnstileToken("")}
+                          scriptOptions={{ nonce }}
+                          options={{
+                            theme: resolvedTheme === "dark" ? "dark" : "light",
+                            size: "flexible",
+                          }}
+                          className="w-full"
+                        />
+                      )}
+                    </div>
+
+                    {formError && (
+                      <p
+                        role="alert"
+                        className="text-sm text-rose-500 dark:text-rose-400"
+                      >
+                        {formError}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 pt-2">
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className={cn(PRIMARY_BUTTON_CLASS, "text-sm")}
+                      >
+                        {isSubmitting && (
+                          <Loader2 size={14} className="animate-spin" />
+                        )}
+                        {t(isLogin ? "login.submit" : "register.submit")}
+                      </button>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {t(
+                          isLogin
+                            ? "login.switchPrompt"
+                            : "register.switchPrompt",
+                        )}
+                        <Link
+                          href={(isLogin ? "/register" : "/login") + nextQuery}
+                          className="ml-1.5 tracking-widest text-(--tone) hover:opacity-75 transition-opacity"
+                        >
+                          {t(
+                            isLogin
+                              ? "login.switchLink"
+                              : "register.switchLink",
+                          )}
+                        </Link>
+                      </p>
+                    </div>
+                  </form>
                 )}
-              </label>
 
-              {/* 人机验证是第三方小窗，改不了样式；主题跟随站点而不是系统。
-                  resolvedTheme 挂载后才有值，等它就绪再挂，免得换主题时令牌被重置 */}
-              <div className="min-h-[65px]">
-                {resolvedTheme && (
-                  <Turnstile
-                    key={turnstileInstanceKey}
-                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""}
-                    onSuccess={setTurnstileToken}
-                    onError={() =>
-                      form.setError("root", { message: t("captchaFailed") })
-                    }
-                    onExpire={() => setTurnstileToken("")}
-                    scriptOptions={{ nonce }}
-                    options={{
-                      theme: resolvedTheme === "dark" ? "dark" : "light",
-                      size: "flexible",
+                {step === "otp" && (
+                  <OtpStep
+                    email={email}
+                    onVerified={() => {
+                      setStep("verified");
+                      setTimeout(() => router.replace(next), 1500);
                     }}
-                    className="w-full"
+                    onRestart={restart}
                   />
                 )}
               </div>
+            </div>
+          </main>
 
-              {formError && (
-                <p
-                  role="alert"
-                  className="text-sm text-rose-500 dark:text-rose-400"
-                >
-                  {formError}
-                </p>
-              )}
-
-              <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={cn(PRIMARY_BUTTON_CLASS, "text-sm")}
-                >
-                  {isSubmitting && (
-                    <Loader2 size={14} className="animate-spin" />
-                  )}
-                  {t(isLogin ? "login.submit" : "register.submit")}
-                </button>
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  {t(isLogin ? "login.switchPrompt" : "register.switchPrompt")}
-                  <Link
-                    href={(isLogin ? "/register" : "/login") + nextQuery}
-                    className="ml-1.5 tracking-widest text-(--tone) hover:opacity-75 transition-opacity"
-                  >
-                    {t(isLogin ? "login.switchLink" : "register.switchLink")}
-                  </Link>
-                </p>
-              </div>
-            </form>
-          )}
-
-          {step === "otp" && (
-            <OtpStep
-              email={email}
-              onVerified={() => {
-                setStep("verified");
-                setTimeout(() => router.replace(next), 1500);
-              }}
-              onRestart={restart}
-            />
-          )}
+          <footer
+            className={cn(
+              "px-6 pb-10 sm:px-10",
+              hasGallery ? "lg:px-16 xl:px-24" : "lg:text-center",
+            )}
+          >
+            <p className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-600">
+              {t("copyright", {
+                year: new Date().getFullYear(),
+                name: tSite("name"),
+              })}
+            </p>
+          </footer>
         </div>
-      </main>
-
-      <footer className="w-full max-w-6xl mx-auto px-6 pb-10">
-        <p className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-600">
-          {t("copyright", {
-            year: new Date().getFullYear(),
-            name: tSite("name"),
-          })}
-        </p>
-      </footer>
+      </div>
     </div>
   );
 }

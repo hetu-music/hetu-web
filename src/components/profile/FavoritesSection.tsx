@@ -32,7 +32,7 @@ export default function FavoritesSection() {
           className={cn(
             TEXT_BUTTON_CLASS,
             clear.confirming &&
-              "text-rose-500 dark:text-rose-400 hover:text-rose-600",
+            "text-rose-500 dark:text-rose-400 hover:text-rose-600",
           )}
         >
           {clear.confirming
@@ -98,7 +98,7 @@ function FavoriteRow({ song }: { song: Song }) {
           alt=""
           width={56}
           height={56}
-          className="w-full h-full object-cover grayscale-[35%] transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
+          className="w-full h-full object-cover grayscale-35 transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
         />
       </Link>
 

@@ -1,5 +1,6 @@
 import { routing } from "@/i18n/routing";
 import { createSupabaseMiddlewareClient } from "@/lib/db/supabase-auth";
+import { loginPathFor } from "@/lib/utils/safe-next";
 import createIntlMiddleware from "next-intl/middleware";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -141,6 +142,9 @@ export async function proxy(request: NextRequest) {
   // Apply Security Headers to Response
   response.headers.set("Content-Security-Policy", cspHeader);
 
+  const localePrefix = pathname.startsWith("/zh-TW") ? "/zh-TW" : "/zh-CN";
+  const returnPath = strippedPathname + request.nextUrl.search;
+
   // Always refresh the Supabase session
   try {
     const supabase = createSupabaseMiddlewareClient(request, response);
@@ -154,10 +158,9 @@ export async function proxy(request: NextRequest) {
     if (strippedPathname.startsWith("/admin")) {
       if (error || !user) {
         console.warn("Auth middleware: User not authenticated", error?.message);
-        // 重定向到带 locale 前缀的 /login（localePrefix: always 下两个 locale 都有前缀）
-        const loginPath = pathname.startsWith("/zh-TW")
-          ? "/zh-TW/login"
-          : "/zh-CN/login";
+        // 重定向到带 locale 前缀的 /login（localePrefix: always 下两个 locale 都有前缀），
+        // 带上原来的后台地址，登录后回到这里
+        const loginPath = `${localePrefix}${loginPathFor(returnPath)}`;
         const redirectResponse = NextResponse.redirect(
           new URL(loginPath, request.url),
         );
@@ -180,9 +183,7 @@ export async function proxy(request: NextRequest) {
   } catch (error) {
     console.error("Auth middleware error:", error);
     if (strippedPathname.startsWith("/admin")) {
-      const loginPath = pathname.startsWith("/zh-TW")
-        ? "/zh-TW/login"
-        : "/zh-CN/login";
+      const loginPath = `${localePrefix}${loginPathFor(returnPath)}`;
       const redirectResponse = NextResponse.redirect(
         new URL(loginPath, request.url),
       );

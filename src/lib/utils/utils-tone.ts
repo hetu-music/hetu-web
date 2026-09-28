@@ -17,6 +17,9 @@ export interface CoverTone {
 /** 封面几乎无彩色（黑白、灰调）时的中性色调 */
 export const NEUTRAL_TONE: CoverTone = toneFrom(220, 0.12);
 
+/** 墨蓝：没有封面的页面（个人中心、加载、404、出错）统一用这个强调色 */
+export const INK_TONE: CoverTone = toneFrom(224, 0.38);
+
 function toneFrom(hue: number, saturation: number): CoverTone {
   const h = Math.round(hue);
   const s = Math.round(Math.min(Math.max(saturation, 0.12), 0.55) * 100);

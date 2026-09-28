@@ -63,7 +63,7 @@ export default function LanguageOptions({
               className={cn(
                 "w-full px-2.5 py-2 rounded-xl text-left text-xs font-semibold flex items-center gap-3 transition-all duration-300 cursor-pointer border hover:translate-x-0.5",
                 isActive
-                  ? "text-blue-600 dark:text-blue-400 bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/15 dark:border-blue-500/20"
+                  ? "text-(--tone) bg-(--tone)/10 border-(--tone)/20"
                   : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/30 dark:hover:bg-slate-900/50 border-transparent",
                 isPending && "opacity-40 cursor-wait",
               )}
@@ -74,17 +74,15 @@ export default function LanguageOptions({
                   "w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shadow-sm transition-transform duration-300",
                   isActive
                     ? isCN
-                      ? "bg-blue-500 text-white"
-                      : "bg-indigo-500 text-white"
+                      ? "bg-(--tone) text-white dark:text-slate-900"
+                      : "bg-(--tone) text-white dark:text-slate-900"
                     : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400",
                 )}
               >
                 {isCN ? "简" : "繁"}
               </div>
               <span className="flex-1">{lang.label}</span>
-              {isActive && (
-                <Check size={13} className="text-blue-500 dark:text-blue-400" />
-              )}
+              {isActive && <Check size={13} className="text-(--tone)" />}
             </button>
           );
         })}

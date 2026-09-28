@@ -104,7 +104,7 @@
     "collapse": "收起",
     "comments": {
       "intro": "批註寫在字句旁；這裡是對整首歌的評點。",
-      "count": "共 {count} 則批註",
+      "count": "共 {count} 則批評",
       "empty": "還沒有人評點這首歌。",
       "anonymous": "佚名",
       "private": "私批",
@@ -124,7 +124,7 @@
       "annotateLine": "批註這一句",
       "annotateParagraph": "批註這一段",
       "annotateScore": "批註樂譜",
-      "markerLabel": "{count} 則批註",
+      "markerLabel": "{count} 則批評",
       "playFrom": "從此句播放",
       "inline": "夾批",
       "orphan": "原句已改：",
@@ -141,7 +141,7 @@
       "submitReply": "回覆",
       "save": "儲存",
       "cancel": "取消",
-      "login": "登入後可以批註",
+      "login": "登入後可以批評",
       "error": "沒能儲存，請稍後重試",
       "close": "關閉",
       "slot": {

@@ -215,7 +215,7 @@ const About: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   <div className="flex flex-col gap-2 mt-2">
                     <a
                       href="mailto:feedback@hetu-music.com"
-                      className="w-fit inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-blue-600 dark:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                      className="w-fit inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-(--tone) hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
                     >
                       <Mail size={16} />
                       <span>feedback@hetu-music.com</span>
@@ -318,7 +318,7 @@ const About: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         <div
                           key={idx}
                           style={{ animationDelay: `${idx * 40}ms` }}
-                          className="animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both flex items-start gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-slate-700 transition-colors"
+                          className="animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both flex items-start gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 hover:border-(--tone)/30 dark:hover:border-slate-700 transition-colors"
                         >
                           <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm font-bold shrink-0">
                             {contributor.name?.charAt(0).toUpperCase() ?? "?"}

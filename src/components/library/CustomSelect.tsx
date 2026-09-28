@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useId, useMemo, useState } from "react";
-import { Check, ChevronDown, Minus, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, ChevronDown, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   Popover,
   PopoverContent,
@@ -16,6 +19,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils/utils";
+import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 
 interface Option {
   value: string;
@@ -26,23 +30,24 @@ interface CustomSelectProps {
   value: string[];
   onChange: (value: string[]) => void;
   options: Option[];
+  /** 字段名，窄屏底部面板的标题 */
+  label: string;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
-  selectAllLabel?: string;
-  allSelectedLabel?: string;
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({
   value,
   onChange,
   options,
-  placeholder = "请选择",
+  label,
+  placeholder,
   className = "",
   disabled = false,
-  selectAllLabel = "全选",
-  allSelectedLabel = "全部已选",
 }) => {
+  const t = useTranslations("library.filter");
+  const isDesktop = useIsDesktop();
   const contentId = useId();
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
@@ -114,204 +119,239 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
 
   let displayText: string;
   if (value.length === 0) {
-    displayText = placeholder;
+    displayText = placeholder ?? "";
   } else if (value.length === options.length && options.length > 1) {
-    displayText = allSelectedLabel;
+    displayText = t("allSelected");
   } else if (value.length === 1) {
     displayText = options.find((o) => o.value === value[0])?.label ?? value[0];
   } else {
-    displayText = `${value.length} 项已选`;
+    displayText = t("selectedCount", { count: value.length });
   }
 
   const hasSelection = value.length > 0;
+  const selectedInView = searchValue.trim()
+    ? targetOptions.filter((o) => value.includes(o.value)).length
+    : value.length;
+  const selectedItemClass =
+    "text-(--tone) data-[selected=true]:text-(--tone) dark:text-(--tone) dark:data-[selected=true]:text-(--tone)";
+
+  // 宽屏下拉与窄屏底部面板共用的列表：搜索、全选、选项、清除
+  const panel = (
+    <Command
+      className="min-h-0 flex-1"
+      filter={(itemValue, search) => {
+        if (!search) return 1;
+        const s = search.toLowerCase();
+        if (itemValue === "__select_all__") {
+          return stableOptions.some(
+            (o) =>
+              o.value.toLowerCase().includes(s) ||
+              o.label.toLowerCase().includes(s),
+          )
+            ? 1
+            : 0;
+        }
+        const option = stableOptions.find((o) => o.value === itemValue);
+        if (option) {
+          return option.value.toLowerCase().includes(s) ||
+            option.label.toLowerCase().includes(s)
+            ? 1
+            : 0;
+        }
+        return itemValue.toLowerCase().includes(s) ? 1 : 0;
+      }}
+    >
+      <CommandInput
+        placeholder={t("search")}
+        value={searchValue}
+        onValueChange={setSearchValue}
+      />
+      {/* flex-1 min-h-0 撑满剩余高度；max-h-none 去掉 command.tsx 的固定上限 */}
+      <CommandList id={contentId} className="min-h-0 max-h-none flex-1">
+        <CommandEmpty>{t("noMatch")}</CommandEmpty>
+        <CommandGroup>
+          {targetOptions.length > 0 && (
+            // 全选只是一行小字，右边是已选计数；选没选只看颜色，不画复选框。
+            // cmdk 默认高亮第一项，这一行不铺底，免得一打开就有一道灰条
+            <CommandItem
+              key="__select_all__"
+              value="__select_all__"
+              onSelect={toggleSelectAll}
+              className={cn(
+                "text-xs tracking-widest text-slate-400 data-[selected=true]:bg-transparent dark:text-slate-500 dark:data-[selected=true]:bg-transparent",
+                (isAllSelected || isIndeterminate) && selectedItemClass,
+              )}
+            >
+              <span className="truncate">{t("selectAll")}</span>
+              <span className="ml-auto tabular-nums">
+                {selectedInView}/{targetOptions.length}
+              </span>
+            </CommandItem>
+          )}
+          {stableOptions.map((option) => {
+            const isSelected = value.includes(option.value);
+            return (
+              <CommandItem
+                key={option.value}
+                value={option.value}
+                onSelect={() => toggleOption(option.value)}
+                className={cn(isSelected && selectedItemClass)}
+              >
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                <Check
+                  size={14}
+                  strokeWidth={2.25}
+                  aria-hidden
+                  className={cn("shrink-0", !isSelected && "invisible")}
+                />
+              </CommandItem>
+            );
+          })}
+        </CommandGroup>
+      </CommandList>
+      {hasSelection && (
+        <button
+          type="button"
+          onClick={() => {
+            onChange([]);
+            setOpen(false);
+          }}
+          className="h-10 shrink-0 border-t border-slate-200/70 text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 dark:border-slate-800 dark:text-slate-500 dark:hover:text-slate-200"
+        >
+          {t("clearAll")}
+        </button>
+      )}
+    </Command>
+  );
+
+  const trigger = (
+    <button
+      type="button"
+      role="combobox"
+      aria-expanded={open}
+      aria-controls={contentId}
+      disabled={disabled}
+      onClick={isDesktop ? undefined : () => handleOpenChange(!open)}
+      // 与站内输入框一致：只有一道底线，展开或悬停时换成强调色
+      className={cn(
+        "flex h-9 w-full items-center justify-between gap-2",
+        "border-0 border-b border-slate-300 bg-transparent px-0 dark:border-slate-700",
+        "text-sm text-slate-600 dark:text-slate-300",
+        "transition-colors duration-200 hover:border-(--tone) focus:outline-none focus-visible:border-(--tone)",
+        open && "border-(--tone)",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
+    >
+      <span
+        className={cn(
+          "flex-1 truncate text-left",
+          hasSelection
+            ? "text-slate-800 dark:text-slate-100"
+            : "text-slate-400 dark:text-slate-500",
+        )}
+      >
+        {displayText}
+      </span>
+      <span className="flex shrink-0 items-center gap-1">
+        {hasSelection && (
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label={t("clearAll")}
+            onClick={clearAll}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ")
+                clearAll(e as unknown as React.MouseEvent);
+            }}
+            className="flex h-5 w-5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+          >
+            <X size={12} />
+          </span>
+        )}
+        <ChevronDown
+          size={14}
+          className={cn(
+            "text-slate-400 transition-transform duration-200",
+            open && "rotate-180",
+          )}
+        />
+      </span>
+    </button>
+  );
+
+  // 窄屏：底部面板（DESIGN.md 浮层一节）。筛选栏吸顶且带 backdrop-filter，
+  // 会把里面的 fixed 元素困住，所以挂到 body 上
+  if (!isDesktop) {
+    return (
+      <>
+        {trigger}
+        {typeof document !== "undefined" &&
+          createPortal(
+            <AnimatePresence>
+              {open && (
+                <div className="md:hidden">
+                  <motion.div
+                    key="backdrop"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => handleOpenChange(false)}
+                    className="fixed inset-0 z-60 bg-slate-950/30 backdrop-blur-[2px]"
+                  />
+                  <motion.div
+                    key="sheet"
+                    role="dialog"
+                    aria-label={label}
+                    initial={{ y: "100%" }}
+                    animate={{ y: 0 }}
+                    exit={{ y: "100%" }}
+                    transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                    className="fixed inset-x-0 bottom-0 z-60 flex max-h-[75vh] flex-col rounded-t-2xl bg-[#FAFAFA] pb-[env(safe-area-inset-bottom)] shadow-[0_-20px_50px_-20px_rgba(15,23,42,0.35)] dark:bg-[#0B0F19]"
+                  >
+                    <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-2">
+                      <p className="font-serif text-xs tracking-[0.4em] text-(--tone)">
+                        {label}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenChange(false)}
+                        aria-label={t("close")}
+                        className="-mr-1 p-1 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    {panel}
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>,
+            document.body,
+          )}
+      </>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={contentId}
-          disabled={disabled}
-          className={cn(
-            "flex h-10 w-full items-center justify-between gap-2 rounded-lg",
-            "border border-slate-200 dark:border-slate-800",
-            "bg-white dark:bg-slate-900",
-            "px-3 text-sm",
-            "text-slate-600 dark:text-slate-300",
-            "transition-all duration-200",
-            "hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-900/10",
-            "focus:outline-none",
-            open && "border-blue-400 dark:border-blue-500",
-            hasSelection &&
-              !open &&
-              "border-blue-400/60 dark:border-blue-600/60",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            className,
-          )}
-        >
-          <span
-            className={cn(
-              "flex-1 truncate text-left",
-              !hasSelection && "text-slate-400 dark:text-slate-500",
-              hasSelection && "font-medium text-slate-700 dark:text-slate-200",
-            )}
-          >
-            {displayText}
-          </span>
-          <div className="flex shrink-0 items-center gap-1">
-            {hasSelection && (
-              <span
-                role="button"
-                tabIndex={0}
-                aria-label="清除筛选"
-                onClick={clearAll}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ")
-                    clearAll(e as unknown as React.MouseEvent);
-                }}
-                className="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300 transition-colors"
-              >
-                <X size={10} />
-              </span>
-            )}
-            <ChevronDown
-              size={14}
-              className={cn(
-                "text-slate-400 transition-transform duration-200",
-                open && "rotate-180",
-              )}
-            />
-          </div>
-        </button>
-      </PopoverTrigger>
-
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       {/*
-        max-height uses Radix's --radix-popover-content-available-height variable,
-        which reflects the actual remaining viewport space in the current placement
-        direction (above or below the trigger). This adapts automatically.
+        max-height 取 Radix 的 --radix-popover-content-available-height，
+        即当前方向（上或下）实际剩下的视口空间
       */}
       <PopoverContent
-        className="p-0 flex flex-col overflow-hidden"
+        className="flex flex-col overflow-hidden p-0"
         collisionPadding={8}
         onOpenAutoFocus={(e) => e.preventDefault()}
         style={{
           width: "var(--radix-popover-trigger-width)",
-          minWidth: "160px",
+          minWidth: "180px",
           maxHeight:
-            "calc(var(--radix-popover-content-available-height) - 8px)",
+            "min(420px, calc(var(--radix-popover-content-available-height) - 8px))",
         }}
       >
-        <Command
-          className="flex-1 min-h-0"
-          filter={(itemValue, search) => {
-            if (!search) return 1;
-            if (itemValue === "__select_all__") {
-              const s = search.toLowerCase();
-              return stableOptions.some(
-                (o) =>
-                  o.value.toLowerCase().includes(s) ||
-                  o.label.toLowerCase().includes(s),
-              )
-                ? 1
-                : 0;
-            }
-            const s = search.toLowerCase();
-            const option = stableOptions.find((o) => o.value === itemValue);
-            if (option) {
-              return option.value.toLowerCase().includes(s) ||
-                option.label.toLowerCase().includes(s)
-                ? 1
-                : 0;
-            }
-            return itemValue.toLowerCase().includes(s) ? 1 : 0;
-          }}
-        >
-          <CommandInput
-            placeholder="搜索…"
-            value={searchValue}
-            onValueChange={setSearchValue}
-          />
-          {/* flex-1 min-h-0 fills remaining height; max-h-none removes the fixed cap from command.tsx */}
-          <CommandList id={contentId} className="flex-1 min-h-0 max-h-none">
-            <CommandEmpty>无匹配结果</CommandEmpty>
-            <CommandGroup>
-              {targetOptions.length > 0 && (
-                <CommandItem
-                  key="__select_all__"
-                  value="__select_all__"
-                  onSelect={toggleSelectAll}
-                  className={cn(
-                    "flex items-center gap-2 font-medium cursor-pointer border-b border-slate-100 dark:border-slate-800 mb-1 pb-2 rounded-b-none",
-                    isAllSelected &&
-                      "bg-blue-50/60 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
-                    isIndeterminate &&
-                      "text-blue-700 dark:text-blue-300 font-medium",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                      isAllSelected || isIndeterminate
-                        ? "border-blue-500 bg-blue-500 text-white"
-                        : "border-slate-300 dark:border-slate-600 bg-transparent",
-                    )}
-                  >
-                    {isAllSelected && <Check size={10} strokeWidth={3} />}
-                    {isIndeterminate && <Minus size={10} strokeWidth={3} />}
-                  </div>
-                  <span className="truncate">{selectAllLabel}</span>
-                  <span className="ml-auto text-xs text-slate-400 font-normal">
-                    {searchValue.trim()
-                      ? `${targetOptions.filter((o) => value.includes(o.value)).length}/${targetOptions.length}`
-                      : `${value.length}/${options.length}`}
-                  </span>
-                </CommandItem>
-              )}
-              {stableOptions.map((option) => {
-                const isSelected = value.includes(option.value);
-                return (
-                  <CommandItem
-                    key={option.value}
-                    value={option.value}
-                    onSelect={() => toggleOption(option.value)}
-                    className={cn(
-                      isSelected &&
-                        "bg-blue-50/60 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                        isSelected
-                          ? "border-blue-500 bg-blue-500 text-white"
-                          : "border-slate-300 dark:border-slate-600 bg-transparent",
-                      )}
-                    >
-                      {isSelected && <Check size={10} strokeWidth={3} />}
-                    </div>
-                    <span className="truncate">{option.label}</span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-          {hasSelection && (
-            <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  onChange([]);
-                  setOpen(false);
-                }}
-                className="w-full rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center"
-              >
-                清除筛选
-              </button>
-            </div>
-          )}
-        </Command>
+        {panel}
       </PopoverContent>
     </Popover>
   );

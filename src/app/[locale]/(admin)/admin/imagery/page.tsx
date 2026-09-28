@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAdminPageSession } from "@/lib/server/server-auth";
+import { loginPathFor } from "@/lib/utils/safe-next";
 import { getImageryCategories } from "@/lib/server/service-imagery";
 import ImageryAdminClient from "@/components/admin/ImageryAdminClient";
 import type { Metadata } from "next";
@@ -21,7 +22,7 @@ export default async function ImageryAdminPage({ params }: Props) {
   // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
   const adminSession = await getAdminPageSession();
   if (!adminSession) {
-    redirect(`/${locale}/login`);
+    redirect(`/${locale}${loginPathFor("/admin/imagery")}`);
   }
 
   const categories = await getImageryCategories().catch(() => []);

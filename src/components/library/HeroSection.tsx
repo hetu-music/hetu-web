@@ -96,9 +96,13 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
         </h2>
 
         <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 mt-auto -mb-1 lg:-mb-1.5 min-h-6">
-          <span className="text-blue-600 dark:text-blue-500 font-mono text-lg leading-none relative top-[-0.5px] md:-top-0.5 select-none">
+          <span
+            aria-hidden
+            className="text-(--tone) font-mono text-lg leading-none relative top-[-0.5px] md:-top-0.5 select-none"
+          >
             &gt;
           </span>
+
           <AnimatePresence mode="wait">
             <motion.p
               key={hoveredId || "default"}

@@ -34,14 +34,18 @@
 }
 
 /* 颜色：保留在 :root / .dark，支持运行时主题切换 */
+/* --tone 全站默认墨蓝（与 utils-tone 的 INK_TONE 同值）。页面可在根容器上覆盖，
+   如歌曲页用封面取色；播放器、浮层这类挂在页面之外的组件就用这个默认值 */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --tone: hsl(224 38% 36%);
 }
 
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --tone: hsl(224 48% 72%);
 }
 
 /* ── 3. 基础样式 ─────────────────────────────────────────────────────────────── */
@@ -108,6 +112,12 @@
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* 下拉列表里的细滚动条，不要系统自带的粗条和箭头 */
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.4) transparent;
 }
 
 @utility mask-linear-fade-edges {
@@ -311,5 +321,41 @@
 
   to {
     opacity: 1;
+  }
+}
+
+/* 加载屏：一小段强调色沿细线从左划到右，同歌曲页顶栏的阅读进度 */
+@keyframes folio-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+.folio-sweep-anim {
+  animation: folio-sweep 1.6s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+
+/* 登录页封面墙：每列封面重复两遍，平移半个自身高度即可无缝循环 */
+@keyframes cover-drift-up {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes cover-drift-down {
+  from {
+    transform: translateY(-50%);
+  }
+
+  to {
+    transform: translateY(0);
   }
 }

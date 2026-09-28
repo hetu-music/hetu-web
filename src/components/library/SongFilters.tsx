@@ -1,5 +1,6 @@
 import React from "react";
 import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
+import { FIELD_LABEL_CLASS } from "@/components/shared/form-field";
 import CustomSelect from "./CustomSelect";
 import { Slider } from "@/components/ui/slider";
 import { useTranslations } from "next-intl";
@@ -29,47 +30,23 @@ interface SongFiltersProps {
   };
 }
 
-const YearRangeSlider = ({
-  range,
-  setRange,
-  values,
+/** 一个筛选项：上面字段标签，下面控件 */
+function Field({
+  label,
+  className,
+  children,
 }: {
-  range: [number, number];
-  setRange: (range: [number, number]) => void;
-  values: (string | number)[];
-}) => {
-  const maxIndex = values.length - 1;
-
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="px-1 py-1 select-none">
-      {/* Selected range labels */}
-      <div className="flex justify-between mb-3">
-        <span className="text-xs font-mono font-semibold text-blue-500 dark:text-blue-400">
-          {values[range[0]]}
-        </span>
-        <span className="text-xs font-mono font-semibold text-blue-500 dark:text-blue-400">
-          {values[range[1]]}
-        </span>
-      </div>
-
-      <Slider
-        min={0}
-        max={maxIndex}
-        step={1}
-        value={[range[0], range[1]]}
-        onValueChange={(v) => setRange([v[0], v[1]] as [number, number])}
-        minStepsBetweenThumbs={0}
-        aria-label="Year range"
-      />
-
-      {/* Boundary labels */}
-      <div className="flex justify-between mt-2 text-[10px] text-slate-400/60 font-mono">
-        <span>{values[0]}</span>
-        <span>{values[maxIndex]}</span>
-      </div>
+    <div className={className}>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
+      <div className="mt-2">{children}</div>
     </div>
   );
-};
+}
 
 const SongFilters: React.FC<SongFiltersProps> = ({
   yearRangeIndices,
@@ -91,115 +68,113 @@ const SongFilters: React.FC<SongFiltersProps> = ({
   const tEnum = useTranslations("enums");
   const tCommon = useTranslations("common");
 
-  // 共享样式常量
-  const labelStyle =
-    "text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest";
-
   const getGenreLabel = (genre: string) => {
     if (genre === FILTER_OPTION_UNKNOWN) return tCommon("unknown");
     return tEnum.has(`genre.${genre}`) ? tEnum(`genre.${genre}`) : genre;
   };
 
-  // If no years loaded yet, use dummy
-  const displayYears =
+  // 年份还没算出来时先给个占位区间
+  const years =
     sliderYears.length > 0
       ? sliderYears
       : [new Date().getFullYear(), FILTER_OPTION_UNKNOWN];
+  const [from, to] = yearRangeIndices;
+  const yearLabel = (i: number) => {
+    const v = years[i];
+    return v === FILTER_OPTION_UNKNOWN ? tCommon("unknown") : String(v);
+  };
+
+  const selects = [
+    {
+      key: "genre",
+      value: selectedGenre,
+      onChange: setSelectedGenre,
+      placeholder: t("allGenres"),
+      options: filterOptions.allGenres
+        .filter((v) => v !== FILTER_OPTION_ALL)
+        .map((v) => ({ value: v, label: getGenreLabel(v) })),
+    },
+    {
+      key: "artist",
+      value: selectedArtist,
+      onChange: setSelectedArtist,
+      placeholder: t("allArtists"),
+      options: filterOptions.allArtists
+        .filter((v) => v !== FILTER_OPTION_ALL)
+        .map((v) => ({ value: v, label: v })),
+    },
+    {
+      key: "lyricist",
+      value: selectedLyricist,
+      onChange: setSelectedLyricist,
+      placeholder: t("allLyricists"),
+      options: filterOptions.allLyricists
+        .filter((v) => v !== FILTER_OPTION_ALL)
+        .map((v) => ({ value: v, label: v })),
+    },
+    {
+      key: "composer",
+      value: selectedComposer,
+      onChange: setSelectedComposer,
+      placeholder: t("allComposers"),
+      options: filterOptions.allComposers
+        .filter((v) => v !== FILTER_OPTION_ALL)
+        .map((v) => ({ value: v, label: v })),
+    },
+    {
+      key: "arranger",
+      value: selectedArranger,
+      onChange: setSelectedArranger,
+      placeholder: t("allArrangers"),
+      options: filterOptions.allArrangers
+        .filter((v) => v !== FILTER_OPTION_ALL)
+        .map((v) => ({ value: v, label: v })),
+    },
+  ];
 
   return (
-    <div className="w-full flex flex-col gap-4 p-1">
-      {/* Top Row: Year Slider */}
-      <div className="w-full bg-white/30 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800/50 rounded-xl p-3">
-        <div className={`${labelStyle} mb-1`}>{t("yearRange")}</div>
-        <YearRangeSlider
-          range={yearRangeIndices}
-          setRange={setYearRangeIndices}
-          values={displayYears}
-        />
-      </div>
-
-      {/* Bottom Row: Other Filters */}
-      <div className="w-full bg-white/30 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800/50 rounded-xl p-3">
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {/* Genre Filter */}
-          <div className="flex flex-col gap-1">
-            <label className={`${labelStyle} ml-1`}>{t("genre")}</label>
-            <CustomSelect
-              value={selectedGenre}
-              onChange={setSelectedGenre}
-              placeholder={t("allGenres")}
-              selectAllLabel={t("selectAll")}
-              allSelectedLabel={t("allSelected")}
-              options={filterOptions.allGenres
-                .filter((genre) => genre !== FILTER_OPTION_ALL)
-                .map((genre) => ({
-                  value: genre,
-                  label: getGenreLabel(genre),
-                }))}
-            />
-          </div>
-
-          {/* Artist Filter */}
-          <div className="flex flex-col gap-1">
-            <label className={`${labelStyle} ml-1`}>{t("artist")}</label>
-            <CustomSelect
-              value={selectedArtist}
-              onChange={setSelectedArtist}
-              placeholder={t("allArtists")}
-              selectAllLabel={t("selectAll")}
-              allSelectedLabel={t("allSelected")}
-              options={filterOptions.allArtists
-                .filter((artist) => artist !== FILTER_OPTION_ALL)
-                .map((artist) => ({ value: artist, label: artist }))}
-            />
-          </div>
-
-          {/* Lyricist Filter */}
-          <div className="flex flex-col gap-1">
-            <label className={`${labelStyle} ml-1`}>{t("lyricist")}</label>
-            <CustomSelect
-              value={selectedLyricist}
-              onChange={setSelectedLyricist}
-              placeholder={t("allLyricists")}
-              selectAllLabel={t("selectAll")}
-              allSelectedLabel={t("allSelected")}
-              options={filterOptions.allLyricists
-                .filter((lyricist) => lyricist !== FILTER_OPTION_ALL)
-                .map((lyricist) => ({ value: lyricist, label: lyricist }))}
-            />
-          </div>
-
-          {/* Composer Filter */}
-          <div className="flex flex-col gap-1">
-            <label className={`${labelStyle} ml-1`}>{t("composer")}</label>
-            <CustomSelect
-              value={selectedComposer}
-              onChange={setSelectedComposer}
-              placeholder={t("allComposers")}
-              selectAllLabel={t("selectAll")}
-              allSelectedLabel={t("allSelected")}
-              options={filterOptions.allComposers
-                .filter((composer) => composer !== FILTER_OPTION_ALL)
-                .map((composer) => ({ value: composer, label: composer }))}
-            />
-          </div>
-
-          {/* Arranger Filter */}
-          <div className="flex flex-col gap-1">
-            <label className={`${labelStyle} ml-1`}>{t("arranger")}</label>
-            <CustomSelect
-              value={selectedArranger}
-              onChange={setSelectedArranger}
-              placeholder={t("allArrangers")}
-              selectAllLabel={t("selectAll")}
-              allSelectedLabel={t("allSelected")}
-              options={filterOptions.allArrangers
-                .filter((arranger) => arranger !== FILTER_OPTION_ALL)
-                .map((arranger) => ({ value: arranger, label: arranger }))}
-            />
-          </div>
+    // 不用卡片。年份滑轨单独一行：宽屏「标签 — 滑轨 — 区间」排成一行，
+    // 窄屏标签与区间在上、滑轨在下。下面五个下拉框：宽屏一行五个；
+    // 窄屏两列，流派独占一行，演唱、作词、作曲、编曲排成两行两列
+    <div className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-5">
+      <div className="col-span-full grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 lg:grid-cols-[auto_1fr_auto]">
+        <span className={FIELD_LABEL_CLASS}>{t("yearRange")}</span>
+        {/* 区间文字定宽右对齐，拖动时滑轨长度不跟着变 */}
+        <span className="text-right text-xs tabular-nums tracking-wider text-slate-700 dark:text-slate-300 lg:order-last lg:min-w-28">
+          {from === to
+            ? yearLabel(from)
+            : `${yearLabel(from)} — ${yearLabel(to)}`}
+        </span>
+        <div className="col-span-2 flex h-5 items-center lg:col-span-1">
+          <Slider
+            min={0}
+            max={years.length - 1}
+            step={1}
+            value={[from, to]}
+            onValueChange={(v) =>
+              setYearRangeIndices([v[0], v[1]] as [number, number])
+            }
+            minStepsBetweenThumbs={0}
+            aria-label={t("yearRange")}
+          />
         </div>
       </div>
+
+      {selects.map((s) => (
+        <Field
+          key={s.key}
+          label={t(s.key)}
+          className={s.key === "genre" ? "col-span-2 lg:col-span-1" : undefined}
+        >
+          <CustomSelect
+            value={s.value}
+            onChange={s.onChange}
+            label={t(s.key)}
+            placeholder={s.placeholder}
+            options={s.options}
+          />
+        </Field>
+      ))}
     </div>
   );
 };

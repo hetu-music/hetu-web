@@ -65,7 +65,7 @@ const AppNavbar = forwardRef<HTMLElement, AppNavbarProps>(function AppNavbar(
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
         <button
           onClick={onTitleClick}
-          className="flex cursor-pointer items-center gap-1 text-2xl font-bold tracking-tight text-slate-900 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-400 font-serif"
+          className="flex cursor-pointer items-center gap-1 text-2xl font-bold tracking-tight text-slate-900 transition-colors hover:text-(--tone) dark:text-white dark:hover:text-(--tone) font-serif"
           title={titleTooltip}
         >
           {title}
@@ -74,7 +74,7 @@ const AppNavbar = forwardRef<HTMLElement, AppNavbarProps>(function AppNavbar(
           {onAboutClick && (
             <button
               onClick={onAboutClick}
-              className="rounded-full p-2 text-slate-600 transition-colors hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800"
+              className={NAV_BUTTON_CLASS}
               title="关于"
             >
               <Info size={20} />
@@ -82,14 +82,14 @@ const AppNavbar = forwardRef<HTMLElement, AppNavbarProps>(function AppNavbar(
           )}
           <button
             onClick={openUserPanel}
-            className="relative rounded-full p-2 text-slate-600 transition-colors hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-wait"
+            className={cn(
+              NAV_BUTTON_CLASS,
+              "disabled:opacity-50 disabled:cursor-wait",
+            )}
             title={!loaded ? "加载中…" : user ? user.name : "登录"}
             disabled={!loaded}
           >
-            <User
-              size={20}
-              className={user ? "text-blue-500 dark:text-blue-400" : ""}
-            />
+            <User size={20} className={user ? "text-(--tone)" : ""} />
           </button>
 
           {/* PC端平铺 分享、安装、语言 和 主题切换 */}

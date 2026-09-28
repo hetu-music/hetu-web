@@ -35,12 +35,12 @@
     "noResultsHint": "請嘗試其他關鍵詞或清除篩選條件"
   },
   "listHeader": {
-    "cover": "Cover",
-    "title": "Title / Lyricist / Composer",
-    "type": "Type",
-    "genre": "Genre",
-    "year": "Year",
-    "time": "Time"
+    "cover": "封面",
+    "title": "歌名 / 作詞 / 作曲",
+    "type": "類型",
+    "genre": "流派",
+    "year": "年份",
+    "time": "時長"
   },
   "filter": {
     "type": "類型",
@@ -59,7 +59,11 @@
     "allArtists": "全部演唱",
     "allLyricists": "全部作詞",
     "allComposers": "全部作曲",
-    "allArrangers": "全部編曲"
+    "allArrangers": "全部編曲",
+    "search": "搜尋…",
+    "noMatch": "無相符結果",
+    "selectedCount": "已選 {count} 項",
+    "close": "收起"
   },
   "sort": {
     "label": "排序",

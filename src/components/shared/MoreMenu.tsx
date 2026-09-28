@@ -91,7 +91,7 @@ export default function MoreMenu({
           "w-9 h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer",
           "text-slate-600 dark:text-slate-400",
           isOpen
-            ? "bg-slate-200/60 dark:bg-slate-800 text-blue-600 dark:text-blue-400"
+            ? "bg-slate-200/60 dark:bg-slate-800 text-(--tone)"
             : "hover:bg-slate-200/50 dark:hover:bg-slate-800",
         )}
       >
@@ -132,7 +132,7 @@ export default function MoreMenu({
                 className={cn(
                   "flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 cursor-pointer",
                   resolvedTheme === "light"
-                    ? "bg-white text-blue-600 shadow-sm border border-slate-200/30"
+                    ? "bg-white text-(--tone) shadow-sm border border-slate-200/30"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
                 )}
               >
@@ -147,7 +147,7 @@ export default function MoreMenu({
                 className={cn(
                   "flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 cursor-pointer",
                   resolvedTheme === "dark"
-                    ? "bg-[#161B2C] text-blue-400 shadow-sm border border-slate-800/50"
+                    ? "bg-[#161B2C] text-(--tone) shadow-sm border border-slate-800/50"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
                 )}
               >

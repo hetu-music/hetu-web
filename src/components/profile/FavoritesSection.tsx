@@ -32,7 +32,7 @@ export default function FavoritesSection() {
           className={cn(
             TEXT_BUTTON_CLASS,
             clear.confirming &&
-            "text-rose-500 dark:text-rose-400 hover:text-rose-600",
+              "text-rose-500 dark:text-rose-400 hover:text-rose-600",
           )}
         >
           {clear.confirming

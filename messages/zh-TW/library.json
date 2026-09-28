@@ -59,7 +59,11 @@
     "allArtists": "全部演唱",
     "allLyricists": "全部作詞",
     "allComposers": "全部作曲",
-    "allArrangers": "全部編曲"
+    "allArrangers": "全部編曲",
+    "search": "搜尋…",
+    "noMatch": "無相符結果",
+    "selectedCount": "已選 {count} 項",
+    "close": "收起"
   },
   "sort": {
     "label": "排序",

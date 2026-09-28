@@ -139,7 +139,8 @@ const SongFilters: React.FC<SongFiltersProps> = ({
   ];
 
   return (
-    // 不用卡片：一行字段，年份占两格；窄屏两列
+    // 不用卡片：宽屏一行字段，年份占两格；窄屏两列，年份与流派各占一行，
+    // 演唱、作词、作曲、编曲四个人名字段排成两行两列
     <div className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-7">
       <Field
         label={t("yearRange")}
@@ -169,13 +170,16 @@ const SongFilters: React.FC<SongFiltersProps> = ({
       </Field>
 
       {selects.map((s) => (
-        <Field key={s.key} label={t(s.key)}>
+        <Field
+          key={s.key}
+          label={t(s.key)}
+          className={s.key === "genre" ? "col-span-2 lg:col-span-1" : undefined}
+        >
           <CustomSelect
             value={s.value}
             onChange={s.onChange}
+            label={t(s.key)}
             placeholder={s.placeholder}
-            selectAllLabel={t("selectAll")}
-            allSelectedLabel={t("allSelected")}
             options={s.options}
           />
         </Field>

@@ -114,6 +114,12 @@
   }
 }
 
+/* 下拉列表里的细滚动条，不要系统自带的粗条和箭头 */
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.4) transparent;
+}
+
 @utility mask-linear-fade-edges {
   mask-image: linear-gradient(
     to right,

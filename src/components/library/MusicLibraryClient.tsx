@@ -371,13 +371,14 @@ export default function MusicLibraryClient({
 
         {/* 曲目工具栏：吸顶，底下只有一道细线。标签、搜索、按钮都放在等高的
             一行里竖直居中，当前标签与聚焦的搜索框在细线上亮一段强调色。
-            窄屏分两行：上面搜索与按钮，下面类型标签 */}
+            窄屏分两行：上面搜索与按钮，下面类型标签，两行各有一道细线分开；
+            标签行右缘淡出，提示还能横向滑动 */}
         <section className="sticky top-20 z-40 -mx-6 mb-10 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95">
           <div className="flex flex-col-reverse border-b border-slate-200/70 dark:border-slate-800 md:h-12 md:flex-row md:gap-8">
             <div
               ref={containerRef}
               {...dragHandlers}
-              className="no-scrollbar flex h-12 min-w-0 cursor-grab gap-6 overflow-x-auto active:cursor-grabbing md:h-full"
+              className="no-scrollbar flex h-12 min-w-0 cursor-grab gap-6 overflow-x-auto mask-[linear-gradient(to_right,black_calc(100%-2rem),transparent)] active:cursor-grabbing md:h-full md:mask-none"
             >
               {filterOptions.allTypes.map((type) => {
                 if (type === FILTER_OPTION_ALL && isAnyFilterActive) {
@@ -426,9 +427,9 @@ export default function MusicLibraryClient({
               })}
             </div>
 
-            <div className="flex h-11 items-center gap-1 md:ml-auto md:h-full">
+            <div className="flex h-11 items-center gap-1 border-b border-slate-200/70 dark:border-slate-800 md:ml-auto md:h-full md:border-0">
               {/* 搜索：平时没有边框，只靠放大镜与占位字辨认；聚焦时细线上亮一段强调色 */}
-              <label className="group relative mr-2 flex h-full min-w-0 flex-1 items-center gap-2 md:w-60 md:flex-none">
+              <label className="group relative flex h-full min-w-0 flex-1 items-center gap-2 md:w-60 md:flex-none">
                 <Search size={15} className="shrink-0 text-slate-400" />
                 <input
                   type="text"
@@ -462,6 +463,12 @@ export default function MusicLibraryClient({
                   className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) opacity-0 transition-opacity group-focus-within:opacity-100"
                 />
               </label>
+
+              {/* 搜索与按钮之间一道竖线，分开「找」与「怎么看」 */}
+              <span
+                aria-hidden
+                className="mx-2 h-4 w-px shrink-0 bg-slate-200 dark:bg-slate-800"
+              />
 
               <button
                 type="button"

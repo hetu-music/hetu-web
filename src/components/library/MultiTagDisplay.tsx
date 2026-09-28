@@ -1,8 +1,11 @@
 import { useTranslations } from "next-intl";
 
+/** 超过这个数就只列前几个，余下的记作「+N」 */
+const MAX_SHOWN = 4;
+
 /**
- * 列表视图里的类型、流派：一行灰色小字，多个用「·」隔开，
- * 放不下就截断，悬停看全称。不再按类别上色、不做胶囊。
+ * 列表视图里的类型、流派：灰色小字，一个标签一段，放不下就整段换行，
+ * 不在字中间截断成省略号。不按类别上色、不做胶囊。
  */
 const MultiTagDisplay = ({
   tags,
@@ -12,22 +15,26 @@ const MultiTagDisplay = ({
   type: "type" | "genre";
 }) => {
   const tEnum = useTranslations("enums");
+  const tCommon = useTranslations("common");
 
-  const text =
+  const labels =
     tags && tags.length > 0
-      ? tags
-          .map((v) => (tEnum.has(`${type}.${v}`) ? tEnum(`${type}.${v}`) : v))
-          .join(" · ")
-      : type === "type"
-        ? "未知类型"
-        : "未知流派";
+      ? tags.map((v) => (tEnum.has(`${type}.${v}`) ? tEnum(`${type}.${v}`) : v))
+      : [tCommon("unknown")];
+  const shown = labels.slice(0, MAX_SHOWN);
+  const rest = labels.length - shown.length;
 
   return (
     <span
-      title={text}
-      className="w-24 truncate text-center text-xs tracking-wider text-slate-400 dark:text-slate-500"
+      title={labels.join(" · ")}
+      className="flex w-24 flex-wrap justify-center gap-x-2 gap-y-0.5 text-xs leading-5 tracking-wider text-slate-400 dark:text-slate-500"
     >
-      {text}
+      {shown.map((label) => (
+        <span key={label} className="whitespace-nowrap">
+          {label}
+        </span>
+      ))}
+      {rest > 0 && <span className="tabular-nums">+{rest}</span>}
     </span>
   );
 };

@@ -12,7 +12,7 @@ const Command = React.forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100",
+      "flex h-full w-full flex-col overflow-hidden bg-transparent text-slate-900 dark:text-slate-100",
       className,
     )}
     {...props}
@@ -24,7 +24,7 @@ const CommandInput = React.forwardRef<
   React.ComponentRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
+  <div className="flex h-11 shrink-0 items-center gap-2 border-b border-slate-200/70 px-4 dark:border-slate-800">
     <Search className="shrink-0 text-slate-400" size={14} />
     <CommandPrimitive.Input
       ref={ref}
@@ -45,7 +45,7 @@ const CommandList = React.forwardRef<
   <CommandPrimitive.List
     ref={ref}
     className={cn(
-      "max-h-[360px] overflow-y-auto overflow-x-hidden p-1",
+      "thin-scrollbar max-h-[360px] overflow-y-auto overflow-x-hidden py-1",
       className,
     )}
     {...props}
@@ -59,7 +59,7 @@ const CommandEmpty = React.forwardRef<
 >((props, ref) => (
   <CommandPrimitive.Empty
     ref={ref}
-    className="py-6 text-center text-xs text-slate-400"
+    className="py-8 text-center font-kaiti text-sm text-slate-400 dark:text-slate-500"
     {...props}
   />
 ));
@@ -87,8 +87,8 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none transition-colors",
-      "data-[selected=true]:bg-slate-200/50 dark:data-[selected=true]:bg-slate-800/60",
+      "relative flex cursor-pointer select-none items-center gap-3 px-4 py-2 text-sm text-slate-600 dark:text-slate-300 outline-none transition-colors",
+      "data-[selected=true]:bg-slate-900/[0.03] data-[selected=true]:text-slate-900 dark:data-[selected=true]:bg-white/[0.04] dark:data-[selected=true]:text-slate-100",
       "data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
       className,
     )}

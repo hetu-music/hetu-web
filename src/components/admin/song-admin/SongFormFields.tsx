@@ -155,7 +155,7 @@ export default function SongFormField({
                 onChange={(e) => controllerField.onChange(e.target.value)}
                 className={baseClass}
                 rows={4}
-                placeholder={`请输入${field.label}`}
+                placeholder={field.placeholder ?? `请输入${field.label}`}
               />
               <FieldErrorMessage className="mt-1" message={errorMessage} />
             </>

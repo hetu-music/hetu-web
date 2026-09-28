@@ -45,14 +45,15 @@ const loadQuizPool = unstable_cache(
         TABLES.IMAGERY,
         "id,name",
       ),
+      // 候选池只取计入曲库的歌
       fetchAll<PoolRows["occurrences"][number]>(
         supabase,
-        TABLES.IMAGERY_OCC,
+        TABLES.IMAGERY_OCC_CATALOG,
         "song_id,category_id,imagery_id,lyric_timetag",
       ),
       fetchAll<PoolRows["songs"][number]>(
         supabase,
-        TABLES.MUSIC,
+        TABLES.MUSIC_CATALOG,
         "id,title,artist,album,hascover,has_audio,type",
       ),
     ]);

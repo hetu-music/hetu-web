@@ -535,6 +535,13 @@ export function mapAndSortSongs(data: SongDetail[]): SongDetail[] {
   });
 }
 
+/** 曲库计数：资料有争议的歌照常展示，但不计入收录总数 */
+export function countCatalogSongs(
+  songs: readonly Pick<Song, "dispute_note">[],
+): number {
+  return songs.filter((s) => !s.dispute_note).length;
+}
+
 export function getCoverUrl(song: Pick<Song, "id" | "hascover">): string {
   if (song.hascover === true) {
     return `https://cover.hetu-music.com/cover/${song.id}.jpg`;

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import Fuse from "fuse.js";
 import {
   calculateFilterOptions,
+  countCatalogSongs,
   decodeFilterParam,
   encodeFilterParam,
   filterSongs,
@@ -28,6 +29,21 @@ function makeSong(overrides: Partial<Song> & { id: number }): Song {
     ...overrides,
   };
 }
+
+describe("countCatalogSongs", () => {
+  it("资料有争议的歌不计入总数", () => {
+    const songs = [
+      makeSong({ id: 1 }),
+      makeSong({ id: 2, dispute_note: "作曲署名有两种说法" }),
+      makeSong({ id: 3, dispute_note: null }),
+    ];
+    expect(countCatalogSongs(songs)).toBe(2);
+  });
+
+  it("空字符串视为无争议", () => {
+    expect(countCatalogSongs([makeSong({ id: 1, dispute_note: "" })])).toBe(1);
+  });
+});
 
 describe("mapAndSortSongs", () => {
   it("按 date 降序排序，且从 date 计算 year", () => {

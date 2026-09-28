@@ -15,7 +15,9 @@
     "discNumber": "碟號",
     "genre": "流派",
     "type": "類型",
-    "single": "單曲"
+    "single": "單曲",
+    "disputed": "存疑",
+    "disputedHint": "資料存疑，不計入收錄總數"
   },
   "trackFormat": {
     "trackOnly": "第{track}首",
@@ -90,6 +92,7 @@
     },
     "production": "參與製作",
     "listen": "收聽",
+    "dispute": "資料存疑",
     "shared": "共有",
     "readMode": {
       "poem": "正文",

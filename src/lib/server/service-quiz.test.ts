@@ -95,23 +95,16 @@ function makeRows(): Rows {
 }
 
 /**
- * 按表名分发查询；music 表同时承担候选池与歌词两种查询，按 select 字段区分。
+ * 按表名分发查询：候选池读曲库视图，歌词按 id 读 music 表。
  */
 function mockClient(rows: Rows, lyricsResult?: MockResult) {
   const ok = (data: unknown): MockResult => ({ data, error: null });
   const byTable: Record<string, () => unknown> = {
     [TABLES.IMAGERY_CAT]: () => makeQueryBuilder(ok(rows.categories)),
     [TABLES.IMAGERY]: () => makeQueryBuilder(ok(rows.imagery)),
-    [TABLES.IMAGERY_OCC]: () => makeQueryBuilder(ok(rows.occurrences)),
-    [TABLES.MUSIC]: () => ({
-      select: vi.fn((fields: string) =>
-        makeQueryBuilder(
-          fields.includes("lyrics")
-            ? (lyricsResult ?? ok(rows.lyrics))
-            : ok(rows.songs),
-        ),
-      ),
-    }),
+    [TABLES.IMAGERY_OCC_CATALOG]: () => makeQueryBuilder(ok(rows.occurrences)),
+    [TABLES.MUSIC_CATALOG]: () => makeQueryBuilder(ok(rows.songs)),
+    [TABLES.MUSIC]: () => makeQueryBuilder(lyricsResult ?? ok(rows.lyrics)),
   };
   const from = vi.fn((table: string) => byTable[table]());
   vi.mocked(getServiceClient).mockReturnValue({ from } as unknown as ReturnType<

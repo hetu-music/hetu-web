@@ -65,9 +65,11 @@ const loadImageryIndex = unstable_cache(
         TABLES.IMAGERY_OCC,
         "song_id,imagery_id,category_id,lyric_timetag",
       ),
+      // 出处取全部歌曲（存疑的歌自己的详情页也要标意象），
+      // 歌曲只取计入曲库的：作品数统计与相关作品都以它为范围
       fetchAll<ImageryIndex["songs"][number]>(
         supabase,
-        TABLES.MUSIC,
+        TABLES.MUSIC_CATALOG,
         "id,title,artist,hascover",
       ),
     ]);
@@ -155,7 +157,8 @@ export async function getSongImagery(
   const marks = [...byImagery.values()].filter((m) => m.name);
 
   // ── 相关作品：以 IDF 加权的意象集合余弦相似度，少见的共同意象更能说明气质相近 ──
-  const own = imageryBySong.get(songId);
+  // 不从 imageryBySong 取：存疑的歌不在曲库范围内，但它的详情页照样推荐相关作品
+  const own = new Set(byImagery.keys());
   const related: RelatedSong[] = [];
   if (own && own.size > 0) {
     const n = imageryBySong.size;

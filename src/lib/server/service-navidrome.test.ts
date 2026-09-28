@@ -18,9 +18,11 @@ vi.mock("@/lib/server/server-utils", () => ({
   ),
 }));
 
-vi.mock("@/lib/db/supabase-server", () => ({
-  getServiceClient: vi.fn(),
-}));
+vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/db/supabase-server")>();
+  return { ...actual, getServiceClient: vi.fn() };
+});
 
 vi.mock("@/lib/navidrome/client", async (importOriginal) => {
   const actual =

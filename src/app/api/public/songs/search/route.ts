@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/server/server-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { toSimplified } from "@/lib/utils/utils-convert";
 
 /**
  * GET /api/public/songs/search?q=关键词&limit=10
@@ -10,7 +11,8 @@ import { serverErrorResponse } from "@/lib/server/server-utils";
  */
 export const GET = withAuth(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get("q")?.trim() ?? "";
+  // 标题以简体存储，繁体输入先转简体，否则「夢」搜不到「梦」
+  const q = toSimplified(searchParams.get("q")?.trim() ?? "");
   const limit = Math.min(
     20,
     Math.max(1, parseInt(searchParams.get("limit") ?? "10", 10)),

@@ -4,6 +4,7 @@ import { CommentsProvider } from "@/components/detail/comments/CommentsContext";
 import CommentSheet from "@/components/detail/comments/CommentSheet";
 import CommentsSection from "@/components/detail/comments/CommentsSection";
 import CreatorNotes from "@/components/detail/CreatorNotes";
+import DisputeNotice from "@/components/detail/DisputeNotice";
 import ImageryCaption from "@/components/detail/ImageryCaption";
 import LyricsFolio from "@/components/detail/LyricsFolio";
 import RelatedWorks from "@/components/detail/RelatedWorks";
@@ -372,6 +373,8 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         onSheetOpen={closeCaption}
       >
         <main className="relative pt-32 md:pt-40 pb-32 max-w-6xl mx-auto px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {song.dispute_note && <DisputeNotice note={song.dispute_note} />}
+
           <SongHero
             song={song}
             titleRef={titleRef}

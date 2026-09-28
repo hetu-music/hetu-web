@@ -15,16 +15,17 @@ export type Song = {
   type?: string[] | null;
   updated_at: string;
   has_audio?: boolean;
+  /** 资料争议说明；留空表示无争议。有争议的歌不计入曲库总数 */
+  dispute_note?: string | null;
   collectionInfo?: {
     created_at: string;
-    snippet: string | null;
   };
 };
 
 // Song 类型的数据库字段列表（用于 Supabase 查询）
 // 注意：year 不是数据库字段，而是从 date 计算得出的，所以不包含在内
 export const SONG_LIST_VIEW_FIELDS = [
-  "id,title,album,genre,lyricist,composer,arranger,artist,length,hascover,date,type,has_audio",
+  "id,title,album,genre,lyricist,composer,arranger,artist,length,hascover,date,type,has_audio,dispute_note",
 ] as const;
 
 // 详细歌曲类型（包含更多字段）
@@ -207,6 +208,7 @@ export type SongFormFieldKey =
   | "date"
   | "albumartist"
   | "comment"
+  | "dispute_note"
   | "lyrics"
   | "lyrics_start"
   | "nmn_status"

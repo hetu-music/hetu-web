@@ -29,6 +29,14 @@ export const songFields: SongFieldConfig[] = [
   { key: "date", label: "日期", type: "date", maxLength: 30 },
   { key: "albumartist", label: "出品发行", type: "array", arrayMaxLength: 30 },
   { key: "comment", label: "备注", type: "textarea", maxLength: 10000 },
+  {
+    key: "dispute_note",
+    label: "资料争议",
+    type: "textarea",
+    maxLength: 2000,
+    placeholder:
+      "留空表示无争议；有争议时写明哪项、有哪几种说法、各自出处，会展示在详情页",
+  },
   { key: "lyrics", label: "LRC歌词", type: "textarea", maxLength: 10000 },
   {
     key: "lyrics_start",

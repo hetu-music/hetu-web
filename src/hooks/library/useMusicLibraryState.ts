@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   parseAsArrayOf,
   parseAsBoolean,
@@ -146,10 +152,16 @@ export function useMusicLibraryState(
     return start <= end ? [start, end] : [end, start];
   }, [getMaxYearIndex, yearEnd, yearStart]);
 
-  const [isRestoringScroll, setIsRestoringScroll] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return sessionStorage.getItem(STORAGE_KEY) !== null;
-  });
+  // 初始值必须与服务端一致，不能在初始化时读 sessionStorage，否则 hydration 不匹配，
+  // 而 React 不会修补不匹配的属性，隐藏就不生效。改为挂载后、绘制前再读。
+  const [isRestoringScroll, setIsRestoringScroll] = useState(false);
+
+  useLayoutEffect(() => {
+    if (sessionStorage.getItem(STORAGE_KEY) !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsRestoringScroll(true);
+    }
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {

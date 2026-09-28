@@ -3,6 +3,7 @@ import AdminClientComponent from "@/components/admin/AdminClient";
 import { getSongs } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
 import { getAdminPageSession } from "@/lib/server/server-auth";
+import { loginPathFor } from "@/lib/utils/safe-next";
 import type { Song } from "@/lib/types";
 
 // 强制动态渲染，不在构建时预渲染
@@ -18,7 +19,7 @@ export default async function AdminPage({ params }: Props) {
   // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
   const adminSession = await getAdminPageSession();
   if (!adminSession) {
-    redirect(`/${locale}/login`);
+    redirect(`/${locale}${loginPathFor("/admin")}`);
   }
 
   let songs: Song[] = [];

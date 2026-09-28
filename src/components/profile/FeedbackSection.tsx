@@ -5,7 +5,7 @@ import {
   FIELD_CLASS,
   FIELD_LABEL_CLASS,
   TEXTAREA_CLASS,
-} from "@/components/profile/profile-ui";
+} from "@/components/shared/form-field";
 import {
   PRIMARY_BUTTON_CLASS,
   TEXT_BUTTON_CLASS,

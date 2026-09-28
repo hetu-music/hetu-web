@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { isProfileTab } from "@/components/profile/profile-ui";
 import { getPageUser } from "@/lib/server/server-auth";
+import { loginPathFor } from "@/lib/utils/safe-next";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       tabValue && isProfileTab(tabValue)
         ? `/profile?tab=${tabValue}`
         : "/profile";
-    redirect(`/${locale}/login?next=${encodeURIComponent(back)}`);
+    redirect(`/${locale}${loginPathFor(back)}`);
   }
 
   return (

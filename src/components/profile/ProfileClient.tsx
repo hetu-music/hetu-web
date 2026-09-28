@@ -6,26 +6,18 @@ import FavoritesSection from "@/components/profile/FavoritesSection";
 import FeedbackSection from "@/components/profile/FeedbackSection";
 import ProfileHero from "@/components/profile/ProfileHero";
 import { PROFILE_TABS, type ProfileTab } from "@/components/profile/profile-ui";
-import { InstallButton } from "@/components/pwa/useInstallAction";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
-import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
-import MoreMenu, { type MoreMenuAction } from "@/components/shared/MoreMenu";
-import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
-import ThemeToggle from "@/components/shared/ThemeToggle";
+import PageTopBar from "@/components/shared/PageTopBar";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
-import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/utils";
 import { INK_TONE } from "@/lib/utils/utils-tone";
-import { ArrowLeft, Home } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 
 /** 个人中心：左栏卷首与目录，右栏为当前一节 */
 export default function ProfileClient() {
-  const router = useRouter();
   const t = useTranslations("profile");
-  const tNav = useTranslations("common.nav");
   const { showScrollTop, scrollToTop } = useScrollTop();
   const [activeTab, setActiveTab] = useQueryState(
     "tab",
@@ -46,25 +38,6 @@ export default function ProfileClient() {
     };
   }, []);
 
-  const handleBack = useCallback(() => {
-    const navDepth = parseInt(
-      sessionStorage.getItem("__hetu_web_nav_depth") || "0",
-      10,
-    );
-    if (navDepth > 0) {
-      sessionStorage.setItem("__hetu_web_nav_depth", String(navDepth - 1));
-      router.back();
-    } else {
-      router.push("/");
-    }
-  }, [router]);
-
-  const goHome = useCallback(() => router.push("/"), [router]);
-  const moreActions = useMemo<MoreMenuAction[]>(
-    () => [{ key: "home", icon: Home, label: tNav("home"), onClick: goHome }],
-    [tNav, goHome],
-  );
-
   return (
     <div
       className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
@@ -75,52 +48,7 @@ export default function ProfileClient() {
         } as React.CSSProperties
       }
     >
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#FAFAFA]/80 dark:bg-[#0B0F19]/80 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1 sm:gap-3 min-w-0">
-            <div className="flex items-center gap-1 -ml-2 shrink-0">
-              <button
-                onClick={handleBack}
-                className={cn(NAV_BUTTON_CLASS, "group")}
-                title={tNav("back")}
-              >
-                <ArrowLeft
-                  size={20}
-                  className="transition-transform group-hover:-translate-x-0.5"
-                />
-              </button>
-
-              {/* 窄屏放不下，回主页收进「更多」 */}
-              <div className="hidden md:block w-px h-4 bg-slate-300 dark:bg-slate-700 mx-0.5" />
-              <button
-                onClick={goHome}
-                className={cn(NAV_BUTTON_CLASS, "group hidden md:inline-flex")}
-                title={tNav("home")}
-              >
-                <Home
-                  size={20}
-                  className="transition-transform group-hover:scale-105 group-active:scale-95"
-                />
-              </button>
-            </div>
-
-            <h1 className="px-2 min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
-              {t("title")}
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
-            <div className="hidden md:flex items-center gap-2">
-              <InstallButton className={NAV_BUTTON_CLASS} />
-              <LocaleSwitcher />
-              <ThemeToggle />
-            </div>
-            <div className="flex md:hidden relative">
-              <MoreMenu actions={moreActions} />
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PageTopBar title={t("title")} />
 
       <main className="relative pt-32 md:pt-40 pb-32 max-w-6xl mx-auto px-6">
         <div className="grid gap-y-14 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-x-16">

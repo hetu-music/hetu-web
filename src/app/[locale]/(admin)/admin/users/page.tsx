@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import AdminPanelClient from "@/components/admin/AdminPanelClient";
 import { getAdminPageSession } from "@/lib/server/server-auth";
+import { loginPathFor } from "@/lib/utils/safe-next";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function UsersAdminPage({ params }: Props) {
   // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
   const adminSession = await getAdminPageSession();
   if (!adminSession) {
-    redirect(`/${locale}/login`);
+    redirect(`/${locale}${loginPathFor("/admin/users")}`);
   }
   // 仅超级管理员可用；对应 API 同样以 requireSuperAdmin 校验
   if (adminSession.user.app_metadata?.is_super !== true) {

@@ -6,7 +6,7 @@ import {
   FIELD_ERROR_CLASS,
   FIELD_LABEL_CLASS,
   TEXTAREA_CLASS,
-} from "@/components/profile/profile-ui";
+} from "@/components/shared/form-field";
 import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
 import { useUserContext } from "@/context/UserContext";
 import { useAutoGrow } from "@/hooks/ui";

@@ -33,22 +33,16 @@ interface SongFiltersProps {
 /** 一个筛选项：上面字段标签，下面控件 */
 function Field({
   label,
-  aside,
   className,
   children,
 }: {
   label: string;
-  /** 标签右侧的补充，如年份的当前区间 */
-  aside?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={className}>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className={FIELD_LABEL_CLASS}>{label}</span>
-        {aside}
-      </div>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <div className="mt-2">{children}</div>
     </div>
   );
@@ -139,22 +133,19 @@ const SongFilters: React.FC<SongFiltersProps> = ({
   ];
 
   return (
-    // 不用卡片：宽屏一行字段，年份占两格；窄屏两列，年份与流派各占一行，
-    // 演唱、作词、作曲、编曲四个人名字段排成两行两列
-    <div className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-7">
-      <Field
-        label={t("yearRange")}
-        className="col-span-2"
-        aside={
-          <span className="text-xs tabular-nums tracking-wider text-slate-700 dark:text-slate-300">
-            {from === to
-              ? yearLabel(from)
-              : `${yearLabel(from)} — ${yearLabel(to)}`}
-          </span>
-        }
-      >
-        {/* 滑轨贴底，与下拉框的底线在同一高度（滑轨本身只有 2px 高） */}
-        <div className="flex h-9 items-end">
+    // 不用卡片。年份滑轨单独一行：宽屏「标签 — 滑轨 — 区间」排成一行，
+    // 窄屏标签与区间在上、滑轨在下。下面五个下拉框：宽屏一行五个；
+    // 窄屏两列，流派独占一行，演唱、作词、作曲、编曲排成两行两列
+    <div className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-5">
+      <div className="col-span-full grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 lg:grid-cols-[auto_1fr_auto]">
+        <span className={FIELD_LABEL_CLASS}>{t("yearRange")}</span>
+        {/* 区间文字定宽右对齐，拖动时滑轨长度不跟着变 */}
+        <span className="text-right text-xs tabular-nums tracking-wider text-slate-700 dark:text-slate-300 lg:order-last lg:min-w-28">
+          {from === to
+            ? yearLabel(from)
+            : `${yearLabel(from)} — ${yearLabel(to)}`}
+        </span>
+        <div className="col-span-2 flex h-5 items-center lg:col-span-1">
           <Slider
             min={0}
             max={years.length - 1}
@@ -167,7 +158,7 @@ const SongFilters: React.FC<SongFiltersProps> = ({
             aria-label={t("yearRange")}
           />
         </div>
-      </Field>
+      </div>
 
       {selects.map((s) => (
         <Field

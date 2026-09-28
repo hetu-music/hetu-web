@@ -1,11 +1,11 @@
 import { useTranslations } from "next-intl";
 
-/** 超过这个数就只列前几个，余下的记作「+N」 */
-const MAX_SHOWN = 4;
+/** 最多列出几个，余下的记作「+N」 */
+const MAX_SHOWN = 2;
 
 /**
- * 列表视图里的类型、流派：灰色小字，一个标签一段，放不下就整段换行，
- * 不在字中间截断成省略号。不按类别上色、不做胶囊。
+ * 列表视图里的类型、流派：一行灰色小字，最多列两个，余下记作「+N」，
+ * 悬停看全部。不换行、不按类别上色、不做胶囊。
  */
 const MultiTagDisplay = ({
   tags,
@@ -21,20 +21,17 @@ const MultiTagDisplay = ({
     tags && tags.length > 0
       ? tags.map((v) => (tEnum.has(`${type}.${v}`) ? tEnum(`${type}.${v}`) : v))
       : [tCommon("unknown")];
-  const shown = labels.slice(0, MAX_SHOWN);
-  const rest = labels.length - shown.length;
+  const rest = labels.length - MAX_SHOWN;
 
   return (
     <span
       title={labels.join(" · ")}
-      className="flex w-24 flex-wrap justify-center gap-x-2 gap-y-0.5 text-xs leading-5 tracking-wider text-slate-400 dark:text-slate-500"
+      className="flex w-24 items-baseline justify-center gap-1.5 whitespace-nowrap text-xs tracking-wider text-slate-400 dark:text-slate-500"
     >
-      {shown.map((label) => (
-        <span key={label} className="whitespace-nowrap">
-          {label}
-        </span>
-      ))}
-      {rest > 0 && <span className="tabular-nums">+{rest}</span>}
+      <span className="min-w-0 truncate">
+        {labels.slice(0, MAX_SHOWN).join(" · ")}
+      </span>
+      {rest > 0 && <span className="shrink-0 tabular-nums">+{rest}</span>}
     </span>
   );
 };

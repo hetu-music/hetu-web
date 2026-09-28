@@ -15,7 +15,7 @@ import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/utils";
-import { NEUTRAL_TONE } from "@/lib/utils/utils-tone";
+import { INK_TONE } from "@/lib/utils/utils-tone";
 import { ArrowLeft, Home } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
@@ -70,8 +70,8 @@ export default function ProfileClient() {
       className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
       style={
         {
-          "--tone-light": NEUTRAL_TONE.light,
-          "--tone-dark": NEUTRAL_TONE.dark,
+          "--tone-light": INK_TONE.light,
+          "--tone-dark": INK_TONE.dark,
         } as React.CSSProperties
       }
     >

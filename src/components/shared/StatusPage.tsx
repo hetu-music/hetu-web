@@ -1,4 +1,4 @@
-import { NEUTRAL_TONE } from "@/lib/utils/utils-tone";
+import { INK_TONE } from "@/lib/utils/utils-tone";
 import React from "react";
 
 /** 整页提示里的文字按钮比正文里的大一号 */
@@ -27,8 +27,8 @@ export default function StatusPage({
       className="min-h-screen flex items-center bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
       style={
         {
-          "--tone-light": NEUTRAL_TONE.light,
-          "--tone-dark": NEUTRAL_TONE.dark,
+          "--tone-light": INK_TONE.light,
+          "--tone-dark": INK_TONE.dark,
         } as React.CSSProperties
       }
     >

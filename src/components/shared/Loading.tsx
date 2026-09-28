@@ -1,6 +1,6 @@
 "use client";
 
-import { NEUTRAL_TONE } from "@/lib/utils/utils-tone";
+import { INK_TONE } from "@/lib/utils/utils-tone";
 import { useTranslations } from "next-intl";
 import React from "react";
 
@@ -19,8 +19,8 @@ export default function Loading() {
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-[#0B0F19] [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)] animate-in fade-in duration-700 delay-300 fill-mode-both"
       style={
         {
-          "--tone-light": NEUTRAL_TONE.light,
-          "--tone-dark": NEUTRAL_TONE.dark,
+          "--tone-light": INK_TONE.light,
+          "--tone-dark": INK_TONE.dark,
         } as React.CSSProperties
       }
     >

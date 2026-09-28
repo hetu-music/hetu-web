@@ -20,6 +20,7 @@ const SongSchema = z.object({
   albumartist: z.array(z.string().max(30)).nullable().optional(),
   arranger: z.array(z.string().max(30)).nullable().optional(),
   comment: z.string().max(10000).nullable().optional(),
+  dispute_note: z.string().max(2000).nullable().optional(),
   discnumber: z.number().int().min(1).nullable().optional(),
   disctotal: z.number().int().min(1).nullable().optional(),
   lyrics: z.string().max(10000).nullable().optional(),

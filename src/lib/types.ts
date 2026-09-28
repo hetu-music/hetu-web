@@ -37,6 +37,8 @@ export type SongDetail = Song & {
   lyrics?: string | null;
   /** 歌词从哪个时间标签开始；自动识别署名区出错时由后台指定 */
   lyrics_start?: string | null;
+  /** 资料争议说明；留空表示无争议 */
+  dispute_note?: string | null;
   normalLyrics?: string | null;
   track?: number | null;
   tracktotal?: number | null;
@@ -207,6 +209,7 @@ export type SongFormFieldKey =
   | "date"
   | "albumartist"
   | "comment"
+  | "dispute_note"
   | "lyrics"
   | "lyrics_start"
   | "nmn_status"

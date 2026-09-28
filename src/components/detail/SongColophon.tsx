@@ -121,6 +121,20 @@ export default function SongColophon({
             ))}
           </dl>
 
+          {song.dispute_note && (
+            <div
+              id="dispute"
+              className="scroll-mt-28 border-l-2 border-amber-500/60 pl-4"
+            >
+              <h3 className="text-xs tracking-[0.3em] text-amber-700 dark:text-amber-400 mb-2">
+                {t("folio.dispute")}
+              </h3>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 whitespace-pre-line wrap-break-word">
+                {song.dispute_note}
+              </p>
+            </div>
+          )}
+
           {production.length > 0 && (
             <div>
               <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500 mb-4">

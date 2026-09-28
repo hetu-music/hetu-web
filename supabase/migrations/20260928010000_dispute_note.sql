@@ -1,0 +1,55 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- 资料争议说明：歌曲信息（署名、日期等）存在不同说法时，写明争议所在。
+-- 留空表示没有争议；有内容时详情页在署名旁标「资料存疑」，并在版记里展示全文。
+-- ════════════════════════════════════════════════════════════════════════════
+
+alter table public.temp add column dispute_note text;
+alter table public.music add column dispute_note text;
+
+-- ─── 审批同步：把 dispute_note 一并从 temp 同步到 music ─────────────────────
+--
+-- 下面是 approve_music_sync 的函数体，在 lyrics_start 版本的基础上
+-- 只在三处加了 dispute_note。在 Supabase 后台 Database → Functions 里编辑该函数，
+-- 用它替换原函数体即可，函数签名与 security definer 等属性保持不变。
+--
+-- BEGIN
+--   INSERT INTO public.music (
+--     id, date, title, track, tracktotal, artist, lyricist,
+--     composer, arranger, lyrics, lyrics_start, genre, album, albumartist, comment, dispute_note,
+--     length, discnumber, disctotal, kugolink, type, hascover, qmlink, nelink, nmn_status, updated_at
+--   )
+--   SELECT
+--     id, date, title, track, tracktotal, artist, lyricist,
+--     composer, arranger, lyrics, lyrics_start, genre, album, albumartist, comment, dispute_note,
+--     length, discnumber, disctotal, kugolink, type, hascover, qmlink, nelink, nmn_status, updated_at
+--   FROM public.temp
+--   WHERE id = temp_id
+--   ON CONFLICT (id) DO UPDATE SET
+--     date = EXCLUDED.date,
+--     title = EXCLUDED.title,
+--     track = EXCLUDED.track,
+--     tracktotal = EXCLUDED.tracktotal,
+--     artist = EXCLUDED.artist,
+--     lyricist = EXCLUDED.lyricist,
+--     composer = EXCLUDED.composer,
+--     arranger = EXCLUDED.arranger,
+--     lyrics = EXCLUDED.lyrics,
+--     lyrics_start = EXCLUDED.lyrics_start,
+--     genre = EXCLUDED.genre,
+--     album = EXCLUDED.album,
+--     albumartist = EXCLUDED.albumartist,
+--     comment = EXCLUDED.comment,
+--     dispute_note = EXCLUDED.dispute_note,
+--     length = EXCLUDED.length,
+--     discnumber = EXCLUDED.discnumber,
+--     disctotal = EXCLUDED.disctotal,
+--     kugolink = EXCLUDED.kugolink,
+--     type = EXCLUDED.type,
+--     hascover = EXCLUDED.hascover,
+--     qmlink = EXCLUDED.qmlink,
+--     nelink = EXCLUDED.nelink,
+--     nmn_status = EXCLUDED.nmn_status,
+--     updated_at = EXCLUDED.updated_at;
+-- END;
+--
+-- 另有一个 sync_music_from_temp 函数，若它同样逐列列出字段，也要照此加上 dispute_note。

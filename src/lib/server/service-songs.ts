@@ -243,6 +243,7 @@ export const getSongById = cache(async function getSongById(
       title: toTraditional(result.title) ?? result.title,
       album: toTraditional(result.album),
       comment: toTraditional(result.comment),
+      dispute_note: toTraditional(result.dispute_note),
       lyrics: toTraditionalLrc(result.lyrics),
       normalLyrics: toTraditional(result.normalLyrics) ?? result.normalLyrics,
       // 人名字段也转换

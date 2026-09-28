@@ -21,6 +21,7 @@ export const NON_CRITICAL_FIELD_KEYS: readonly SongFormFieldKey[] = [
   "qmlink",
   "nelink",
   "comment",
+  "dispute_note",
   "lyrics_start",
 ];
 

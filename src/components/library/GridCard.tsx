@@ -8,7 +8,6 @@ import { getCoverUrl } from "@/lib/utils/utils-song";
 import { Heart } from "lucide-react";
 import type React from "react";
 import CoverArt from "./CoverArt";
-import DisputedBadge from "./DisputedBadge";
 import EnqueueButton from "@/components/shared/EnqueueButton";
 import PlayButton from "@/components/shared/PlayButton";
 import { useTranslations } from "next-intl";
@@ -123,7 +122,6 @@ export default function GridCard({
           >
             {song.title}
           </h3>
-          {song.dispute_note && <DisputedBadge className="mt-1" />}
           <span className="shrink-0 text-xs font-mono text-slate-400">
             {song.year || FILTER_OPTION_UNKNOWN}
           </span>

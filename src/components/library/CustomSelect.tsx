@@ -134,17 +134,13 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           aria-expanded={open}
           aria-controls={contentId}
           disabled={disabled}
+          // 与站内输入框一致：只有一道底线，展开或悬停时换成强调色
           className={cn(
-            "flex h-10 w-full items-center justify-between gap-2 rounded-lg",
-            "border border-slate-200 dark:border-slate-800",
-            "bg-white dark:bg-slate-900",
-            "px-3 text-sm",
-            "text-slate-600 dark:text-slate-300",
-            "transition-all duration-200",
-            "hover:border-(--tone)/60 hover:bg-(--tone)/10",
-            "focus:outline-none",
-            open && "border-(--tone)/60",
-            hasSelection && !open && "border-(--tone)/60",
+            "flex h-9 w-full items-center justify-between gap-2",
+            "border-0 border-b border-slate-300 dark:border-slate-700 bg-transparent px-0",
+            "text-sm text-slate-600 dark:text-slate-300",
+            "transition-colors duration-200 hover:border-(--tone) focus:outline-none focus-visible:border-(--tone)",
+            open && "border-(--tone)",
             "disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
@@ -153,7 +149,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             className={cn(
               "flex-1 truncate text-left",
               !hasSelection && "text-slate-400 dark:text-slate-500",
-              hasSelection && "font-medium text-slate-700 dark:text-slate-200",
+              hasSelection && "text-slate-800 dark:text-slate-100",
             )}
           >
             {displayText}
@@ -242,15 +238,14 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                   onSelect={toggleSelectAll}
                   className={cn(
                     "flex items-center gap-2 font-medium cursor-pointer border-b border-slate-100 dark:border-slate-800 mb-1 pb-2 rounded-b-none",
-                    isAllSelected && "bg-(--tone)/10 text-(--tone)",
-                    isIndeterminate && "text-(--tone) font-medium",
+                    (isAllSelected || isIndeterminate) && "text-(--tone)",
                   )}
                 >
                   <div
                     className={cn(
                       "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                       isAllSelected || isIndeterminate
-                        ? "border-(--tone)/60 bg-(--tone) text-white dark:text-slate-900"
+                        ? "border-(--tone) bg-(--tone) text-white dark:text-slate-900"
                         : "border-slate-300 dark:border-slate-600 bg-transparent",
                     )}
                   >
@@ -272,15 +267,13 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                     key={option.value}
                     value={option.value}
                     onSelect={() => toggleOption(option.value)}
-                    className={cn(
-                      isSelected && "bg-(--tone)/10 text-(--tone) font-medium",
-                    )}
+                    className={cn(isSelected && "text-(--tone)")}
                   >
                     <div
                       className={cn(
                         "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                         isSelected
-                          ? "border-(--tone)/60 bg-(--tone) text-white dark:text-slate-900"
+                          ? "border-(--tone) bg-(--tone) text-white dark:text-slate-900"
                           : "border-slate-300 dark:border-slate-600 bg-transparent",
                       )}
                     >
@@ -300,7 +293,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                   onChange([]);
                   setOpen(false);
                 }}
-                className="w-full rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center"
+                className="w-full px-3 py-1.5 text-center text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
               >
                 清除筛选
               </button>

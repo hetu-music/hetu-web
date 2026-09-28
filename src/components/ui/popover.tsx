@@ -18,7 +18,8 @@ const PopoverContent = React.forwardRef<
       align={align}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-0 shadow-2xl outline-none",
+        // 浮层用页面底色，不用纯白（DESIGN.md 第五节）
+        "z-50 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] p-0 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] outline-none",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

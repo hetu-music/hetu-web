@@ -88,7 +88,7 @@ const CommandItem = React.forwardRef<
     ref={ref}
     className={cn(
       "relative flex cursor-pointer select-none items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none transition-colors",
-      "data-[selected=true]:bg-slate-100 dark:data-[selected=true]:bg-slate-800/70",
+      "data-[selected=true]:bg-slate-200/50 dark:data-[selected=true]:bg-slate-800/60",
       "data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
       className,
     )}

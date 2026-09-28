@@ -20,25 +20,23 @@ const Slider = React.forwardRef<
       )}
       {...props}
     >
-      <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700/50">
-        <SliderPrimitive.Range className="absolute h-full bg-blue-500" />
+      {/* 一道细线，选中的区间用强调色 */}
+      <SliderPrimitive.Track className="relative h-0.5 w-full grow overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <SliderPrimitive.Range className="absolute h-full bg-(--tone)" />
       </SliderPrimitive.Track>
 
       {Array.from({ length: thumbCount }).map((_, i) => (
         <SliderPrimitive.Thumb
           key={i}
           className={cn(
-            "flex h-5 w-5 items-center justify-center",
-            "rounded-full bg-white dark:bg-slate-100",
-            "border border-slate-200 shadow-md",
+            "block size-3.5 rounded-full bg-[#FAFAFA] dark:bg-[#0B0F19]",
+            "border-2 border-(--tone)",
             "transition-transform hover:scale-110 active:scale-110 active:cursor-grabbing",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30",
+            "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-(--tone)/20",
             "disabled:pointer-events-none disabled:opacity-50",
             "cursor-grab",
           )}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 pointer-events-none" />
-        </SliderPrimitive.Thumb>
+        />
       ))}
     </SliderPrimitive.Root>
   );

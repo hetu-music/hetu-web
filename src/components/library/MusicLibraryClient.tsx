@@ -492,7 +492,7 @@ export default function MusicLibraryClient({
           </div>
 
           {showAdvancedFilters && (
-            <div className="animate-in slide-in-from-top-2 fade-in py-5 duration-300">
+            <div className="animate-in slide-in-from-top-2 fade-in border-b border-slate-200/70 pb-6 pt-5 duration-300 dark:border-slate-800">
               <SongFilters
                 yearRangeIndices={yearRangeIndices}
                 setYearRangeIndices={setYearRangeIndices}

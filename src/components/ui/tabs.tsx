@@ -34,10 +34,10 @@ const TabsTrigger = React.forwardRef<
       // Inactive colours
       "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
       // Active colours
-      "data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400",
+      "data-[state=active]:text-(--tone)",
       // Bottom indicator via ::after pseudo-element
       "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5",
-      "after:rounded-full after:bg-blue-600 dark:after:bg-blue-400",
+      "after:rounded-full after:bg-(--tone)",
       "after:opacity-0 data-[state=active]:after:opacity-100 after:transition-opacity",
       className,
     )}

@@ -27,6 +27,32 @@ function getConverter(): ConverterFn {
   return newConverter;
 }
 
+let _toSimplified: ConverterFn | null = null;
+
+/**
+ * 繁→简只做逐字转换（tw，不用 twp）：用于把用户输入对齐到库里的简体，
+ * 词汇级改写（如「軟體」→「软件」）会改变用户原本要找的字。
+ */
+function getSimplifiedConverter(): ConverterFn {
+  if (!_toSimplified) {
+    _toSimplified = OpenCC.Converter({ from: "tw", to: "cn" }) as ConverterFn;
+  }
+  return _toSimplified;
+}
+
+/**
+ * 将繁体中文字符串转换为简体，已是简体的部分原样保留。
+ * 库内歌曲资料以简体存储，繁体输入需先转成简体才能匹配。
+ */
+export function toSimplified(text: string): string {
+  if (!text) return text;
+  try {
+    return getSimplifiedConverter()(text);
+  } catch {
+    return text;
+  }
+}
+
 /**
  * 将简体中文字符串转换为繁体中文（台湾）
  * 如果输入为 null 或空，直接返回原值

@@ -3,7 +3,7 @@ import "server-only";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { locales } from "@/i18n/config";
-import { getServiceClient } from "@/lib/db/supabase-server";
+import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import {
   fetchNavidromeLibrary,
   fetchNavidromeSong,
@@ -151,7 +151,7 @@ export async function updateAudioMapping(
   const { supabase, config } = requireDeps();
 
   const { data: song, error } = await supabase
-    .from("music")
+    .from(TABLES.MUSIC)
     .select("id,has_audio")
     .eq("id", songId)
     .maybeSingle();

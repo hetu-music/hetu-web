@@ -219,6 +219,21 @@ export async function getAdminPageSession(): Promise<AdminPageSession | null> {
 }
 
 /**
+ * 需要登录的公开页面用（如个人中心）：返回已验签的当前用户，未登录返回 null。
+ * 与 getAdminPageSession 一样用 getUser()，不信任只读 cookie 的 getSession()。
+ */
+export async function getPageUser(): Promise<AuthenticatedUser | null> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+  return user as unknown as AuthenticatedUser;
+}
+
+/**
  * 验证当前用户是否为管理员（适用于 Server Actions）
  * 如果验证失败则抛出错误，成功则返回当前登录的 AuthenticatedUser 对象。
  */

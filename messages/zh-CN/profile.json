@@ -2,26 +2,35 @@
   "title": "个人中心",
   "tabs": {
     "favorites": "我的收藏",
-    "annotations": "我的批注",
+    "annotations": "我的批评",
     "account": "账户设置",
-    "feedback": "建议反馈",
-    "requests": "反馈管理",
-    "users": "用户管理",
-    "logs": "操作日志"
+    "feedback": "建议反馈"
   },
-  "sections": {
-    "requests": {
-      "title": "反馈管理",
-      "description": "处理用户提交的纠错、申请等反馈"
+  "hero": {
+    "role": {
+      "super": "系统超管",
+      "admin": "管理员",
+      "user": "普通用户"
     },
-    "users": {
-      "title": "用户管理",
-      "description": "管理所有注册用户的资料与权限"
-    },
-    "logs": {
-      "title": "操作日志",
-      "description": "数据库审计记录，仅供查阅"
-    }
+    "email": "邮箱",
+    "favorites": "收藏",
+    "benefits": "权益",
+    "benefitsOn": "已开通",
+    "benefitsOff": "未开通",
+    "adminPanel": "管理面板",
+    "logout": "退出登录"
+  },
+  "favorites": {
+    "summary": "已收藏 {count} 首作品",
+    "clearAll": "全部清除",
+    "confirmClear": "确认清除",
+    "empty": "还没有收藏任何曲目",
+    "savedAt": "收藏于 {date}",
+    "play": "播放",
+    "pause": "暂停",
+    "enqueue": "加入播放列表",
+    "queued": "已在播放列表",
+    "unfavorite": "取消收藏"
   },
   "annotations": {
     "summary": "共 {count} 则批评，涉及 {songs} 首歌",
@@ -47,8 +56,79 @@
     "open": "查看",
     "delete": "删除",
     "confirmDelete": "确认删除",
-    "empty": "还没有写过批注",
+    "empty": "还没有写过批评",
     "emptyHint": "在歌曲页的字句旁、手记旁或评点里都可以批注",
-    "emptyFiltered": "这一类下还没有批注"
+    "emptyFiltered": "这一类下还没有批评"
+  },
+  "account": {
+    "description": "管理您的公开资料与基本信息",
+    "displayName": "用户名",
+    "email": "邮箱",
+    "intro": "个人简介",
+    "display": "公开展示",
+    "displayHint": "开启后，你的用户名和个人简介将在站内 关于-维护团队 页面中展示。",
+    "save": "保存更改",
+    "saved": "已保存",
+    "saveError": "保存失败",
+    "password": {
+      "title": "修改密码",
+      "description": "设置一个更安全的新密码",
+      "current": "当前密码",
+      "new": "新密码",
+      "newPlaceholder": "至少8位，包含字母和数字",
+      "confirm": "确认新密码",
+      "confirmPlaceholder": "再次输入新密码",
+      "submit": "确认修改",
+      "success": "密码修改成功",
+      "error": "修改失败"
+    }
+  },
+  "feedback": {
+    "submitTitle": "提交反馈 / 申请",
+    "type": "类型",
+    "types": {
+      "song_feedback": "歌曲纠错",
+      "benefit_apply": "申请权益",
+      "admin_apply": "申请管理员"
+    },
+    "song": "歌曲",
+    "songPlaceholder": "输入歌曲名称搜索...",
+    "songNotFound": "未找到相关歌曲",
+    "clearSong": "清除",
+    "category": "纠错类别",
+    "optional": "(可选)",
+    "categoryPlaceholder": "如：歌词错误、作者信息等",
+    "contentLabel": {
+      "song_feedback": "纠错内容",
+      "benefit_apply": "申请理由",
+      "admin_apply": "申请说明"
+    },
+    "contentPlaceholder": {
+      "song_feedback": "请描述具体的错误内容和正确信息...",
+      "benefit_apply": "请说明您希望获得权益的原因...",
+      "admin_apply": "请说明您希望成为管理员的原因和能力..."
+    },
+    "errors": {
+      "empty": "请填写内容",
+      "song": "歌曲纠错需要选择歌曲",
+      "submit": "提交失败，请稍后重试"
+    },
+    "submit": "提交",
+    "submitted": "已提交",
+    "historyTitle": "我的提交记录",
+    "historyCount": "共 {count} 条",
+    "historyEmpty": "暂无提交记录",
+    "status": {
+      "pending": "待处理",
+      "replied": "已回复",
+      "approved": "已同意",
+      "rejected": "已拒绝"
+    },
+    "detail": {
+      "category": "类别",
+      "submittedAt": "提交于",
+      "reply": "管理员回复"
+    },
+    "refresh": "刷新"
   }
 }

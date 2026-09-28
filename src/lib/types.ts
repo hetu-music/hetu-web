@@ -116,7 +116,7 @@ export interface SongComment {
   editedAt: string | null;
 }
 
-// 个人页「我的批注」：按歌分组
+// 个人页「我的批评」：按歌分组
 export interface MyComment {
   id: number;
   /** 回复的 anchor 取自所回复的批注 */

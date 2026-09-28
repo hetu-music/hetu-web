@@ -47,4 +47,5 @@ next-env.d.ts
 /public/workbox-*.js
 AGENTS.md
 CLAUDE.md
+DESIGN.md
 GFTI-main

@@ -10,6 +10,7 @@ import { getCoverUrl } from "@/lib/utils/utils-song";
 import { Calendar, Clock, Heart } from "lucide-react";
 import type React from "react";
 import CoverArt from "./CoverArt";
+import DisputedBadge from "./DisputedBadge";
 import MultiTagDisplay from "./MultiTagDisplay";
 import { useTranslations } from "next-intl";
 
@@ -51,16 +52,19 @@ export default function ListRow({
       </div>
 
       <div className="grow min-w-0 flex flex-col justify-center translate-y-[-1.5px] md:translate-y-0">
-        <h3
-          className={cn(
-            "truncate text-lg text-slate-900 transition-colors dark:text-slate-100",
-            isActive
-              ? "text-blue-600 dark:text-blue-400"
-              : "group-hover:text-blue-600 dark:group-hover:text-blue-400",
-          )}
-        >
-          {song.title}
-        </h3>
+        <div className="flex min-w-0 items-center gap-2">
+          <h3
+            className={cn(
+              "truncate text-lg text-slate-900 transition-colors dark:text-slate-100",
+              isActive
+                ? "text-blue-600 dark:text-blue-400"
+                : "group-hover:text-blue-600 dark:group-hover:text-blue-400",
+            )}
+          >
+            {song.title}
+          </h3>
+          {song.dispute_note && <DisputedBadge />}
+        </div>
         <p className="truncate text-sm font-light text-slate-500 dark:text-slate-400">
           {song.lyricist?.join(" ") || "-"}{" "}
           <span className="mx-1 opacity-50">/</span>{" "}

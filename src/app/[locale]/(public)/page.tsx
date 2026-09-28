@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import MusicLibraryClient from "@/components/library/MusicLibraryClient";
 import { getSongs } from "@/lib/server/service-songs";
+import { countCatalogSongs } from "@/lib/utils/utils-song";
 import { Song } from "@/lib/types";
 import Loading from "@/components/shared/Loading";
 import ErrorState from "@/components/shared/Error";
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   try {
     const songs = await getSongs(undefined, undefined, true, locale);
-    const count = songs.length;
+    const count = countCatalogSongs(songs);
     const recentTitles = songs
       .slice(0, 5)
       .map((s) => `《${s.title}》`)

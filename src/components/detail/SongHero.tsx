@@ -129,16 +129,6 @@ export default function SongHero({
           </dl>
         )}
 
-        {/* 资料有争议时只在这里提个醒，说明全文在版记里 */}
-        {song.dispute_note && (
-          <a
-            href="#dispute"
-            className="mt-3 inline-block text-xs tracking-[0.2em] text-amber-700 dark:text-amber-400 underline decoration-dotted underline-offset-4 hover:decoration-solid"
-          >
-            {t("folio.dispute")}
-          </a>
-        )}
-
         {/* 意象题签；窄屏折行时间隔点会挂在行首，只在宽屏用间隔点 */}
         {stripMarks.length > 0 && (
           <div className="mt-10 flex flex-wrap items-baseline gap-x-5 gap-y-3 lg:gap-x-1">

@@ -80,7 +80,7 @@ const occurrences = [
   // 与 3 同源（DJ 版），同分时只留先出现的那首
   occ(9, 10, 3),
   occ(9, 11, 5),
-  // 歌曲表里没有的歌不计入
+  // 不在曲库里的歌（如资料存疑）不计入作品数，也不被推荐
   occ(500, 11, 5),
 ];
 
@@ -103,7 +103,7 @@ function mockClient(overrides: Partial<Tables> = {}) {
     [TABLES.IMAGERY_CAT]: rows.categories,
     [TABLES.IMAGERY]: rows.imagery,
     [TABLES.IMAGERY_OCC]: rows.occurrences,
-    [TABLES.MUSIC]: rows.songs,
+    [TABLES.MUSIC_CATALOG]: rows.songs,
   };
   const from = vi.fn((table: string) =>
     makeQueryBuilder({ data: byTable[table], error: null }),
@@ -186,6 +186,16 @@ describe("getSongImagery", () => {
       artist: ["河圖"],
       shared: ["長劍", "明月"],
     });
+  });
+
+  it("不在曲库里的歌：自己的详情页照常标意象、推荐相关作品", async () => {
+    mockClient();
+    const { marks, related } = await getSongImagery(500, "zh-CN");
+
+    // 作品数只算曲库里的歌：长剑出现在 1、2、3、5、9
+    expect(marks).toEqual([expect.objectContaining({ id: 11, songCount: 5 })]);
+    expect(related.length).toBeGreaterThan(0);
+    expect(related.map((r) => r.id)).not.toContain(500);
   });
 
   it("没有标注的歌：意象与相关作品都为空", async () => {

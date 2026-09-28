@@ -34,6 +34,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //
 // 各表对应的默认访问权限：
 //   MUSIC              → getServiceClient (公开只读)    ★ 写入时必须改用 getUserClient
+//   MUSIC_CATALOG / IMAGERY_OCC_CATALOG → getServiceClient (视图，只读)
 //   ADMIN              → getUserClient    (管理员读写)
 //   IMAGERY / _CAT / _OCC → getServiceClient (公开只读)
 //   USERS              → getUserClient    (用户本人读写，RLS 隔离)
@@ -41,7 +42,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   COMMENTS / _LIKES  → 读：getServiceClient（需连带作者名）；写：用户会话（RLS + RPC）
 export const TABLES = {
   // 核心业务表
-  MUSIC: "music", // 正式歌曲库
+  MUSIC: "music", // 正式歌曲库（全部已发布的歌）
+  // 计入曲库的歌（视图，口径定义见 music_catalog migration）。
+  // 统计、推荐、寻曲等「以曲库为整体」的功能读它；单曲页、收藏等读 MUSIC。
+  MUSIC_CATALOG: "music_catalog",
   ADMIN: "temp", // 管理员暂存/审核表
 
   // 意象系统表
@@ -50,6 +54,7 @@ export const TABLES = {
   IMAGERY_CAT: "imagery_categories",
   IMAGERY_MEANINGS: "imagery_meanings",
   IMAGERY_OCC: "imagery_occurrences",
+  IMAGERY_OCC_CATALOG: "imagery_occurrences_catalog", // 视图：只含 MUSIC_CATALOG 歌曲的出处
 
   // 用户与互动表
   USERS: "users",

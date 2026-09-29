@@ -263,7 +263,7 @@ describe("purgeCloudflareCache", () => {
     const sizes = vi
       .mocked(fetch)
       .mock.calls.map(
-        ([, init]) => JSON.parse(init!.body as string).files.length,
+        ([, init]) => JSON.parse(init?.body as string).files.length,
       );
     expect(sizes).toEqual([30, 30, 5]);
   });

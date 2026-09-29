@@ -277,6 +277,14 @@ export const getSongById = cache(async function getSongById(
             toTraditionalArray(v),
           ]),
         ),
+      aliasOf:
+        result.aliasOf &&
+        Object.fromEntries(
+          Object.entries(result.aliasOf).map(([alias, name]) => [
+            toTraditional(alias) ?? alias,
+            toTraditional(name) ?? name,
+          ]),
+        ),
     };
   }
 

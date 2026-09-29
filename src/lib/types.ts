@@ -59,6 +59,8 @@ export type SongDetail = Song & {
   nmn_status?: boolean | null;
   /** 作品上的原署名，版记照录；只在有名字被归并到主名时才有 */
   credited?: Partial<Record<CreditField, string[] | null>>;
+  /** 本曲用到的别名 → 主名，版记给原署加注 */
+  aliasOf?: Record<string, string>;
 };
 
 // 音乐库客户端组件属性
@@ -164,9 +166,16 @@ export interface FilterOptions {
 }
 
 // 歌曲信息类型
+export interface SongInfoRow {
+  label: string;
+  value: string;
+  /** 署名行逐个列出名字，供版记给别名加注 */
+  names?: string[];
+}
+
 export interface SongInfo {
-  creativeInfo: Array<{ label: string; value: string }>;
-  basicInfo: Array<{ label: string; value: string }>;
+  creativeInfo: SongInfoRow[];
+  basicInfo: SongInfoRow[];
 }
 
 // 意象相关类型

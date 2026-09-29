@@ -25,6 +25,10 @@ describe("applyCreditAliases", () => {
       lyricist: ["潮汐-tide"],
     });
     expect(result.creditAliases?.sort()).toEqual(["潮汐-tide", "萧忆情Alex"]);
+    expect(result.aliasOf).toEqual({
+      萧忆情Alex: "萧忆情",
+      "潮汐-tide": "Tide潮汐",
+    });
     expect(song.artist).toEqual(["河图", "萧忆情Alex"]);
   });
 

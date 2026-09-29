@@ -177,6 +177,7 @@ describe("getSongById", () => {
     const song = await getSongById(1, "music", undefined, "zh-TW");
     expect(song?.artist).toEqual(["蕭憶情"]);
     expect(song?.credited).toEqual({ artist: ["蕭憶情Alex"] });
+    expect(song?.aliasOf).toEqual({ 蕭憶情Alex: "蕭憶情" });
   });
 
   it("后台读 temp 表时署名保持原样", async () => {

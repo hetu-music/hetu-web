@@ -6,7 +6,7 @@ import type { FolioCredit } from "@/lib/utils/utils-folio";
 import { calculateSongInfo } from "@/lib/utils/utils-song";
 import { ArrowUpRight } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 
 /** 这些角色已在卷首署名里（取自作词、作曲、编曲、演唱字段），参与制作中不再重复 */
 const CREDIT_ROLES_SHOWN = new Set([
@@ -121,7 +121,22 @@ export default function SongColophon({
                   {row.label}
                 </dt>
                 <dd className="mt-1.5 text-sm text-slate-800 dark:text-slate-200 wrap-break-word">
-                  {row.value}
+                  {row.names && song.aliasOf
+                    ? row.names.map((name, i) => (
+                        <React.Fragment key={name}>
+                          {i > 0 && " "}
+                          {name}
+                          {/* 夹注：原署与卷首的主名不同，注明是谁 */}
+                          {song.aliasOf?.[name] && (
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
+                              {t("folio.aliasOf", {
+                                name: song.aliasOf[name],
+                              })}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      ))
+                    : row.value}
                 </dd>
               </div>
             ))}

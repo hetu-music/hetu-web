@@ -26,7 +26,10 @@ const SKIP_BUTTON =
  * 贴底的播放条，与顶栏上下对称：页面底色，上沿一道进度细线。
  *
  * 本组件不订阅播放进度：进度线与时间码由 useProgress 直接写 DOM，
- * 歌词由 TrackSubline / LyricRow 自己跟进度，整条播放条只在曲目或播放状态变化时重渲染。
+ * 歌词由 TrackSubline 自己跟进度，整条播放条只在曲目或播放状态变化时重渲染。
+ *
+ * 窄屏只有一行：歌词代替歌手显示在歌名下，不另起一行——另起的一行无论怎么修饰，
+ * 都像挂在满满一排控件下的附件，头重脚轻。为给歌词腾宽度，窄屏不放「上一首」。
  */
 export default function PlayerBar() {
   const t = useTranslations("common.player");
@@ -98,7 +101,7 @@ export default function PlayerBar() {
               onClick={prev}
               disabled={!hasPrev}
               aria-label={t("prev")}
-              className={SKIP_BUTTON}
+              className={cn(SKIP_BUTTON, "max-md:hidden")}
             >
               <SkipBack size={15} className="fill-current" />
             </button>
@@ -139,7 +142,7 @@ export default function PlayerBar() {
             </button>
           </div>
 
-          <div className="flex items-center justify-end gap-4 pl-2 md:pl-0">
+          <div className="flex items-center justify-end gap-4 md:pl-0">
             <span className="hidden text-xs tracking-wider text-slate-400 tabular-nums md:inline dark:text-slate-500">
               {/* 由 useProgress 直接写入，React 不管它的内容 */}
               <span ref={timeRef} />
@@ -151,15 +154,13 @@ export default function PlayerBar() {
           </div>
         </div>
       </div>
-
-      <LyricRow songId={currentTrack.songId} />
     </div>
   );
 }
 
 /**
- * 歌名下的一行：出错时显示错误；宽屏有当前句时显示歌词，否则显示歌手。
- * 窄屏这一栏太窄，只放歌手，歌词另起一行（LyricRow）。
+ * 歌名下的一行：出错时显示错误，有当前句时显示歌词，否则显示歌手。
+ * 歌词字号按这一栏的宽度缩放（父级带 @container），窄屏长句会缩小，缩到下限才省略。
  */
 function TrackSubline({
   songId,
@@ -180,46 +181,19 @@ function TrackSubline({
       </p>
     );
   }
+  if (text) {
+    return (
+      <LyricText
+        key={index}
+        text={text}
+        maxPx={13}
+        className="mt-0.5 leading-4"
+      />
+    );
+  }
   return (
-    <>
-      <p
-        className={cn(
-          "mt-0.5 truncate text-xs tracking-wider text-slate-400 dark:text-slate-500",
-          text && "md:hidden",
-        )}
-      >
-        {artist || t("unknownArtist")}
-      </p>
-      {text && (
-        <LyricText
-          key={index}
-          text={text}
-          maxPx={13}
-          className="mt-0.5 hidden leading-4 md:block"
-        />
-      )}
-    </>
-  );
-}
-
-/**
- * 窄屏的歌词行：占满播放条宽度，长句也放得下。
- * 按「这首歌有没有时间轴歌词」决定出现与否，而不是按当前有没有句子——
- * 否则前奏、间奏时整条播放条会一高一矮地跳。高度变化要与 FloatingActionButtons 的让位同步。
- */
-function LyricRow({ songId }: { songId: number }) {
-  const { hasLyrics, index, text } = useCurrentLyric(songId);
-  if (!hasLyrics) return null;
-  return (
-    <div className="@container mx-auto flex h-7 items-start justify-center px-4 md:hidden">
-      {text && (
-        <LyricText
-          key={index}
-          text={text}
-          maxPx={14}
-          className="text-center leading-5 tracking-wide"
-        />
-      )}
-    </div>
+    <p className="mt-0.5 truncate text-xs tracking-wider text-slate-400 dark:text-slate-500">
+      {artist || t("unknownArtist")}
+    </p>
   );
 }

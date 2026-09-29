@@ -96,7 +96,7 @@
     "next": "下一首",
     "loading": "正在載入…",
     "progress": "播放進度",
-    "queue": "佇列",
+    "queue": "播放佇列，共 {count} 首",
     "queueTitle": "播放佇列",
     "queueCount": "{count} 首",
     "clear": "清空",

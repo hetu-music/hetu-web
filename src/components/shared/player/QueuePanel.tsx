@@ -5,12 +5,15 @@ import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import { cn } from "@/lib/utils/utils";
 import { usePlayerStore } from "@/store/player-store";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { ListMusic, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
+
+const ICON_BUTTON =
+  "flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-700 md:size-9 dark:text-slate-500 dark:hover:text-slate-200";
 
 const TEXT_BUTTON =
   "text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200";
@@ -62,14 +65,14 @@ export default function QueueControl() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label={t("queue", { count })}
+        title={t("queue", { count })}
         className={cn(
-          TEXT_BUTTON,
-          "flex items-center gap-1.5 py-2",
+          ICON_BUTTON,
           open && "text-(--tone) hover:text-(--tone) dark:text-(--tone)",
         )}
       >
-        {t("queue")}
-        <span className="tabular-nums tracking-normal">{count}</span>
+        <ListMusic size={18} />
       </button>
 
       <AnimatePresence>

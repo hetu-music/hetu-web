@@ -1,7 +1,6 @@
 "use client";
 
 import PlayerToggle from "@/components/shared/PlayerToggle";
-import { useLyricLines } from "@/components/shared/player/lyrics";
 import { cn } from "@/lib/utils/utils";
 import { usePlayerStore } from "@/store/player-store";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -62,9 +61,6 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
   const playerShown = usePlayerStore(
     (s) => !!s.currentTrack && s.playerVisible,
   );
-  // 窄屏播放条在有歌词时多一行（PlayerBar 的 LyricRow，高 1.75rem）
-  const songId = usePlayerStore((s) => s.currentTrack?.songId);
-  const hasLyricRow = useLyricLines(songId).length > 0;
   const scrolling = useScrolling();
   const [held, setHeld] = useState(false);
   const showJump = scrolling || held;
@@ -87,9 +83,6 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
         playerShown
           ? "bottom-[calc(5rem+env(safe-area-inset-bottom))]"
           : "bottom-6 sm:bottom-8",
-        playerShown &&
-          hasLyricRow &&
-          "max-md:bottom-[calc(6.75rem+env(safe-area-inset-bottom))]",
         !visible && "opacity-0 translate-y-3 pointer-events-none",
         className,
       )}

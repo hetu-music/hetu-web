@@ -79,7 +79,10 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
         "ring-1 ring-slate-900/[0.06] dark:ring-white/10",
         "shadow-[0_10px_28px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_10px_28px_-12px_rgba(0,0,0,0.6)]",
         "transition-[bottom,opacity,translate] duration-300 ease-out",
-        playerShown ? "bottom-[112px]" : "bottom-6 sm:bottom-8",
+        // 播放条高 4rem（另加底部安全区），胶囊浮在它上方 1rem
+        playerShown
+          ? "bottom-[calc(5rem+env(safe-area-inset-bottom))]"
+          : "bottom-6 sm:bottom-8",
         !visible && "opacity-0 translate-y-3 pointer-events-none",
         className,
       )}

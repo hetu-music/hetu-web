@@ -516,9 +516,19 @@ if (typeof window !== "undefined") {
       usePlayerStore.getState()._setError(msg);
     });
 
-    // MediaSession 进度同步（timeupdate 持续更新，canplay 在 seek 后立即同步）
-    audio.addEventListener("timeupdate", syncMediaSessionPosition);
-    audio.addEventListener("ratechange", syncMediaSessionPosition);
+    // MediaSession 进度同步：系统控件会按 position + playbackRate 自行推算，
+    // 只需在位置跳变时同步（canplay 覆盖 seek 与换曲）。timeupdate 每秒约 4 次，
+    // 逐次同步会不停唤醒锁屏/通知栏控件，这里只做低频校准，防止长时间累积漂移
+    let lastPositionSync = 0;
+    audio.addEventListener("timeupdate", () => {
+      const now = Date.now();
+      if (now - lastPositionSync < 10_000) return;
+      lastPositionSync = now;
+      syncMediaSessionPosition();
+    });
+    ["play", "pause", "seeked", "ratechange", "durationchange"].forEach((e) =>
+      audio.addEventListener(e, syncMediaSessionPosition),
+    );
   }, 0);
 }
 /* v8 ignore stop */

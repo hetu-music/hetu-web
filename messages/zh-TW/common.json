@@ -88,5 +88,23 @@
       "empty": "暫無貢獻者資訊",
       "unknown": "未知貢獻者"
     }
+  },
+  "player": {
+    "play": "播放",
+    "pause": "暫停",
+    "prev": "上一首",
+    "next": "下一首",
+    "loading": "正在載入…",
+    "progress": "播放進度",
+    "queue": "佇列",
+    "queueTitle": "播放佇列",
+    "queueCount": "{count} 首",
+    "clear": "清空",
+    "confirmClear": "確認清空",
+    "remove": "移出佇列",
+    "close": "收起",
+    "unknownArtist": "佚名",
+    "show": "展開播放器",
+    "hide": "收起播放器"
   }
 }

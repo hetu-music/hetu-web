@@ -9,6 +9,7 @@ import {
   Play,
   Check,
 } from "lucide-react";
+import PlayingBars from "@/components/shared/PlayingBars";
 import { cn } from "@/lib/utils/utils";
 import { usePlayerStore } from "@/store/player-store";
 import type { PlayerTrack } from "@/store/player-store";
@@ -106,20 +107,7 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
       </button>
 
       <div className="min-w-0 flex items-center gap-2.5">
-        {isThisPlaying && !currentError && (
-          <span className="flex gap-0.5 items-end h-3 shrink-0" aria-hidden>
-            {[60, 100, 40].map((h, j) => (
-              <span
-                key={j}
-                className="w-0.5 bg-(--tone) rounded-full"
-                style={{
-                  height: `${h}%`,
-                  animation: `gpBounce 0.8s ease-in-out ${j * 0.2}s infinite`,
-                }}
-              />
-            ))}
-          </span>
-        )}
+        {isThisPlaying && !currentError && <PlayingBars />}
         <p
           className={cn(
             "text-sm tracking-wider truncate",
@@ -154,13 +142,6 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
           加入队列
         </button>
       )}
-
-      <style>{`
-        @keyframes gpBounce {
-          0%, 100% { transform: scaleY(0.4); }
-          50% { transform: scaleY(1); }
-        }
-      `}</style>
     </div>
   );
 };

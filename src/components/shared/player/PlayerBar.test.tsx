@@ -132,7 +132,8 @@ describe("播放条", () => {
     expect(
       screen.getByRole("link", { name: "歌一" }).getAttribute("href"),
     ).toBe("/song/1");
-    expect(screen.getByText("第一句")).toBeTruthy();
+    // 宽屏在歌名下、窄屏另起一行，两处都在 DOM 里，由 md: 断点切换显示
+    expect(screen.getAllByText("第一句")).toHaveLength(2);
     expect(screen.getByText("4:05")).toBeTruthy();
     expect(screen.getByRole("button", { name: "播放" })).toBeTruthy();
     // 第一首没有上一首
@@ -152,7 +153,7 @@ describe("播放条", () => {
     expect(slider.getAttribute("aria-valuenow")).toBe("12");
     const fill = slider.lastElementChild as HTMLElement;
     expect(fill.style.transform).toBe(`scaleX(${12.3 / 245})`);
-    expect(screen.getByText("第二句")).toBeTruthy();
+    expect(screen.getAllByText("第二句")).toHaveLength(2);
   });
 
   it("加载中显示新流的起点，而不是旧流的位置", () => {
@@ -183,6 +184,34 @@ describe("播放条", () => {
     fakeAudio.currentTime = 2;
     emit("timeupdate");
     expect(screen.getByText("1:02")).toBeTruthy();
+  });
+
+  it("歌词用楷体，字号按字数缩放", () => {
+    renderPlayer();
+    const [line] = screen.getAllByText("第一句");
+    expect(line.className).toContain("font-kaiti");
+    // 3 个汉字 × 1.08 的余量：100cqw / 3.24，jsdom 会把 calc 化简
+    expect(line.style.fontSize).toMatch(/^clamp\(11px, 30\.86\d*cqw, 13px\)$/);
+  });
+
+  it("窄屏歌词行只在这首歌有时间轴歌词时出现", () => {
+    usePlayerStore.setState({
+      lyricsMap: new Map([[1, "没有时间轴的纯文本"]]),
+    });
+    renderPlayer();
+    expect(screen.queryByText("没有时间轴的纯文本")).toBeNull();
+    // 没有歌词行时歌名下显示歌手，且不在宽屏隐藏
+    expect(screen.getByText("河图").className).not.toContain("md:hidden");
+  });
+
+  it("前奏还没有句子时歌词行照样占位，播放条不跳", () => {
+    usePlayerStore.setState({
+      lyricsMap: new Map([[1, "[00:15.00]迟来的第一句"]]),
+    });
+    const { container } = renderPlayer();
+    const row = container.querySelector(".h-7");
+    expect(row).not.toBeNull();
+    expect(row?.textContent).toBe("");
   });
 
   it("收起时整条 inert", () => {

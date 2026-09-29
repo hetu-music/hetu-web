@@ -1,12 +1,7 @@
 "use client";
 
-import { usePlaybackTick } from "@/hooks/player/usePlayerTime";
 import { Link } from "@/i18n/navigation";
-import {
-  formatPlayerTime,
-  getCurrentLrcIndex,
-  parseLrc,
-} from "@/lib/player/player-utils";
+import { formatPlayerTime } from "@/lib/player/player-utils";
 import { cn } from "@/lib/utils/utils";
 import { usePlayerStore } from "@/store/player-store";
 import {
@@ -20,7 +15,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { LyricText, useCurrentLyric } from "./lyrics";
 import { ProgressLine, useProgress } from "./progress";
 import QueueControl from "./QueuePanel";
 
@@ -31,7 +26,7 @@ const SKIP_BUTTON =
  * 贴底的播放条，与顶栏上下对称：页面底色，上沿一道进度细线。
  *
  * 本组件不订阅播放进度：进度线与时间码由 useProgress 直接写 DOM，
- * 歌词行由 TrackSubline 自己跟进度，整条播放条只在曲目或播放状态变化时重渲染。
+ * 歌词由 TrackSubline / LyricRow 自己跟进度，整条播放条只在曲目或播放状态变化时重渲染。
  */
 export default function PlayerBar() {
   const t = useTranslations("common.player");
@@ -63,7 +58,7 @@ export default function PlayerBar() {
       <ProgressLine progress={progress} label={t("progress")} />
 
       <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-6">
-        {/* 曲目：封面、歌名，下一行是歌词 / 歌手 / 错误 */}
+        {/* 曲目：封面、歌名，下一行是歌手或错误；宽屏有歌词时换成当前句 */}
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-slate-100 ring-1 ring-slate-900/5 dark:bg-slate-800 dark:ring-white/10">
             {currentTrack.coverUrl ? (
@@ -80,7 +75,8 @@ export default function PlayerBar() {
               </div>
             )}
           </div>
-          <div className="min-w-0">
+          {/* @container：宽屏歌词按这一栏的宽度缩放字号 */}
+          <div className="@container min-w-0 flex-1">
             <Link
               href={`/song/${currentTrack.songId}`}
               className="block truncate font-serif text-sm text-slate-900 transition-colors hover:text-(--tone) dark:text-slate-50"
@@ -155,13 +151,15 @@ export default function PlayerBar() {
           </div>
         </div>
       </div>
+
+      <LyricRow songId={currentTrack.songId} />
     </div>
   );
 }
 
 /**
- * 歌名下的一行：出错时显示错误，有歌词时显示当前句，否则显示歌手。
- * 当前句跟 timeupdate 算，只在句子变化时重渲染这一行。
+ * 歌名下的一行：出错时显示错误；宽屏有当前句时显示歌词，否则显示歌手。
+ * 窄屏这一栏太窄，只放歌手，歌词另起一行（LyricRow）。
  */
 function TrackSubline({
   songId,
@@ -172,20 +170,7 @@ function TrackSubline({
 }) {
   const t = useTranslations("common.player");
   const error = usePlayerStore((s) => s.error);
-  const lrc = usePlayerStore((s) => s.lyricsMap.get(songId));
-  const lines = useMemo(() => (lrc ? parseLrc(lrc) : []), [lrc]);
-
-  const [index, setIndex] = useState(-1);
-  const refresh = usePlaybackTick(
-    useCallback(
-      (ct: number) => setIndex(getCurrentLrcIndex(lines, ct)),
-      [lines],
-    ),
-  );
-  // 换曲或歌词刚到时立即算一次；暂停中不会有 timeupdate
-  useEffect(() => refresh(), [lines, refresh]);
-
-  const text = index >= 0 ? lines[index]?.text : null;
+  const { index, text } = useCurrentLyric(songId);
 
   if (error) {
     return (
@@ -195,19 +180,46 @@ function TrackSubline({
       </p>
     );
   }
-  if (text) {
-    return (
-      <p
-        key={index}
-        className="mt-0.5 truncate font-serif text-xs text-(--tone) animate-in fade-in duration-500"
-      >
-        {text}
-      </p>
-    );
-  }
   return (
-    <p className="mt-0.5 truncate text-xs tracking-wider text-slate-400 dark:text-slate-500">
-      {artist || t("unknownArtist")}
-    </p>
+    <>
+      <p
+        className={cn(
+          "mt-0.5 truncate text-xs tracking-wider text-slate-400 dark:text-slate-500",
+          text && "md:hidden",
+        )}
+      >
+        {artist || t("unknownArtist")}
+      </p>
+      {text && (
+        <LyricText
+          key={index}
+          text={text}
+          maxPx={13}
+          className="mt-0.5 hidden leading-4 md:block"
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * 窄屏的歌词行：占满播放条宽度，长句也放得下。
+ * 按「这首歌有没有时间轴歌词」决定出现与否，而不是按当前有没有句子——
+ * 否则前奏、间奏时整条播放条会一高一矮地跳。高度变化要与 FloatingActionButtons 的让位同步。
+ */
+function LyricRow({ songId }: { songId: number }) {
+  const { hasLyrics, index, text } = useCurrentLyric(songId);
+  if (!hasLyrics) return null;
+  return (
+    <div className="@container mx-auto flex h-7 items-start justify-center px-4 md:hidden">
+      {text && (
+        <LyricText
+          key={index}
+          text={text}
+          maxPx={14}
+          className="text-center leading-5 tracking-wide"
+        />
+      )}
+    </div>
   );
 }

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeQueryBuilder } from "@/test/mockSupabase";
 
+// 别名归并另有单测（utils-credits），这里默认不登记任何别名
+vi.mock("@/lib/server/service-credit-aliases", () => ({
+  getCreditAliases: vi.fn(async () => new Map()),
+}));
+
 vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/db/supabase-server")>();

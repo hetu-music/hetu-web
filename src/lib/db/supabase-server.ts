@@ -36,6 +36,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   MUSIC              → getServiceClient (公开只读)    ★ 写入时必须改用 getUserClient
 //   MUSIC_CATALOG / IMAGERY_OCC_CATALOG → getServiceClient (视图，只读)
 //   ADMIN              → getUserClient    (管理员读写)
+//   CREDIT_ALIASES     → getServiceClient (公开只读)
 //   IMAGERY / _CAT / _OCC → getServiceClient (公开只读)
 //   USERS              → getUserClient    (用户本人读写，RLS 隔离)
 //   COLLECTIONS        → getUserClient    (用户本人读写，RLS 隔离)
@@ -47,6 +48,7 @@ export const TABLES = {
   // 统计、推荐、寻曲等「以曲库为整体」的功能读它；单曲页、收藏等读 MUSIC。
   MUSIC_CATALOG: "music_catalog",
   ADMIN: "temp", // 管理员暂存/审核表
+  CREDIT_ALIASES: "credit_aliases", // 署名别名 → 主名，公开读取时归并
 
   // 意象系统表
   IMAGERY: "imagery",

@@ -209,6 +209,8 @@ export function createFuseInstance(songs: Song[]) {
       { name: "lyricist", weight: 0.15 },
       { name: "composer", weight: 0.1 },
       { name: "arranger", weight: 0.05 },
+      // 搜别署也能找到，列表里显示的仍是主名
+      { name: "creditAliases", weight: 0.05 },
     ],
     threshold: 0.4, // 放宽阈值，对中文更友好
     includeScore: true,

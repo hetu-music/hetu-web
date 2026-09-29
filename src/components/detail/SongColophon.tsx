@@ -56,7 +56,13 @@ export default function SongColophon({
   const tEnum = useTranslations("enums");
 
   const rows = useMemo(() => {
-    const info = calculateSongInfo(song, t, tCommon, tEnum);
+    // 卷首用主名，版记照录作品上的原署
+    const info = calculateSongInfo(
+      song.credited ? { ...song, ...song.credited } : song,
+      t,
+      tCommon,
+      tEnum,
+    );
     const unknown = tCommon("unknown");
     // 基本信息里的「未知」只是占位，不值得占一行
     return [

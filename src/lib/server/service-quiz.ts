@@ -21,6 +21,8 @@ import type { QuizQuestionView, QuizResultView } from "@/lib/quiz/views";
 import type { Song } from "@/lib/types";
 import { processLyrics } from "@/lib/utils/utils-lyrics";
 import { toTraditional } from "@/lib/utils/utils-convert";
+import { applyCreditAliases } from "@/lib/utils/utils-credits";
+import { getCreditAliases } from "@/lib/server/service-credit-aliases";
 
 // ─── 候选池 ───────────────────────────────────────────────────────────────────
 
@@ -189,7 +191,10 @@ export async function getQuizResult(
 
   const result = evaluate(model, answers);
   const songById = new Map(model.songs.map((s) => [s.id, s]));
-  const lyrics = await getLyricsByIds(result.matches.map((m) => m.songId));
+  const [lyrics, aliases] = await Promise.all([
+    getLyricsByIds(result.matches.map((m) => m.songId)),
+    getCreditAliases(),
+  ]);
   const tr = localizer(locale);
   const reasonLabel = (r: MatchReason) =>
     tr(r.kind === "dimension" ? getDimension(r.key).label : `「${r.name}」`);
@@ -217,7 +222,7 @@ export async function getQuizResult(
     matches: result.matches.flatMap((m) => {
       const song = songById.get(m.songId);
       if (!song) return [];
-      const view = toSong(song);
+      const view = applyCreditAliases(toSong(song), aliases);
       return [
         {
           song: {

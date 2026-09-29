@@ -54,6 +54,14 @@ export function toSimplified(text: string): string {
 }
 
 /**
+ * 是否像繁体写成：转繁不变、转简会变。
+ * 只是粗判：简体里单用的「著」转简会变成「着」，也会被当成繁体。
+ */
+export function looksTraditional(text: string): boolean {
+  return toTraditional(text) === text && toSimplified(text) !== text;
+}
+
+/**
  * 将简体中文字符串转换为繁体中文（台湾）
  * 如果输入为 null 或空，直接返回原值
  */

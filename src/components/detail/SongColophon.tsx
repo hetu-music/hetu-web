@@ -1,13 +1,13 @@
 "use client";
 
-import CreditAlias from "@/components/detail/CreditAlias";
+import CreditNames from "@/components/detail/CreditNames";
 import SectionHeading from "@/components/detail/SectionHeading";
 import type { SongDetail } from "@/lib/types";
 import type { FolioCredit } from "@/lib/utils/utils-folio";
 import { calculateSongInfo } from "@/lib/utils/utils-song";
 import { ArrowUpRight } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 
 /** 这些角色已在卷首署名里（取自作词、作曲、编曲、演唱字段），参与制作中不再重复 */
 const CREDIT_ROLES_SHOWN = new Set([
@@ -122,22 +122,12 @@ export default function SongColophon({
                   {row.label}
                 </dt>
                 <dd className="mt-1.5 text-sm text-slate-800 dark:text-slate-200 wrap-break-word">
-                  {row.names && song.aliasOf
-                    ? row.names.map((name, i) => (
-                        <React.Fragment key={name}>
-                          {i > 0 && " "}
-                          {/* 原署与卷首的主名不同：照录原署，加线可查 */}
-                          {song.aliasOf?.[name] ? (
-                            <CreditAlias
-                              name={name}
-                              mainName={song.aliasOf[name]}
-                            />
-                          ) : (
-                            name
-                          )}
-                        </React.Fragment>
-                      ))
-                    : row.value}
+                  {/* 只有含别署的一栏才需要虚线与注 */}
+                  {song.aliasOf && row.names?.some((n) => song.aliasOf?.[n]) ? (
+                    <CreditNames names={row.names} aliasOf={song.aliasOf} />
+                  ) : (
+                    row.value
+                  )}
                 </dd>
               </div>
             ))}

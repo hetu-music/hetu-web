@@ -5,6 +5,7 @@ import { getCsrfToken } from "@/lib/api/csrf";
 import type { SongComment } from "@/lib/types";
 import type { NewCommentAnchor } from "@/lib/utils/utils-comments";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocale } from "next-intl";
 import { useCallback, useMemo } from "react";
 
 export type NewComment =
@@ -27,14 +28,16 @@ async function send(method: string, url: string, body?: unknown) {
 
 /**
  * 某首歌的批注与增删改赞。
- * 列表随登录身份而变（私批、赞过与否），查询键带上用户 id。
+ * 列表随登录身份而变（私批、赞过与否），查询键带上用户 id；
+ * 被批原文随页面简繁而转，查询键也带上语言。
  */
 export function useSongComments(songId: number) {
   const { user, loaded } = useUserContext();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const queryKey = useMemo(
-    () => ["song-comments", songId, user?.id ?? null] as const,
-    [songId, user?.id],
+    () => ["song-comments", songId, user?.id ?? null, locale] as const,
+    [songId, user?.id, locale],
   );
 
   const query = useQuery({
@@ -42,7 +45,9 @@ export function useSongComments(songId: number) {
     enabled: loaded,
     staleTime: 30_000,
     queryFn: async (): Promise<SongComment[]> => {
-      const res = await fetch(`/api/public/songs/${songId}/comments`);
+      const res = await fetch(
+        `/api/public/songs/${songId}/comments?locale=${encodeURIComponent(locale)}`,
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: { comments: SongComment[] } = await res.json();
       return data.comments;

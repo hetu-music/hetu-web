@@ -54,6 +54,7 @@ function buildFromEntries(
       { name: "lyricist", weight: 0.1 },
       { name: "composer", weight: 0.05 },
       { name: "arranger", weight: 0.05 },
+      { name: "creditAliases", weight: 0.05 },
       { name: LYRIC_SEARCH_KEY, weight: 0.15 },
     ],
     threshold: 0.35,

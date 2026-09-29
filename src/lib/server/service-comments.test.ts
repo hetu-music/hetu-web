@@ -10,7 +10,15 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
   return { ...actual, getServiceClient: vi.fn() };
 });
 
+vi.mock("@/lib/server/service-songs", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/server/service-songs")>();
+  return { ...actual, getSongById: vi.fn() };
+});
+
 import { getServiceClient } from "@/lib/db/supabase-server";
+import { getSongById } from "@/lib/server/service-songs";
+import type { SongComment, SongDetail } from "@/lib/types";
 import { NextRequest } from "next/server";
 import {
   CommentError,
@@ -22,6 +30,7 @@ import {
   likeComment,
   listMyComments,
   listSongComments,
+  localizeQuotes,
   unlikeComment,
 } from "./service-comments";
 
@@ -611,5 +620,87 @@ describe("listMyComments 边界", () => {
     expect(
       await listMyComments(createMockSupabaseClient([mine]), "me", "zh-CN"),
     ).toEqual([]);
+  });
+});
+
+describe("localizeQuotes", () => {
+  beforeEach(() => vi.mocked(getSongById).mockReset());
+
+  const comment = (overrides: Partial<SongComment>): SongComment => ({
+    id: 1,
+    parentId: null,
+    anchor: "lyrics",
+    anchorIndex: 0,
+    anchorTime: null,
+    anchorQuote: null,
+    body: "好",
+    private: false,
+    pending: false,
+    deleted: false,
+    likeCount: 0,
+    liked: false,
+    mine: false,
+    author: null,
+    createdAt: "2026-09-01T00:00:00Z",
+    editedAt: null,
+    ...overrides,
+  });
+
+  it("繁体页：简体写下的原文转成繁体，不必查歌", async () => {
+    const list = await localizeQuotes(
+      [
+        comment({ id: 1, anchorQuote: "云想衣裳花想容" }),
+        comment({ id: 2, anchorQuote: "雲想衣裳花想容" }),
+        comment({ id: 3, anchor: "song" }),
+      ],
+      7,
+      "zh-TW",
+    );
+    expect(list.map((c) => c.anchorQuote)).toEqual([
+      "雲想衣裳花想容",
+      "雲想衣裳花想容",
+      null,
+    ]);
+    expect(getSongById).not.toHaveBeenCalled();
+  });
+
+  it("简体页：繁体写下的原文找回库里那一行的简体，词汇转换过的也认得", async () => {
+    vi.mocked(getSongById).mockResolvedValue({
+      title: "歌",
+      lyrics_start: null,
+      lyrics: "[00:01.00]云想衣裳花想容\n[00:05.00]显著的软件",
+      comment: "第一段后来\n\n第二段",
+    } as unknown as SongDetail);
+
+    const list = await localizeQuotes(
+      [
+        comment({ id: 1, anchorQuote: "雲想衣裳花想容" }),
+        comment({ id: 2, anchorIndex: 1, anchorQuote: "顯著的軟體" }),
+        comment({ id: 3, anchor: "notes", anchorQuote: "第一段後來" }),
+        comment({ id: 4, anchorQuote: "春風拂檻露華濃" }),
+        comment({ id: 5, anchorQuote: "显著的软件" }),
+      ],
+      7,
+      "zh-CN",
+    );
+    expect(getSongById).toHaveBeenCalledWith(7);
+    expect(list.map((c) => c.anchorQuote)).toEqual([
+      "云想衣裳花想容",
+      "显著的软件",
+      "第一段后来",
+      // 找不回的只转简
+      "春风拂槛露华浓",
+      "显著的软件",
+    ]);
+  });
+
+  it("简体页：没有繁体原文时不查歌", async () => {
+    const list = await localizeQuotes(
+      [comment({ anchorQuote: "云想衣裳花想容" })],
+      7,
+      "zh-CN",
+    );
+    expect(list[0].anchorQuote).toBe("云想衣裳花想容");
+    expect(getSongById).not.toHaveBeenCalled();
   });
 });

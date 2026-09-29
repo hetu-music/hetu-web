@@ -7,6 +7,8 @@ import {
 } from "@/lib/db/supabase-server";
 import { Song, SongDetail, SONG_LIST_VIEW_FIELDS } from "@/lib/types";
 import { mapAndSortSongs } from "@/lib/utils/utils-song";
+import { applyCreditAliases } from "@/lib/utils/utils-credits";
+import { getCreditAliases } from "@/lib/server/service-credit-aliases";
 import { processLyrics } from "@/lib/utils/utils-lyrics";
 import {
   toTraditional,
@@ -30,6 +32,9 @@ function toTraditionalSongList(songs: Song[]): Song[] {
       composer: toTraditionalArray(s.composer),
       arranger: toTraditionalArray(s.arranger),
     };
+    if (s.creditAliases) {
+      res.creditAliases = toTraditionalArray(s.creditAliases) ?? undefined;
+    }
     if (item.albumartist) {
       res.albumartist = toTraditionalArray(item.albumartist);
     }
@@ -65,14 +70,17 @@ export const getSongs = cache(async function getSongs(
       );
       return [];
     }
-    const data = await fetchAll<Record<string, unknown>>(
-      supabase,
-      table,
-      selectFields,
-      (q) => q.order("id", { ascending: true }),
-    );
+    const [data, aliases] = await Promise.all([
+      fetchAll<Record<string, unknown>>(supabase, table, selectFields, (q) =>
+        q.order("id", { ascending: true }),
+      ),
+      getCreditAliases(),
+    ]);
+    // 公开展示用主名；后台读 temp 表，署名保持原样
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    songs = mapAndSortSongs(data as any);
+    songs = mapAndSortSongs(data as any).map((song) =>
+      applyCreditAliases(song, aliases),
+    );
   } else {
     // Admin / 其他表：用户权限客户端
     const supabase = getUserClient(accessToken);
@@ -142,8 +150,11 @@ export async function getSongsByIds(
     if (data) rows.push(...(data as unknown as Record<string, unknown>[]));
   }
 
+  const aliases = await getCreditAliases();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const songs = mapAndSortSongs(rows as any);
+  const songs = mapAndSortSongs(rows as any).map((song) =>
+    applyCreditAliases(song, aliases),
+  );
 
   return locale === "zh-TW" ? toTraditionalSongList(songs) : songs;
 }
@@ -230,11 +241,16 @@ export const getSongById = cache(async function getSongById(
     }
   }
 
-  const result: SongDetail & { normalLyrics: string } = {
+  const detail: SongDetail & { normalLyrics: string } = {
     ...data,
     year: data.date ? new Date(data.date).getFullYear() : null,
     normalLyrics,
   } as SongDetail & { normalLyrics: string };
+  // 公开页卷首用主名，原署留在 credited 里给版记；后台编辑看到的仍是原样
+  const isPublic = table === TABLES.MUSIC && !accessToken;
+  const result = isPublic
+    ? applyCreditAliases(detail, await getCreditAliases())
+    : detail;
 
   // 繁体转换：服务端完成，客户端零负担
   if (locale === "zh-TW") {
@@ -252,6 +268,23 @@ export const getSongById = cache(async function getSongById(
       composer: toTraditionalArray(result.composer),
       arranger: toTraditionalArray(result.arranger),
       albumartist: toTraditionalArray(result.albumartist),
+      // 只转有的字段：版记会拿它覆盖署名，补出来的 null 会把原有署名盖掉
+      credited:
+        result.credited &&
+        Object.fromEntries(
+          Object.entries(result.credited).map(([k, v]) => [
+            k,
+            toTraditionalArray(v),
+          ]),
+        ),
+      aliasOf:
+        result.aliasOf &&
+        Object.fromEntries(
+          Object.entries(result.aliasOf).map(([alias, name]) => [
+            toTraditional(alias) ?? alias,
+            toTraditional(name) ?? name,
+          ]),
+        ),
     };
   }
 

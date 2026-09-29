@@ -91,6 +91,7 @@
       "close": "關閉"
     },
     "production": "參與製作",
+    "aliasOf": "本曲原署「<em>{alias}</em>」，是{name}的另一個署名；卷首、曲庫篩選與檢索統一記作「<em>{name}</em>」。",
     "listen": "收聽",
     "dispute": "資料存疑",
     "shared": "共有",

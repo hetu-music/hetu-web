@@ -5,6 +5,7 @@ import { fetchWithTimeout } from "@/lib/utils/utils-common";
 
 // 两家 CDN 的刷新接口串在发布流程的 Promise.all 上，卡住就卡住整个发布
 const PURGE_TIMEOUT_MS = 10000;
+const CLOUDFLARE_PURGE_BATCH = 30;
 
 const CSRF_COOKIE_NAME = "csrf-token";
 const CSRF_HEADER_NAME = "x-csrf-token";
@@ -224,29 +225,33 @@ export async function purgeCloudflareCache(paths: string[]) {
     return `${siteUrl.replace(/\/$/, "")}${cleanPath}`;
   });
 
-  try {
-    const res = await fetchWithTimeout(
-      `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+  // 按 URL 清缓存每次最多 30 条（免费套餐），署名别名一改就可能牵动几十首歌
+  for (let i = 0; i < urls.length; i += CLOUDFLARE_PURGE_BATCH) {
+    const batch = urls.slice(i, i + CLOUDFLARE_PURGE_BATCH);
+    try {
+      const res = await fetchWithTimeout(
+        `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ files: batch }),
         },
-        body: JSON.stringify({ files: urls }),
-      },
-      PURGE_TIMEOUT_MS,
-    );
+        PURGE_TIMEOUT_MS,
+      );
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[Cloudflare] 刷新 CDN 缓存失败:", errText);
-    } else {
-      // eslint-disable-next-line no-console
-      console.log("[Cloudflare] 成功刷新 CDN 缓存:", urls);
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("[Cloudflare] 刷新 CDN 缓存失败:", errText);
+      } else {
+        // eslint-disable-next-line no-console
+        console.log("[Cloudflare] 成功刷新 CDN 缓存:", batch);
+      }
+    } catch (err) {
+      console.error("[Cloudflare] 刷新 CDN 缓存出错:", err);
     }
-  } catch (err) {
-    console.error("[Cloudflare] 刷新 CDN 缓存出错:", err);
   }
 }
 

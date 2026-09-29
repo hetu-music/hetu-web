@@ -12,6 +12,11 @@ import type {
   SongImageryView,
 } from "@/lib/types";
 import { toTraditional, toTraditionalArray } from "@/lib/utils/utils-convert";
+import {
+  applyCreditAliases,
+  type CreditAliasMap,
+} from "@/lib/utils/utils-credits";
+import { getCreditAliases } from "@/lib/server/service-credit-aliases";
 
 const RELATED_LIMIT = 4;
 const SHARED_LIMIT = 3;
@@ -92,8 +97,12 @@ export async function getSongImagery(
   locale: string,
 ): Promise<SongImageryView> {
   let index: ImageryIndex;
+  let aliases: CreditAliasMap;
   try {
-    index = await loadImageryIndex();
+    [index, aliases] = await Promise.all([
+      loadImageryIndex(),
+      getCreditAliases(),
+    ]);
   } catch (e) {
     console.error("[getSongImagery] 加载意象索引失败", e);
     return { marks: [], related: [] };
@@ -183,8 +192,9 @@ export async function getSongImagery(
 
     const seenBase = new Set([ownBase]);
     for (const { id, shared } of scored) {
-      const song = songById.get(id);
-      if (!song) continue;
+      const found = songById.get(id);
+      if (!found) continue;
+      const song = applyCreditAliases(found, aliases);
       const base = baseTitle(song.title);
       if (seenBase.has(base)) continue;
       seenBase.add(base);

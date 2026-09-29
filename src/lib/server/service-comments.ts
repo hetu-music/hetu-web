@@ -1,5 +1,5 @@
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
-import { getSongsByIds } from "@/lib/server/service-songs";
+import { getSongById, getSongsByIds } from "@/lib/server/service-songs";
 import type {
   CommentAnchor,
   MyComment,
@@ -7,9 +7,19 @@ import type {
   SongComment,
 } from "@/lib/types";
 import {
+  type AnchorContext,
   COMMENT_BODY_MAX,
   COMMENT_QUOTE_MAX,
+  paragraphQuote,
+  resolveSlot,
+  toQuote,
 } from "@/lib/utils/utils-comments";
+import {
+  looksTraditional,
+  toSimplified,
+  toTraditional,
+} from "@/lib/utils/utils-convert";
+import { buildFolio, parseNotes } from "@/lib/utils/utils-folio";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
@@ -156,6 +166,86 @@ export async function listSongComments(
 }
 
 /**
+ * 被批原文换成看的人所用的字，好让前端逐字比对找回原处。
+ *
+ * 原文按写批注时页面上的字存：简体页存简体，繁体页存繁体。
+ * - 繁体页：一律转繁。繁体页的歌词本就是库里简体转繁而来，同一转换两边一致，
+ *   已是繁体的原文再转一次也不变。
+ * - 简体页：繁体写下的原文转简未必还原（「軟體」≠「软件」、「著」→「着」），
+ *   改为把库里的简体歌词与手记转繁后比对，找回那一行，换上它的简体原文。
+ *   找不回的只转简，降级为总评时读着顺眼。
+ */
+export async function localizeQuotes(
+  comments: SongComment[],
+  songId: number,
+  locale: string,
+): Promise<SongComment[]> {
+  if (locale === "zh-TW") {
+    return comments.map((c) =>
+      c.anchorQuote
+        ? { ...c, anchorQuote: toTraditional(c.anchorQuote) ?? c.anchorQuote }
+        : c,
+    );
+  }
+
+  const foreign = comments.filter(
+    (c) =>
+      (c.anchor === "lyrics" || c.anchor === "notes") &&
+      c.anchorQuote &&
+      looksTraditional(c.anchorQuote),
+  );
+  if (foreign.length === 0) return comments;
+
+  const song = await getSongById(songId);
+  const lines = song
+    ? buildFolio(song.lyrics, {
+        title: song.title,
+        lyricsStart: song.lyrics_start,
+      }).lines
+    : [];
+  const paragraphs = parseNotes(song?.comment)?.paragraphs ?? [];
+  const fold = <T extends { text: string }>(l: T): T => ({
+    ...l,
+    text: toTraditional(l.text) ?? l.text,
+  });
+  const folded: AnchorContext = {
+    lines: lines.map(fold),
+    paragraphs: paragraphs.map((p) => p.map(fold)),
+  };
+
+  const localized = new Map<number, string>();
+  for (const c of foreign) {
+    const quote = c.anchorQuote as string;
+    const { slot, orphan } = resolveSlot(
+      { ...c, anchorQuote: toTraditional(quote) ?? quote },
+      folded,
+    );
+    localized.set(
+      c.id,
+      orphan
+        ? toSimplified(quote)
+        : slot.section === "lyrics"
+          ? toQuote(lines[slot.line].text)
+          : slot.section === "notes"
+            ? paragraphQuote(paragraphs[slot.paragraph])
+            : quote,
+    );
+  }
+  return comments.map((c) =>
+    localized.has(c.id)
+      ? { ...c, anchorQuote: localized.get(c.id) as string }
+      : c,
+  );
+}
+
+/** 个人页只作展示，不必找回原处：按页面语言转一下字即可 */
+function displayQuote(quote: string | null, locale: string): string | null {
+  if (!quote) return quote;
+  if (locale === "zh-TW") return toTraditional(quote);
+  return looksTraditional(quote) ? toSimplified(quote) : quote;
+}
+
+/**
  * 个人页：自己写过的批注与回复，按歌分组，最近写过的歌在前。
  * 自己的行用用户会话读（RLS 允许读自己的正常与待审批注）；
  * 歌名、所回复的批注及其作者要跨用户读，走高权限客户端。
@@ -230,7 +320,10 @@ export async function listMyComments(
     const comment: MyComment = {
       id: r.id,
       anchor: (parent ? parent.anchor : r.anchor) ?? "song",
-      anchorQuote: parent ? parent.anchor_quote : r.anchor_quote,
+      anchorQuote: displayQuote(
+        parent ? parent.anchor_quote : r.anchor_quote,
+        locale,
+      ),
       body: r.body,
       private: r.visibility === VISIBILITY.PRIVATE,
       pending: r.status === STATUS.PENDING,

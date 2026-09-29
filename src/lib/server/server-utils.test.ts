@@ -248,6 +248,26 @@ describe("purgeCloudflareCache", () => {
     ]);
   });
 
+  it("超过 30 条时分批请求（按 URL 清缓存每次最多 30 条）", async () => {
+    vi.stubEnv("CLOUDFLARE_ZONE_ID", "zone123");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "token456");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.com");
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    } as Response);
+
+    const paths = Array.from({ length: 65 }, (_, i) => `/song/${i}`);
+    await purgeCloudflareCache(paths);
+
+    const sizes = vi
+      .mocked(fetch)
+      .mock.calls.map(
+        ([, init]) => JSON.parse(init?.body as string).files.length,
+      );
+    expect(sizes).toEqual([30, 30, 5]);
+  });
+
   it("Cloudflare 返回非 2xx 时记录失败但不抛异常（不影响调用方主流程）", async () => {
     vi.stubEnv("CLOUDFLARE_ZONE_ID", "zone123");
     vi.stubEnv("CLOUDFLARE_API_TOKEN", "token456");

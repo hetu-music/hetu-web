@@ -6,6 +6,8 @@ import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-sugg
 import type { AudioOverview } from "@/lib/server/service-navidrome";
 import type { ApplyResult } from "@/lib/navidrome/store";
 import type { NavSong } from "@/lib/navidrome/sync";
+import type { CreditAliasRow } from "@/lib/server/service-credit-aliases";
+import type { CreditNameUsage } from "@/lib/utils/utils-credits";
 
 // 新增歌曲
 export async function apiCreateSong(song: Partial<Song>, csrfToken: string) {
@@ -417,6 +419,45 @@ export async function apiDeleteOccurrence(id: number, csrfToken: string) {
     headers: { "x-csrf-token": csrfToken },
   });
   if (!res.ok) throw new Error("删除关系失败");
+  return res.json();
+}
+
+// ─── Credit Aliases API ────────────────────────────────────────────────────────
+
+async function errorMessage(res: Response, fallback: string) {
+  const d = await res.json().catch(() => ({}));
+  return (d as { error?: string }).error || fallback;
+}
+
+export async function apiGetCreditAliases(): Promise<{
+  aliases: CreditAliasRow[];
+  names: CreditNameUsage[];
+}> {
+  const res = await fetch("/api/admin/credit-aliases");
+  if (!res.ok) throw new Error(await errorMessage(res, "获取署名别名失败"));
+  return res.json();
+}
+
+export async function apiCreateCreditAlias(
+  alias: string,
+  name: string,
+  csrfToken: string,
+): Promise<CreditAliasRow> {
+  const res = await fetch("/api/admin/credit-aliases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+    body: JSON.stringify({ alias, name }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, "登记别名失败"));
+  return res.json();
+}
+
+export async function apiDeleteCreditAlias(alias: string, csrfToken: string) {
+  const res = await fetch(
+    `/api/admin/credit-aliases?alias=${encodeURIComponent(alias)}`,
+    { method: "DELETE", headers: { "x-csrf-token": csrfToken } },
+  );
+  if (!res.ok) throw new Error(await errorMessage(res, "删除别名失败"));
   return res.json();
 }
 

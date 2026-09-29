@@ -20,7 +20,19 @@ export type Song = {
   collectionInfo?: {
     created_at: string;
   };
+  /** 已归并到主名的原署名，只供搜索命中（见 utils-credits） */
+  creditAliases?: string[];
 };
+
+/** 参与别名归并的署名字段 */
+export const CREDIT_FIELDS = [
+  "lyricist",
+  "composer",
+  "arranger",
+  "artist",
+  "albumartist",
+] as const;
+export type CreditField = (typeof CREDIT_FIELDS)[number];
 
 // Song 类型的数据库字段列表（用于 Supabase 查询）
 // 注意：year 不是数据库字段，而是从 date 计算得出的，所以不包含在内
@@ -45,6 +57,10 @@ export type SongDetail = Song & {
   qmlink?: string | null;
   nelink?: string | null;
   nmn_status?: boolean | null;
+  /** 作品上的原署名，版记照录；只在有名字被归并到主名时才有 */
+  credited?: Partial<Record<CreditField, string[] | null>>;
+  /** 本曲用到的别名 → 主名，版记给原署加注 */
+  aliasOf?: Record<string, string>;
 };
 
 // 音乐库客户端组件属性
@@ -150,9 +166,16 @@ export interface FilterOptions {
 }
 
 // 歌曲信息类型
+export interface SongInfoRow {
+  label: string;
+  value: string;
+  /** 署名行逐个列出名字，供版记给别名加注 */
+  names?: string[];
+}
+
 export interface SongInfo {
-  creativeInfo: Array<{ label: string; value: string }>;
-  basicInfo: Array<{ label: string; value: string }>;
+  creativeInfo: SongInfoRow[];
+  basicInfo: SongInfoRow[];
 }
 
 // 意象相关类型

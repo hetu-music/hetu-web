@@ -4,6 +4,11 @@ import {
   makeQueryBuilder,
 } from "@/test/mockSupabase";
 
+// 别名归并另有单测（utils-credits），这里默认不登记任何别名
+vi.mock("@/lib/server/service-credit-aliases", () => ({
+  getCreditAliases: vi.fn(async () => new Map()),
+}));
+
 vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/db/supabase-server")>();
@@ -15,6 +20,7 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 });
 
 import { getServiceClient, getUserClient } from "@/lib/db/supabase-server";
+import { getCreditAliases } from "@/lib/server/service-credit-aliases";
 import {
   createSong,
   getSongById,
@@ -149,6 +155,48 @@ describe("getSongById", () => {
     expect(song?.title).toBe("中國話");
     expect(song?.album).toBe("簡體專輯");
     expect(song?.artist).toEqual(["中國歌手"]);
+  });
+
+  it("公开页：署名换成主名，原署留给版记（繁体一并转换，缺的字段不补）", async () => {
+    vi.mocked(getCreditAliases).mockResolvedValueOnce(
+      new Map([["萧忆情Alex", "萧忆情"]]),
+    );
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: {
+            id: 1,
+            title: "标题",
+            artist: ["萧忆情Alex"],
+            lyricist: ["河图"],
+          },
+          error: null,
+        }),
+      ]),
+    );
+    const song = await getSongById(1, "music", undefined, "zh-TW");
+    expect(song?.artist).toEqual(["蕭憶情"]);
+    expect(song?.credited).toEqual({ artist: ["蕭憶情Alex"] });
+    expect(song?.aliasOf).toEqual({ 蕭憶情Alex: "蕭憶情" });
+  });
+
+  it("后台读 temp 表时署名保持原样", async () => {
+    vi.mocked(getCreditAliases).mockResolvedValueOnce(
+      new Map([["萧忆情Alex", "萧忆情"]]),
+    );
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: { id: 1, title: "标题", artist: ["萧忆情Alex"] },
+          error: null,
+        }),
+      ]),
+    );
+    const song = await getSongById(1, "temp", "token");
+    expect(song?.artist).toEqual(["萧忆情Alex"]);
+    expect(song?.credited).toBeUndefined();
+    // 后台路径不读别名表，排队的返回值要清掉，免得漏给后面的用例
+    vi.mocked(getCreditAliases).mockReset();
   });
 });
 

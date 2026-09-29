@@ -1,15 +1,20 @@
 "use client";
 
 import AuditLogsPanel from "@/components/admin/AuditLogsPanel";
+import CreditAliasPanel from "@/components/admin/CreditAliasPanel";
 import RequestsPanel from "@/components/admin/RequestsPanel";
 import UserManagePanel from "@/components/admin/UserManagePanel";
 import { useUserContext } from "@/context/UserContext";
 import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import AdminNavbar from "./song-admin/AdminNavbar";
 
-type PanelSection = "requests" | "users" | "logs";
+type PanelSection = "credits" | "requests" | "users" | "logs";
 
 const HEADERS: Record<PanelSection, { title: string; description: string }> = {
+  credits: {
+    title: "署名管理",
+    description: "登记同一个人在不同作品里的不同署名，全站归到一个主名下",
+  },
   requests: {
     title: "反馈管理",
     description: "处理用户提交的纠错、申请等反馈",
@@ -24,7 +29,7 @@ const HEADERS: Record<PanelSection, { title: string; description: string }> = {
   },
 };
 
-/** 反馈、用户、日志三个后台页共用的外壳（原先放在个人中心里） */
+/** 署名、反馈、用户、日志几个后台页共用的外壳 */
 export default function AdminPanelClient({
   section,
 }: {
@@ -54,6 +59,7 @@ export default function AdminPanelClient({
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 md:p-6">
+          {section === "credits" && <CreditAliasPanel csrfToken={csrfToken} />}
           {section === "requests" && (
             <RequestsPanel csrfToken={csrfToken} isSuper={!!user?.isSuper} />
           )}

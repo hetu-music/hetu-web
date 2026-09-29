@@ -4,7 +4,13 @@ import {
   GENRE_ORDER,
   TYPE_ORDER,
 } from "@/lib/constants";
-import { FilterOptions, Song, SongDetail, SongInfo } from "@/lib/types";
+import {
+  FilterOptions,
+  Song,
+  SongDetail,
+  SongInfo,
+  SongInfoRow,
+} from "@/lib/types";
 import { formatDate, formatTime } from "@/lib/utils/utils-common";
 import Fuse from "fuse.js";
 import { useTranslations } from "next-intl";
@@ -209,6 +215,8 @@ export function createFuseInstance(songs: Song[]) {
       { name: "lyricist", weight: 0.15 },
       { name: "composer", weight: 0.1 },
       { name: "arranger", weight: 0.05 },
+      // 搜别署也能找到，列表里显示的仍是主名
+      { name: "creditAliases", weight: 0.05 },
     ],
     threshold: 0.4, // 放宽阈值，对中文更友好
     includeScore: true,
@@ -393,50 +401,28 @@ export function calculateSongInfo(
 ): SongInfo {
   const getLabel = (key: string, fallback: string) => (t ? t(key) : fallback);
   const unknownStr = tCommon ? tCommon("unknown") : "未知";
+  const creditRow = (
+    key: string,
+    fallback: string,
+    names: string[] | null | undefined,
+  ): SongInfoRow =>
+    names && names.length > 0
+      ? { label: getLabel(key, fallback), value: names.join(" "), names }
+      : { label: getLabel(key, fallback), value: unknownStr };
 
   return {
     creativeInfo: [
-      {
-        label: getLabel("labels.lyricist", "作词"),
-        value:
-          song.lyricist && song.lyricist.length > 0
-            ? song.lyricist.join(" ")
-            : unknownStr,
-      },
-      {
-        label: getLabel("labels.composer", "作曲"),
-        value:
-          song.composer && song.composer.length > 0
-            ? song.composer.join(" ")
-            : unknownStr,
-      },
-      {
-        label: getLabel("labels.arranger", "编曲"),
-        value:
-          song.arranger && song.arranger.length > 0
-            ? song.arranger.join(" ")
-            : unknownStr,
-      },
-      {
-        label: getLabel("labels.artist", "演唱"),
-        value:
-          song.artist && song.artist.length > 0
-            ? song.artist.join(" ")
-            : unknownStr,
-      },
+      creditRow("labels.lyricist", "作词", song.lyricist),
+      creditRow("labels.composer", "作曲", song.composer),
+      creditRow("labels.arranger", "编曲", song.arranger),
+      creditRow("labels.artist", "演唱", song.artist),
     ],
     basicInfo: [
       {
         label: getLabel("labels.album", "专辑"),
         value: song.album || unknownStr,
       },
-      {
-        label: getLabel("labels.albumartist", "出品发行"),
-        value:
-          song.albumartist && song.albumartist.length > 0
-            ? song.albumartist.join(" ")
-            : unknownStr,
-      },
+      creditRow("labels.albumartist", "出品发行", song.albumartist),
       {
         label: getLabel("labels.releaseDate", "发行日期"),
         value: formatDate(song.date),

@@ -1,5 +1,6 @@
 "use client";
 
+import CreditAlias from "@/components/detail/CreditAlias";
 import SectionHeading from "@/components/detail/SectionHeading";
 import type { SongDetail } from "@/lib/types";
 import type { FolioCredit } from "@/lib/utils/utils-folio";
@@ -125,14 +126,14 @@ export default function SongColophon({
                     ? row.names.map((name, i) => (
                         <React.Fragment key={name}>
                           {i > 0 && " "}
-                          {name}
-                          {/* 夹注：原署与卷首的主名不同，注明是谁 */}
-                          {song.aliasOf?.[name] && (
-                            <span className="text-xs text-slate-400 dark:text-slate-500">
-                              {t("folio.aliasOf", {
-                                name: song.aliasOf[name],
-                              })}
-                            </span>
+                          {/* 原署与卷首的主名不同：照录原署，加线可查 */}
+                          {song.aliasOf?.[name] ? (
+                            <CreditAlias
+                              name={name}
+                              mainName={song.aliasOf[name]}
+                            />
+                          ) : (
+                            name
                           )}
                         </React.Fragment>
                       ))

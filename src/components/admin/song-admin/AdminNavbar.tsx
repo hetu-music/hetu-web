@@ -5,6 +5,7 @@ import {
   Home,
   Music,
   ScrollText,
+  Signature,
   Tag,
   User,
   Users,
@@ -18,7 +19,7 @@ const ICON_BUTTON_CLASS =
   "p-2 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400";
 
 export type AdminSection =
-  "songs" | "imagery" | "audio" | "requests" | "users" | "logs";
+  "songs" | "imagery" | "credits" | "audio" | "requests" | "users" | "logs";
 
 type SectionConfig = {
   key: AdminSection;
@@ -52,6 +53,16 @@ const SECTIONS: SectionConfig[] = [
       "from-violet-600 to-fuchsia-600 dark:from-violet-500 dark:to-fuchsia-500 shadow-violet-500/20 dark:shadow-violet-500/10",
     hoverIconClassName:
       "group-hover:text-violet-500 dark:group-hover:text-violet-400",
+  },
+  {
+    key: "credits",
+    href: "/admin/credits",
+    label: "署名管理",
+    icon: Signature,
+    activeClassName:
+      "from-rose-500 to-pink-600 dark:from-rose-500 dark:to-pink-500 shadow-rose-500/20 dark:shadow-rose-500/10",
+    hoverIconClassName:
+      "group-hover:text-rose-500 dark:group-hover:text-rose-400",
   },
   {
     key: "audio",
@@ -146,7 +157,7 @@ export default function AdminNavbar({
                     s.hoverIconClassName,
                   )}
                 />
-                {/* 六个入口排不下，未选中的只在宽屏显示文字 */}
+                {/* 入口多，未选中的只在宽屏显示文字 */}
                 <span className="hidden lg:inline">{s.label}</span>
               </Link>
             );

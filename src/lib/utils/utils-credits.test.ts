@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyCreditAliases } from "./utils-credits";
+import { applyCreditAliases, summarizeCreditNames } from "./utils-credits";
 
 const aliases = new Map([
   ["萧忆情Alex", "萧忆情"],
@@ -46,5 +46,18 @@ describe("applyCreditAliases", () => {
   it("只处理歌曲上存在的字段", () => {
     const result = applyCreditAliases({ artist: ["萧忆情Alex"] }, aliases);
     expect("albumartist" in result).toBe(false);
+  });
+});
+
+describe("summarizeCreditNames", () => {
+  it("按名字统计歌曲数与角色，身兼数职只算一首", () => {
+    const usage = summarizeCreditNames([
+      { artist: ["河图"], composer: ["河图"], lyricist: ["Finale"] },
+      { artist: ["河图"], albumartist: ["河图"] },
+    ]);
+    expect(usage).toEqual([
+      { name: "Finale", songs: 1, roles: ["lyricist"] },
+      { name: "河图", songs: 2, roles: ["composer", "artist", "albumartist"] },
+    ]);
   });
 });

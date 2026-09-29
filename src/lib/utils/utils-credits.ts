@@ -40,3 +40,36 @@ export function applyCreditAliases<T extends CreditFields>(
   if (replaced.size === 0) return song;
   return { ...song, ...resolved, credited, creditAliases: [...replaced] };
 }
+
+/** 一个署名在曲库里的使用情况，供后台挑选别名与主名 */
+export type CreditNameUsage = {
+  name: string;
+  /** 署有这个名字的歌曲数 */
+  songs: number;
+  /** 以这个名字担任过的角色，按 CREDIT_FIELDS 的顺序 */
+  roles: CreditField[];
+};
+
+export function summarizeCreditNames(songs: CreditFields[]): CreditNameUsage[] {
+  const usage = new Map<string, { songs: number; roles: Set<CreditField> }>();
+  for (const song of songs) {
+    const seen = new Set<string>();
+    for (const field of CREDIT_FIELDS) {
+      for (const name of song[field] ?? []) {
+        const entry = usage.get(name) ?? { songs: 0, roles: new Set() };
+        entry.roles.add(field);
+        // 一首歌里身兼数职只算一首
+        if (!seen.has(name)) {
+          entry.songs += 1;
+          seen.add(name);
+        }
+        usage.set(name, entry);
+      }
+    }
+  }
+  return [...usage].map(([name, { songs, roles }]) => ({
+    name,
+    songs,
+    roles: CREDIT_FIELDS.filter((f) => roles.has(f)),
+  }));
+}

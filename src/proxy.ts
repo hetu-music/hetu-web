@@ -64,7 +64,7 @@ export async function proxy(request: NextRequest) {
       style-src 'self' 'unsafe-inline';
       img-src 'self' blob: data: https://cover.hetu-music.com;
       font-src 'self';
-      media-src 'self' https://pre.hetu-music.com https://opt.hetu-music.com;
+      media-src 'self' https://pre.hetu-music.com;
       connect-src 'self' https://cloudflareinsights.com;
       object-src 'none';
       base-uri 'self';
@@ -83,7 +83,7 @@ export async function proxy(request: NextRequest) {
       style-src 'self' 'unsafe-inline';
       img-src 'self' blob: data: https://cover.hetu-music.com;
       font-src 'self';
-      media-src 'self' https://pre.hetu-music.com https://opt.hetu-music.com;
+      media-src 'self' https://pre.hetu-music.com;
       connect-src 'self' https://cloudflareinsights.com;
       object-src 'none';
       base-uri 'self';

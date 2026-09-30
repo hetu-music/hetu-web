@@ -7,8 +7,8 @@ import { useTranslations } from "next-intl";
 
 /**
  * 播放条的开关：有曲目时才出现。
- * 播放条收起时，唱片转动是唯一的「正在播放」提示；展开后播放条自己会显示状态，
- * 唱片就停下，只留强调色——无限旋转会让整条浮动胶囊逐帧重新合成。
+ * 唱片跟播放状态走：播放时转，暂停时停在当前角度（暂停动画而不是移除，免得跳回原位）。
+ * 胶囊不做毛玻璃，转动只重绘这一个图标。
  */
 export default function PlayerToggle({ className }: { className?: string }) {
   const t = useTranslations("common.player");
@@ -31,10 +31,9 @@ export default function PlayerToggle({ className }: { className?: string }) {
       <Disc3
         size={20}
         className={cn(
+          "animate-spin animation-duration-[3s] motion-reduce:animate-none",
+          !isPlaying && "[animation-play-state:paused]",
           playerVisible && "text-(--tone)",
-          isPlaying &&
-            !playerVisible &&
-            "animate-spin animation-duration-[3s] motion-reduce:animate-none",
         )}
       />
     </button>

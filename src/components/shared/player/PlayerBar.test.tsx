@@ -86,11 +86,11 @@ beforeEach(() => {
         }),
     ),
   );
-  // useIsDesktop：按宽屏处理，队列是下拉而不是底部面板
+  // useIsDesktop：按宽屏处理，队列是下拉而不是底部面板；没开「减少动态效果」
   vi.stubGlobal(
     "matchMedia",
-    vi.fn(() => ({
-      matches: true,
+    vi.fn((query: string) => ({
+      matches: !query.includes("reduced-motion"),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     })),
@@ -160,6 +160,35 @@ describe("播放条", () => {
     const fill = slider.lastElementChild as HTMLElement;
     expect(fill.style.transform).toBe(`scaleX(${12.3 / 245})`);
     expect(screen.getByText("第二句")).toBeTruthy();
+  });
+
+  it("正常往前走时进度线在两次更新之间匀速滑过去，跳转时直接到位", () => {
+    renderPlayer();
+    const fill = screen.getByRole("slider").lastElementChild as HTMLElement;
+    fakeAudio.currentTime = 1;
+    emit("timeupdate");
+    fakeAudio.currentTime = 1.25;
+    emit("timeupdate");
+    expect(fill.style.transition).toMatch(/^transform [0-9]+ms linear, /);
+
+    // 往回跳或一次走太远：不滑
+    fakeAudio.currentTime = 0.5;
+    emit("timeupdate");
+    expect(fill.style.transition).not.toContain("transform");
+    fakeAudio.currentTime = 30;
+    emit("timeupdate");
+    expect(fill.style.transition).not.toContain("transform");
+  });
+
+  it("播放条收起时进度线不滑", () => {
+    renderPlayer();
+    const fill = screen.getByRole("slider").lastElementChild as HTMLElement;
+    act(() => usePlayerStore.setState({ playerVisible: false }));
+    fakeAudio.currentTime = 1;
+    emit("timeupdate");
+    fakeAudio.currentTime = 1.25;
+    emit("timeupdate");
+    expect(fill.style.transition).not.toContain("transform");
   });
 
   it("加载中显示新流的起点，而不是旧流的位置", () => {

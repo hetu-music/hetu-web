@@ -10,6 +10,16 @@ import React, { useCallback, useEffect, useRef } from "react";
 /** 键盘左右键一次跳多少秒 */
 const KEY_STEP = 10;
 
+/** 进度线悬停变粗的过渡，与下面按帧滑动的过渡写在同一条 transition 里 */
+const HOVER_TRANSITION = "height 200ms, top 200ms";
+
+/** 两次 timeupdate 间前进超过这么多秒就不算「正常走」，直接跳过去 */
+const MAX_GLIDE_STEP = 1.5;
+
+const reducedMotion = () =>
+  typeof matchMedia === "function" &&
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export type Progress = ReturnType<typeof useProgress>;
 
 /**
@@ -17,6 +27,10 @@ export type Progress = ReturnType<typeof useProgress>;
  *
  * opus 流不能原生跳转，跳转是带 timeOffset 重新取流，新流就绪前 audio 里还是旧位置。
  * 所以拖动时和跳转后到新流就绪前，都显示「预览位置」而不是实际位置，免得进度条闪回。
+ *
+ * timeupdate 约 4 次/秒，宽屏上每次要跳好几个像素。正常往前走时给进度线一段匀速过渡，
+ * 时长取两次更新的实际间隔，在两次更新之间滑过去：过渡由合成器跑，不需要每帧执行 JS。
+ * 拖动、跳转、换曲时直接跳到位。
  */
 export function useProgress() {
   const seek = usePlayerStore((s) => s.seek);
@@ -26,11 +40,31 @@ export function useProgress() {
   const timeRef = useRef<HTMLSpanElement>(null);
   const previewRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
+  /** 上一次画的位置与时刻，用来判断这次是不是正常往前走、该滑多久 */
+  const lastPaintRef = useRef({ t: 0, at: 0 });
 
-  const paint = useCallback((t: number, dur: number) => {
+  const paint = useCallback((t: number, dur: number, glide = false) => {
     const ratio = dur > 0 ? Math.min(1, Math.max(0, t / dur)) : 0;
-    // 用 transform 而不是 width：只需合成，不触发重排和重绘
-    if (fillRef.current) fillRef.current.style.transform = `scaleX(${ratio})`;
+    const now = performance.now();
+    const last = lastPaintRef.current;
+    const step = t - last.t;
+    const interval = now - last.at;
+    lastPaintRef.current = { t, at: now };
+    const fill = fillRef.current;
+    if (fill) {
+      const smooth =
+        glide &&
+        step > 0 &&
+        step < MAX_GLIDE_STEP &&
+        interval < MAX_GLIDE_STEP * 1000 &&
+        usePlayerStore.getState().playerVisible &&
+        !reducedMotion();
+      fill.style.transition = smooth
+        ? `transform ${Math.round(interval)}ms linear, ${HOVER_TRANSITION}`
+        : HOVER_TRANSITION;
+      // 用 transform 而不是 width：只需合成，不触发重排和重绘
+      fill.style.transform = `scaleX(${ratio})`;
+    }
     const text = formatPlayerTime(t);
     if (timeRef.current && timeRef.current.textContent !== text) {
       timeRef.current.textContent = text;
@@ -42,7 +76,7 @@ export function useProgress() {
   const refresh = usePlaybackTick(
     useCallback(
       (ct: number, dur: number) => {
-        if (previewRef.current === null) paint(ct, dur);
+        if (previewRef.current === null) paint(ct, dur, true);
       },
       [paint],
     ),
@@ -179,8 +213,8 @@ export function ProgressLine({
       <div className="absolute inset-x-0 top-2 h-px bg-slate-200 dark:bg-slate-800" />
       <div
         ref={fillRef}
-        className="absolute inset-x-0 top-[7px] h-0.5 origin-left bg-(--tone) transition-[height,top] duration-200 group-hover:top-1.5 group-hover:h-1 group-focus-visible:top-1.5 group-focus-visible:h-1"
-        style={{ transform: "scaleX(0)" }}
+        className="absolute inset-x-0 top-[7px] h-0.5 origin-left bg-(--tone) group-hover:top-1.5 group-hover:h-1 group-focus-visible:top-1.5 group-focus-visible:h-1"
+        style={{ transform: "scaleX(0)", transition: HOVER_TRANSITION }}
       />
     </div>
   );

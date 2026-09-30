@@ -25,6 +25,11 @@ export type NavSong = {
   track?: number;
   duration?: number;
   path?: string;
+  /** 以下三项只在播放时用：判断能否直接发原文件 */
+  suffix?: string;
+  bitRate?: number;
+  /** 无损格式才有位深，有损格式为 0 或缺省 */
+  bitDepth?: number;
 };
 
 export type MappingRow = { id: number; navid_id: string };

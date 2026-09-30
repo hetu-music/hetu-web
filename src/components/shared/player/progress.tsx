@@ -82,17 +82,24 @@ export function useProgress() {
     ),
   );
 
-  // 跳转发出后，新流就绪或取流失败（isLoading 落回 false）时交还给实际位置
-  useEffect(
-    () =>
-      usePlayerStore.subscribe((s, prev) => {
-        if (!prev.isLoading || s.isLoading) return;
-        if (draggingRef.current || previewRef.current === null) return;
-        previewRef.current = null;
-        refresh();
-      }),
-    [refresh],
-  );
+  // 跳转发出后交还给实际位置：转码流在新流就绪或取流失败（isLoading 落回 false）时，
+  // 原文件在浏览器原生跳转完成（seeked）时
+  useEffect(() => {
+    const release = () => {
+      if (draggingRef.current || previewRef.current === null) return;
+      previewRef.current = null;
+      refresh();
+    };
+    const unsubscribe = usePlayerStore.subscribe((s, prev) => {
+      if (prev.isLoading && !s.isLoading) release();
+    });
+    const audio = getAudio();
+    audio?.addEventListener("seeked", release);
+    return () => {
+      unsubscribe();
+      audio?.removeEventListener("seeked", release);
+    };
+  }, [refresh]);
 
   const preview = useCallback(
     (t: number) => {

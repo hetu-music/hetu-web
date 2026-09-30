@@ -221,6 +221,31 @@ describe("播放条", () => {
     expect(screen.getByText("1:02")).toBeTruthy();
   });
 
+  it("原文件原生跳转：预览位置保持到 seeked", () => {
+    renderPlayer();
+    const slider = screen.getByRole("slider", { name: "播放进度" });
+    slider.getBoundingClientRect = () => ({ left: 0, width: 245 }) as DOMRect;
+
+    // 原生跳转不经过 isLoading；这里只看进度条这一侧，store 的跳转换成桩
+    const seek = usePlayerStore.getState().seek;
+    act(() => usePlayerStore.setState({ seek: vi.fn() }));
+    fireEvent.pointerDown(slider, { clientX: 90, pointerId: 1 });
+    fireEvent.pointerUp(slider, { clientX: 90, pointerId: 1 });
+    expect(screen.getByText("1:30")).toBeTruthy();
+
+    // 跳转完成前的旧位置不能闪回
+    fakeAudio.currentTime = 5;
+    emit("timeupdate");
+    expect(screen.getByText("1:30")).toBeTruthy();
+
+    fakeAudio.currentTime = 90;
+    emit("seeked");
+    fakeAudio.currentTime = 91;
+    emit("timeupdate");
+    expect(screen.getByText("1:31")).toBeTruthy();
+    act(() => usePlayerStore.setState({ seek }));
+  });
+
   it("歌词用楷体，字号按字数缩放", () => {
     renderPlayer();
     const line = screen.getByText("第一句");

@@ -9,6 +9,8 @@ import {
 import {
   buildStreamUrl,
   streamLinkConfigFromEnv,
+  streamModeFor,
+  type StreamMode,
 } from "@/lib/navidrome/stream-link";
 
 /**
@@ -118,9 +120,11 @@ export const GET = withAuth(
 
     const navidSongId = navidRow.navid_id as string;
 
-    // opus 流没有 Content-Length，浏览器读不出 audio.duration，时长要从元数据取；
-    // 也用来算链接的过期时间。取不到不影响播放
+    // 曲目元数据：时长（opus 流没有 Content-Length，浏览器读不出 audio.duration，
+    // 也用来算链接的过期时间）和格式（有损源直接发原文件）。
+    // 取不到时不带时长、按转码处理，不影响播放
     let duration: number | null = null;
+    let mode: StreamMode = "transcode";
     const navidrome = navidromeConfigFromEnv();
     if (navidrome) {
       try {
@@ -128,8 +132,9 @@ export const GET = withAuth(
           timeoutMs: DURATION_TIMEOUT_MS,
         });
         duration = song?.duration ?? null;
+        mode = streamModeFor(song);
       } catch {
-        // 降级为 null
+        // 降级为转码、无时长
       }
     }
 
@@ -138,9 +143,12 @@ export const GET = withAuth(
         navidId: navidSongId,
         userId: user.id,
         duration,
+        mode,
         timeOffset,
       }),
       duration,
+      // 原文件支持分段请求，浏览器能原生跳转；转码流跳转要带 timeOffset 重新取
+      seekable: mode === "original",
     });
   },
 );

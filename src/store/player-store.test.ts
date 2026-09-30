@@ -18,6 +18,17 @@ const { getFakeAudio, resetFakeAudio } = vi.hoisted(() => {
       currentTime: 0,
       src: "",
       playbackRate: 1,
+      readyState: 0,
+      listeners: {} as Record<string, (() => void)[]>,
+    };
+    // 只实现 once 语义用得到的部分：emit 时调用并清掉
+    a.addEventListener = (type: string, fn: () => void) => {
+      (a.listeners[type] ??= []).push(fn);
+    };
+    a.emit = (type: string) => {
+      const fns = a.listeners[type] ?? [];
+      a.listeners[type] = [];
+      fns.forEach((fn: () => void) => fn());
     };
     a.play = () => {
       a.paused = false;
@@ -387,6 +398,91 @@ describe("seek", () => {
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
     const secondCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(secondCallUrl).toContain("timeOffset=100");
+  });
+});
+
+describe("seek：原文件（seekable）", () => {
+  function stubSeekable() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          url: "https://example.com/file",
+          duration: 200,
+          seekable: true,
+        }),
+      })),
+    );
+  }
+
+  it("原文件直接改 currentTime，不重新取流", async () => {
+    stubSeekable();
+    usePlayerStore.getState().play(track(1));
+    await vi.waitFor(() =>
+      expect(getFakeAudio().src).toBe("https://example.com/file"),
+    );
+    getFakeAudio().readyState = 4;
+    vi.mocked(fetch).mockClear();
+
+    usePlayerStore.getState().seek(80);
+    expect(getFakeAudio().currentTime).toBe(80);
+    expect(fetch).not.toHaveBeenCalled();
+    // 原文件的 currentTime 就是整首里的位置
+    expect(usePlayerStore.getState().seekBase).toBe(0);
+  });
+
+  it("元数据没到时先等 loadedmetadata 再跳", async () => {
+    stubSeekable();
+    usePlayerStore.getState().play(track(1));
+    await vi.waitFor(() =>
+      expect(getFakeAudio().src).toBe("https://example.com/file"),
+    );
+
+    usePlayerStore.getState().seek(50);
+    expect(getFakeAudio().currentTime).toBe(0);
+    getFakeAudio().emit("loadedmetadata");
+    expect(getFakeAudio().currentTime).toBe(50);
+  });
+
+  it("带起播位置取到原文件时：从头发，元数据就绪后跳过去，seekBase 为 0", async () => {
+    stubSeekable();
+    usePlayerStore.setState({ currentTrack: track(1) });
+    usePlayerStore.getState()._fetchAndSetSrc(1, false, 42);
+    await vi.waitFor(() =>
+      expect(getFakeAudio().src).toBe("https://example.com/file"),
+    );
+    expect(usePlayerStore.getState().seekBase).toBe(0);
+    getFakeAudio().emit("loadedmetadata");
+    expect(getFakeAudio().currentTime).toBe(42);
+  });
+
+  it("换成转码流后恢复为重新取流", async () => {
+    stubSeekable();
+    usePlayerStore.getState().play(track(1));
+    await vi.waitFor(() =>
+      expect(getFakeAudio().src).toBe("https://example.com/file"),
+    );
+    // 不带 seekable 即转码流
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          url: "https://example.com/stream",
+          duration: 120,
+        }),
+      })),
+    );
+    usePlayerStore.getState().play(track(2));
+    await vi.waitFor(() =>
+      expect(getFakeAudio().src).toBe("https://example.com/stream"),
+    );
+    vi.mocked(fetch).mockClear();
+
+    usePlayerStore.getState().seek(30);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain("timeOffset=30");
   });
 });
 

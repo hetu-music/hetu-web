@@ -166,6 +166,64 @@ describe("GET /api/navidrome/stream-url — 限流", () => {
   });
 });
 
+function stubSong(song: object) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        "subsonic-response": {
+          status: "ok",
+          song: { id: "track-abc", title: "歌", duration: 245, ...song },
+        },
+      }),
+    })),
+  );
+}
+
+describe("GET /api/navidrome/stream-url — 原文件与转码", () => {
+  it("mp3 发原文件，可原生跳转", async () => {
+    stubSong({ suffix: "mp3", bitRate: 320 });
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      seekable: boolean;
+    };
+    expect(new URL(body.url).pathname).toBe("/file/track-abc");
+    expect(body.seekable).toBe(true);
+  });
+
+  it("原文件不带起播位置，由浏览器自己跳", async () => {
+    stubSong({ suffix: "mp3" });
+    const url = await getUrl("?songId=42&timeOffset=63");
+    expect(url.searchParams.has("t")).toBe(false);
+  });
+
+  it("flac 转码，不能原生跳转", async () => {
+    stubSong({ suffix: "flac", bitDepth: 16 });
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      seekable: boolean;
+    };
+    expect(new URL(body.url).pathname).toBe("/stream/track-abc");
+    expect(body.seekable).toBe(false);
+  });
+
+  it("取不到曲目信息时按转码处理", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    );
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      seekable: boolean;
+    };
+    expect(new URL(body.url).pathname).toBe("/stream/track-abc");
+    expect(body.seekable).toBe(false);
+  });
+});
+
 describe("GET /api/navidrome/stream-url — 播放链接", () => {
   it("返回中继上的签名路径，不带任何 Navidrome 凭证", async () => {
     const res = await GET(makeRequest());

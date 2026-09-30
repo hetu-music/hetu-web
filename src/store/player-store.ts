@@ -65,7 +65,10 @@ export interface PlayerActions {
   _setVolumeState: (volume: number, isMuted: boolean) => void;
   _onEnded: () => void;
   _addLyrics: (songId: number, lyrics: string) => void;
-  /** 内部：stream-url fetch，timeOffset 用于 opus seek */
+  /**
+   * 内部：stream-url fetch。timeOffset 是起播位置：转码流由服务端从这里开始转，
+   * 原文件则在元数据就绪后由浏览器跳过去
+   */
   _fetchAndSetSrc: (
     songId: number,
     isRetry?: boolean,
@@ -89,10 +92,35 @@ let _isSeekingMediaSession = false;
 let _seekTargetTime: number | null = null;
 /** MediaSession seekto debounce timer */
 let _seekToTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * 当前音源能否原生跳转：原文件（mp3 等有损源）带长度、支持分段请求，
+ * 跳转直接改 audio.currentTime；转码的 opus 流不行，要带 timeOffset 重新取流。
+ * 由 stream-url 返回的 seekable 决定，每次取新地址前先复位
+ */
+let _nativeSeek = false;
 /** fetch 请求版本号，每次 _fetchAndSetSrc 递增，回调里不匹配则丢弃（防并发竞态） */
 let _fetchGeneration = 0;
 
 // ─── 工具 ─────────────────────────────────────────────────────────────────────
+
+/**
+ * 原文件跳到指定位置。元数据还没到时先等 loadedmetadata：
+ * 这之前改 currentTime，有的浏览器（Safari）会直接忽略
+ */
+function nativeSeekTo(audio: HTMLAudioElement, time: number) {
+  // 1 即 HTMLMediaElement.HAVE_METADATA；不引用全局常量，node 下的单测也能跑
+  if (audio.readyState >= 1) {
+    audio.currentTime = time;
+    return;
+  }
+  audio.addEventListener(
+    "loadedmetadata",
+    () => {
+      audio.currentTime = time;
+    },
+    { once: true },
+  );
+}
 
 /** 取播放地址失败，带上给用户看的错误种类 */
 class StreamUrlError extends Error {
@@ -230,6 +258,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
 
       set({ isLoading: true, error: null });
       _isSeekingMediaSession = true;
+      // 新地址回来之前不知道是哪种音源，期间的跳转一律按重新取流处理
+      _nativeSeek = false;
 
       const qs = new URLSearchParams({ songId: String(songId) });
       if (timeOffset > 0) qs.set("timeOffset", String(Math.floor(timeOffset)));
@@ -240,9 +270,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
           return r.json() as Promise<{
             url?: string;
             duration?: number;
+            seekable?: boolean;
           }>;
         })
-        .then(({ url, duration }) => {
+        .then(({ url, duration, seekable }) => {
           // 版本号不匹配说明已有更新的请求，丢弃此结果
           if (generation !== _fetchGeneration) return;
           if (songId !== _loadingTrackId) return;
@@ -253,11 +284,15 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
           _isSeeking = false;
           audio.src = url;
           audio.load();
+          _nativeSeek = seekable === true;
+          // 原文件总是从头开始发，起播位置由浏览器自己跳过去
+          if (_nativeSeek && timeOffset > 0) nativeSeekTo(audio, timeOffset);
 
-          // 更新 seekBase 和 trackDuration，isLoading 由 loadstart/canplay 事件管理，不在这里改
+          // 更新 seekBase 和 trackDuration，isLoading 由 loadstart/canplay 事件管理，不在这里改。
+          // 原文件的 currentTime 就是整首里的位置，seekBase 恒为 0
           set({
             error: null,
-            seekBase: timeOffset,
+            seekBase: _nativeSeek ? 0 : timeOffset,
             ...(duration != null && duration > 0
               ? { trackDuration: duration }
               : {}),
@@ -457,16 +492,23 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
       });
     },
 
-    // opus 流不支持原生 seek，改用 timeOffset 重新请求流
+    // 原文件直接改 currentTime；转码的 opus 流不支持原生 seek，改用 timeOffset 重新请求流
     seek: (time) => {
       const s = get();
       if (!s.currentTrack) return;
       const targetTime = Math.max(0, Math.min(time, s.trackDuration || 0));
-      // 立即告知系统控件目标位置，不等 canplay
+      // 立即告知系统控件目标位置，不等 canplay / seeked
       _seekTargetTime = targetTime;
       _isSeekingMediaSession = true;
       syncMediaSessionPosition();
+      // 与重新取流的行为一致：跳转后接着播
       _shouldPlayAfterLoad = true;
+      const audio = getAudio();
+      if (_nativeSeek && audio) {
+        nativeSeekTo(audio, targetTime);
+        if (audio.paused) safePlay();
+        return;
+      }
       get()._fetchAndSetSrc(s.currentTrack.songId, false, targetTime);
     },
 
@@ -532,7 +574,12 @@ if (typeof window !== "undefined") {
       if (isNetworkError && _retryCount < 1) {
         _retryCount += 1;
         if (_loadingTrackId !== null) {
-          usePlayerStore.getState()._fetchAndSetSrc(_loadingTrackId, true);
+          // 从断开的位置接着取：播到一半断线、原文件链接过期（410）都走这里
+          const { seekBase } = usePlayerStore.getState();
+          const resumeAt = Math.floor(seekBase + audio.currentTime);
+          usePlayerStore
+            .getState()
+            ._fetchAndSetSrc(_loadingTrackId, true, resumeAt);
           return;
         }
       }
@@ -558,6 +605,13 @@ if (typeof window !== "undefined") {
       if (now - lastPositionSync < 10_000) return;
       lastPositionSync = now;
       syncMediaSessionPosition();
+    });
+    // 原生跳转完成：恢复 MediaSession 位置同步（转码流由 canplay 负责）。
+    // 要注册在下面的同步监听之前，同步时才会用实际位置而不是目标位置
+    audio.addEventListener("seeked", () => {
+      if (!_nativeSeek) return;
+      _isSeekingMediaSession = false;
+      _seekTargetTime = null;
     });
     ["play", "pause", "seeked", "ratechange", "durationchange"].forEach((e) =>
       audio.addEventListener(e, syncMediaSessionPosition),

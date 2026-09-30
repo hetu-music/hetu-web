@@ -4,6 +4,7 @@ import PlayerToggle from "@/components/shared/PlayerToggle";
 import { cn } from "@/lib/utils/utils";
 import { usePlayerStore } from "@/store/player-store";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { useTranslations } from "next-intl";
 import React, { useEffect, useState } from "react";
 
 interface FloatingActionButtonsProps {
@@ -56,6 +57,7 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
   onScrollToTop,
   className,
 }) => {
+  const t = useTranslations("common.scroll");
   const hasPlayer = usePlayerStore((s) => !!s.currentTrack);
   // 播放条展开时让到它上方
   const playerShown = usePlayerStore(
@@ -75,7 +77,8 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
       onBlur={() => setHeld(false)}
       className={cn(
         "fixed right-4 sm:right-6 z-50 flex flex-col overflow-hidden rounded-full",
-        "bg-white/90 dark:bg-slate-900/85 backdrop-blur-xl",
+        // 与播放条、下拉同用页面底色：不透明，不做毛玻璃（常驻元素的模糊会持续耗电）
+        "bg-[#FAFAFA] dark:bg-[#0B0F19]",
         "ring-1 ring-slate-900/[0.06] dark:ring-white/10",
         "shadow-[0_10px_28px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_10px_28px_-12px_rgba(0,0,0,0.6)]",
         "transition-[bottom,opacity,translate] duration-300 ease-out",
@@ -104,8 +107,8 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
             type="button"
             onClick={showScrollTop ? onScrollToTop : scrollToBottom}
             className={cn(BUTTON_CLASS, "relative")}
-            title={showScrollTop ? "返回顶部" : "一键到底"}
-            aria-label={showScrollTop ? "返回顶部" : "一键到底"}
+            title={showScrollTop ? t("toTop") : t("toBottom")}
+            aria-label={showScrollTop ? t("toTop") : t("toBottom")}
             aria-hidden={!showJump}
             tabIndex={showJump ? 0 : -1}
           >

@@ -222,9 +222,9 @@ describe("播放条", () => {
   });
 
   it("出错时错误优先于歌词", () => {
-    usePlayerStore.setState({ error: "网络错误" });
+    usePlayerStore.setState({ error: "network" });
     renderPlayer();
-    expect(screen.getByText("网络错误")).toBeTruthy();
+    expect(screen.getByText("网络错误，无法加载音频")).toBeTruthy();
     expect(screen.queryByText("第一句")).toBeNull();
   });
 

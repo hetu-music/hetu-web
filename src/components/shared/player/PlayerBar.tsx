@@ -177,7 +177,7 @@ function TrackSubline({
     return (
       <p className="mt-0.5 flex items-center gap-1 text-xs text-rose-500">
         <AlertCircle size={12} className="shrink-0" />
-        <span className="truncate">{error}</span>
+        <span className="truncate">{t(`errors.${error}`)}</span>
       </p>
     );
   }

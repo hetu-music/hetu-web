@@ -105,6 +105,27 @@
     "close": "收起",
     "unknownArtist": "佚名",
     "show": "展开播放器",
-    "hide": "收起播放器"
+    "hide": "收起播放器",
+    "preview": "试听本首",
+    "previewing": "正在试听本首",
+    "enqueue": "加入队列",
+    "enqueueTitle": "加入播放队列",
+    "inQueue": "已在队列",
+    "inQueueTitle": "已在播放队列",
+    "errors": {
+      "blocked": "浏览器拦下了自动播放，请点一下播放",
+      "forbidden": "暂无试听权限",
+      "notFound": "这首暂无音源",
+      "unavailable": "音源服务暂不可用，请稍后重试",
+      "streamFailed": "获取播放地址失败，请稍后重试",
+      "network": "网络错误，无法加载音频",
+      "decode": "音频解码失败",
+      "unsupported": "不支持的音频格式或无权访问",
+      "failed": "播放失败，请稍后重试"
+    }
+  },
+  "scroll": {
+    "toTop": "返回顶部",
+    "toBottom": "一键到底"
   }
 }

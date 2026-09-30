@@ -150,22 +150,51 @@ describe("play", () => {
     usePlayerStore.getState().play(track(1));
 
     await vi.waitFor(() => {
-      expect(usePlayerStore.getState().error).toBeTruthy();
+      expect(usePlayerStore.getState().error).toBe("streamFailed");
     });
     expect(usePlayerStore.getState().isPlaying).toBe(false);
+  });
+
+  it.each([
+    [401, "forbidden"],
+    [403, "forbidden"],
+    [404, "notFound"],
+    [503, "unavailable"],
+  ] as const)("stream-url 返回 %i 时错误为 %s", async (status, code) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status })),
+    );
+    usePlayerStore.getState().play(track(1));
+
+    await vi.waitFor(() => {
+      expect(usePlayerStore.getState().error).toBe(code);
+    });
+  });
+
+  it("接口成功但没给地址时按取地址失败处理", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({}) })),
+    );
+    usePlayerStore.getState().play(track(1));
+
+    await vi.waitFor(() => {
+      expect(usePlayerStore.getState().error).toBe("streamFailed");
+    });
   });
 
   it("网络异常（fetch reject）时降级为 error 状态而不抛出未捕获异常", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
-        throw new Error("network down");
+        throw new TypeError("Failed to fetch");
       }),
     );
     usePlayerStore.getState().play(track(1));
 
     await vi.waitFor(() => {
-      expect(usePlayerStore.getState().error).toBe("network down");
+      expect(usePlayerStore.getState().error).toBe("network");
     });
   });
 

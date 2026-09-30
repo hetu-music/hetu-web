@@ -105,6 +105,27 @@
     "close": "收起",
     "unknownArtist": "佚名",
     "show": "展開播放器",
-    "hide": "收起播放器"
+    "hide": "收起播放器",
+    "preview": "試聽本首",
+    "previewing": "正在試聽本首",
+    "enqueue": "加入佇列",
+    "enqueueTitle": "加入播放佇列",
+    "inQueue": "已在佇列",
+    "inQueueTitle": "已在播放佇列",
+    "errors": {
+      "blocked": "瀏覽器攔下了自動播放，請點一下播放",
+      "forbidden": "暫無試聽權限",
+      "notFound": "這首暫無音源",
+      "unavailable": "音源服務暫不可用，請稍後重試",
+      "streamFailed": "取得播放網址失敗，請稍後重試",
+      "network": "網路錯誤，無法載入音訊",
+      "decode": "音訊解碼失敗",
+      "unsupported": "不支援的音訊格式或無權存取",
+      "failed": "播放失敗，請稍後重試"
+    }
+  },
+  "scroll": {
+    "toTop": "回到頂部",
+    "toBottom": "一鍵到底"
   }
 }

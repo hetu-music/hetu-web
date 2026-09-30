@@ -37,9 +37,7 @@ beforeEach(() => {
     intro: "简介",
     is_admin: false,
     is_super: false,
-    navid_id: null,
-    navid_pw: null,
-    endpoint: null,
+    can_stream: false,
   };
   mockRowError = null;
 });
@@ -50,41 +48,19 @@ describe("GET /api/auth/me", () => {
     expect((await GET(request())).status).toBe(401);
   });
 
-  it("返回资料但不包含 navid_pw 等凭证字段", async () => {
-    mockRow = {
-      ...mockRow,
-      navid_id: "navi-user",
-      navid_pw: "navi-secret",
-      endpoint: "https://pre.example.com",
-    };
+  it("返回资料，权益只给出布尔值", async () => {
+    mockRow = { ...mockRow, can_stream: true };
 
     const res = await GET(request());
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.name).toBe("荼靡");
-    // 明文密码绝不能出现在响应里
-    expect(JSON.stringify(body)).not.toContain("navi-secret");
-    expect(body).not.toHaveProperty("navid_pw");
+    expect(body.hasBenefits).toBe(true);
+    expect(body).not.toHaveProperty("can_stream");
   });
 
-  it("三项凭证齐全时 hasBenefits 为 true", async () => {
-    mockRow = {
-      ...mockRow,
-      navid_id: "navi-user",
-      navid_pw: "navi-secret",
-      endpoint: "https://pre.example.com",
-    };
-    expect((await (await GET(request())).json()).hasBenefits).toBe(true);
-  });
-
-  it("凭证缺任意一项时 hasBenefits 为 false", async () => {
-    mockRow = {
-      ...mockRow,
-      navid_id: "navi-user",
-      navid_pw: "navi-secret",
-      endpoint: null,
-    };
+  it("没有试听权益时 hasBenefits 为 false", async () => {
     expect((await (await GET(request())).json()).hasBenefits).toBe(false);
   });
 
@@ -97,14 +73,14 @@ describe("GET /api/auth/me", () => {
   });
 
   it("查询出错时不泄漏数据库原始错误", async () => {
-    mockRowError = { message: 'column "navid_pw" does not exist' };
+    mockRowError = { message: 'column "can_stream" does not exist' };
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await GET(request());
     const body = JSON.stringify(await res.json());
 
     expect(res.status).toBe(500);
-    expect(body).not.toContain("navid_pw");
+    expect(body).not.toContain("can_stream");
     spy.mockRestore();
   });
 });

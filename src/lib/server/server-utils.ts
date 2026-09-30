@@ -57,7 +57,7 @@ export async function setCSRFCookie(token: string) {
   const cookies = await nextCookies();
   cookies.set(CSRF_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
   });

@@ -9,6 +9,8 @@ import {
   Play,
   Check,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import PlayingBars from "@/components/shared/PlayingBars";
 import { cn } from "@/lib/utils/utils";
 import { usePlayerStore } from "@/store/player-store";
 import type { PlayerTrack } from "@/store/player-store";
@@ -30,6 +32,7 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
   hasAudio = true,
   className,
 }) => {
+  const t = useTranslations("common.player");
   // 细粒度 selector，避免无关状态变化触发重渲染
   const currentTrack = usePlayerStore((s) => s.currentTrack);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -73,19 +76,22 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
   if (!hasAudio) return null;
 
   const status = currentError
-    ? currentError
+    ? t(`errors.${currentError}`)
     : isThisLoading
-      ? "正在加载…"
+      ? t("loading")
       : isThisPlaying
-        ? "正在试听本首"
-        : "试听本首";
+        ? t("previewing")
+        : t("preview");
 
   return (
     <div className={cn("flex items-center gap-4 select-none", className)}>
       <button
+        type="button"
         onClick={handleToggle}
         disabled={isThisLoading}
-        aria-label={isThisPlaying ? "暂停" : "播放"}
+        aria-label={
+          isThisLoading ? t("loading") : isThisPlaying ? t("pause") : t("play")
+        }
         className={cn(
           "w-11 h-11 shrink-0 rounded-full flex items-center justify-center transition-all duration-300",
           "border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--tone)/40",
@@ -106,20 +112,7 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
       </button>
 
       <div className="min-w-0 flex items-center gap-2.5">
-        {isThisPlaying && !currentError && (
-          <span className="flex gap-0.5 items-end h-3 shrink-0" aria-hidden>
-            {[60, 100, 40].map((h, j) => (
-              <span
-                key={j}
-                className="w-0.5 bg-(--tone) rounded-full"
-                style={{
-                  height: `${h}%`,
-                  animation: `gpBounce 0.8s ease-in-out ${j * 0.2}s infinite`,
-                }}
-              />
-            ))}
-          </span>
-        )}
+        {isThisPlaying && !currentError && <PlayingBars />}
         <p
           className={cn(
             "text-sm tracking-wider truncate",
@@ -128,8 +121,18 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
               : "text-slate-600 dark:text-slate-300",
           )}
         >
-          {currentError && <AlertCircle size={13} className="shrink-0" />}
-          {status}
+          {currentError ? (
+            <>
+              <AlertCircle size={13} className="shrink-0" />
+              <span className="truncate">{status}</span>
+              {/* 错误代码不截断：用户截图反馈时靠它判断断在哪一环 */}
+              <span className="shrink-0 font-mono text-[11px] tracking-normal opacity-60">
+                {currentError}
+              </span>
+            </>
+          ) : (
+            status
+          )}
         </p>
       </div>
 
@@ -137,30 +140,24 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
 
       {isInQueue ? (
         <span
-          title="已在播放队列"
+          title={t("inQueueTitle")}
           className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 shrink-0"
         >
           <Check size={13} strokeWidth={2.5} />
-          已在队列
+          {t("inQueue")}
         </span>
       ) : (
         <button
+          type="button"
           onClick={handleEnqueue}
-          aria-label="加入播放队列"
-          title="加入播放队列"
+          aria-label={t("enqueueTitle")}
+          title={t("enqueueTitle")}
           className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 hover:text-(--tone) transition-colors shrink-0"
         >
           <ListPlus size={14} />
-          加入队列
+          {t("enqueue")}
         </button>
       )}
-
-      <style>{`
-        @keyframes gpBounce {
-          0%, 100% { transform: scaleY(0.4); }
-          50% { transform: scaleY(1); }
-        }
-      `}</style>
     </div>
   );
 };

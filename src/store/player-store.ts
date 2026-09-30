@@ -12,6 +12,21 @@ export interface PlayerTrack {
   coverUrl?: string | null;
 }
 
+/**
+ * 播放错误的种类。store 里只存代码，文案由组件按 common.player.errors 翻译
+ */
+export type PlayerErrorCode =
+  | "blocked"
+  | "forbidden"
+  | "notFound"
+  | "unavailable"
+  | "rateLimited"
+  | "streamFailed"
+  | "network"
+  | "decode"
+  | "unsupported"
+  | "failed";
+
 export interface PlayerState {
   currentTrack: PlayerTrack | null;
   queue: PlayerTrack[];
@@ -20,7 +35,7 @@ export interface PlayerState {
   isLoading: boolean;
   volume: number;
   isMuted: boolean;
-  error: string | null;
+  error: PlayerErrorCode | null;
   playerVisible: boolean;
   lyricsMap: Map<number, string>;
   /** 从 Navidrome getSong 获取的准确时长（秒），opus 流无法从 audio.duration 读取 */
@@ -46,7 +61,7 @@ export interface PlayerActions {
   /** 内部：audio 事件回调用 */
   _setPlaying: (v: boolean) => void;
   _setLoading: (v: boolean) => void;
-  _setError: (msg: string | null) => void;
+  _setError: (code: PlayerErrorCode | null) => void;
   _setVolumeState: (volume: number, isMuted: boolean) => void;
   _onEnded: () => void;
   _addLyrics: (songId: number, lyrics: string) => void;
@@ -79,6 +94,23 @@ let _fetchGeneration = 0;
 
 // ─── 工具 ─────────────────────────────────────────────────────────────────────
 
+/** 取播放地址失败，带上给用户看的错误种类 */
+class StreamUrlError extends Error {
+  code: PlayerErrorCode;
+  constructor(code: PlayerErrorCode) {
+    super(code);
+    this.code = code;
+  }
+}
+
+function streamUrlErrorCode(status: number): PlayerErrorCode {
+  if (status === 401 || status === 403) return "forbidden";
+  if (status === 404) return "notFound";
+  if (status === 429) return "rateLimited";
+  if (status === 503) return "unavailable";
+  return "streamFailed";
+}
+
 function safePlay() {
   const audio = getAudio();
   if (!audio) return;
@@ -88,9 +120,7 @@ function safePlay() {
       if (err.name !== "AbortError") {
         console.warn("[Player] play() failed:", err.message);
         if (err.name === "NotAllowedError") {
-          usePlayerStore
-            .getState()
-            ._setError("播放被浏览器阻止，请手动点击播放");
+          usePlayerStore.getState()._setError("blocked");
           usePlayerStore.getState()._setPlaying(false);
         }
       }
@@ -154,7 +184,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
     // ── 内部 setters ──────────────────────────────────────────────────────────
     _setPlaying: (v) => set({ isPlaying: v }),
     _setLoading: (v) => set({ isLoading: v }),
-    _setError: (msg) => set({ error: msg }),
+    _setError: (code) => set({ error: code }),
     _setVolumeState: (volume, isMuted) => set({ volume, isMuted }),
     _addLyrics: (songId, lyrics) =>
       set((s) => {
@@ -206,18 +236,17 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
 
       fetch(`/api/navidrome/stream-url?${qs}`)
         .then((r) => {
-          if (!r.ok) throw new Error(`stream-url error: ${r.status}`);
+          if (!r.ok) throw new StreamUrlError(streamUrlErrorCode(r.status));
           return r.json() as Promise<{
             url?: string;
             duration?: number;
-            error?: string;
           }>;
         })
-        .then(({ url, duration, error }) => {
+        .then(({ url, duration }) => {
           // 版本号不匹配说明已有更新的请求，丢弃此结果
           if (generation !== _fetchGeneration) return;
           if (songId !== _loadingTrackId) return;
-          if (!url) throw new Error(error ?? "未获取到播放地址");
+          if (!url) throw new StreamUrlError("streamFailed");
 
           _isSeeking = true;
           audio.pause();
@@ -238,12 +267,17 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
           // 版本号不匹配说明已被取代，静默丢弃
           if (generation !== _fetchGeneration) return;
           if (songId !== _loadingTrackId) return;
-          const msg =
-            err instanceof Error ? err.message : "获取播放地址失败，请稍后重试";
+          // fetch 本身 reject 是断网或请求被拦（TypeError），其余按接口返回归类
+          const code: PlayerErrorCode =
+            err instanceof StreamUrlError
+              ? err.code
+              : err instanceof TypeError
+                ? "network"
+                : "streamFailed";
           _shouldPlayAfterLoad = false;
           _isSeekingMediaSession = false;
           _seekTargetTime = null;
-          set({ isLoading: false, isPlaying: false, error: msg });
+          set({ isLoading: false, isPlaying: false, error: code });
         });
     },
 
@@ -503,22 +537,31 @@ if (typeof window !== "undefined") {
         }
       }
 
-      let msg = "播放失败，请稍后重试";
-      if (err?.code === MediaError.MEDIA_ERR_NETWORK)
-        msg = "网络错误，无法加载音频";
-      if (err?.code === MediaError.MEDIA_ERR_DECODE) msg = "音频解码失败";
+      let code: PlayerErrorCode = "failed";
+      if (err?.code === MediaError.MEDIA_ERR_NETWORK) code = "network";
+      if (err?.code === MediaError.MEDIA_ERR_DECODE) code = "decode";
       if (err?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED)
-        msg = "不支持的音频格式或无权限";
+        code = "unsupported";
 
       _shouldPlayAfterLoad = false;
       usePlayerStore.getState()._setLoading(false);
       usePlayerStore.getState()._setPlaying(false);
-      usePlayerStore.getState()._setError(msg);
+      usePlayerStore.getState()._setError(code);
     });
 
-    // MediaSession 进度同步（timeupdate 持续更新，canplay 在 seek 后立即同步）
-    audio.addEventListener("timeupdate", syncMediaSessionPosition);
-    audio.addEventListener("ratechange", syncMediaSessionPosition);
+    // MediaSession 进度同步：系统控件会按 position + playbackRate 自行推算，
+    // 只需在位置跳变时同步（canplay 覆盖 seek 与换曲）。timeupdate 每秒约 4 次，
+    // 逐次同步会不停唤醒锁屏/通知栏控件，这里只做低频校准，防止长时间累积漂移
+    let lastPositionSync = 0;
+    audio.addEventListener("timeupdate", () => {
+      const now = Date.now();
+      if (now - lastPositionSync < 10_000) return;
+      lastPositionSync = now;
+      syncMediaSessionPosition();
+    });
+    ["play", "pause", "seeked", "ratechange", "durationchange"].forEach((e) =>
+      audio.addEventListener(e, syncMediaSessionPosition),
+    );
   }, 0);
 }
 /* v8 ignore stop */

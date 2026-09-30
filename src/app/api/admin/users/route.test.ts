@@ -67,7 +67,7 @@ describe("GET /api/admin/users", () => {
     expect(res.status).toBe(503);
   });
 
-  it("superAdmin 正常获取用户列表（不含 navid_pw）", async () => {
+  it("superAdmin 正常获取用户列表", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({ data: [{ id: "u1", name: "张三" }], error: null }),
@@ -119,33 +119,39 @@ describe("PUT /api/admin/users（防止超管权限被误撤销）", () => {
     expect(res.status).toBe(200);
   });
 
-  it("navid_pw 为空字符串时视为“不修改”，不会被写入更新对象", async () => {
+  it("不再保存 Navidrome 密码：旧客户端传来的 navid_pw 被忽略", async () => {
     const client = createMockSupabaseClient([
       makeQueryBuilder({ data: null, error: null }),
     ]);
     vi.mocked(getServiceClient).mockReturnValue(client);
 
     await PUT(
-      jsonRequest("PUT", { id: VALID_UUID, name: "新名字", navid_pw: "" }),
+      jsonRequest("PUT", { id: VALID_UUID, name: "新名字", navid_pw: "x" }),
     );
 
-    // 断言实际传给 .update() 的对象里不包含 navid_pw 字段
     const builder = client.from.mock.results[0].value;
     const updateCall = builder.update.mock.calls[0][0];
     expect(updateCall).not.toHaveProperty("navid_pw");
     expect(updateCall).toMatchObject({ name: "新名字" });
   });
 
-  it("navid_pw 显式传 null 时会被写入为 null（清空凭证）", async () => {
+  it("收回权益：can_stream 写入 false，旧的账号字段被忽略", async () => {
     const client = createMockSupabaseClient([
       makeQueryBuilder({ data: null, error: null }),
     ]);
     vi.mocked(getServiceClient).mockReturnValue(client);
 
-    await PUT(jsonRequest("PUT", { id: VALID_UUID, navid_pw: null }));
+    await PUT(
+      jsonRequest("PUT", {
+        id: VALID_UUID,
+        can_stream: false,
+        navid_id: null,
+        endpoint: null,
+      }),
+    );
 
     const builder = client.from.mock.results[0].value;
     const updateCall = builder.update.mock.calls[0][0];
-    expect(updateCall).toMatchObject({ navid_pw: null });
+    expect(updateCall).toEqual({ can_stream: false });
   });
 });

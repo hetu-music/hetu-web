@@ -26,9 +26,7 @@ interface EditState {
   display: boolean;
   intro: string;
   is_admin: boolean;
-  navid_id: string;
-  navid_pw: string; // write-only, empty = no change
-  endpoint: string;
+  can_stream: boolean;
 }
 
 function buildEditState(user: UserRecord): EditState {
@@ -37,9 +35,7 @@ function buildEditState(user: UserRecord): EditState {
     display: user.display,
     intro: user.intro ?? "",
     is_admin: user.is_admin,
-    navid_id: user.navid_id ?? "",
-    navid_pw: "",
-    endpoint: user.endpoint ?? "",
+    can_stream: user.can_stream,
   };
 }
 export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
@@ -97,16 +93,11 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
       setClearingId(userId);
       setSaveMsg(null);
       try {
-        await apiUpdateUser(
-          { id: userId, navid_id: null, navid_pw: null, endpoint: null },
-          csrfToken,
-        );
+        await apiUpdateUser({ id: userId, can_stream: false }, csrfToken);
         setUsers((prev) =>
-          prev.map((u) =>
-            u.id === userId ? { ...u, navid_id: null, endpoint: null } : u,
-          ),
+          prev.map((u) => (u.id === userId ? { ...u, can_stream: false } : u)),
         );
-        setSaveMsg("已清空");
+        setSaveMsg("已收回");
       } catch (e) {
         setSaveMsg(e instanceof Error ? e.message : "操作失败");
       } finally {
@@ -129,13 +120,8 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
           display: editState.display,
           intro: editState.intro || null,
           is_admin: editState.is_admin,
-          navid_id: editState.navid_id || null,
-          endpoint: editState.endpoint || null,
+          can_stream: editState.can_stream,
         };
-        // Only send navid_pw when user typed something
-        if (editState.navid_pw) {
-          payload.navid_pw = editState.navid_pw;
-        }
         await apiUpdateUser(payload, csrfToken);
         setUsers((prev) =>
           prev.map((u) =>
@@ -146,8 +132,7 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
                   display: editState.display,
                   intro: editState.intro || null,
                   is_admin: editState.is_admin,
-                  navid_id: editState.navid_id || null,
-                  endpoint: editState.endpoint || null,
+                  can_stream: editState.can_stream,
                 }
               : u,
           ),
@@ -312,62 +297,6 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
                           />
                         </div>
 
-                        {/* navid_id */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                            Navid ID
-                          </label>
-                          <input
-                            type="text"
-                            value={editState.navid_id}
-                            onChange={(e) =>
-                              setEditState((s) =>
-                                s ? { ...s, navid_id: e.target.value } : s,
-                              )
-                            }
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          />
-                        </div>
-
-                        {/* navid_pw — write-only */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                            Navid 密码{" "}
-                            <span className="text-slate-400 normal-case font-normal">
-                              (留空=不修改)
-                            </span>
-                          </label>
-                          <input
-                            type="password"
-                            value={editState.navid_pw}
-                            onChange={(e) =>
-                              setEditState((s) =>
-                                s ? { ...s, navid_pw: e.target.value } : s,
-                              )
-                            }
-                            placeholder="输入新密码"
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          />
-                        </div>
-
-                        {/* endpoint */}
-                        <div className="space-y-1 sm:col-span-2">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                            登录网址 (Endpoint)
-                          </label>
-                          <input
-                            type="url"
-                            value={editState.endpoint}
-                            onChange={(e) =>
-                              setEditState((s) =>
-                                s ? { ...s, endpoint: e.target.value } : s,
-                              )
-                            }
-                            placeholder="https://示例网址"
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          />
-                        </div>
-
                         {/* intro */}
                         <div className="space-y-1 sm:col-span-2">
                           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
@@ -414,6 +343,35 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
                           </div>
                           <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
                             公开展示
+                          </span>
+                        </label>
+
+                        {/* can_stream toggle */}
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <div
+                            onClick={() =>
+                              setEditState((s) =>
+                                s ? { ...s, can_stream: !s.can_stream } : s,
+                              )
+                            }
+                            className={cn(
+                              "w-9 h-5 rounded-full transition-colors relative",
+                              editState.can_stream
+                                ? "bg-blue-500"
+                                : "bg-slate-300 dark:bg-slate-700",
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
+                                editState.can_stream
+                                  ? "translate-x-4"
+                                  : "translate-x-0.5",
+                              )}
+                            />
+                          </div>
+                          <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                            试听权益
                           </span>
                         </label>
 
@@ -512,22 +470,12 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
                       </div>
                       <div>
                         <span className="text-slate-400 font-bold uppercase tracking-wide text-[10px]">
-                          Navid ID
+                          试听权益
                         </span>
-                        <p className="text-slate-700 dark:text-slate-300 mt-0.5 font-mono">
-                          {user.navid_id || "—"}
+                        <p className="text-slate-700 dark:text-slate-300 mt-0.5">
+                          {user.can_stream ? "有" : "无"}
                         </p>
                       </div>
-                      {user.endpoint && (
-                        <div className="col-span-2 sm:col-span-3">
-                          <span className="text-slate-400 font-bold uppercase tracking-wide text-[10px]">
-                            登录网址
-                          </span>
-                          <p className="text-slate-700 dark:text-slate-300 mt-0.5 font-mono break-all">
-                            {user.endpoint}
-                          </p>
-                        </div>
-                      )}
                       {user.intro && (
                         <div className="col-span-2 sm:col-span-3">
                           <span className="text-slate-400 font-bold uppercase tracking-wide text-[10px]">
@@ -539,8 +487,8 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
                         </div>
                       )}
 
-                      {/* Clear benefits button — only shown when navid_id has a value */}
-                      {user.navid_id && (
+                      {/* 收回权益：只在有权益时显示 */}
+                      {user.can_stream && (
                         <div className="col-span-2 sm:col-span-3 pt-1">
                           <button
                             onClick={() => handleClearBenefits(user.id)}
@@ -552,7 +500,7 @@ export default function UserManagePanel({ csrfToken }: UserManagePanelProps) {
                             ) : (
                               <Trash2 size={12} />
                             )}
-                            清空权益
+                            收回权益
                           </button>
                         </div>
                       )}

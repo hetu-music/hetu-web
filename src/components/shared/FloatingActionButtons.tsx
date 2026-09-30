@@ -4,6 +4,7 @@ import PlayerToggle from "@/components/shared/PlayerToggle";
 import { cn } from "@/lib/utils/utils";
 import { usePlayerStore } from "@/store/player-store";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { useTranslations } from "next-intl";
 import React, { useEffect, useState } from "react";
 
 interface FloatingActionButtonsProps {
@@ -47,7 +48,9 @@ function scrollToBottom() {
 
 /**
  * 页面右下角的竖向胶囊：播放条开关（有曲目时常驻）与跳转按钮。
- * 跳转按钮只在滚动时出现，停下一会儿后收起；指针停在胶囊上时不收。
+ * 跳转按钮只在滚动时出现，停下一会儿后收起；已展开时指针停在胶囊上不收，
+ * 但指针移入或聚焦不会把收起的按钮展开——否则胶囊一变高，刚瞄准的开关就挪了位置。
+ * 胶囊贴底定位，开关放在最下面：跳转按钮在它上方伸缩，开关始终不动。
  * 没滚下去时指向底部，滚下去后指向顶部。
  * 两者都不显示时整条隐去；只剩一个时胶囊收成圆形。
  */
@@ -56,6 +59,7 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
   onScrollToTop,
   className,
 }) => {
+  const t = useTranslations("common.scroll");
   const hasPlayer = usePlayerStore((s) => !!s.currentTrack);
   // 播放条展开时让到它上方
   const playerShown = usePlayerStore(
@@ -68,25 +72,31 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
 
   return (
     <div
-      onPointerEnter={(e) => e.pointerType === "mouse" && setHeld(true)}
+      onPointerEnter={(e) =>
+        e.pointerType === "mouse" && showJump && setHeld(true)
+      }
       onPointerLeave={() => setHeld(false)}
       // 只有键盘聚焦才留住；鼠标点过后按钮仍带焦点，不能因此一直不收
-      onFocus={(e) => e.target.matches(":focus-visible") && setHeld(true)}
+      onFocus={(e) =>
+        showJump && e.target.matches(":focus-visible") && setHeld(true)
+      }
       onBlur={() => setHeld(false)}
       className={cn(
         "fixed right-4 sm:right-6 z-50 flex flex-col overflow-hidden rounded-full",
-        "bg-white/90 dark:bg-slate-900/85 backdrop-blur-xl",
+        // 页面底色略透一点，不做毛玻璃（常驻元素的模糊会持续耗电）
+        "bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95",
         "ring-1 ring-slate-900/[0.06] dark:ring-white/10",
         "shadow-[0_10px_28px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_10px_28px_-12px_rgba(0,0,0,0.6)]",
         "transition-[bottom,opacity,translate] duration-300 ease-out",
-        playerShown ? "bottom-[112px]" : "bottom-6 sm:bottom-8",
+        // 播放条高 4rem（另加底部安全区），胶囊浮在它上方 1rem
+        playerShown
+          ? "bottom-[calc(5rem+env(safe-area-inset-bottom))]"
+          : "bottom-6 sm:bottom-8",
         !visible && "opacity-0 translate-y-3 pointer-events-none",
         className,
       )}
     >
-      <PlayerToggle className={BUTTON_CLASS} />
-
-      {/* 跳转：不显示时高度收起，胶囊随之缩短 */}
+      {/* 跳转：不显示时高度收起，胶囊从上方缩短 */}
       <div
         className={cn(
           "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
@@ -94,15 +104,12 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
         )}
       >
         <div className="min-h-0 overflow-hidden">
-          {hasPlayer && (
-            <div className="mx-auto h-px w-5 bg-slate-200 dark:bg-slate-700" />
-          )}
           <button
             type="button"
             onClick={showScrollTop ? onScrollToTop : scrollToBottom}
             className={cn(BUTTON_CLASS, "relative")}
-            title={showScrollTop ? "返回顶部" : "一键到底"}
-            aria-label={showScrollTop ? "返回顶部" : "一键到底"}
+            title={showScrollTop ? t("toTop") : t("toBottom")}
+            aria-label={showScrollTop ? t("toTop") : t("toBottom")}
             aria-hidden={!showJump}
             tabIndex={showJump ? 0 : -1}
           >
@@ -123,8 +130,13 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
               )}
             />
           </button>
+          {hasPlayer && (
+            <div className="mx-auto h-px w-5 bg-slate-200 dark:bg-slate-700" />
+          )}
         </div>
       </div>
+
+      <PlayerToggle className={BUTTON_CLASS} />
     </div>
   );
 };

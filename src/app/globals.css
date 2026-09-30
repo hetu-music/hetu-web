@@ -359,3 +359,26 @@
     transform: translateY(0);
   }
 }
+
+/* 播放中的跳动条（PlayingBars）：只在播放且可见时挂载，避免看不见的元素持续占用合成 */
+@keyframes playing-bar {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.playing-bar-anim {
+  transform-origin: bottom;
+  animation: playing-bar 0.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playing-bar-anim {
+    animation: none;
+  }
+}

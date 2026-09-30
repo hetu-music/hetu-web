@@ -1,141 +1,84 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getAudio } from "@/lib/player/audio-engine";
 import { usePlayerStore } from "@/store/player-store";
 
+type Tick = (currentTime: number, duration: number) => void;
+
 /**
- * usePlayerTime
+ * usePlaybackTick
  *
- * 低频 React state（用于歌词行切换）+ 高频 DOM 回调（用于进度条/时间码）。
+ * 播放进度回调，不产生 React state，供调用方直接写 DOM（进度条、时间码）。
  *
- * - currentTime / duration：仅在歌词行可能切换时更新（约每秒一次），
- *   驱动 GlobalPlayer 里 currentLrcIndex 的 useMemo，避免 60fps 重渲染。
- * - onTick：每个 rAF 帧调用，供调用方直接操作 DOM（进度条宽度、时间码文字），
- *   完全绕开 React 渲染管线。
+ * 跟随 audio 的 timeupdate（约每秒 4 次）而不是 rAF：一首三分钟的歌，
+ * 进度条约半秒才走 1px，逐帧（高刷屏上每秒 120 次）重绘几乎全是白算，
+ * 手机上会持续占着 GPU 发热。
+ *
+ * 返回的 refresh 用于元素晚于本 hook 挂载时补一次（暂停时不会有 timeupdate）。
  */
-export function usePlayerTime(
-  onTick?: (currentTime: number, duration: number) => void,
-): {
-  currentTime: number;
-  duration: number;
-} {
-  const trackDuration = usePlayerStore((s) => s.trackDuration);
-  const seekBase = usePlayerStore((s) => s.seekBase);
-
-  const seekBaseRef = useRef(seekBase);
-  const trackDurationRef = useRef(trackDuration);
+export function usePlaybackTick(onTick: Tick): () => void {
   const onTickRef = useRef(onTick);
-
-  useEffect(() => {
-    seekBaseRef.current = seekBase;
-  }, [seekBase]);
-  useEffect(() => {
-    trackDurationRef.current = trackDuration;
-  }, [trackDuration]);
   useEffect(() => {
     onTickRef.current = onTick;
   });
 
-  const [currentTime, setCurrentTime] = useState(seekBase);
-  const rafIdRef = useRef<number>(0);
-  const isPlayingRef = useRef(false);
-  // 上次触发 setState 时的秒数（整数），只在整秒变化时才 setState
-  const lastSecRef = useRef(-1);
-  // loadstart 到 canplay 之间屏蔽 readTime，防止 audio.currentTime=0 时写入错误位置
-  const isLoadingRef = useRef(false);
-
-  // seekBase 变化时立即同步
-  const [prevSeekBase, setPrevSeekBase] = useState(seekBase);
-  if (prevSeekBase !== seekBase) {
-    setPrevSeekBase(seekBase);
-    setCurrentTime(seekBase);
-  }
-
-  // 在 effect 中同步 lastSecRef，避免在渲染阶段写 ref
-  useEffect(() => {
-    lastSecRef.current = Math.floor(seekBase);
-  }, [seekBase]);
+  const refresh = useCallback(() => {
+    const audio = getAudio();
+    if (!audio) return;
+    const { seekBase, trackDuration, isLoading } = usePlayerStore.getState();
+    // 加载中（换曲或 opus 重新取流）audio 里还是旧流或已归零，位置不可信，
+    // 此时 seekBase 就是新流的起点：换曲为 0，跳转为目标秒数
+    const ct = isLoading ? seekBase : seekBase + audio.currentTime;
+    onTickRef.current(ct, trackDuration);
+  }, []);
 
   useEffect(() => {
     const audio = getAudio();
     if (!audio) return;
 
-    const readTime = () => {
-      // seek/加载期间 audio.currentTime 不可信（已被重置为 0），跳过
-      if (isLoadingRef.current) return;
-
-      const ct = seekBaseRef.current + audio.currentTime;
-      const dur = trackDurationRef.current;
-
-      // 高频 DOM 回调（每帧）
-      onTickRef.current?.(ct, dur);
-
-      // 低频 setState（每整秒，用于歌词行切换）
-      const sec = Math.floor(ct);
-      if (sec !== lastSecRef.current) {
-        lastSecRef.current = sec;
-        setCurrentTime(ct);
-      }
-    };
-
-    const startRaf = () => {
-      cancelAnimationFrame(rafIdRef.current);
-      const loop = () => {
-        readTime();
-        if (isPlayingRef.current) {
-          rafIdRef.current = requestAnimationFrame(loop);
-        }
-      };
-      rafIdRef.current = requestAnimationFrame(loop);
-    };
-
-    const onPlay = () => {
-      isPlayingRef.current = true;
-      startRaf();
-    };
-    const onPause = () => {
-      isPlayingRef.current = false;
-      cancelAnimationFrame(rafIdRef.current);
-      readTime();
-    };
-    const onSeeked = () => readTime();
-    const onLoadedMetadata = () => readTime();
-    const onLoadStart = () => {
-      isLoadingRef.current = true;
-    };
-    const onCanPlay = () => {
-      isLoadingRef.current = false;
-      // 新流就绪，立即用最新的 seekBase + audio.currentTime 刷新一次
-      readTime();
-      // 如果正在播放，重启 rAF 循环
-      if (isPlayingRef.current) startRaf();
-    };
-
-    audio.addEventListener("play", onPlay);
-    audio.addEventListener("pause", onPause);
-    audio.addEventListener("seeked", onSeeked);
-    audio.addEventListener("loadedmetadata", onLoadedMetadata);
-    audio.addEventListener("loadstart", onLoadStart);
-    audio.addEventListener("canplay", onCanPlay);
-
-    if (!audio.paused) {
-      isPlayingRef.current = true;
-      startRaf();
-    } else {
-      readTime();
-    }
+    const events = ["timeupdate", "seeked", "loadedmetadata", "pause"];
+    events.forEach((e) => audio.addEventListener(e, refresh));
+    // 新流就绪（isLoading 落回 false）和 seekBase / trackDuration 更新时
+    // 未必伴随 audio 事件，直接跟 store
+    const unsubscribe = usePlayerStore.subscribe((s, prev) => {
+      if (
+        s.isLoading !== prev.isLoading ||
+        s.seekBase !== prev.seekBase ||
+        s.trackDuration !== prev.trackDuration
+      )
+        refresh();
+    });
+    refresh();
 
     return () => {
-      cancelAnimationFrame(rafIdRef.current);
-      audio.removeEventListener("play", onPlay);
-      audio.removeEventListener("pause", onPause);
-      audio.removeEventListener("seeked", onSeeked);
-      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
-      audio.removeEventListener("loadstart", onLoadStart);
-      audio.removeEventListener("canplay", onCanPlay);
+      events.forEach((e) => audio.removeEventListener(e, refresh));
+      unsubscribe();
     };
-  }, []);
+  }, [refresh]);
+
+  return refresh;
+}
+
+/**
+ * usePlayerTime
+ *
+ * 整秒粒度的 React state，用于歌词行切换这类低频渲染。
+ * 高频的进度条、时间码请用 usePlaybackTick 直接写 DOM。
+ */
+export function usePlayerTime(): { currentTime: number; duration: number } {
+  const trackDuration = usePlayerStore((s) => s.trackDuration);
+  const [currentTime, setCurrentTime] = useState(0);
+  const lastSecRef = useRef(-1);
+
+  usePlaybackTick(
+    useCallback((ct: number) => {
+      const sec = Math.floor(ct);
+      if (sec === lastSecRef.current) return;
+      lastSecRef.current = sec;
+      setCurrentTime(ct);
+    }, []),
+  );
 
   return { currentTime, duration: trackDuration };
 }

@@ -258,7 +258,6 @@ export type SongFieldConfig = {
 };
 
 // 用户记录类型（管理员用户管理面板）
-// navid_pw 为只写字段，不在读取结果中返回
 export type UserRecord = {
   id: string;
   name: string;
@@ -266,8 +265,8 @@ export type UserRecord = {
   intro: string | null;
   is_admin: boolean;
   is_super: boolean;
-  navid_id: string | null;
-  endpoint: string | null;
+  /** 试听权益：能否在站内播放 */
+  can_stream: boolean;
 };
 
 // ─── 用户请求/反馈相关类型 ────────────────────────────────────────────────────
@@ -314,7 +313,5 @@ export type UserUpdatePayload = {
   intro?: string | null;
   is_admin?: boolean;
   is_super?: boolean;
-  navid_id?: string | null;
-  navid_pw?: string | null;
-  endpoint?: string | null;
+  can_stream?: boolean;
 };

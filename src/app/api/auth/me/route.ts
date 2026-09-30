@@ -9,9 +9,7 @@ export const GET = withAuth(
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from(TABLES.USERS)
-      .select(
-        "name, display, intro, is_admin, is_super, navid_id, navid_pw, endpoint",
-      )
+      .select("name, display, intro, is_admin, is_super, can_stream")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -27,7 +25,7 @@ export const GET = withAuth(
       intro: data?.intro ?? null,
       isAdmin: data?.is_admin ?? false,
       isSuper: data?.is_super ?? false,
-      hasBenefits: !!data?.navid_id && !!data?.navid_pw && !!data?.endpoint,
+      hasBenefits: data?.can_stream === true,
     });
   },
 );

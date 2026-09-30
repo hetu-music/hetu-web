@@ -66,6 +66,7 @@ async function call<T>(
   config: NavidromeConfig,
   endpoint: string,
   params: Record<string, string>,
+  timeoutMs = TIMEOUT_MS,
 ): Promise<T> {
   const salt = crypto.randomBytes(8).toString("hex");
   const query = new URLSearchParams({
@@ -81,7 +82,7 @@ async function call<T>(
     ...params,
   });
   const res = await fetch(`${config.url}/rest/${endpoint}?${query}`, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   });
   if (!res.ok)
@@ -119,13 +120,22 @@ export async function fetchNavidromeLibrary(
   }
 }
 
-/** 查询单个曲目，不存在时返回 null */
+/**
+ * 查询单个曲目，不存在时返回 null。
+ * 播放前取时长时传一个短的 timeoutMs，别让起播等上 30 秒
+ */
 export async function fetchNavidromeSong(
   config: NavidromeConfig,
   id: string,
+  { timeoutMs }: { timeoutMs?: number } = {},
 ): Promise<NavSong | null> {
   try {
-    const body = await call<{ song?: RawSong }>(config, "getSong", { id });
+    const body = await call<{ song?: RawSong }>(
+      config,
+      "getSong",
+      { id },
+      timeoutMs,
+    );
     return body.song ? toNavSong(body.song) : null;
   } catch (error) {
     if (error instanceof NavidromeError && error.code === ERROR_NOT_FOUND) {

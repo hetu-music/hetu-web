@@ -593,21 +593,17 @@ if (typeof window !== "undefined") {
       state.currentIndex !== prev.currentIndex;
 
     if (trackChanged) {
+      // 手拼的优化图地址不会被 Next 自动纠正：w 必须在 deviceSizes/imageSizes 里，
+      // q 必须在 images.qualities 里（Next 16 默认只有 75），否则 /_next/image 直接 400。
+      // 输出格式按 Accept 协商（可能是 webp/avif），所以不写 type
       const artworkSrc = currentTrack.coverUrl
-        ? `/_next/image?url=${encodeURIComponent(currentTrack.coverUrl)}&w=512&q=90`
+        ? `/_next/image?url=${encodeURIComponent(currentTrack.coverUrl)}&w=640&q=75`
         : null;
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title,
         artist: currentTrack.artist ?? undefined,
         artwork: artworkSrc
-          ? [
-              { src: artworkSrc, sizes: "96x96", type: "image/jpeg" },
-              { src: artworkSrc, sizes: "128x128", type: "image/jpeg" },
-              { src: artworkSrc, sizes: "192x192", type: "image/jpeg" },
-              { src: artworkSrc, sizes: "256x256", type: "image/jpeg" },
-              { src: artworkSrc, sizes: "384x384", type: "image/jpeg" },
-              { src: artworkSrc, sizes: "512x512", type: "image/jpeg" },
-            ]
+          ? [{ src: artworkSrc, sizes: "640x640" }]
           : undefined,
       });
     }

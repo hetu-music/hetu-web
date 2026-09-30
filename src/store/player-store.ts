@@ -20,6 +20,7 @@ export type PlayerErrorCode =
   | "forbidden"
   | "notFound"
   | "unavailable"
+  | "rateLimited"
   | "streamFailed"
   | "network"
   | "decode"
@@ -105,6 +106,7 @@ class StreamUrlError extends Error {
 function streamUrlErrorCode(status: number): PlayerErrorCode {
   if (status === 401 || status === 403) return "forbidden";
   if (status === 404) return "notFound";
+  if (status === 429) return "rateLimited";
   if (status === 503) return "unavailable";
   return "streamFailed";
 }

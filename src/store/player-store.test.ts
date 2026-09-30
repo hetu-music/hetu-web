@@ -159,6 +159,7 @@ describe("play", () => {
     [401, "forbidden"],
     [403, "forbidden"],
     [404, "notFound"],
+    [429, "rateLimited"],
     [503, "unavailable"],
   ] as const)("stream-url 返回 %i 时错误为 %s", async (status, code) => {
     vi.stubGlobal(

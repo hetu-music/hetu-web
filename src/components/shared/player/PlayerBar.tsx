@@ -178,6 +178,10 @@ function TrackSubline({
       <p className="mt-0.5 flex items-center gap-1 text-xs text-rose-500">
         <AlertCircle size={12} className="shrink-0" />
         <span className="truncate">{t(`errors.${error}`)}</span>
+        {/* 错误代码不截断：用户截图反馈时靠它判断断在哪一环 */}
+        <span className="shrink-0 font-mono text-[10px] opacity-60">
+          {error}
+        </span>
       </p>
     );
   }

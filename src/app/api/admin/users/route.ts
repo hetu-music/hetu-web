@@ -17,14 +17,10 @@ const userUpdateSchema = z.object({
   display: z.boolean().optional(),
   intro: z.string().max(500, "简介不能超过500个字符").nullable().optional(),
   is_admin: z.boolean().optional(),
-  navid_id: z.string().max(100).nullable().optional(),
-  // navid_pw 为只写字段，允许为空字符串（表示不修改）
-  navid_pw: z.string().max(200).nullable().optional(),
-  // endpoint 为登录网址，普通字段
-  endpoint: z.string().max(500).nullable().optional(),
+  can_stream: z.boolean().optional(),
 });
 
-// ─── GET: 列出所有用户（不含 navid_pw）────────────────────────────────────────
+// ─── GET: 列出所有用户 ────────────────────────────────────────────────────────
 
 export const GET = withAuth(
   async (_request: NextRequest, _user: AuthenticatedUser) => {
@@ -36,7 +32,7 @@ export const GET = withAuth(
     const users = await fetchAll<UserRecord>(
       supabase,
       TABLES.USERS,
-      "id, name, display, intro, is_admin, is_super, navid_id, endpoint",
+      "id, name, display, intro, is_admin, is_super, can_stream",
       (q) => q.order("sort_order", { ascending: true, nullsFirst: false }),
     );
 
@@ -65,7 +61,7 @@ export const PUT = withAuth(
       );
     }
 
-    const { id, navid_pw, ...fieldsToUpdate } = parsed.data;
+    const { id, ...fieldsToUpdate } = parsed.data;
 
     // 防止超级管理员被取消 is_admin 权限
     if (fieldsToUpdate.is_admin === false) {
@@ -90,12 +86,6 @@ export const PUT = withAuth(
     const updateObj: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(fieldsToUpdate)) {
       if (value !== undefined) updateObj[key] = value;
-    }
-    // navid_pw 非空字符串时才写入（空字符串表示不修改）
-    if (navid_pw !== undefined && navid_pw !== null && navid_pw !== "") {
-      updateObj.navid_pw = navid_pw;
-    } else if (navid_pw === null) {
-      updateObj.navid_pw = null;
     }
 
     if (Object.keys(updateObj).length === 0) {

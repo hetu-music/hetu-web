@@ -2,18 +2,55 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
-import nodeCrypto from "crypto";
-import { fetchWithTimeout } from "@/lib/utils/utils-common";
+import {
+  fetchNavidromeSong,
+  navidromeConfigFromEnv,
+} from "@/lib/navidrome/client";
+import {
+  buildStreamUrl,
+  streamLinkConfigFromEnv,
+} from "@/lib/navidrome/stream-link";
 
-function md5(input: string): string {
-  return nodeCrypto.createHash("md5").update(input, "utf8").digest("hex");
+/**
+ * 每位用户在滚动窗口内最多能取几首「不同的」歌。拖进度条会带 timeOffset 重新取地址，
+ * 同一首歌重复取不算新的一首。正常听歌一小时十几首、一天几百首，这里只拦批量拉取。
+ */
+const HOURLY_SONG_LIMIT = 60;
+const DAILY_SONG_LIMIT = 400;
+
+/** 取时长最多等这么久，超时就不带时长，不耽误起播 */
+const DURATION_TIMEOUT_MS = 3000;
+
+/**
+ * 登记一次取流并检查额度，返回 true 表示放行。
+ * 数据库出错时放行并记日志：用户就那么几个，限流失效比放不了歌好。
+ */
+async function claimStreamGrant(
+  supabase: NonNullable<ReturnType<typeof getServiceClient>>,
+  userId: string,
+  songId: number,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("claim_stream_grant", {
+    p_user_id: userId,
+    p_song_id: songId,
+    p_hour_limit: HOURLY_SONG_LIMIT,
+    p_day_limit: DAILY_SONG_LIMIT,
+  });
+  if (error) {
+    console.error("[stream-url] claim_stream_grant failed:", error);
+    return true;
+  }
+  return data === "ok";
 }
 
 export const GET = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
     const { searchParams } = new URL(request.url);
     const songIdStr = searchParams.get("songId")?.trim();
-    const timeOffsetStr = searchParams.get("timeOffset");
+    const timeOffset = Math.max(
+      0,
+      Math.floor(Number(searchParams.get("timeOffset")) || 0),
+    );
 
     if (!songIdStr) {
       return NextResponse.json(
@@ -27,32 +64,28 @@ export const GET = withAuth(
       return NextResponse.json({ error: "invalid songId" }, { status: 400 });
     }
 
+    // 有试听权益的用户才能取链接；播放本身走服务账号和签名链接
     const supabase = await createSupabaseServerClient();
     const { data: userData, error: userErr } = await supabase
       .from(TABLES.USERS)
-      .select("navid_id, navid_pw, endpoint")
+      .select("can_stream")
       .eq("id", user.id)
       .maybeSingle();
 
     if (userErr || !userData) {
       return NextResponse.json(
-        { error: "Failed to fetch user credentials" },
+        { error: "Failed to fetch user" },
         { status: 500 },
       );
     }
 
-    const { navid_id, navid_pw, endpoint } = userData as {
-      navid_id: string | null;
-      navid_pw: string | null;
-      endpoint: string | null;
-    };
-
-    if (!navid_id || !navid_pw || !endpoint) {
+    if ((userData as { can_stream: boolean }).can_stream !== true) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const linkConfig = streamLinkConfigFromEnv();
     const serviceClient = getServiceClient();
-    if (!serviceClient) {
+    if (!linkConfig || !serviceClient) {
       return NextResponse.json(
         { error: "Service unavailable" },
         { status: 503 },
@@ -79,61 +112,34 @@ export const GET = withAuth(
       );
     }
 
-    const navidSongId = navidRow.navid_id as string;
-
-    const salt = nodeCrypto.randomBytes(8).toString("hex");
-    const token = md5(navid_pw + salt);
-    const base = endpoint.replace(/\/$/, "");
-
-    // 从 Navidrome getSong 获取准确的 duration（opus 流没有 Content-Length，
-    // 浏览器无法从 audio.duration 读取，必须从元数据获取）
-    let duration: number | null = null;
-    try {
-      const songInfoParams = new URLSearchParams({
-        u: navid_id,
-        t: token,
-        s: salt,
-        v: "1.16.1",
-        c: "hetu-web",
-        id: navidSongId,
-        f: "json",
-      });
-      const songInfoRes = await fetchWithTimeout(
-        `${base}/rest/getSong?${songInfoParams}`,
-        {},
-        5000,
-      );
-      if (songInfoRes.ok) {
-        const songInfo = (await songInfoRes.json()) as {
-          "subsonic-response"?: { song?: { duration?: number } };
-        };
-        duration = songInfo?.["subsonic-response"]?.song?.duration ?? null;
-      }
-    } catch {
-      // duration 获取失败不影响播放，降级为 null
+    if (!(await claimStreamGrant(serviceClient, user.id, songId))) {
+      return NextResponse.json({ error: "Too many songs" }, { status: 429 });
     }
 
-    // 构造 stream URL，seek 时带 timeOffset 让 Navidrome 从指定秒数开始返回流
-    const streamParams = new URLSearchParams({
-      u: navid_id,
-      t: token,
-      s: salt,
-      v: "1.16.1",
-      c: "hetu-web",
-      id: navidSongId,
-      format: "opus",
-      maxBitRate: "192",
-    });
+    const navidSongId = navidRow.navid_id as string;
 
-    if (timeOffsetStr) {
-      const timeOffset = parseFloat(timeOffsetStr);
-      if (!isNaN(timeOffset) && timeOffset > 0) {
-        streamParams.set("timeOffset", String(Math.floor(timeOffset)));
+    // opus 流没有 Content-Length，浏览器读不出 audio.duration，时长要从元数据取；
+    // 也用来算链接的过期时间。取不到不影响播放
+    let duration: number | null = null;
+    const navidrome = navidromeConfigFromEnv();
+    if (navidrome) {
+      try {
+        const song = await fetchNavidromeSong(navidrome, navidSongId, {
+          timeoutMs: DURATION_TIMEOUT_MS,
+        });
+        duration = song?.duration ?? null;
+      } catch {
+        // 降级为 null
       }
     }
 
     return NextResponse.json({
-      url: `${base}/rest/stream?${streamParams}`,
+      url: buildStreamUrl(linkConfig, {
+        navidId: navidSongId,
+        userId: user.id,
+        duration,
+        timeOffset,
+      }),
       duration,
     });
   },

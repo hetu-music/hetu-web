@@ -117,6 +117,7 @@
       "forbidden": "暂无试听权限",
       "notFound": "这首暂无音源",
       "unavailable": "音源服务暂不可用，请稍后重试",
+      "rateLimited": "播放太频繁，请稍后再试",
       "streamFailed": "获取播放地址失败，请稍后重试",
       "network": "网络错误，无法加载音频",
       "decode": "音频解码失败",

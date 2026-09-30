@@ -121,8 +121,18 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
               : "text-slate-600 dark:text-slate-300",
           )}
         >
-          {currentError && <AlertCircle size={13} className="shrink-0" />}
-          {status}
+          {currentError ? (
+            <>
+              <AlertCircle size={13} className="shrink-0" />
+              <span className="truncate">{status}</span>
+              {/* 错误代码不截断：用户截图反馈时靠它判断断在哪一环 */}
+              <span className="shrink-0 font-mono text-[11px] tracking-normal opacity-60">
+                {currentError}
+              </span>
+            </>
+          ) : (
+            status
+          )}
         </p>
       </div>
 

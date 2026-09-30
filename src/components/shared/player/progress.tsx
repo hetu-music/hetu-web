@@ -220,7 +220,7 @@ export function ProgressLine({
       <div className="absolute inset-x-0 top-2 h-px bg-slate-200 dark:bg-slate-800" />
       <div
         ref={fillRef}
-        className="absolute inset-x-0 top-[7px] h-0.5 origin-left bg-(--tone) group-hover:top-1.5 group-hover:h-1 group-focus-visible:top-1.5 group-focus-visible:h-1"
+        className="absolute inset-x-0 top-1.75 h-0.5 origin-left bg-(--tone) group-hover:top-1.5 group-hover:h-1 group-focus-visible:top-1.5 group-focus-visible:h-1"
         style={{ transform: "scaleX(0)", transition: HOVER_TRANSITION }}
       />
     </div>

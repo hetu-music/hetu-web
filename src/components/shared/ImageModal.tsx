@@ -30,6 +30,18 @@ const ImageModal: React.FC<ImageModalProps> = ({
   title,
 }) => {
   const t = useTranslations("common.imageViewer");
+
+  // 关闭时调用方会立刻把 src 清空，面板却还在放退场动画；留着上一张图，
+  // 否则 <img> 拿到空 src 会报错
+  const [shown, setShown] = useState({ src, alt, title });
+  if (
+    isOpen &&
+    src &&
+    (src !== shown.src || alt !== shown.alt || title !== shown.title)
+  ) {
+    setShown({ src, alt, title });
+  }
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
@@ -144,17 +156,6 @@ const ImageModal: React.FC<ImageModalProps> = ({
     rotateClockwise,
     rotateCounterClockwise,
   ]);
-
-  // 重置状态当模态框打开时
-  useEffect(() => {
-    if (isOpen) {
-      const resetModalState = () => {
-        resetTransform();
-        setShowHint(false); // 重置提示显示状态
-      };
-      resetModalState();
-    }
-  }, [isOpen, resetTransform]);
 
   // 切换提示显示
   const toggleHint = useCallback(() => {
@@ -371,18 +372,25 @@ const ImageModal: React.FC<ImageModalProps> = ({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
+      // 退场放完再复原缩放和旋转。放在打开时复原的话，上次放大过的图会先以放大的样子出现再缩回去
+      onOpenChangeComplete={(open) => {
+        if (!open) {
+          resetTransform();
+          setShowHint(false);
+        }
+      }}
     >
       <DialogContent
         variant="viewer"
-        aria-label={title ? undefined : alt}
+        aria-label={shown.title ? undefined : shown.alt}
         className="flex items-center justify-center p-4"
         style={{ touchAction: "none" }}
       >
         {/* 图片标题 - 左上角 */}
-        {title && (
+        {shown.title && (
           <div className="absolute top-4 left-4 z-10">
             <DialogTitle className="text-white dark:text-white text-lg font-semibold bg-black/30 backdrop-blur-sm px-4 py-2 rounded-full">
-              {title}
+              {shown.title}
             </DialogTitle>
           </div>
         )}
@@ -433,9 +441,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
           </div>
         )}
 
-        {/* 图片容器 - 占满整个屏幕 */}
+        {/* 图片容器 - 占满整个屏幕。开合时只有图片微微缩放，周围的标题和工具栏只淡入淡出 */}
         <div
-          className="absolute inset-0 flex items-center justify-center overflow-hidden"
+          className="absolute inset-0 flex items-center justify-center overflow-hidden transition-[scale] duration-300 ease-page group-data-starting-style:scale-95 group-data-ending-style:scale-95 group-data-ending-style:duration-200"
           style={{ touchAction: "none" }}
         >
           <div
@@ -460,16 +468,22 @@ const ImageModal: React.FC<ImageModalProps> = ({
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            <Image
-              src={src}
-              alt={alt}
-              width={1200}
-              height={800}
-              className="max-w-full max-h-full object-contain"
-              style={{ objectFit: "contain" }}
-              priority
-              draggable={false}
-            />
+            {shown.src && (
+              <Image
+                src={shown.src}
+                alt={shown.alt}
+                width={1200}
+                height={800}
+                // 加载完再淡入，不在面板淡入之后突然冒出来
+                onLoad={() => setLoadedSrc(shown.src)}
+                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ease-page ${
+                  loadedSrc === shown.src ? "opacity-100" : "opacity-0"
+                }`}
+                style={{ objectFit: "contain" }}
+                priority
+                draggable={false}
+              />
+            )}
           </div>
         </div>
 

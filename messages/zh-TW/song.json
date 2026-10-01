@@ -54,6 +54,8 @@
   "notFound": "歌曲不存在或已被刪除。",
   "ogSuffix": " - 河圖作品勘鑒",
   "viewCover": "查看封面",
+  "coverTitle": "{title} · 封面",
+  "scoreTitle": "{title} · 樂譜",
   "noCover": "暫無封面",
   "lyricFormat": {
     "normal": "普通",

@@ -2,7 +2,11 @@
   "site": {
     "name": "河图作品勘鉴",
     "title": "河图作品勘鉴 - 河图音乐作品收录与鉴赏",
-    "description": "河图音乐作品收录与鉴赏。"
+    "description": "河图音乐作品收录与鉴赏。",
+    "logo": {
+      "part1": "河图",
+      "part2": "作品勘鉴"
+    }
   },
   "nav": {
     "backToHome": "返回首页",
@@ -10,7 +14,16 @@
     "back": "返回",
     "about": "关于",
     "login": "登录",
-    "loading": "加载中…"
+    "loading": "加载中…",
+    "share": "分享本页",
+    "more": "更多",
+    "close": "关闭",
+    "install": "安装为应用",
+    "theme": "主题",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "themeSystem": "跟随系统",
+    "script": "文字"
   },
   "error": {
     "title": "出错了",
@@ -29,7 +42,7 @@
   "imagery": {
     "title": "意象词云",
     "description": "在 {count} 个精选意象中发现河图音乐的诗意世界。涵盖 {categoryNames} 等分类，探索山川、日月、草木、时令在歌词中的流转。",
-    "subtitle": "行过 {count} ，长歌踏雪去何方",
+    "subtitle": "{count} 回眸遍，长歌踏雪去何方",
     "all": "全部",
     "noData": "暂无数据",
     "times": "{count} 次",
@@ -41,7 +54,9 @@
       "lyricistLabel": "词作",
       "relatedSongs": "相关曲目",
       "songsByLyricist": "{name}的曲目",
-      "appears": "出现 {count} 次"
+      "appears": "出现 {count} 次",
+      "title": "意象详情",
+      "description": "{name}在河图作品中出现 {count} 次"
     }
   },
   "story": {
@@ -128,5 +143,38 @@
   "scroll": {
     "toTop": "返回顶部",
     "toBottom": "一键到底"
+  },
+  "installGuide": {
+    "title": "添加到主屏幕",
+    "intro": "在 iPhone、iPad 上需要手动添加，之后从主屏幕打开，没有地址栏。",
+    "step1": "点浏览器的「共享」按钮",
+    "hint1": "Safari 里没看到，先点右下角的「⋯」",
+    "step2": "在菜单里选「添加到主屏幕」",
+    "hint2": "在菜单靠下的位置，可能要往下滑",
+    "step3": "点右上角的「添加」",
+    "done": "知道了"
+  },
+  "imageViewer": {
+    "help": "操作提示",
+    "close": "关闭",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "rotateLeft": "逆时针旋转",
+    "rotateRight": "顺时针旋转",
+    "reset": "重置",
+    "hintZoom": "滚轮或双指缩放图片",
+    "hintDoubleClick": "双击放大或复原",
+    "hintDrag": "放大后拖动查看",
+    "hintRotate": "R、L 键旋转图片",
+    "hintReset": "0 键复原",
+    "hintClose": "Esc 键关闭"
+  },
+  "pagination": {
+    "first": "第一页",
+    "prev": "上一页",
+    "next": "下一页",
+    "last": "最后一页",
+    "choose": "选择页数",
+    "jumpTo": "跳到"
   }
 }

@@ -25,6 +25,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export type SongResult = SongRef;
 
+/** 没有署名词作者的曲目归在这一组；只作内部标记，显示时取 i18n 的「未知」 */
+export const UNKNOWN_LYRICIST = "\u0000unknown";
+
 export interface DetailPanelProps {
   open: boolean;
   panelSide?: "left" | "right";
@@ -76,7 +79,6 @@ const PanelBody = memo(function PanelBody({
   activeLyricist,
   onLyricistClick,
   onLinkClick,
-  isDesktop,
 }: {
   songs: SongResult[];
   songsLoading: boolean;
@@ -85,17 +87,18 @@ const PanelBody = memo(function PanelBody({
   activeLyricist: string | null;
   onLyricistClick: (name: string) => void;
   onLinkClick: () => void;
-  isDesktop: boolean;
 }) {
   const t = useTranslations("common.imagery");
   const tCommon = useTranslations("common");
   const activeLyricistLabel =
-    (activeLyricist === "未知" ? tCommon("unknown") : activeLyricist) || "";
+    (activeLyricist === UNKNOWN_LYRICIST
+      ? tCommon("unknown")
+      : activeLyricist) || "";
   const filtered = useMemo(
     () =>
       activeLyricist
         ? songs.filter((song) =>
-            activeLyricist === "未知"
+            activeLyricist === UNKNOWN_LYRICIST
               ? !song.lyricist || song.lyricist.length === 0
               : song.lyricist?.includes(activeLyricist),
           )
@@ -116,13 +119,7 @@ const PanelBody = memo(function PanelBody({
 
   if (songs.length === 0) {
     return (
-      <p
-        className={`text-center text-sm tracking-[0.25em] pl-[0.25em] py-16 ${
-          isDesktop
-            ? "text-slate-300 dark:text-slate-700"
-            : "text-slate-400 dark:text-slate-600"
-        }`}
-      >
+      <p className="text-center font-kaiti text-sm py-16 text-slate-400 dark:text-slate-500">
         {t("detailPanel.noWorks")}
       </p>
     );
@@ -147,7 +144,7 @@ const PanelBody = memo(function PanelBody({
               }`}
             >
               <span
-                className={`inline-block transition-all duration-500 font-system ${
+                className={`inline-block transition-all duration-500 ${
                   !activeLyricist
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 -translate-x-2"
@@ -158,7 +155,7 @@ const PanelBody = memo(function PanelBody({
               </span>
               {t("all")}
               <span
-                className={`inline-block transition-all duration-500 font-system ${
+                className={`inline-block transition-all duration-500 ${
                   !activeLyricist
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 translate-x-2"
@@ -170,7 +167,8 @@ const PanelBody = memo(function PanelBody({
             </button>
 
             {lyricistCounts.map(([name, count]) => {
-              const displayName = name === "未知" ? tCommon("unknown") : name;
+              const displayName =
+                name === UNKNOWN_LYRICIST ? tCommon("unknown") : name;
               const isActive = activeLyricist === name;
               return (
                 <button
@@ -183,7 +181,7 @@ const PanelBody = memo(function PanelBody({
                   }`}
                 >
                   <span
-                    className={`inline-block transition-all duration-500 font-system ${
+                    className={`inline-block transition-all duration-500 ${
                       isActive
                         ? "opacity-100 translate-x-0"
                         : "opacity-0 -translate-x-2"
@@ -194,7 +192,7 @@ const PanelBody = memo(function PanelBody({
                   </span>
                   {displayName}
                   <span
-                    className={`inline-block transition-all duration-500 font-system ${
+                    className={`inline-block transition-all duration-500 ${
                       isActive
                         ? "opacity-100 translate-x-0"
                         : "opacity-0 translate-x-2"
@@ -203,7 +201,7 @@ const PanelBody = memo(function PanelBody({
                   >
                     」
                   </span>
-                  <span className="ml-1 text-[10px] opacity-40 font-mono tracking-normal group-hover:opacity-60 transition-opacity">
+                  <span className="ml-1 text-[10px] opacity-40 tracking-normal group-hover:opacity-60 transition-opacity">
                     ({count})
                   </span>
                 </button>
@@ -252,7 +250,7 @@ const PanelBody = memo(function PanelBody({
                   className="flex items-center justify-between py-4 px-6 border-b border-slate-100/80 dark:border-slate-800/50 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group"
                 >
                   <div className="min-w-0 pr-4">
-                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors truncate tracking-wide">
+                    <div className="font-serif text-sm text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors truncate tracking-wide">
                       {song.title}
                     </div>
                     <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate tracking-wide">
@@ -277,6 +275,23 @@ const PanelBody = memo(function PanelBody({
 
 // ─── Panel header ──────────────────────────────────────────────────────────────
 
+/** 分类与出现次数，写法同歌曲页的意象书眉（ImageryCaption）：分类一行衬线小字，数目一行楷体 */
+function PanelMeta({ path, count }: { path: string[]; count: number }) {
+  const t = useTranslations("common.imagery");
+  return (
+    <div className="space-y-1">
+      {path.length > 0 && (
+        <p className="font-serif text-xs tracking-[0.2em] text-slate-500 dark:text-slate-400">
+          {path.join(" · ")}
+        </p>
+      )}
+      <p className="font-kaiti text-sm text-slate-600 dark:text-slate-300">
+        {t("detailPanel.appears", { count })}
+      </p>
+    </div>
+  );
+}
+
 function PanelHeader({
   selectedItem,
   selectedPalette,
@@ -288,7 +303,6 @@ function PanelHeader({
   selectedCategoryPath: string[];
   isDesktop: boolean;
 }) {
-  const t = useTranslations("common.imagery");
   if (!selectedItem) return null;
 
   if (isDesktop) {
@@ -297,7 +311,7 @@ function PanelHeader({
         {/* Decorative background character */}
         <span
           aria-hidden
-          className="pointer-events-none select-none absolute -bottom-6 -right-3 font-serif leading-none"
+          className="pointer-events-none select-none absolute -bottom-6 -right-3 font-calligraphy leading-none"
           style={{
             fontSize: "11rem",
             opacity: 0.035,
@@ -309,23 +323,11 @@ function PanelHeader({
         </span>
 
         <h2
-          className={`font-serif text-[3.2rem] leading-none font-normal tracking-[0.2em] mb-4 ${selectedPalette.text}`}
+          className={`font-calligraphy text-[3.2rem] leading-none font-normal tracking-[0.2em] mb-4 ${selectedPalette.text}`}
         >
           {selectedItem.name}
         </h2>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-xs text-slate-500 dark:text-slate-400 tracking-widest">
-            {t("detailPanel.appears", { count: selectedItem.count })}
-          </span>
-          {selectedCategoryPath.length > 0 && (
-            <>
-              <span className="text-slate-200 dark:text-slate-700">·</span>
-              <span className="text-xs text-slate-400 dark:text-slate-500 tracking-wide">
-                {selectedCategoryPath.join(" › ")}
-              </span>
-            </>
-          )}
-        </div>
+        <PanelMeta path={selectedCategoryPath} count={selectedItem.count} />
         <div
           className="mt-5 h-[1.5px] w-12 rounded-full"
           style={{ backgroundColor: selectedPalette.accent, opacity: 0.6 }}
@@ -339,19 +341,11 @@ function PanelHeader({
     <div className="flex items-start justify-between px-8 pt-3 pb-4 border-b border-slate-100/40 dark:border-slate-800/40 shrink-0">
       <div className="min-w-0">
         <h2
-          className={`font-serif text-3xl font-normal tracking-[0.2em] mb-1 ${selectedPalette.text}`}
+          className={`font-calligraphy text-3xl font-normal tracking-[0.2em] mb-1 ${selectedPalette.text}`}
         >
           {selectedItem.name}
         </h2>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 dark:text-slate-500 tracking-wide">
-          <span>{t("detailPanel.appears", { count: selectedItem.count })}</span>
-          {selectedCategoryPath.length > 0 && (
-            <>
-              <span className="text-slate-200 dark:text-slate-700">·</span>
-              <span>{selectedCategoryPath.join(" › ")}</span>
-            </>
-          )}
-        </div>
+        <PanelMeta path={selectedCategoryPath} count={selectedItem.count} />
       </div>
     </div>
   );
@@ -372,6 +366,7 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
     onClose,
   } = props;
 
+  const t = useTranslations("common.imagery");
   const isDesktop = useIsDesktop();
   const [activeLyricist, setActiveLyricist] = useState<string | null>(null);
 
@@ -382,52 +377,8 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
     });
   }, [selectedItem]);
 
-  // 面板开启时锁定页面滚动
-  useEffect(() => {
-    if (!open) return;
-
-    const html = document.documentElement;
-    const body = document.body;
-
-    const prev = {
-      htmlOverflow: html.style.overflow,
-      htmlTouchAction: html.style.touchAction,
-      htmlOverscrollBehavior: html.style.overscrollBehavior,
-      bodyOverflow: body.style.overflow,
-      bodyTouchAction: body.style.touchAction,
-      bodyOverscrollBehavior: body.style.overscrollBehavior,
-    };
-
-    // overflow:hidden 阻止窗口滚动，且不改变 window.scrollY。
-    // 不能用 position:fixed —— 它会将 scrollY 重置为 0，
-    // 破坏依赖 window.scrollY 定位的 useWindowVirtualizer。
-    html.style.overflow = "hidden";
-    html.style.touchAction = "none";
-    html.style.overscrollBehavior = "none";
-    body.style.overflow = "hidden";
-    body.style.touchAction = "none";
-    body.style.overscrollBehavior = "none";
-
-    // 额外阻止 iOS Safari 橡皮筋回弹，同时放行面板内部滚动容器的触摸事件
-    const preventTouchMove = (e: TouchEvent) => {
-      const target = e.target as Element | null;
-      if (target?.closest(".overflow-y-auto")) return;
-      e.preventDefault();
-    };
-    document.addEventListener("touchmove", preventTouchMove, {
-      passive: false,
-    });
-
-    return () => {
-      html.style.overflow = prev.htmlOverflow;
-      html.style.touchAction = prev.htmlTouchAction;
-      html.style.overscrollBehavior = prev.htmlOverscrollBehavior;
-      body.style.overflow = prev.bodyOverflow;
-      body.style.touchAction = prev.bodyTouchAction;
-      body.style.overscrollBehavior = prev.bodyOverscrollBehavior;
-      document.removeEventListener("touchmove", preventTouchMove);
-    };
-  }, [open]);
+  // 锁滚动交给 Base UI：它只把 html 设成 overflow:hidden，不用 position:fixed，
+  // 不会把 scrollY 归零、打乱依赖 window.scrollY 的 useWindowVirtualizer
 
   const handleLyricistClick = useCallback((name: string) => {
     setActiveLyricist((prev) => (name === "" || prev === name ? null : name));
@@ -441,21 +392,28 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
     activeLyricist,
     onLyricistClick: handleLyricistClick,
     onLinkClick: onClose,
-    isDesktop,
   };
 
   if (!isDesktop) {
     return (
       <Drawer open={open} onOpenChange={(v) => !v && onClose()}>
-        <DrawerContent className="h-[65dvh]">
+        <DrawerContent
+          // 意象页独有的半透明毛玻璃面板（DESIGN.md 第四节）
+          className="h-[65dvh] bg-[#FAFAFA]/96 dark:bg-[#0B0F19]/96 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/50"
+          contentClassName="flex flex-col overflow-hidden px-0 pb-0"
+          transparentBackdrop
+        >
           {/* Accessible title/description (visually hidden) */}
           <DrawerTitle className="sr-only">
-            {selectedItem?.name ?? "意象详情"}
+            {selectedItem?.name ?? t("detailPanel.title")}
           </DrawerTitle>
           <DrawerDescription className="sr-only">
             {selectedItem
-              ? `${selectedItem.name}在河图作品中出现${selectedItem.count}次`
-              : "意象详情面板"}
+              ? t("detailPanel.description", {
+                  name: selectedItem.name,
+                  count: selectedItem.count,
+                })
+              : t("detailPanel.title")}
           </DrawerDescription>
 
           <PanelHeader
@@ -474,24 +432,26 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()} modal={false}>
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side={panelSide}
-        className={[
-          "top-(--nav-h,48px) h-[calc(100vh-var(--nav-h,48px))] w-[min(440px,42vw)] p-0 border-none shadow-2xl transition-all duration-500",
+        className={
           panelSide === "right"
-            ? "border-l border-slate-200/50 dark:border-white/5"
-            : "border-r border-slate-200/50 dark:border-white/5",
-        ].join(" ")}
+            ? "top-(--nav-h) h-[calc(100dvh-var(--nav-h))] w-[min(440px,42vw)] border-l border-slate-200/50 dark:border-white/5"
+            : "top-(--nav-h) h-[calc(100dvh-var(--nav-h))] w-[min(440px,42vw)] border-r border-slate-200/50 dark:border-white/5"
+        }
       >
         {/* Accessible title/description (visually hidden) */}
         <SheetTitle className="sr-only">
-          {selectedItem?.name ?? "意象详情"}
+          {selectedItem?.name ?? t("detailPanel.title")}
         </SheetTitle>
         <SheetDescription className="sr-only">
           {selectedItem
-            ? `${selectedItem.name}在河图作品中出现${selectedItem.count}次`
-            : "意象详情面板"}
+            ? t("detailPanel.description", {
+                name: selectedItem.name,
+                count: selectedItem.count,
+              })
+            : t("detailPanel.title")}
         </SheetDescription>
 
         <PanelHeader

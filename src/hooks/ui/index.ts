@@ -6,3 +6,5 @@ export { useMediaQuery } from "./useMediaQuery";
 export { useTwoStepConfirm } from "./useTwoStepConfirm";
 export { useAutoGrow } from "./useAutoGrow";
 export { useMounted } from "./useMounted";
+export { useDebouncedValue } from "./useDebouncedValue";
+export { useIntersection } from "./useIntersection";

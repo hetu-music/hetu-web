@@ -4,15 +4,16 @@ import { useCallback, useTransition } from "react";
 import { useLocale } from "next-intl";
 import { useRouter, usePathname } from "@/i18n/navigation";
 
-// 语言配置项，未来如需添加英语（en）、日语（ja）等，只需在此追加配置即可
+// 语言配置项，未来如需添加英语（en）、日语（ja）等，只需在此追加配置即可。
+// 名称各用自己的字形写，不随当前语系翻译：找自己能读的那一项最快
 export const LANGUAGES = [
-  { code: "zh-CN", label: "简体中文" },
-  { code: "zh-TW", label: "繁體中文" },
+  { code: "zh-CN", label: "简体" },
+  { code: "zh-TW", label: "繁體" },
 ] as const;
 
 /**
  * 语言切换的共享逻辑：当前语系、切换中状态、切换与预加载。
- * 供 LocaleSwitcher（宽屏）与 MoreMenu（移动端二级菜单）共用，保证两处行为一致。
+ * 顶栏宽屏的文字下拉与窄屏的「更多」共用，保证两处行为一致。
  */
 export function useLocaleSwitch() {
   const locale = useLocale();

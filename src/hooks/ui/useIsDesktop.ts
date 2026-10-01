@@ -1,16 +1,6 @@
-import { useEffect, useState } from "react";
+import { useMediaQuery } from "./useMediaQuery";
 
-/** Returns true when the viewport is ≥768px (md breakpoint). SSR-safe: starts false. */
+/** 视口不窄于 768px（md 断点）；服务端渲染时视为窄屏 */
 export function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    requestAnimationFrame(() => {
-      setIsDesktop(mq.matches);
-    });
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isDesktop;
+  return useMediaQuery("(min-width: 768px)");
 }

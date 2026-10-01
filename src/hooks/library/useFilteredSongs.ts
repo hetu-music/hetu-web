@@ -1,6 +1,6 @@
 "use client";
 
-import { useDebouncedValue } from "@mantine/hooks";
+import { useDebouncedValue } from "@/hooks/ui/useDebouncedValue";
 import { useMemo } from "react";
 import {
   FILTER_OPTION_ALL,

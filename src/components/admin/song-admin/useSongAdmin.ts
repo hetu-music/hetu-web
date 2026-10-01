@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { handleApprove } from "@/app/actions/admin-actions";
 import {
@@ -26,8 +26,6 @@ import { convertEmptyStringToNull } from "@/lib/utils/utils-common";
 import type { OperationMessage, SongFormMode } from "./types";
 
 const TOAST_DURATION_MS = 3000;
-const NOTIFICATION_INTERVAL_MS = 3600000;
-const NOTIFICATION_STORAGE_KEY = "lastNotificationTime";
 
 type SetSongs = React.Dispatch<React.SetStateAction<SongDetail[]>>;
 
@@ -66,20 +64,6 @@ export function useSongAdmin(setSongs: SetSongs) {
   const autoComplete = useAutoComplete(csrfToken, (msg) => {
     notify({ type: "error", text: msg });
   });
-
-  // 距上次展示超过一小时才再次弹出使用说明
-  useEffect(() => {
-    const lastTime = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
-    const now = Date.now();
-    if (lastTime && now - parseInt(lastTime) <= NOTIFICATION_INTERVAL_MS) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      setShowNotification(true);
-      localStorage.setItem(NOTIFICATION_STORAGE_KEY, now.toString());
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
 
   const toggleRowExpansion = useCallback((id: number) => {
     setExpandedRows((prev) => {

@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import React from "react";
 
 /**
- * 整页加载屏：一行小字、一道细线，线上一段强调色来回划过；底部一句楷体题记。
+ * 整页加载屏：一行小字、一道细线，线上一段强调色来回划过；底部一句楷体题记
+ * （同首页卷首那句，句末同样接「……」）。
  * 延迟 300ms 才淡入，切换很快时不会一闪而过。
  */
 export default function Loading() {
@@ -36,9 +37,9 @@ export default function Loading() {
 
       <p
         aria-hidden
-        className="absolute bottom-12 inset-x-6 text-center font-kaiti text-[15px] tracking-wider text-slate-400 dark:text-slate-500"
+        className="absolute bottom-12 inset-x-6 text-center font-kaiti italic text-[15px] tracking-wider text-slate-400 dark:text-slate-500"
       >
-        {tHero("defaultDesc")}
+        {tHero("defaultDesc")}……
       </p>
     </div>
   );

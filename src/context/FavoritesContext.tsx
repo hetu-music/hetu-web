@@ -1,14 +1,7 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { createContext, useCallback, useContext } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUserContext } from "@/context/UserContext";
 import { getCsrfToken, resetCsrfToken } from "@/lib/api/csrf";
 import type { Song } from "@/lib/types";
@@ -32,193 +25,125 @@ interface FavoritesContextValue {
   isLoggedIn: boolean;
 }
 
-interface FavoritesState {
-  userId: string | null;
+interface FavoritesData {
   favorites: number[];
   favoriteSongs: Song[];
-  loaded: boolean;
+}
+
+const EMPTY: FavoritesData = { favorites: [], favoriteSongs: [] };
+
+/** 按用户分开缓存：换账号时直接落到新 key 上，不会残留上一个用户的收藏 */
+const favoritesKey = (userId: string | null) => ["favorites", userId] as const;
+
+async function fetchFavorites(): Promise<FavoritesData> {
+  const res = await fetch("/api/public/collections");
+  // 接口失败视为没有收藏，而不是卡在加载中
+  if (!res.ok) return EMPTY;
+  const data = await res.json();
+  return {
+    favorites: data.songIds ?? [],
+    favoriteSongs: Array.isArray(data.songs) ? data.songs : [],
+  };
+}
+
+function sendCollectionChange(
+  method: "POST" | "DELETE",
+  songId: number,
+  csrf: string,
+) {
+  return fetch("/api/public/collections", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-csrf-token": csrf,
+    },
+    body: JSON.stringify({ songId }),
+  });
 }
 
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const { user, loaded: userLoaded } = useUserContext();
-  const [favoritesState, setFavoritesState] = useState<FavoritesState>({
-    userId: null,
-    favorites: [],
-    favoriteSongs: [],
-    loaded: false,
-  });
-  const prevUserIdRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
   const currentUserId = user?.id ?? null;
-  const favorites = useMemo(
-    () =>
-      favoritesState.userId === currentUserId ? favoritesState.favorites : [],
-    [currentUserId, favoritesState.favorites, favoritesState.userId],
-  );
-  const favoriteSongs = useMemo(
-    () =>
-      favoritesState.userId === currentUserId
-        ? favoritesState.favoriteSongs
-        : [],
-    [currentUserId, favoritesState.favoriteSongs, favoritesState.userId],
-  );
+  const queryKey = favoritesKey(currentUserId);
+
+  const { data = EMPTY, isPending } = useQuery({
+    queryKey,
+    queryFn: fetchFavorites,
+    enabled: userLoaded && currentUserId !== null,
+    // 只在收藏变动后主动失效，不按时间重新拉取
+    staleTime: Infinity,
+    retry: false,
+  });
+  const { favorites, favoriteSongs } = data;
+
   const loaded = !userLoaded
     ? false
     : currentUserId === null
       ? true
-      : favoritesState.userId === currentUserId && favoritesState.loaded;
+      : !isPending;
 
-  // Reload favorites when user changes
-  const fetchFavorites = useCallback(async () => {
-    if (!currentUserId) return;
-
-    try {
-      const res = await fetch("/api/public/collections");
-      if (!res.ok) {
-        setFavoritesState({
-          userId: currentUserId,
-          favorites: [],
-          favoriteSongs: [],
-          loaded: true,
-        });
-        return;
-      }
-      const data = await res.json();
-      setFavoritesState({
-        userId: currentUserId,
-        favorites: data.songIds ?? [],
-        favoriteSongs: Array.isArray(data.songs) ? data.songs : [],
-        loaded: true,
-      });
-    } catch {
-      setFavoritesState((prev) =>
-        prev.userId === currentUserId
-          ? { ...prev, loaded: true }
-          : {
-              userId: currentUserId,
-              favorites: [],
-              favoriteSongs: [],
-              loaded: true,
-            },
-      );
-    }
-  }, [currentUserId]);
-
-  useEffect(() => {
-    if (!userLoaded) return;
-
-    // Skip if user hasn't changed
-    if (currentUserId === prevUserIdRef.current) return;
-    prevUserIdRef.current = currentUserId;
-
-    if (currentUserId) {
-      void fetch("/api/public/collections")
-        .then(async (res) => {
-          if (!res.ok) {
-            setFavoritesState({
-              userId: currentUserId,
-              favorites: [],
-              favoriteSongs: [],
-              loaded: true,
-            });
-            return;
-          }
-
-          const data = await res.json();
-          setFavoritesState({
-            userId: currentUserId,
-            favorites: data.songIds ?? [],
-            favoriteSongs: Array.isArray(data.songs) ? data.songs : [],
-            loaded: true,
-          });
-        })
-        .catch(() => {
-          setFavoritesState({
-            userId: currentUserId,
-            favorites: [],
-            favoriteSongs: [],
-            loaded: true,
-          });
-        });
-    }
-  }, [currentUserId, userLoaded]);
+  const refreshFavorites = useCallback(
+    () =>
+      queryClient.invalidateQueries({ queryKey: favoritesKey(currentUserId) }),
+    [queryClient, currentUserId],
+  );
 
   const toggleFavorite = useCallback(
     async (id: number) => {
-      if (!user) return;
+      if (!currentUserId) return;
+      const key = favoritesKey(currentUserId);
 
-      // Read current state via functional update pattern to avoid stale closure
-      let isCurrentlyFav = false;
+      // 从缓存读当前状态，避免闭包里的旧值
+      const isCurrentlyFav =
+        queryClient.getQueryData<FavoritesData>(key)?.favorites.includes(id) ??
+        false;
 
-      setFavoritesState((prev) => {
-        const prevFavorites =
-          prev.userId === currentUserId ? prev.favorites : [];
-        isCurrentlyFav = prevFavorites.includes(id);
-        return {
-          userId: currentUserId,
-          favorites: isCurrentlyFav
-            ? prevFavorites.filter((x) => x !== id)
-            : [...prevFavorites, id],
-          favoriteSongs:
-            prev.userId === currentUserId ? prev.favoriteSongs : [],
-          loaded: true,
-        };
-      });
+      // 乐观更新；取消收藏时顺手把歌曲对象也移走，
+      // 新加的收藏不补歌曲数据，成功后整体重拉一次
+      queryClient.setQueryData<FavoritesData>(key, (prev = EMPTY) =>
+        isCurrentlyFav
+          ? {
+              favorites: prev.favorites.filter((x) => x !== id),
+              favoriteSongs: prev.favoriteSongs.filter((s) => s.id !== id),
+            }
+          : { ...prev, favorites: [...prev.favorites, id] },
+      );
 
-      // Also optimistically remove from favoriteSongs if unfavoriting
-      // (we don't need to add song data on favorite — it'll be there on next full fetch)
-      if (isCurrentlyFav) {
-        setFavoritesState((prev) => ({
+      const rollback = () =>
+        queryClient.setQueryData<FavoritesData>(key, (prev = EMPTY) => ({
           ...prev,
-          userId: currentUserId,
-          favoriteSongs: prev.favoriteSongs.filter((s) => s.id !== id),
-        }));
-      }
-
-      try {
-        const csrf = await getCsrfToken();
-        const res = await fetch("/api/public/collections", {
-          method: isCurrentlyFav ? "DELETE" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-csrf-token": csrf,
-          },
-          body: JSON.stringify({ songId: id }),
-        });
-
-        if (!res.ok) {
-          // Rollback
-          setFavoritesState((prev) => ({
-            ...prev,
-            userId: currentUserId,
-            favorites: isCurrentlyFav
-              ? [...prev.favorites, id]
-              : prev.favorites.filter((x) => x !== id),
-          }));
-          resetCsrfToken();
-          // Re-fetch to get consistent state
-          void fetchFavorites();
-          return;
-        }
-
-        // After a successful add, re-fetch to get the full song data
-        // so that the profile page shows the correct song info
-        if (!isCurrentlyFav) {
-          void fetchFavorites();
-        }
-      } catch {
-        // Rollback on network error
-        setFavoritesState((prev) => ({
-          ...prev,
-          userId: currentUserId,
           favorites: isCurrentlyFav
             ? [...prev.favorites, id]
             : prev.favorites.filter((x) => x !== id),
         }));
+
+      try {
+        const csrf = await getCsrfToken();
+        const res = await sendCollectionChange(
+          isCurrentlyFav ? "DELETE" : "POST",
+          id,
+          csrf,
+        );
+
+        if (!res.ok) {
+          rollback();
+          resetCsrfToken();
+          void queryClient.invalidateQueries({ queryKey: key });
+          return;
+        }
+
+        // 加收藏成功后重拉，个人页才有完整的歌曲信息
+        if (!isCurrentlyFav) {
+          void queryClient.invalidateQueries({ queryKey: key });
+        }
+      } catch {
+        rollback();
       }
     },
-    [currentUserId, fetchFavorites, user],
+    [queryClient, currentUserId],
   );
 
   const isFavorite = useCallback(
@@ -227,40 +152,20 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   );
 
   const clearFavorites = useCallback(async () => {
-    if (!user || favorites.length === 0) return;
-    const prevFavs = favorites;
-    const prevSongs = favoriteSongs;
-    setFavoritesState({
-      userId: currentUserId,
-      favorites: [],
-      favoriteSongs: [],
-      loaded: true,
-    });
+    if (!currentUserId || favorites.length === 0) return;
+    const key = favoritesKey(currentUserId);
+    const previous = queryClient.getQueryData<FavoritesData>(key);
+    queryClient.setQueryData<FavoritesData>(key, EMPTY);
 
     try {
       const csrf = await getCsrfToken();
       await Promise.all(
-        prevFavs.map((id) =>
-          fetch("/api/public/collections", {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-              "x-csrf-token": csrf,
-            },
-            body: JSON.stringify({ songId: id }),
-          }),
-        ),
+        favorites.map((id) => sendCollectionChange("DELETE", id, csrf)),
       );
     } catch {
-      // Rollback
-      setFavoritesState({
-        userId: currentUserId,
-        favorites: prevFavs,
-        favoriteSongs: prevSongs,
-        loaded: true,
-      });
+      queryClient.setQueryData(key, previous);
     }
-  }, [currentUserId, user, favorites, favoriteSongs]);
+  }, [queryClient, currentUserId, favorites]);
 
   return (
     <FavoritesContext.Provider
@@ -270,7 +175,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         toggleFavorite,
         isFavorite,
         clearFavorites,
-        refreshFavorites: fetchFavorites,
+        refreshFavorites,
         loaded,
         isLoggedIn: !!user,
       }}

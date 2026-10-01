@@ -136,12 +136,7 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans transition-colors duration-500 dark:bg-[#0B0F19]">
-      <AdminNavbar
-        active="imagery"
-        userName={user?.name}
-        isLoggedIn={Boolean(user)}
-        isSuper={user?.isSuper}
-      />
+      <AdminNavbar active="imagery" isSuper={user?.isSuper} />
 
       <main className="pt-24 pb-20 max-w-7xl mx-auto px-6">
         {/* Header & Stats */}
@@ -195,7 +190,7 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
         </div>
 
         {/* Controls Bar */}
-        <div className="sticky top-20 z-40 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm py-4 mb-8 -mx-6 px-6 border-y border-transparent data-[scrolled=true]:border-slate-100">
+        <div className="sticky top-(--nav-h) z-40 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm py-4 mb-8 -mx-6 px-6 border-y border-transparent data-[scrolled=true]:border-slate-100">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             {/* Tab Pills */}
             <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
@@ -360,7 +355,7 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-70 animate-in fade-in slide-in-from-bottom-4">
           <div
             className={cn(
               "px-6 py-3 rounded-full shadow-xl flex items-center gap-3 border backdrop-blur-md",

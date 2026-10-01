@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TYPE_ORDER } from "@/lib/constants";
 import { Award, Mail, User, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import React, { useLayoutEffect, useRef, useState } from "react";
 
 /** Smoothly animates height changes when children resize (e.g. tab switching). */
 function AnimatedHeight({ children }: { children: React.ReactNode }) {
@@ -127,47 +128,43 @@ const WeiboIcon = ({
   </svg>
 );
 
-const About: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const About = ({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
   const t = useTranslations("common.about");
-  const [contributors, setContributors] = useState<Contributor[]>([]);
-  const [contributorsLoading, setContributorsLoading] = useState(false);
-  const [contributorsError, setContributorsError] = useState<string | null>(
-    null,
-  );
-
-  const fetchContributors = useCallback(async () => {
-    setContributorsLoading(true);
-    setContributorsError(null);
-    try {
+  // 切到「维护者」页签才去拉，之后留在缓存里
+  const [wantContributors, setWantContributors] = useState(false);
+  const {
+    data: contributors = [],
+    isLoading: contributorsLoading,
+    isError: contributorsFailed,
+  } = useQuery({
+    queryKey: ["public", "contributors"],
+    queryFn: async (): Promise<Contributor[]> => {
       const res = await fetch("/api/public/contributors");
+      if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
-      setContributors(
-        Array.isArray(data.contributors) ? data.contributors : [],
-      );
-    } catch {
-      setContributorsError(t("maintainersSection.loadError"));
-    } finally {
-      setContributorsLoading(false);
-    }
-  }, [t]);
+      return Array.isArray(data.contributors) ? data.contributors : [];
+    },
+    enabled: wantContributors,
+  });
+  const contributorsError = contributorsFailed
+    ? t("maintainersSection.loadError")
+    : null;
 
   const mainContributor = contributors.find((c) => c.sort_order === 2);
 
   return (
-    // Dialog handles scroll-lock, focus-trap, Escape key, and backdrop automatically
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="overflow-hidden">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent variant="classic" className="overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
-          <DialogClose asChild>
-            <button className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <X size={20} />
-            </button>
+          <DialogClose className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <X size={20} />
           </DialogClose>
         </DialogHeader>
 
@@ -179,13 +176,7 @@ const About: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           defaultValue="about"
           className="flex flex-col"
           onValueChange={(value) => {
-            if (
-              value === "maintainer" &&
-              contributors.length === 0 &&
-              !contributorsLoading
-            ) {
-              fetchContributors();
-            }
+            if (value === "maintainer") setWantContributors(true);
           }}
         >
           <TabsList className="px-6">

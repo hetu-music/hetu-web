@@ -93,7 +93,9 @@ export default async function LocaleLayout({ children, params }: Props) {
         <PWARegistration />
         <NextIntlClientProvider messages={messages} locale={locale}>
           <Providers>
-            <div className="relative z-10 min-h-screen">{children}</div>
+            {/* 不要给这层加 z-index：那会自成一个层级上下文，页面里的浮层再高也压不过
+                外面的播放条（层级表见 DESIGN.md 第九节） */}
+            <div className="relative min-h-screen">{children}</div>
           </Providers>
         </NextIntlClientProvider>
       </body>

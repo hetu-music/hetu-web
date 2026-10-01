@@ -1,6 +1,6 @@
 "use client";
 
-import AppNavbar from "@/components/shared/AppNavbar";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { useRouter } from "@/i18n/navigation";
 import { encodeAnswers } from "@/lib/quiz/codec";
 import type { QuizQuestionView } from "@/lib/quiz/views";
@@ -32,7 +32,6 @@ function shuffledIndices(n: number): number[] {
 
 export default function QuizClient({ questions, poolSize }: Props) {
   const t = useTranslations("quiz");
-  const tSite = useTranslations("common.site");
   const router = useRouter();
 
   const [stage, setStage] = useState<Stage>("intro");
@@ -104,20 +103,10 @@ export default function QuizClient({ questions, poolSize }: Props) {
   }, [stage, order, index, choose]);
 
   const question = questions[index];
-  const siteName = tSite("name");
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
-      <AppNavbar
-        title={
-          <>
-            {siteName.substring(0, 2)}
-            <span className="mx-2 h-5 w-[2px] translate-y-[1.5px] rounded-full bg-blue-600" />
-            {siteName.substring(2)}
-          </>
-        }
-        onTitleClick={() => router.push("/")}
-      />
+      <TopBar exit={{ kind: "logo" }} />
 
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 pb-24 pt-32">
         <AnimatePresence mode="wait">

@@ -12,8 +12,9 @@ import {
   FIELD_ERROR_CLASS,
   FIELD_LABEL_CLASS,
 } from "@/components/shared/form-field";
-import PageTopBar from "@/components/shared/PageTopBar";
 import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
+import SiteMark from "@/components/shared/SiteMark";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { useMounted } from "@/hooks/ui";
 import { Link, useRouter } from "@/i18n/navigation";
 import { getCsrfToken } from "@/lib/api/csrf";
@@ -29,10 +30,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useTranslations } from "next-intl";
+import { useTheme } from "next-themes";
 import React, { useMemo, useState } from "react";
-import { type Resolver, useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 
 type Step = "credentials" | "otp" | "verified";
 
@@ -158,7 +159,7 @@ export default function AuthClient({
         } as React.CSSProperties
       }
     >
-      <PageTopBar />
+      <TopBar exit={{ kind: "logo" }} user={false} />
 
       <div
         className={cn(
@@ -195,7 +196,7 @@ export default function AuthClient({
                 : "pt-32 md:pt-40 lg:justify-center",
             )}
           >
-            <div className="w-full max-w-[26rem]">
+            <div className="w-full max-w-104">
               <header>
                 <p className="text-xs tracking-[0.35em] text-(--tone) mb-5">
                   {tSite("name")}
@@ -264,7 +265,7 @@ export default function AuthClient({
 
                     {/* 人机验证是第三方小窗，改不了样式；主题跟随站点而不是系统。
                   站点主题只在浏览器里读得到，挂载后再渲染，否则水合不一致 */}
-                    <div className="min-h-[65px]">
+                    <div className="min-h-16.25">
                       {mounted && (
                         <Turnstile
                           key={turnstileInstanceKey}
@@ -349,12 +350,7 @@ export default function AuthClient({
               hasGallery ? "lg:px-16 xl:px-24" : "lg:text-center",
             )}
           >
-            <p className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-600">
-              {t("copyright", {
-                year: new Date().getFullYear(),
-                name: tSite("name"),
-              })}
-            </p>
+            <SiteMark />
           </footer>
         </div>
       </div>

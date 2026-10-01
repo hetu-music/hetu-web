@@ -1,16 +1,20 @@
 "use client";
 
-import About from "@/components/library/About";
-import AppNavbar from "@/components/shared/AppNavbar";
-import { usePlayerStore } from "@/store/player-store";
+import SiteMark from "@/components/shared/SiteMark";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
-import { useIntersection } from "@mantine/hooks";
+import { useIntersection } from "@/hooks/ui/useIntersection";
 import { useQuery } from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 
+import {
+  GRAY_PALETTE,
+  PALETTE_FULL,
+  PALETTE_TEXT,
+  sortLevel1Categories,
+} from "@/lib/imagery/palette";
 import React, {
   memo,
   useCallback,
@@ -21,14 +25,10 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  GRAY_PALETTE,
-  PALETTE_FULL,
-  PALETTE_TEXT,
-  sortLevel1Categories,
-} from "@/lib/imagery/palette";
-import type { SongResult } from "./ImageryDetailPanel";
-import ImageryDetailPanel from "./ImageryDetailPanel";
+import ImageryDetailPanel, {
+  type SongResult,
+  UNKNOWN_LYRICIST,
+} from "./ImageryDetailPanel";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -101,6 +101,14 @@ function triggerHaptic(ms = 8) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
     navigator.vibrate(ms);
   }
+}
+
+/** 把选中的意象写进网址（?w=<id>），可以直接分享；用原生 history 改，不触发导航 */
+function syncWordParam(id: number | null) {
+  const url = new URL(window.location.href);
+  if (id === null) url.searchParams.delete("w");
+  else url.searchParams.set("w", String(id));
+  window.history.replaceState(null, "", url);
 }
 
 function seededShuffle<T>(list: T[], seed: number): T[] {
@@ -216,21 +224,45 @@ const CategoryButton = memo(function CategoryButton({
 
 // ─── main component ───────────────────────────────────────────────────────────
 
+/**
+ * 平滑滚到 top，滚停了再调 done。只用在进页时的一次性跳转，不提供取消：
+ * 作为 effect 的清理去取消，依赖一变就会把面板永远卡在不打开
+ * 老 Safari 没有 scrollend，逐帧看位置：到了，或连续几帧不动（滚到底到不了），都算停
+ */
+function smoothScrollThen(top: number, done: () => void) {
+  const target = Math.max(0, top);
+  if (Math.abs(window.scrollY - target) < 2) {
+    done();
+    return;
+  }
+  let raf = 0;
+  let last = -1;
+  let still = 0;
+  const stop = () => {
+    cancelAnimationFrame(raf);
+    clearTimeout(timer);
+    window.removeEventListener("scrollend", finish);
+  };
+  const finish = () => {
+    stop();
+    done();
+  };
+  const tick = () => {
+    const y = window.scrollY;
+    still = y === last ? still + 1 : 0;
+    last = y;
+    if (Math.abs(y - target) < 2 || still >= 6) finish();
+    else raf = requestAnimationFrame(tick);
+  };
+  window.addEventListener("scrollend", finish);
+  // 兜底：无论如何 1.5 秒后打开
+  const timer = setTimeout(finish, 1500);
+  window.scrollTo({ top: target, behavior: "smooth" });
+  raf = requestAnimationFrame(tick);
+}
+
 export default function ImageryClient({ items, categories }: Props) {
-  const router = useRouter();
   const t = useTranslations("common.imagery");
-  const tSite = useTranslations("common.site");
-  const { setPlayerVisible } = usePlayerStore();
-
-  // 意象词云页面：隐藏播放条但不暂停音乐，离开时恢复显示
-  useEffect(() => {
-    setPlayerVisible(false);
-    return () => {
-      setPlayerVisible(true);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── category hierarchy ───────────────────────────────────────────────────
   const catMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -315,31 +347,18 @@ export default function ImageryClient({ items, categories }: Props) {
     x: number;
     y: number;
   } | null>(null);
-  const [showAbout, setShowAbout] = useState(false);
 
   const isDesktop = useIsDesktop();
-  const navRef = useRef<HTMLElement>(null);
   const cloudRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(960);
+  const [widthMeasured, setWidthMeasured] = useState(false);
   const [scrollMargin, setScrollMargin] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [marqueeSeed, setMarqueeSeed] = useState(0);
-  const { ref: headerRef, entry: headerEntry } = useIntersection({
+  const { ref: headerRef, entry: headerEntry } = useIntersection<HTMLElement>({
     threshold: 0.05,
   });
   const headerVisible = headerEntry?.isIntersecting ?? true;
-
-  // Hide global scrollbar only on this page
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    html.classList.add("no-scrollbar");
-    body.classList.add("no-scrollbar");
-    return () => {
-      html.classList.remove("no-scrollbar");
-      body.classList.remove("no-scrollbar");
-    };
-  }, []);
 
   // Trigger entrance animation after first paint
   useEffect(() => {
@@ -347,21 +366,6 @@ export default function ImageryClient({ items, categories }: Props) {
       setMounted(true);
       setMarqueeSeed(Math.floor(Math.random() * 2147483647));
     });
-  }, []);
-
-  // Track nav height → CSS variable --nav-h for the panel to consume
-  useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const update = () =>
-      document.documentElement.style.setProperty(
-        "--nav-h",
-        `${nav.getBoundingClientRect().height}px`,
-      );
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(nav);
-    return () => ro.disconnect();
   }, []);
 
   // ── precomputed display data ──────────────────────────────────────────────
@@ -459,7 +463,7 @@ export default function ImageryClient({ items, categories }: Props) {
     songs.forEach((song) => {
       const lyricists = song.lyricist ?? [];
       if (lyricists.length === 0) {
-        counts.set("未知", (counts.get("未知") ?? 0) + 1);
+        counts.set(UNKNOWN_LYRICIST, (counts.get(UNKNOWN_LYRICIST) ?? 0) + 1);
       } else {
         lyricists.forEach((l) => counts.set(l, (counts.get(l) ?? 0) + 1));
       }
@@ -485,6 +489,7 @@ export default function ImageryClient({ items, categories }: Props) {
     });
     ro.observe(el);
     setContainerWidth(el.getBoundingClientRect().width);
+    setWidthMeasured(true);
     return () => ro.disconnect();
   }, []);
 
@@ -545,9 +550,7 @@ export default function ImageryClient({ items, categories }: Props) {
       setPanelSide(clickX > (cloudRight * 3) / 4 ? "left" : "right");
       setSelectedItem(d.item);
       setPanelOpen(true);
-      // 面板打开后 Drawer/Sheet 会给背景加 aria-hidden，需要先让按钮失焦
-      // 避免 "aria-hidden on focused element" 的无障碍警告
-      (document.activeElement as HTMLElement)?.blur();
+      syncWordParam(d.item.id);
       // Dismiss tooltip immediately when panel opens
       hoveredBtnRef.current = null;
       setHoveredData(null);
@@ -594,27 +597,45 @@ export default function ImageryClient({ items, categories }: Props) {
     setHoveredData(null);
   }, []);
 
-  const handleClose = useCallback(() => setPanelOpen(false), []);
+  const handleClose = useCallback(() => {
+    setPanelOpen(false);
+    syncWordParam(null);
+  }, []);
 
-  const handleTitleReset = useCallback(() => {
-    router.push("/");
-  }, [router]);
+  // 从网址 ?w=<意象id> 进来（如歌曲页的意象书眉）：先把这个词滚到视口中间，
+  // 再打开它的面板。要等容器宽度量好、分好行，滚动位置才准，所以只在那之后做一次
+  const deepLinkDone = useRef(false);
+  useEffect(() => {
+    if (deepLinkDone.current || !widthMeasured || scrollMargin === 0) return;
+    deepLinkDone.current = true;
+    const id = Number(new URLSearchParams(window.location.search).get("w"));
+    if (!id) return;
+    const rowIndex = wordRows.findIndex((row) =>
+      row.some((d) => d.item.id === id),
+    );
+    const item = items.find((i) => i.id === id);
+    if (rowIndex < 0 || !item) {
+      syncWordParam(null);
+      return;
+    }
+    const open = () => {
+      // 行高是边滚边量的，按估算滚过去可能差一点；停下后附近的行都量过了，再校正一次
+      rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+      requestAnimationFrame(() => {
+        setPanelSide("right");
+        setSelectedItem(item);
+        setPanelOpen(true);
+      });
+    };
+    const target = rowVirtualizer.getOffsetForIndex(rowIndex, "center")?.[0];
+    if (target === undefined) open();
+    else smoothScrollThen(target, open);
+  }, [widthMeasured, scrollMargin, wordRows, items, rowVirtualizer]);
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-slate-800 dark:text-slate-200">
-      <AppNavbar
-        ref={navRef}
-        title={
-          <>
-            {tSite("name").substring(0, 2)}
-            <span className="mx-2 h-5 w-[2px] translate-y-[1.5px] rounded-full bg-blue-600" />
-            {tSite("name").substring(2)}
-          </>
-        }
-        onTitleClick={handleTitleReset}
-        onAboutClick={() => setShowAbout(true)}
-      />
+      <TopBar exit={{ kind: "logo" }} />
 
       {/* ── hero ── */}
       <header
@@ -689,7 +710,7 @@ export default function ImageryClient({ items, categories }: Props) {
               ))}
           </h1>
           <p
-            className={`font-serif text-base md:text-xl text-slate-500 dark:text-slate-400 tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
+            className={`font-kaiti text-base md:text-xl text-slate-500 dark:text-slate-400 tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
             style={{ animationDelay: "1650ms" }}
           >
             {t("subtitle", { count: wordDisplayList.length })}
@@ -698,12 +719,12 @@ export default function ImageryClient({ items, categories }: Props) {
       </header>
 
       {/* ── category filter ── */}
-      <div className="sticky top-(--nav-h,48px) z-20 bg-[#FAFAFA]/40 dark:bg-[#0B0F19]/40 backdrop-blur-2xl border-b border-slate-200/10 dark:border-slate-800/20 transition-all duration-1000">
+      <div className="sticky top-(--nav-h) z-20 bg-[#FAFAFA]/40 dark:bg-[#0B0F19]/40 backdrop-blur-2xl border-b border-slate-200/10 dark:border-slate-800/20 transition-all duration-1000">
         <div className="max-w-5xl mx-auto px-6 py-2.5">
           {/* L1 filter row */}
           <div className="flex items-center gap-8 overflow-x-auto no-scrollbar py-1 mask-linear-fade-edges">
             {/* Start spacer for mask */}
-            <div className="min-w-[8px]" />
+            <div className="min-w-2" />
 
             <CategoryButton
               label={t("all")}
@@ -735,7 +756,7 @@ export default function ImageryClient({ items, categories }: Props) {
             })}
 
             {/* End spacer for mask */}
-            <div className="min-w-[8px]" />
+            <div className="min-w-2" />
           </div>
 
           {/* L2 sub-filter row — calligraphic list */}
@@ -746,7 +767,7 @@ export default function ImageryClient({ items, categories }: Props) {
               <div className="grid grid-cols-3 sm:flex sm:items-center gap-y-4 gap-x-6 sm:gap-6 sm:flex-wrap pt-3 border-t border-slate-200/20 dark:border-slate-800/10">
                 {/* On desktop, we keep the spacer; on mobile grid, we skip it or use it as a grid item if needed.
                     Actually, let's keep it and adjust the grid flow. */}
-                <div className="hidden sm:block min-w-[8px]" />
+                <div className="hidden sm:block min-w-2" />
 
                 {level2Categories.map((cat) => {
                   const isActive = activeL2Id === cat.id;
@@ -767,14 +788,14 @@ export default function ImageryClient({ items, categories }: Props) {
                       }`}
                     >
                       <span
-                        className={`inline-block transition-all duration-700 font-system ${isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"} mr-1.5`}
+                        className={`inline-block transition-all duration-700 ${isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"} mr-1.5`}
                         style={{ color: palette.accent }}
                       >
                         「
                       </span>
                       {cat.name}
                       <span
-                        className={`inline-block transition-all duration-700 font-system ${isActive ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"} ml-1.5`}
+                        className={`inline-block transition-all duration-700 ${isActive ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"} ml-1.5`}
                         style={{ color: palette.accent }}
                       >
                         」
@@ -805,7 +826,7 @@ export default function ImageryClient({ items, categories }: Props) {
         }
       >
         {wordDisplayList.length === 0 ? (
-          <div className="text-center text-slate-400 dark:text-slate-600 text-sm py-24 tracking-[0.3em]">
+          <div className="text-center font-kaiti text-sm py-24 text-slate-400 dark:text-slate-500">
             {t("noData")}
           </div>
         ) : (
@@ -857,7 +878,7 @@ export default function ImageryClient({ items, categories }: Props) {
             {hoveredData && isDesktop && (
               <div
                 key={hoveredData.itemId}
-                className="fixed z-50 pointer-events-none"
+                className="fixed z-60 pointer-events-none"
                 style={{
                   left: hoveredData.x,
                   top: hoveredData.y - 8,
@@ -890,9 +911,7 @@ export default function ImageryClient({ items, categories }: Props) {
       {/* ── footer ── */}
       <footer className="max-w-5xl mx-auto px-8 pb-12">
         <div className="border-t border-slate-100 dark:border-slate-800 pt-8 text-center">
-          <p className="text-xs text-slate-400 dark:text-slate-600 font-mono">
-            &copy; {new Date().getFullYear()} {tSite("name")}
-          </p>
+          <SiteMark />
         </div>
       </footer>
 
@@ -908,8 +927,6 @@ export default function ImageryClient({ items, categories }: Props) {
         lyricistCounts={lyricistCounts}
         onClose={handleClose}
       />
-
-      {showAbout && <About onClose={() => setShowAbout(false)} />}
     </div>
   );
 }

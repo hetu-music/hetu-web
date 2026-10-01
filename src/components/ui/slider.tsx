@@ -1,46 +1,56 @@
 "use client";
 
+import { Slider as BaseSlider } from "@base-ui/react/slider";
 import * as React from "react";
-import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/lib/utils/utils";
 
-const Slider = React.forwardRef<
-  React.ComponentRef<typeof SliderPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
->(({ className, ...props }, ref) => {
-  // Derive thumb count from value or defaultValue so we render the correct number of thumbs
-  const thumbCount = (props.value ?? props.defaultValue ?? [0]).length;
+type SliderProps = Omit<
+  React.ComponentProps<typeof BaseSlider.Root<number[]>>,
+  "className" | "onValueChange"
+> & {
+  className?: string;
+  value: number[];
+  onValueChange: (value: number[]) => void;
+  "aria-label"?: string;
+};
 
+/** 一道细线，选中的区间用强调色；滑块是页面底色的小圆，描一圈强调色 */
+function Slider({
+  className,
+  value,
+  onValueChange,
+  "aria-label": ariaLabel,
+  ...props
+}: SliderProps) {
   return (
-    <SliderPrimitive.Root
-      ref={ref}
-      className={cn(
-        "relative flex w-full touch-none select-none items-center",
-        className,
-      )}
+    <BaseSlider.Root
+      value={value}
+      onValueChange={(next) => onValueChange(next as number[])}
+      className={cn("w-full", className)}
       {...props}
     >
-      {/* 一道细线，选中的区间用强调色 */}
-      <SliderPrimitive.Track className="relative h-0.5 w-full grow overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-        <SliderPrimitive.Range className="absolute h-full bg-(--tone)" />
-      </SliderPrimitive.Track>
-
-      {Array.from({ length: thumbCount }).map((_, i) => (
-        <SliderPrimitive.Thumb
-          key={i}
-          className={cn(
-            "block size-3.5 rounded-full bg-[#FAFAFA] dark:bg-[#0B0F19]",
-            "border-2 border-(--tone)",
-            "transition-transform hover:scale-110 active:scale-110 active:cursor-grabbing",
-            "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-(--tone)/20",
-            "disabled:pointer-events-none disabled:opacity-50",
-            "cursor-grab",
-          )}
-        />
-      ))}
-    </SliderPrimitive.Root>
+      <BaseSlider.Control className="flex w-full touch-none select-none items-center py-2">
+        <BaseSlider.Track className="relative h-0.5 w-full rounded-full bg-slate-200 dark:bg-slate-700">
+          <BaseSlider.Indicator className="rounded-full bg-(--tone)" />
+          {value.map((_, i) => (
+            <BaseSlider.Thumb
+              key={i}
+              index={i}
+              getAriaLabel={ariaLabel ? () => ariaLabel : undefined}
+              className={cn(
+                "block size-3.5 rounded-full bg-[#FAFAFA] dark:bg-[#0B0F19]",
+                "border-2 border-(--tone)",
+                "transition-[scale] hover:scale-110 data-dragging:scale-110",
+                "cursor-grab data-dragging:cursor-grabbing",
+                "has-focus-visible:ring-4 has-focus-visible:ring-(--tone)/20",
+                "data-disabled:pointer-events-none data-disabled:opacity-50",
+              )}
+            />
+          ))}
+        </BaseSlider.Track>
+      </BaseSlider.Control>
+    </BaseSlider.Root>
   );
-});
-Slider.displayName = SliderPrimitive.Root.displayName;
+}
 
 export { Slider };

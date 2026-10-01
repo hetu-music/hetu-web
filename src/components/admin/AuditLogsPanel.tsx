@@ -9,7 +9,8 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 interface AuditLog {
   id: string;
@@ -123,64 +124,42 @@ function getEntityIdentity(
   }
 }
 
+async function fetchAuditLogs(
+  page: number,
+  table: string,
+): Promise<AuditLogsResponse> {
+  const res = await fetch(`/api/admin/audit-logs?page=${page}&table=${table}`);
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as { error?: string }).error ?? "加载失败");
+  }
+  return res.json();
+}
+
 export default function AuditLogsPanel() {
-  const [data, setData] = useState<AuditLogsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<string>("all");
 
-  const fetchPage = useCallback(async (p: number, table: string = "all") => {
-    try {
-      const res = await fetch(`/api/admin/audit-logs?page=${p}&table=${table}`);
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error((d as { error?: string }).error ?? "加载失败");
-      }
-      const json: AuditLogsResponse = await res.json();
-      setData(json);
-      setPage(p);
-      setExpandedId(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    data,
+    error,
+    isFetching: loading,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin", "audit-logs", page, tableFilter],
+    queryFn: () => fetchAuditLogs(page, tableFilter),
+    // 翻页、换表时先留着上一页，不闪回整页加载
+    placeholderData: keepPreviousData,
+    staleTime: 0,
+  });
 
-  const loadPage = useCallback(
-    async (p: number, table: string = tableFilter) => {
-      setLoading(true);
-      setError(null);
-      await fetchPage(p, table);
-      if (typeof window !== "undefined") {
-        window.scrollTo({ top: 0 });
-      }
-    },
-    [fetchPage, tableFilter],
-  );
-
-  useEffect(() => {
-    void fetch(`/api/admin/audit-logs?page=1&table=all`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}));
-          throw new Error((d as { error?: string }).error ?? "加载失败");
-        }
-
-        return (await res.json()) as AuditLogsResponse;
-      })
-      .then((json) => {
-        setData(json);
-        setPage(1);
-        setExpandedId(null);
-      })
-      .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "加载失败");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const loadPage = (p: number, table: string = tableFilter) => {
+    setPage(p);
+    setTableFilter(table);
+    setExpandedId(null);
+    window.scrollTo({ top: 0 });
+  };
 
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 1;
 
@@ -192,12 +171,12 @@ export default function AuditLogsPanel() {
     );
   }
 
-  if (error) {
+  if (error && !loading) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-slate-500">
-        <p className="text-sm">{error}</p>
+        <p className="text-sm">{error.message}</p>
         <button
-          onClick={() => loadPage(page, tableFilter)}
+          onClick={() => void refetch()}
           className="flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-600"
         >
           <RefreshCw size={13} />
@@ -221,7 +200,6 @@ export default function AuditLogsPanel() {
             value={tableFilter}
             onChange={(e) => {
               const val = e.target.value;
-              setTableFilter(val);
               loadPage(1, val);
             }}
             disabled={loading}
@@ -242,7 +220,7 @@ export default function AuditLogsPanel() {
           </select>
         </div>
         <button
-          onClick={() => loadPage(page, tableFilter)}
+          onClick={() => void refetch()}
           disabled={loading}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
           title="刷新"

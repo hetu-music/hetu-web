@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   X,
   ZoomIn,
@@ -27,6 +29,19 @@ const ImageModal: React.FC<ImageModalProps> = ({
   alt,
   title,
 }) => {
+  const t = useTranslations("common.imageViewer");
+
+  // 关闭时调用方会立刻把 src 清空，面板却还在放退场动画；留着上一张图，
+  // 否则 <img> 拿到空 src 会报错
+  const [shown, setShown] = useState({ src, alt, title });
+  if (
+    isOpen &&
+    src &&
+    (src !== shown.src || alt !== shown.alt || title !== shown.title)
+  ) {
+    setShown({ src, alt, title });
+  }
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
@@ -63,13 +78,14 @@ const ImageModal: React.FC<ImageModalProps> = ({
     setRotation((prev) => (prev - 90 + 360) % 360);
   }, []);
 
-  // 禁用浏览器默认触摸行为
+  // 禁用浏览器默认的触摸与页面缩放，双指只缩放图片。锁滚动交给 Dialog
   useEffect(() => {
     if (isOpen) {
-      // 禁用页面滚动和缩放
-      document.body.style.overflow = "hidden";
-      document.body.style.touchAction = "none";
-      document.body.style.userSelect = "none";
+      const body = document.body;
+      const prevTouchAction = body.style.touchAction;
+      const prevUserSelect = body.style.userSelect;
+      body.style.touchAction = "none";
+      body.style.userSelect = "none";
 
       // 添加viewport meta标签来禁用缩放（如果不存在）
       let viewportMeta = document.querySelector(
@@ -90,9 +106,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
       }
 
       return () => {
-        document.body.style.overflow = "unset";
-        document.body.style.touchAction = "auto";
-        document.body.style.userSelect = "auto";
+        body.style.touchAction = prevTouchAction;
+        body.style.userSelect = prevUserSelect;
 
         // 恢复原始viewport设置
         if (originalViewportContent) {
@@ -107,9 +122,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
   // 处理键盘事件
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      } else if (event.key === "+" || event.key === "=") {
+      // Esc 由 Dialog 处理
+      if (event.key === "+" || event.key === "=") {
         event.preventDefault();
         zoomIn();
       } else if (event.key === "-") {
@@ -136,24 +150,12 @@ const ImageModal: React.FC<ImageModalProps> = ({
     };
   }, [
     isOpen,
-    onClose,
     zoomIn,
     zoomOut,
     resetTransform,
     rotateClockwise,
     rotateCounterClockwise,
   ]);
-
-  // 重置状态当模态框打开时
-  useEffect(() => {
-    if (isOpen) {
-      const resetModalState = () => {
-        resetTransform();
-        setShowHint(false); // 重置提示显示状态
-      };
-      resetModalState();
-    }
-  }, [isOpen, resetTransform]);
 
   // 切换提示显示
   const toggleHint = useCallback(() => {
@@ -364,171 +366,186 @@ const ImageModal: React.FC<ImageModalProps> = ({
     }
   }, [scale, resetTransform]);
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ touchAction: "none" }}
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      // 退场放完再复原缩放和旋转。放在打开时复原的话，上次放大过的图会先以放大的样子出现再缩回去
+      onOpenChangeComplete={(open) => {
+        if (!open) {
+          resetTransform();
+          setShowHint(false);
+        }
+      }}
     >
-      {/* 背景遮罩 */}
-      <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* 图片标题 - 左上角 */}
-      {title && (
-        <div className="absolute top-4 left-4 z-10">
-          <h3 className="text-white text-lg font-semibold bg-black/30 backdrop-blur-sm px-4 py-2 rounded-full">
-            {title}
-          </h3>
-        </div>
-      )}
-
-      {/* Hint 和关闭按钮 - 右上角 */}
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-        <button
-          onClick={toggleHint}
-          className="p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/20 text-white/70 hover:text-white hover:bg-black/40 transition-all duration-200"
-          aria-label="显示操作提示"
-          title="显示操作提示"
-        >
-          <HelpCircle size={18} />
-        </button>
-
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/20 text-white/70 hover:text-white hover:bg-black/40 transition-all duration-200"
-          aria-label="关闭"
-          title="关闭 (ESC)"
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      {/* 操作提示弹窗 - 屏幕中央 */}
-      {showHint && (
-        <div
-          className="absolute inset-0 flex items-center justify-center z-20"
-          onClick={toggleHint}
-        >
-          <div
-            className="bg-black/80 backdrop-blur-sm text-white p-6 rounded-2xl border border-white/20 max-w-md mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center mb-4">
-              <h3 className="text-lg font-semibold">操作提示</h3>
-            </div>
-            <div className="space-y-2 text-sm text-white/90">
-              <div>• 滚轮/双指缩放图片</div>
-              <div>• 双击放大或重置</div>
-              <div>• 拖拽移动图片</div>
-              <div>• R/L 键旋转图片</div>
-              <div>• 0 键重置所有变换</div>
-              <div>• ESC 键关闭图片</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 图片容器 - 占满整个屏幕 */}
-      <div
-        className="absolute inset-0 flex items-center justify-center overflow-hidden"
+      <DialogContent
+        variant="viewer"
+        aria-label={shown.title ? undefined : shown.alt}
+        className="flex items-center justify-center p-4"
         style={{ touchAction: "none" }}
       >
+        {/* 图片标题 - 左上角 */}
+        {shown.title && (
+          <div className="absolute top-4 left-4 z-10">
+            <DialogTitle className="text-white dark:text-white text-lg font-semibold bg-black/30 backdrop-blur-sm px-4 py-2 rounded-full">
+              {shown.title}
+            </DialogTitle>
+          </div>
+        )}
+
+        {/* Hint 和关闭按钮 - 右上角 */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <button
+            onClick={toggleHint}
+            className="p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/20 text-white/70 hover:text-white hover:bg-black/40 transition-all duration-200"
+            aria-label={t("help")}
+            title={t("help")}
+          >
+            <HelpCircle size={18} />
+          </button>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/20 text-white/70 hover:text-white hover:bg-black/40 transition-all duration-200"
+            aria-label={t("close")}
+            title={`${t("close")} (Esc)`}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* 操作提示弹窗 - 屏幕中央 */}
+        {showHint && (
+          <div
+            className="absolute inset-0 flex items-center justify-center z-20"
+            onClick={toggleHint}
+          >
+            <div
+              className="bg-black/80 backdrop-blur-sm text-white p-6 rounded-2xl border border-white/20 max-w-md mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-semibold">{t("help")}</h3>
+              </div>
+              <div className="space-y-2 text-sm text-white/90">
+                <div>• {t("hintZoom")}</div>
+                <div>• {t("hintDoubleClick")}</div>
+                <div>• {t("hintDrag")}</div>
+                <div>• {t("hintRotate")}</div>
+                <div>• {t("hintReset")}</div>
+                <div>• {t("hintClose")}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 图片容器 - 占满整个屏幕。开合时只有图片微微缩放，周围的标题和工具栏只淡入淡出 */}
         <div
-          ref={imageRef}
-          className="relative select-none flex items-center justify-center w-full h-full"
-          style={{
-            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px) rotate(${rotation}deg)`,
-            transition: isDragging ? "none" : "transform 0.2s ease-out",
-            cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
-            touchAction: "none",
-            userSelect: "none",
-            WebkitUserSelect: "none",
-            WebkitTouchCallout: "none",
-          }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onDoubleClick={handleDoubleClick}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          className="absolute inset-0 flex items-center justify-center overflow-hidden transition-[scale] duration-300 ease-page group-data-starting-style:scale-95 group-data-ending-style:scale-95 group-data-ending-style:duration-200"
+          style={{ touchAction: "none" }}
         >
-          <Image
-            src={src}
-            alt={alt}
-            width={1200}
-            height={800}
-            className="max-w-full max-h-full object-contain"
-            style={{ objectFit: "contain" }}
-            priority
-            draggable={false}
-          />
+          <div
+            ref={imageRef}
+            className="relative select-none flex items-center justify-center w-full h-full"
+            style={{
+              transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px) rotate(${rotation}deg)`,
+              transition: isDragging ? "none" : "transform 0.2s ease-out",
+              cursor:
+                scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+              touchAction: "none",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              WebkitTouchCallout: "none",
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {shown.src && (
+              <Image
+                src={shown.src}
+                alt={shown.alt}
+                width={1200}
+                height={800}
+                // 加载完再淡入，不在面板淡入之后突然冒出来
+                onLoad={() => setLoadedSrc(shown.src)}
+                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ease-page ${
+                  loadedSrc === shown.src ? "opacity-100" : "opacity-0"
+                }`}
+                style={{ objectFit: "contain" }}
+                priority
+                draggable={false}
+              />
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* 控制按钮组 - 小屏居中，大屏右下角 */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 sm:left-auto sm:right-4 sm:translate-x-0 z-10 max-w-[calc(100vw-1rem)] sm:max-w-none px-2 sm:px-0">
-        <div className="flex items-center gap-1.5 sm:gap-2 bg-black/30 backdrop-blur-sm px-3 sm:px-4 py-3 rounded-full border border-white/10 overflow-x-auto scrollbar-hide">
-          <button
-            onClick={zoomOut}
-            className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
-            aria-label="缩小"
-            title="缩小 (-)"
-          >
-            <ZoomOut size={16} />
-          </button>
+        {/* 控制按钮组 - 小屏居中，大屏右下角 */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 sm:left-auto sm:right-4 sm:translate-x-0 z-10 max-w-[calc(100vw-1rem)] sm:max-w-none px-2 sm:px-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-black/30 backdrop-blur-sm px-3 sm:px-4 py-3 rounded-full border border-white/10 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={zoomOut}
+              className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
+              aria-label={t("zoomOut")}
+              title={`${t("zoomOut")} (-)`}
+            >
+              <ZoomOut size={16} />
+            </button>
 
-          <span className="text-white text-sm min-w-[2.8rem] sm:min-w-12 text-center shrink-0">
-            {Math.round(scale * 100)}%
-          </span>
+            <span className="text-white text-sm min-w-[2.8rem] sm:min-w-12 text-center shrink-0">
+              {Math.round(scale * 100)}%
+            </span>
 
-          <button
-            onClick={zoomIn}
-            className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
-            aria-label="放大"
-            title="放大 (+)"
-          >
-            <ZoomIn size={16} />
-          </button>
+            <button
+              onClick={zoomIn}
+              className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
+              aria-label={t("zoomIn")}
+              title={`${t("zoomIn")} (+)`}
+            >
+              <ZoomIn size={16} />
+            </button>
 
-          <div className="w-px h-5 sm:h-6 bg-white/20 mx-1 shrink-0"></div>
+            <div className="w-px h-5 sm:h-6 bg-white/20 mx-1 shrink-0"></div>
 
-          <button
-            onClick={rotateCounterClockwise}
-            className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
-            aria-label="逆时针旋转"
-            title="逆时针旋转 (L)"
-          >
-            <RotateCcw size={16} />
-          </button>
+            <button
+              onClick={rotateCounterClockwise}
+              className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
+              aria-label={t("rotateLeft")}
+              title={`${t("rotateLeft")} (L)`}
+            >
+              <RotateCcw size={16} />
+            </button>
 
-          <button
-            onClick={rotateClockwise}
-            className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
-            aria-label="顺时针旋转"
-            title="顺时针旋转 (R)"
-          >
-            <RotateCw size={16} />
-          </button>
+            <button
+              onClick={rotateClockwise}
+              className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
+              aria-label={t("rotateRight")}
+              title={`${t("rotateRight")} (R)`}
+            >
+              <RotateCw size={16} />
+            </button>
 
-          <div className="w-px h-5 sm:h-6 bg-white/20 mx-1 shrink-0"></div>
+            <div className="w-px h-5 sm:h-6 bg-white/20 mx-1 shrink-0"></div>
 
-          <button
-            onClick={resetTransform}
-            className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
-            aria-label="重置"
-            title="重置 (0)"
-          >
-            <RefreshCw size={16} />
-          </button>
+            <button
+              onClick={resetTransform}
+              className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
+              aria-label={t("reset")}
+              title={`${t("reset")} (0)`}
+            >
+              <RefreshCw size={16} />
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

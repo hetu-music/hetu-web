@@ -7,13 +7,13 @@ import FeedbackSection from "@/components/profile/FeedbackSection";
 import ProfileHero from "@/components/profile/ProfileHero";
 import { PROFILE_TABS, type ProfileTab } from "@/components/profile/profile-ui";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
-import PageTopBar from "@/components/shared/PageTopBar";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { cn } from "@/lib/utils/utils";
 import { INK_TONE } from "@/lib/utils/utils-tone";
 import { useTranslations } from "next-intl";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import React, { useEffect } from "react";
+import React from "react";
 
 /** 个人中心：左栏卷首与目录，右栏为当前一节 */
 export default function ProfileClient() {
@@ -28,16 +28,6 @@ export default function ProfileClient() {
     }),
   );
 
-  // 各节长短不一，切换时滚动条出现或消失会让页面左右跳动
-  useEffect(() => {
-    const htmlEl = document.documentElement;
-    const originalGutter = htmlEl.style.scrollbarGutter;
-    htmlEl.style.scrollbarGutter = "stable";
-    return () => {
-      htmlEl.style.scrollbarGutter = originalGutter;
-    };
-  }, []);
-
   return (
     <div
       className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
@@ -48,7 +38,14 @@ export default function ProfileClient() {
         } as React.CSSProperties
       }
     >
-      <PageTopBar title={t("title")} />
+      <TopBar
+        exit={{ kind: "back" }}
+        nav={
+          <h1 className="px-2 min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+            {t("title")}
+          </h1>
+        }
+      />
 
       <main className="relative pt-32 md:pt-40 pb-32 max-w-6xl mx-auto px-6">
         <div className="grid gap-y-14 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-x-16">

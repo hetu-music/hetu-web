@@ -1,7 +1,6 @@
 "use client";
 
-import About from "@/components/library/About";
-import AppNavbar from "@/components/shared/AppNavbar";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { usePlayerStore } from "@/store/player-store";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
@@ -313,10 +312,8 @@ export default function ImageryClient({ items, categories }: Props) {
     x: number;
     y: number;
   } | null>(null);
-  const [showAbout, setShowAbout] = useState(false);
 
   const isDesktop = useIsDesktop();
-  const navRef = useRef<HTMLElement>(null);
   const cloudRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(960);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -345,21 +342,6 @@ export default function ImageryClient({ items, categories }: Props) {
       setMounted(true);
       setMarqueeSeed(Math.floor(Math.random() * 2147483647));
     });
-  }, []);
-
-  // Track nav height → CSS variable --nav-h for the panel to consume
-  useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const update = () =>
-      document.documentElement.style.setProperty(
-        "--nav-h",
-        `${nav.getBoundingClientRect().height}px`,
-      );
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(nav);
-    return () => ro.disconnect();
   }, []);
 
   // ── precomputed display data ──────────────────────────────────────────────
@@ -597,10 +579,7 @@ export default function ImageryClient({ items, categories }: Props) {
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-slate-800 dark:text-slate-200">
-      <AppNavbar
-        ref={navRef}
-        onAboutClick={() => setShowAbout(true)}
-      />
+      <TopBar exit={{ kind: "logo" }} />
 
       {/* ── hero ── */}
       <header
@@ -684,7 +663,7 @@ export default function ImageryClient({ items, categories }: Props) {
       </header>
 
       {/* ── category filter ── */}
-      <div className="sticky top-(--nav-h,48px) z-20 bg-[#FAFAFA]/40 dark:bg-[#0B0F19]/40 backdrop-blur-2xl border-b border-slate-200/10 dark:border-slate-800/20 transition-all duration-1000">
+      <div className="sticky top-(--nav-h) z-20 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm border-b border-slate-200/70 dark:border-slate-800">
         <div className="max-w-5xl mx-auto px-6 py-2.5">
           {/* L1 filter row */}
           <div className="flex items-center gap-8 overflow-x-auto no-scrollbar py-1 mask-linear-fade-edges">
@@ -894,8 +873,6 @@ export default function ImageryClient({ items, categories }: Props) {
         lyricistCounts={lyricistCounts}
         onClose={handleClose}
       />
-
-      {showAbout && <About onClose={() => setShowAbout(false)} />}
     </div>
   );
 }

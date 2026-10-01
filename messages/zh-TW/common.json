@@ -15,7 +15,15 @@
     "about": "關於",
     "login": "登入",
     "loading": "載入中…",
-    "share": "分享"
+    "share": "分享本頁",
+    "more": "更多",
+    "close": "關閉",
+    "install": "安裝為應用",
+    "theme": "主題",
+    "themeLight": "淺色",
+    "themeDark": "深色",
+    "themeSystem": "跟隨系統",
+    "script": "文字"
   },
   "error": {
     "title": "出錯了",

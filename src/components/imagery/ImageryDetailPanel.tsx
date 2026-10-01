@@ -478,7 +478,7 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
       <SheetContent
         side={panelSide}
         className={[
-          "top-(--nav-h,48px) h-[calc(100vh-var(--nav-h,48px))] w-[min(440px,42vw)] p-0 border-none shadow-2xl transition-all duration-500",
+          "top-(--nav-h) h-[calc(100vh-var(--nav-h))] w-[min(440px,42vw)] p-0 border-none shadow-2xl transition-all duration-500",
           panelSide === "right"
             ? "border-l border-slate-200/50 dark:border-white/5"
             : "border-r border-slate-200/50 dark:border-white/5",

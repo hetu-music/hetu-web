@@ -10,32 +10,21 @@ import LyricsFolio from "@/components/detail/LyricsFolio";
 import RelatedWorks from "@/components/detail/RelatedWorks";
 import ScoreSection from "@/components/detail/ScoreSection";
 import {
+  jumpTo,
   type NavItem,
   ReadingProgress,
-  SectionNav,
-  SectionSheet,
   useActiveSection,
 } from "@/components/detail/SectionNav";
 import SongColophon from "@/components/detail/SongColophon";
 import SongHero from "@/components/detail/SongHero";
-import { InstallButton } from "@/components/pwa/useInstallAction";
 import FavoriteButton from "@/components/shared/FavoriteButton";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import ImageModal from "@/components/shared/ImageModal";
-import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
-import MoreMenu, { type MoreMenuAction } from "@/components/shared/MoreMenu";
-import {
-  NAV_ACTIONS_CLASS,
-  NAV_BAR_CLASS,
-  NAV_BAR_INNER_CLASS,
-  NAV_BUTTON_CLASS,
-} from "@/components/shared/nav-button";
-import ThemeToggle from "@/components/shared/ThemeToggle";
+import TopBar, { type TopBarAction } from "@/components/shared/topbar/TopBar";
+import { PlaceNav } from "@/components/shared/topbar/parts";
 import { useUserContext } from "@/context/UserContext";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
-import { usePathname, useRouter } from "@/i18n/navigation";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
-import { cn } from "@/lib/utils/utils";
 import { buildFolio, markLines, parseNotes } from "@/lib/utils/utils-folio";
 import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
 import {
@@ -43,7 +32,7 @@ import {
   NEUTRAL_TONE,
   toneFromImage,
 } from "@/lib/utils/utils-tone";
-import { ArrowLeft, Home, Share2, User } from "lucide-react";
+import { Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, {
   useCallback,
@@ -61,8 +50,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   imagery,
   excerpt,
 }) => {
-  const router = useRouter();
-  const pathname = usePathname();
   const t = useTranslations("song");
   const tNav = useTranslations("common.nav");
   const { user, loaded: userLoaded } = useUserContext();
@@ -76,7 +63,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     alt: string;
     title: string;
   } | null>(null);
-  const [isBackActive, setIsBackActive] = useState(false);
 
   // ── 正文与意象 ──────────────────────────────────────────────────────────
   const folio = useMemo(
@@ -168,36 +154,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   }, []);
 
   // ── 其他交互 ────────────────────────────────────────────────────────────
-  const openUserPanel = (tab: "account" | "favorites" = "favorites") => {
-    if (!user) {
-      const next = encodeURIComponent(pathname + window.location.search);
-      router.push(`/login?next=${next}`);
-      return;
-    }
-    const d = parseInt(
-      sessionStorage.getItem("__hetu_web_nav_depth") || "0",
-      10,
-    );
-    sessionStorage.setItem("__hetu_web_nav_depth", String(d + 1));
-    router.push(`/profile?tab=${tab}`);
-  };
-
-  const handleBack = () => {
-    setIsBackActive(true);
-    // 通过 sessionStorage 中的导航深度判断是否有站内历史
-    // 该值由主页面在 router.push 前递增，确保 SPA 导航也能正确追踪
-    const navDepth = parseInt(
-      sessionStorage.getItem("__hetu_web_nav_depth") || "0",
-      10,
-    );
-    if (navDepth > 0) {
-      sessionStorage.setItem("__hetu_web_nav_depth", String(navDepth - 1));
-      router.back();
-    } else {
-      router.push("/");
-    }
-  };
-
   const handleShare = useCallback(async () => {
     const artistText = song.artist ? ` - ${song.artist.join("、")}` : "";
     const shareData = {
@@ -240,20 +196,18 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   }, [song.nmn_status, imagery.related.length, notes, t]);
 
   const activeSection = useActiveSection(tocItems);
-  const [tocOpen, setTocOpen] = useState(false);
-
-  const goHome = useCallback(() => router.push("/"), [router]);
-  const moreActions = useMemo<MoreMenuAction[]>(
+  // 窄屏放不下歌名：卷首时显示「目录」，滚过题名后显示当前章节
+  const activeLabel = tocItems.find((i) => i.id === activeSection)?.label;
+  const topBarActions = useMemo<TopBarAction[]>(
     () => [
       {
         key: "share",
         icon: Share2,
-        label: t("actions.share"),
+        label: tNav("share"),
         onClick: handleShare,
       },
-      { key: "home", icon: Home, label: tNav("home"), onClick: goHome },
     ],
-    [t, tNav, handleShare, goHome],
+    [tNav, handleShare],
   );
 
   const appliedTone = tone ?? NEUTRAL_TONE;
@@ -278,85 +232,21 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         }}
       />
 
-      <nav className={NAV_BAR_CLASS}>
-        <div className={NAV_BAR_INNER_CLASS}>
-          <div className="flex items-center gap-1 sm:gap-3 min-w-0">
-            <div className="flex items-center gap-1 -ml-2 shrink-0">
-              <button
-                onClick={handleBack}
-                className={cn(
-                  NAV_BUTTON_CLASS,
-                  "group",
-                  isBackActive && "bg-slate-200/50 dark:bg-slate-800",
-                )}
-                title={tNav("back")}
-              >
-                <ArrowLeft
-                  size={20}
-                  className={cn(
-                    "transition-transform",
-                    isBackActive
-                      ? "-translate-x-0.5"
-                      : "group-hover:-translate-x-0.5",
-                  )}
-                />
-              </button>
-
-              {/* 窄屏放不下，回主页收进「更多」 */}
-              <div className="hidden md:block w-px h-4 bg-slate-300 dark:bg-slate-700 mx-0.5" />
-              <button
-                onClick={goHome}
-                className={cn(NAV_BUTTON_CLASS, "group hidden md:inline-flex")}
-                title={tNav("home")}
-              >
-                <Home
-                  size={20}
-                  className="transition-transform group-hover:scale-105 group-active:scale-95"
-                />
-              </button>
-            </div>
-
-            <SectionNav
-              items={tocItems}
-              active={activeSection}
-              title={song.title}
-              showTitle={titleOutOfView}
-              open={tocOpen}
-              onOpenChange={setTocOpen}
-            />
-          </div>
-
-          <div className={NAV_ACTIONS_CLASS}>
-            <FavoriteButton songId={song.id} />
-            <button
-              onClick={() => openUserPanel("favorites")}
-              className={NAV_BUTTON_CLASS}
-              title={user ? user.name : tNav("login")}
-            >
-              <User size={20} className={user ? "text-(--tone)" : ""} />
-            </button>
-
-            {/* 宽屏平铺 分享、安装、语言 和 主题切换 */}
-            <div className="hidden md:flex items-center gap-2">
-              <button
-                onClick={handleShare}
-                className={NAV_BUTTON_CLASS}
-                title={t("actions.share")}
-                aria-label={t("actions.share")}
-              >
-                <Share2 size={20} />
-              </button>
-              <InstallButton className={NAV_BUTTON_CLASS} />
-              <LocaleSwitcher />
-              <ThemeToggle />
-            </div>
-
-            {/* 窄屏收进「更多」 */}
-            <div className="flex md:hidden relative">
-              <MoreMenu actions={moreActions} />
-            </div>
-          </div>
-        </div>
+      <TopBar
+        exit={{ kind: "back" }}
+        nav={
+          <PlaceNav
+            title={song.title}
+            label={titleOutOfView && activeLabel ? activeLabel : t("folio.toc")}
+            items={tocItems}
+            active={activeSection}
+            onSelect={(id) => jumpTo(tocItems, id)}
+            menuTitle={t("folio.toc")}
+          />
+        }
+        pinned={<FavoriteButton songId={song.id} />}
+        actions={topBarActions}
+      >
         <ImageryCaption
           mark={activeMark}
           lineCount={
@@ -367,7 +257,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
           onClose={closeCaption}
         />
         <ReadingProgress />
-      </nav>
+      </TopBar>
 
       <CommentsProvider
         songId={song.id}
@@ -446,13 +336,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         src={imageModal?.src ?? ""}
         alt={imageModal?.alt ?? ""}
         title={imageModal?.title ?? ""}
-      />
-
-      <SectionSheet
-        items={tocItems}
-        active={activeSection}
-        open={tocOpen}
-        onOpenChange={setTocOpen}
       />
     </div>
   );

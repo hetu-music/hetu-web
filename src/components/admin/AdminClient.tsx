@@ -101,8 +101,6 @@ export default function AdminClientComponent({
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 font-sans">
       <AdminNavbar
         active="songs"
-        userName={user?.name}
-        isLoggedIn={Boolean(user)}
         isSuper={user?.isSuper}
         onOpenNotification={() => admin.setShowNotification(true)}
       />
@@ -138,7 +136,7 @@ export default function AdminClientComponent({
         </div>
 
         {/* Controls Bar */}
-        <div className="sticky top-20 z-40 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm py-4 mb-8 -mx-6 px-6 border-y border-transparent data-[scrolled=true]:border-slate-100">
+        <div className="sticky top-(--nav-h) z-40 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm py-4 mb-8 -mx-6 px-6 border-y border-transparent data-[scrolled=true]:border-slate-100">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             {/* Filter Pills */}
             <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">

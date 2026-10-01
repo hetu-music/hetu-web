@@ -109,12 +109,7 @@ export default function AudioAdminClient() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans transition-colors duration-500 dark:bg-[#0B0F19]">
-      <AdminNavbar
-        active="audio"
-        userName={user?.name}
-        isLoggedIn={Boolean(user)}
-        isSuper={user?.isSuper}
-      />
+      <AdminNavbar active="audio" isSuper={user?.isSuper} />
 
       <main className="mx-auto max-w-7xl px-6 pb-20 pt-24">
         <div className="mb-10">
@@ -168,7 +163,7 @@ export default function AudioAdminClient() {
               onSync={() => sync.mutate()}
             />
 
-            <div className="sticky top-20 z-40 -mx-6 mb-6 bg-[#FAFAFA]/95 px-6 py-4 backdrop-blur-sm dark:bg-[#0B0F19]/95">
+            <div className="sticky top-(--nav-h) z-40 -mx-6 mb-6 bg-[#FAFAFA]/95 px-6 py-4 backdrop-blur-sm dark:bg-[#0B0F19]/95">
               <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
                 <div className="no-scrollbar flex w-full items-center gap-2 overflow-x-auto md:w-auto">
                   {FILTERS.map((f) => (

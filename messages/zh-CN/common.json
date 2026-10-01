@@ -15,7 +15,15 @@
     "about": "关于",
     "login": "登录",
     "loading": "加载中…",
-    "share": "分享"
+    "share": "分享本页",
+    "more": "更多",
+    "close": "关闭",
+    "install": "安装为应用",
+    "theme": "主题",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "themeSystem": "跟随系统",
+    "script": "文字"
   },
   "error": {
     "title": "出错了",

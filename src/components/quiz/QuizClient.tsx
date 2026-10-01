@@ -1,6 +1,6 @@
 "use client";
 
-import AppNavbar from "@/components/shared/AppNavbar";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { useRouter } from "@/i18n/navigation";
 import { encodeAnswers } from "@/lib/quiz/codec";
 import type { QuizQuestionView } from "@/lib/quiz/views";
@@ -106,8 +106,7 @@ export default function QuizClient({ questions, poolSize }: Props) {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
-      <AppNavbar
-      />
+      <TopBar exit={{ kind: "logo" }} />
 
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 pb-24 pt-32">
         <AnimatePresence mode="wait">

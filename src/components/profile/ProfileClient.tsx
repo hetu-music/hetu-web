@@ -7,7 +7,7 @@ import FeedbackSection from "@/components/profile/FeedbackSection";
 import ProfileHero from "@/components/profile/ProfileHero";
 import { PROFILE_TABS, type ProfileTab } from "@/components/profile/profile-ui";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
-import PageTopBar from "@/components/shared/PageTopBar";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { cn } from "@/lib/utils/utils";
 import { INK_TONE } from "@/lib/utils/utils-tone";
@@ -48,7 +48,14 @@ export default function ProfileClient() {
         } as React.CSSProperties
       }
     >
-      <PageTopBar title={t("title")} />
+      <TopBar
+        exit={{ kind: "back" }}
+        nav={
+          <h1 className="px-2 min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+            {t("title")}
+          </h1>
+        }
+      />
 
       <main className="relative pt-32 md:pt-40 pb-32 max-w-6xl mx-auto px-6">
         <div className="grid gap-y-14 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-x-16">

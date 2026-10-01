@@ -40,6 +40,8 @@
   --background: #ffffff;
   --foreground: #171717;
   --tone: hsl(224 38% 36%);
+  /* 顶栏高度（TopBar 的 h-20）：吸顶的二级栏、侧面板都从这里往下排 */
+  --nav-h: 5rem;
 }
 
 .dark {

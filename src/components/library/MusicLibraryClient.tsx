@@ -1,6 +1,6 @@
 "use client";
 
-import AppNavbar from "@/components/shared/AppNavbar";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import Pagination from "@/components/shared/Pagination";
@@ -32,13 +32,13 @@ import {
   Mic2,
   RotateCcw,
   Search,
+  Share2,
   SlidersHorizontal,
   X,
   XCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import About from "./About";
 import GridCard from "./GridCard";
 import HeroSection from "./HeroSection";
 import ListRow from "./ListRow";
@@ -106,7 +106,6 @@ export default function MusicLibraryClient({
   const tEnum = useTranslations("enums");
   const { isLoggedIn } = useFavorites();
   const [mounted, setMounted] = useState(false);
-  const [showAbout, setShowAbout] = useState(false);
   const [activeSongId, setActiveSongId] = useState<number | null>(null);
   const [mountKey, setMountKey] = useState(0);
   const { showScrollTop, scrollToTop } = useScrollTop();
@@ -348,11 +347,20 @@ export default function MusicLibraryClient({
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
-      <AppNavbar
-        onTitleClick={handleTitleReset}
-        onAboutClick={() => setShowAbout(true)}
-        onShare={handleShare}
-        titleTooltip={t("titleTooltip")}
+      <TopBar
+        exit={{
+          kind: "logo",
+          onClick: handleTitleReset,
+          tooltip: t("titleTooltip"),
+        }}
+        actions={[
+          {
+            key: "share",
+            icon: Share2,
+            label: tCommon("nav.share"),
+            onClick: handleShare,
+          },
+        ]}
       />
 
       <main className="mx-auto max-w-7xl px-6 pb-20 pt-32">
@@ -366,7 +374,7 @@ export default function MusicLibraryClient({
             一行里竖直居中，当前标签与聚焦的搜索框在细线上亮一段强调色。
             窄屏分两行：上面搜索与按钮，下面类型标签，两行各有一道细线分开；
             标签行右缘淡出，提示还能横向滑动 */}
-        <section className="sticky top-20 z-40 -mx-6 mb-10 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95">
+        <section className="sticky top-(--nav-h) z-40 -mx-6 mb-10 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95">
           <div className="flex flex-col-reverse border-b border-slate-200/70 dark:border-slate-800 md:h-12 md:flex-row md:gap-8">
             <div
               ref={containerRef}
@@ -593,8 +601,6 @@ export default function MusicLibraryClient({
           )}
         </section>
       </main>
-
-      {showAbout && <About onClose={() => setShowAbout(false)} />}
 
       <FloatingActionButtons
         showScrollTop={showScrollTop}

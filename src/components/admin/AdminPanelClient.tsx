@@ -41,12 +41,7 @@ export default function AdminPanelClient({
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 font-sans">
-      <AdminNavbar
-        active={section}
-        userName={user?.name}
-        isLoggedIn={Boolean(user)}
-        isSuper={user?.isSuper}
-      />
+      <AdminNavbar active={section} isSuper={user?.isSuper} />
 
       <main className="pt-24 pb-20 max-w-7xl mx-auto px-6">
         <div className="mb-10">

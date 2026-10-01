@@ -19,7 +19,7 @@ vi.mock("@/i18n/navigation", () => ({
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
-vi.mock("@/components/shared/AppNavbar", () => ({
+vi.mock("@/components/shared/topbar/TopBar", () => ({
   default: () => null,
 }));
 // 去掉动画，让 AnimatePresence 立即切换

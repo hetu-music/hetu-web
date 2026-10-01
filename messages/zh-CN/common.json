@@ -54,7 +54,9 @@
       "lyricistLabel": "词作",
       "relatedSongs": "相关曲目",
       "songsByLyricist": "{name}的曲目",
-      "appears": "出现 {count} 次"
+      "appears": "出现 {count} 次",
+      "title": "意象详情",
+      "description": "{name}在河图作品中出现 {count} 次"
     }
   },
   "story": {

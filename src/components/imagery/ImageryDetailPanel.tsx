@@ -25,6 +25,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export type SongResult = SongRef;
 
+/** 没有署名词作者的曲目归在这一组；只作内部标记，显示时取 i18n 的「未知」 */
+export const UNKNOWN_LYRICIST = "\u0000unknown";
+
 export interface DetailPanelProps {
   open: boolean;
   panelSide?: "left" | "right";
@@ -76,7 +79,6 @@ const PanelBody = memo(function PanelBody({
   activeLyricist,
   onLyricistClick,
   onLinkClick,
-  isDesktop,
 }: {
   songs: SongResult[];
   songsLoading: boolean;
@@ -85,17 +87,18 @@ const PanelBody = memo(function PanelBody({
   activeLyricist: string | null;
   onLyricistClick: (name: string) => void;
   onLinkClick: () => void;
-  isDesktop: boolean;
 }) {
   const t = useTranslations("common.imagery");
   const tCommon = useTranslations("common");
   const activeLyricistLabel =
-    (activeLyricist === "未知" ? tCommon("unknown") : activeLyricist) || "";
+    (activeLyricist === UNKNOWN_LYRICIST
+      ? tCommon("unknown")
+      : activeLyricist) || "";
   const filtered = useMemo(
     () =>
       activeLyricist
         ? songs.filter((song) =>
-            activeLyricist === "未知"
+            activeLyricist === UNKNOWN_LYRICIST
               ? !song.lyricist || song.lyricist.length === 0
               : song.lyricist?.includes(activeLyricist),
           )
@@ -116,13 +119,7 @@ const PanelBody = memo(function PanelBody({
 
   if (songs.length === 0) {
     return (
-      <p
-        className={`text-center text-sm tracking-[0.25em] pl-[0.25em] py-16 ${
-          isDesktop
-            ? "text-slate-300 dark:text-slate-700"
-            : "text-slate-400 dark:text-slate-600"
-        }`}
-      >
+      <p className="text-center font-kaiti text-sm py-16 text-slate-400 dark:text-slate-500">
         {t("detailPanel.noWorks")}
       </p>
     );
@@ -147,7 +144,7 @@ const PanelBody = memo(function PanelBody({
               }`}
             >
               <span
-                className={`inline-block transition-all duration-500 font-system ${
+                className={`inline-block transition-all duration-500 ${
                   !activeLyricist
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 -translate-x-2"
@@ -158,7 +155,7 @@ const PanelBody = memo(function PanelBody({
               </span>
               {t("all")}
               <span
-                className={`inline-block transition-all duration-500 font-system ${
+                className={`inline-block transition-all duration-500 ${
                   !activeLyricist
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 translate-x-2"
@@ -170,7 +167,8 @@ const PanelBody = memo(function PanelBody({
             </button>
 
             {lyricistCounts.map(([name, count]) => {
-              const displayName = name === "未知" ? tCommon("unknown") : name;
+              const displayName =
+                name === UNKNOWN_LYRICIST ? tCommon("unknown") : name;
               const isActive = activeLyricist === name;
               return (
                 <button
@@ -183,7 +181,7 @@ const PanelBody = memo(function PanelBody({
                   }`}
                 >
                   <span
-                    className={`inline-block transition-all duration-500 font-system ${
+                    className={`inline-block transition-all duration-500 ${
                       isActive
                         ? "opacity-100 translate-x-0"
                         : "opacity-0 -translate-x-2"
@@ -194,7 +192,7 @@ const PanelBody = memo(function PanelBody({
                   </span>
                   {displayName}
                   <span
-                    className={`inline-block transition-all duration-500 font-system ${
+                    className={`inline-block transition-all duration-500 ${
                       isActive
                         ? "opacity-100 translate-x-0"
                         : "opacity-0 translate-x-2"
@@ -203,7 +201,7 @@ const PanelBody = memo(function PanelBody({
                   >
                     」
                   </span>
-                  <span className="ml-1 text-[10px] opacity-40 font-mono tracking-normal group-hover:opacity-60 transition-opacity">
+                  <span className="ml-1 text-[10px] opacity-40 tracking-normal group-hover:opacity-60 transition-opacity">
                     ({count})
                   </span>
                 </button>
@@ -252,7 +250,7 @@ const PanelBody = memo(function PanelBody({
                   className="flex items-center justify-between py-4 px-6 border-b border-slate-100/80 dark:border-slate-800/50 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group"
                 >
                   <div className="min-w-0 pr-4">
-                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors truncate tracking-wide">
+                    <div className="font-serif text-sm text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors truncate tracking-wide">
                       {song.title}
                     </div>
                     <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate tracking-wide">
@@ -297,7 +295,7 @@ function PanelHeader({
         {/* Decorative background character */}
         <span
           aria-hidden
-          className="pointer-events-none select-none absolute -bottom-6 -right-3 font-serif leading-none"
+          className="pointer-events-none select-none absolute -bottom-6 -right-3 font-calligraphy leading-none"
           style={{
             fontSize: "11rem",
             opacity: 0.035,
@@ -309,7 +307,7 @@ function PanelHeader({
         </span>
 
         <h2
-          className={`font-serif text-[3.2rem] leading-none font-normal tracking-[0.2em] mb-4 ${selectedPalette.text}`}
+          className={`font-calligraphy text-[3.2rem] leading-none font-normal tracking-[0.2em] mb-4 ${selectedPalette.text}`}
         >
           {selectedItem.name}
         </h2>
@@ -339,7 +337,7 @@ function PanelHeader({
     <div className="flex items-start justify-between px-8 pt-3 pb-4 border-b border-slate-100/40 dark:border-slate-800/40 shrink-0">
       <div className="min-w-0">
         <h2
-          className={`font-serif text-3xl font-normal tracking-[0.2em] mb-1 ${selectedPalette.text}`}
+          className={`font-calligraphy text-3xl font-normal tracking-[0.2em] mb-1 ${selectedPalette.text}`}
         >
           {selectedItem.name}
         </h2>
@@ -372,6 +370,7 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
     onClose,
   } = props;
 
+  const t = useTranslations("common.imagery");
   const isDesktop = useIsDesktop();
   const [activeLyricist, setActiveLyricist] = useState<string | null>(null);
 
@@ -441,7 +440,6 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
     activeLyricist,
     onLyricistClick: handleLyricistClick,
     onLinkClick: onClose,
-    isDesktop,
   };
 
   if (!isDesktop) {
@@ -450,12 +448,15 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
         <DrawerContent className="h-[65dvh]">
           {/* Accessible title/description (visually hidden) */}
           <DrawerTitle className="sr-only">
-            {selectedItem?.name ?? "意象详情"}
+            {selectedItem?.name ?? t("detailPanel.title")}
           </DrawerTitle>
           <DrawerDescription className="sr-only">
             {selectedItem
-              ? `${selectedItem.name}在河图作品中出现${selectedItem.count}次`
-              : "意象详情面板"}
+              ? t("detailPanel.description", {
+                  name: selectedItem.name,
+                  count: selectedItem.count,
+                })
+              : t("detailPanel.title")}
           </DrawerDescription>
 
           <PanelHeader
@@ -486,12 +487,15 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
       >
         {/* Accessible title/description (visually hidden) */}
         <SheetTitle className="sr-only">
-          {selectedItem?.name ?? "意象详情"}
+          {selectedItem?.name ?? t("detailPanel.title")}
         </SheetTitle>
         <SheetDescription className="sr-only">
           {selectedItem
-            ? `${selectedItem.name}在河图作品中出现${selectedItem.count}次`
-            : "意象详情面板"}
+            ? t("detailPanel.description", {
+                name: selectedItem.name,
+                count: selectedItem.count,
+              })
+            : t("detailPanel.title")}
         </SheetDescription>
 
         <PanelHeader

@@ -68,7 +68,7 @@ const SheetContent = React.forwardRef<
         ref={ref}
         className={cn(
           "fixed z-50 flex flex-col",
-          "bg-white dark:bg-[#0c0f1a]",
+          "bg-[#FAFAFA] dark:bg-[#0B0F19]",
           "shadow-2xl",
           "transition ease-[cubic-bezier(0.22,1,0.36,1)]",
           "duration-500",

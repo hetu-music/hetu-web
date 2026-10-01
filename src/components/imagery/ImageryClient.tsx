@@ -3,7 +3,6 @@
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
-import { usePlayerStore } from "@/store/player-store";
 import { useIntersection } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
@@ -25,8 +24,10 @@ import React, {
   useRef,
   useState,
 } from "react";
-import type { SongResult } from "./ImageryDetailPanel";
-import ImageryDetailPanel from "./ImageryDetailPanel";
+import ImageryDetailPanel, {
+  type SongResult,
+  UNKNOWN_LYRICIST,
+} from "./ImageryDetailPanel";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -190,17 +191,19 @@ const CategoryButton = memo(function CategoryButton({
   return (
     <button
       onClick={onClick}
-      className={`group relative py-1.5 text-[14px] transition-all duration-700 font-serif whitespace-nowrap ${isActive
+      className={`group relative py-1.5 text-[14px] transition-all duration-700 font-serif whitespace-nowrap ${
+        isActive
           ? "text-slate-900 dark:text-white tracking-[0.25em]"
           : "text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 tracking-[0.2em] hover:tracking-[0.25em]"
-        }`}
+      }`}
     >
       {label}
       <span
-        className={`absolute bottom-0 left-0 h-[1.5px] transition-all duration-1000 ease-out origin-left ${isActive
+        className={`absolute bottom-0 left-0 h-[1.5px] transition-all duration-1000 ease-out origin-left ${
+          isActive
             ? "w-[calc(100%-0.25em)] scale-x-100 opacity-80"
             : "w-[calc(100%-0.25em)] scale-x-0 opacity-0"
-          }`}
+        }`}
         style={{
           backgroundColor: accentColor,
           boxShadow: isActive ? `0 1px 10px ${accentColor}22` : "none",
@@ -215,17 +218,6 @@ const CategoryButton = memo(function CategoryButton({
 export default function ImageryClient({ items, categories }: Props) {
   const t = useTranslations("common.imagery");
   const tSite = useTranslations("common.site");
-  const { setPlayerVisible } = usePlayerStore();
-
-  // 意象词云页面：隐藏播放条但不暂停音乐，离开时恢复显示
-  useEffect(() => {
-    setPlayerVisible(false);
-    return () => {
-      setPlayerVisible(true);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── category hierarchy ───────────────────────────────────────────────────
   const catMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -296,8 +288,8 @@ export default function ImageryClient({ items, categories }: Props) {
       activeL1Id === null
         ? []
         : categories
-          .filter((c) => c.level === 2 && c.parent_id === activeL1Id)
-          .sort((a, b) => a.name.localeCompare(b.name, "zh")),
+            .filter((c) => c.level === 2 && c.parent_id === activeL1Id)
+            .sort((a, b) => a.name.localeCompare(b.name, "zh")),
     [categories, activeL1Id],
   );
   const [selectedItem, setSelectedItem] = useState<ImageryItem | null>(null);
@@ -437,7 +429,7 @@ export default function ImageryClient({ items, categories }: Props) {
     songs.forEach((song) => {
       const lyricists = song.lyricist ?? [];
       if (lyricists.length === 0) {
-        counts.set("未知", (counts.get("未知") ?? 0) + 1);
+        counts.set(UNKNOWN_LYRICIST, (counts.get(UNKNOWN_LYRICIST) ?? 0) + 1);
       } else {
         lyricists.forEach((l) => counts.set(l, (counts.get(l) ?? 0) + 1));
       }
@@ -723,20 +715,21 @@ export default function ImageryClient({ items, categories }: Props) {
                     <button
                       key={cat.id}
                       onClick={() => setActiveL2Id(isActive ? null : cat.id)}
-                      className={`group relative text-[12px] transition-all duration-700 font-serif tracking-widest whitespace-nowrap py-1 ${isActive
+                      className={`group relative text-[12px] transition-all duration-700 font-serif tracking-widest whitespace-nowrap py-1 ${
+                        isActive
                           ? "text-slate-700 dark:text-slate-300"
                           : "text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 hover:tracking-[0.15em]"
-                        }`}
+                      }`}
                     >
                       <span
-                        className={`inline-block transition-all duration-700 font-system ${isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"} mr-1.5`}
+                        className={`inline-block transition-all duration-700 ${isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"} mr-1.5`}
                         style={{ color: palette.accent }}
                       >
                         「
                       </span>
                       {cat.name}
                       <span
-                        className={`inline-block transition-all duration-700 font-system ${isActive ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"} ml-1.5`}
+                        className={`inline-block transition-all duration-700 ${isActive ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"} ml-1.5`}
                         style={{ color: palette.accent }}
                       >
                         」
@@ -760,14 +753,14 @@ export default function ImageryClient({ items, categories }: Props) {
         style={
           mounted
             ? {
-              animation: "main-fade-in 1s ease-out both",
-              animationDelay: "200ms",
-            }
+                animation: "main-fade-in 1s ease-out both",
+                animationDelay: "200ms",
+              }
             : undefined
         }
       >
         {wordDisplayList.length === 0 ? (
-          <div className="text-center text-slate-400 dark:text-slate-600 text-sm py-24 tracking-[0.3em]">
+          <div className="text-center font-kaiti text-sm py-24 text-slate-400 dark:text-slate-500">
             {t("noData")}
           </div>
         ) : (

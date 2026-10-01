@@ -1,93 +1,76 @@
 "use client";
 
+import { Drawer as BaseDrawer } from "@base-ui/react/drawer";
 import * as React from "react";
-import { Drawer as DrawerPrimitive } from "vaul";
+import { PanelHeader } from "@/components/ui/dialog";
+import { useOverlayHost } from "@/components/ui/overlay-host";
 import { cn } from "@/lib/utils/utils";
 
-const Drawer = ({
-  shouldScaleBackground = false,
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-);
-Drawer.displayName = "Drawer";
+/** 窄屏的底部面板，往下拖可以收起（默认 swipeDirection="down"） */
+const Drawer = BaseDrawer.Root;
+const DrawerClose = BaseDrawer.Close;
+const DrawerTitle = BaseDrawer.Title;
+const DrawerDescription = BaseDrawer.Description;
 
-const DrawerTrigger = DrawerPrimitive.Trigger;
-const DrawerPortal = DrawerPrimitive.Portal;
-const DrawerClose = DrawerPrimitive.Close;
-
-const DrawerOverlay = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-50 bg-black/30 dark:bg-black/50 backdrop-blur-[2px]",
-      className,
-    )}
-    {...props}
-  />
-));
-DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
-
-const DrawerContent = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-50 flex flex-col",
-        "rounded-t-[20px]",
-        "bg-[#FAFAFA]/96 dark:bg-[#0B0F19]/96 backdrop-blur-xl",
-        "border-t border-slate-200/60 dark:border-slate-700/50",
-        "shadow-2xl shadow-black/20",
-        "outline-none",
-        className,
-      )}
-      {...props}
-    >
-      {/* Visual drag handle */}
-      <div
-        className="flex justify-center pt-[14px] pb-1 shrink-0"
-        aria-hidden="true"
-      >
-        <div className="w-9 h-[4px] rounded-full bg-slate-300/80 dark:bg-slate-600/70" />
-      </div>
-      {children}
-    </DrawerPrimitive.Content>
-  </DrawerPortal>
-));
-DrawerContent.displayName = "DrawerContent";
-
-export {
-  Drawer,
-  DrawerTrigger,
-  DrawerPortal,
-  DrawerOverlay,
-  DrawerClose,
-  DrawerContent,
+type DrawerContentProps = Omit<
+  React.ComponentProps<typeof BaseDrawer.Popup>,
+  "className"
+> & {
+  /** 面板本身，常用来定高度 */
+  className?: string;
+  /** 面板里可滚动的内容区 */
+  contentClassName?: string;
+  title: string;
+  /** 只给读屏用的说明 */
+  description?: string;
 };
 
-const DrawerTitle = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Title ref={ref} className={cn(className)} {...props} />
-));
-DrawerTitle.displayName = DrawerPrimitive.Title.displayName;
+function DrawerContent({
+  className,
+  contentClassName,
+  title,
+  description,
+  children,
+  ...props
+}: DrawerContentProps) {
+  const host = useOverlayHost();
+  return (
+    <BaseDrawer.Portal container={host}>
+      {/* 遮罩随拖动的进度变淡；拖动中不要过渡，松手后按甩出的速度收尾 */}
+      <BaseDrawer.Backdrop className="fixed inset-0 z-60 bg-slate-950/30 backdrop-blur-[2px] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]" />
+      <BaseDrawer.Viewport className="fixed inset-0 z-60 flex items-end justify-center touch-none">
+        <BaseDrawer.Popup
+          className={cn(
+            "relative flex w-full min-h-0 max-h-[calc(100dvh-var(--nav-h))] flex-col outline-none touch-none",
+            "rounded-t-2xl bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_-20px_50px_-20px_rgba(15,23,42,0.35)]",
+            // 位移交给 Base UI 写进 --drawer-swipe-movement-y，transform 只能由这里统一给出
+            "[transform:translateY(var(--drawer-swipe-movement-y))] transition-transform duration-400 ease-page data-swiping:duration-0",
+            "data-starting-style:[transform:translateY(100%)] data-ending-style:[transform:translateY(100%)] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+            // 往上拖过头时，底下补一截同色，不露出页面
+            "after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-12 after:bg-[inherit] after:content-['']",
+            className,
+          )}
+          {...props}
+        >
+          <div className="shrink-0 select-none">
+            <div
+              aria-hidden
+              className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-slate-300/80 dark:bg-slate-700"
+            />
+            <PanelHeader title={title} description={description} />
+          </div>
+          <BaseDrawer.Content
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto overscroll-contain touch-auto px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+              contentClassName,
+            )}
+          >
+            {children}
+          </BaseDrawer.Content>
+        </BaseDrawer.Popup>
+      </BaseDrawer.Viewport>
+    </BaseDrawer.Portal>
+  );
+}
 
-const DrawerDescription = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Description ref={ref} className={cn(className)} {...props} />
-));
-DrawerDescription.displayName = DrawerPrimitive.Description.displayName;
-
-export { DrawerTitle, DrawerDescription };
+export { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle };

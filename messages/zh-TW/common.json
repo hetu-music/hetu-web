@@ -71,22 +71,21 @@
     "title": "關於",
     "description": "關於河圖作品勘鑒項目的說明",
     "tabs": {
-      "intro": "項目介紹",
-      "types": "類型說明",
-      "maintainers": "維護團隊"
+      "intro": "序",
+      "types": "凡例",
+      "thanks": "致謝"
     },
     "introSection": {
-      "title": "簡介",
       "content": "本項目為河圖作品勘鑒，致力於收錄整理河圖的音樂作品資料，為聽眾提供便捷的篩選與搜尋服務。"
     },
     "feedbackSection": {
-      "title": "數據與回饋",
+      "title": "來函",
       "content": "數據來源於創作者微博及各大音樂平台。若發現誤漏，可以註冊本站帳號或透過下方聯絡方式進行回饋。",
       "weibo": "微博"
     },
     "thanksSection": {
-      "title": "特別鳴謝",
-      "content": "正版河圖吧吧主 <highlight>{name}</highlight> 及眾位網友整理的《歌手河圖作品發布勘鑒》，為本項目提供了寶貴參考資料。"
+      "title": "鳴謝",
+      "content": "正版河圖吧吧主<highlight>顧大一</highlight>及眾位網友整理的《歌手河圖作品發布勘鑒》，為本項目提供了寶貴參考資料。"
     },
     "typeDescriptions": {
       "原创": "河圖原創作品。",
@@ -98,10 +97,11 @@
       "参与": "以非主創身份參與的作品。"
     },
     "maintainersSection": {
-      "loading": "載入數據中...",
-      "loadError": "獲取貢獻者失敗",
-      "empty": "暫無貢獻者資訊",
-      "unknown": "未知貢獻者"
+      "title": "維護",
+      "loading": "名錄載入中……",
+      "loadError": "名錄暫時取不到",
+      "empty": "暫無名錄",
+      "unknown": "佚名"
     }
   },
   "player": {

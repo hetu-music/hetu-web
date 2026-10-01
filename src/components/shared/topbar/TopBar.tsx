@@ -84,6 +84,8 @@ export default function TopBar({
   const [sheetHost, setSheetHost] = useState<HTMLDivElement | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  // 点开过一次才去加载「关于」；之后留着，收起时才放得完退场动画
+  const [aboutLoaded, setAboutLoaded] = useState(false);
   const moreScope = useId();
   const closeMore = useCallback(() => setMoreOpen(false), []);
   useDismiss(moreOpen, closeMore, moreScope);
@@ -105,7 +107,10 @@ export default function TopBar({
             {exit.kind === "logo" && (
               <button
                 type="button"
-                onClick={() => setAboutOpen(true)}
+                onClick={() => {
+                  setAboutLoaded(true);
+                  setAboutOpen(true);
+                }}
                 className={NAV_BUTTON_CLASS}
                 title={tNav("about")}
                 aria-label={tNav("about")}
@@ -167,7 +172,7 @@ export default function TopBar({
       {/* 底部面板挂在顶栏外：顶栏的 backdrop-filter 会把 fixed 元素困住 */}
       <div ref={setSheetHost} />
 
-      {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
+      {aboutLoaded && <About open={aboutOpen} onOpenChange={setAboutOpen} />}
     </SheetHostContext.Provider>
   );
 }

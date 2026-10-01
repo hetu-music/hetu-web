@@ -1,11 +1,12 @@
 "use client";
 
+import { OverlayHostContext } from "@/components/ui/overlay-host";
 import { useMounted } from "@/hooks/ui";
 import { cn } from "@/lib/utils/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { createContext, useContext, useEffect } from "react";
+import React, { useContext, useEffect } from "react";
 import { createPortal } from "react-dom";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
@@ -38,7 +39,7 @@ export function useDismiss(open: boolean, onClose: () => void, scope: string) {
  * 所以面板要挂到顶栏外；又不能直接挂到 body 上，否则拿不到页面根容器上的
  * 封面取色 --tone。TopBar 在自己旁边放一个挂载点，经由这里传下去。
  */
-export const SheetHostContext = createContext<HTMLElement | null>(null);
+export const SheetHostContext = OverlayHostContext;
 
 /** 宽屏下拉：页面底色、细描边、柔和投影；窄屏一律改用底部面板 */
 export function MenuPanel({

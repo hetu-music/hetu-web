@@ -5,7 +5,7 @@ import {
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
-} from "@/components/ui/drawer";
+} from "@/components/ui/drawer-vaul";
 import {
   Sheet,
   SheetContent,

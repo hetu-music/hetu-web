@@ -28,6 +28,9 @@
     ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, Monaco,
     "Courier New", var(--font-mono-cjk), monospace;
   --font-calligraphy: var(--font-keben), cursive;
+
+  /* 全站缓动（DESIGN.md 第六节）：生成 ease-page 工具类，浮层的 CSS 过渡都用它 */
+  --ease-page: cubic-bezier(0.23, 1, 0.32, 1);
   --font-kaiti:
     var(--font-kaiti-custom), "KaiTi", "STKaiti", "DFKai-SB", "BiauKai", "楷体",
     "楷体_GB2312", serif;

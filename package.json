@@ -23,6 +23,7 @@
     "navidrome:sync": "tsx --env-file=.env.local scripts/navidrome-sync.ts"
   },
   "dependencies": {
+    "@base-ui/react": "^1.8.0",
     "@gsap/react": "^2.1.2",
     "@hookform/resolvers": "5.9.1",
     "@marsidev/react-turnstile": "^1.6.1",

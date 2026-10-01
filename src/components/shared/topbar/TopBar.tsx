@@ -7,7 +7,13 @@ import {
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/utils";
-import { Info, type LucideIcon, MoreHorizontal } from "lucide-react";
+import {
+  Download,
+  Home,
+  Info,
+  type LucideIcon,
+  MoreHorizontal,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import React, { useCallback, useId, useState } from "react";
@@ -191,15 +197,23 @@ function MoreSheet({
   const theme = useThemeChoice();
   const scriptChoice = useScriptChoice();
 
-  const rows: { key: string; label: string; onClick: () => void }[] = [
+  const rows: TopBarAction[] = [
     ...actions,
     ...(home
-      ? [{ key: "home", label: tNav("home"), onClick: () => router.push("/") }]
+      ? [
+          {
+            key: "home",
+            icon: Home,
+            label: tNav("home"),
+            onClick: () => router.push("/"),
+          },
+        ]
       : []),
     ...(install && installAction.available
       ? [
           {
             key: "install",
+            icon: Download,
             label: tNav("install"),
             onClick: installAction.start,
           },
@@ -217,7 +231,7 @@ function MoreSheet({
       >
         {rows.length > 0 && (
           <ul className="mb-3 pb-3 border-b border-slate-200/70 dark:border-slate-800">
-            {rows.map((row) => (
+            {rows.map(({ icon: Icon, ...row }) => (
               <li key={row.key}>
                 <button
                   type="button"
@@ -225,8 +239,12 @@ function MoreSheet({
                     onClose();
                     row.onClick();
                   }}
-                  className="w-full py-3 text-left text-sm tracking-widest text-slate-700 dark:text-slate-300 hover:text-(--tone) transition-colors"
+                  className="group flex w-full items-center gap-3 py-3 text-left text-sm tracking-widest text-slate-700 dark:text-slate-300 hover:text-(--tone) transition-colors"
                 >
+                  <Icon
+                    size={16}
+                    className="shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-(--tone) transition-colors"
+                  />
                   {row.label}
                 </button>
               </li>

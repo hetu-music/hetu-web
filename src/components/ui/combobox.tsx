@@ -94,6 +94,5 @@ export {
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
-  ComboboxPopup
+  ComboboxPopup,
 };
-

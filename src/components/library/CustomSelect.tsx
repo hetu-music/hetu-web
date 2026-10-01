@@ -189,7 +189,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
               // 选中的只变颜色，停在上面也不变回灰
               className={cn(
                 isSelected &&
-                "text-(--tone) data-highlighted:text-(--tone) dark:text-(--tone) dark:data-highlighted:text-(--tone)",
+                  "text-(--tone) data-highlighted:text-(--tone) dark:text-(--tone) dark:data-highlighted:text-(--tone)",
               )}
             >
               <span className="min-w-0 flex-1 truncate">

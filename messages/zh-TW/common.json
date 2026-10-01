@@ -2,7 +2,11 @@
   "site": {
     "name": "河圖作品勘鑒",
     "title": "河圖作品勘鑒 - 河圖音樂作品收錄與鑑賞",
-    "description": "河圖音樂作品收錄與鑑賞。"
+    "description": "河圖音樂作品收錄與鑑賞。",
+    "logo": {
+      "part1": "河圖",
+      "part2": "作品勘鑒"
+    }
   },
   "nav": {
     "backToHome": "返回首頁",
@@ -10,7 +14,8 @@
     "back": "返回",
     "about": "關於",
     "login": "登入",
-    "loading": "載入中…"
+    "loading": "載入中…",
+    "share": "分享"
   },
   "error": {
     "title": "出錯了",

@@ -349,13 +349,6 @@ export default function MusicLibraryClient({
   return (
     <div className="min-h-screen bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
       <AppNavbar
-        title={
-          <>
-            {t("logo.part1")}
-            <span className="mx-2 h-5 w-0.5 translate-y-[1.5px] rounded-full bg-(--tone)" />
-            {t("logo.part2")}
-          </>
-        }
         onTitleClick={handleTitleReset}
         onAboutClick={() => setShowAbout(true)}
         onShare={handleShare}

@@ -4,7 +4,7 @@ import CoverArt from "@/components/library/CoverArt";
 import AppNavbar from "@/components/shared/AppNavbar";
 import EnqueueButton from "@/components/shared/EnqueueButton";
 import PlayButton from "@/components/shared/PlayButton";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import type { QuizResultView } from "@/lib/quiz/views";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { motion } from "framer-motion";
@@ -33,10 +33,7 @@ function fadeUp(delay: number) {
 
 export default function QuizResultClient({ result }: Props) {
   const t = useTranslations("quiz");
-  const tSite = useTranslations("common.site");
-  const router = useRouter();
   const [copied, setCopied] = useState(false);
-  const siteName = tSite("name");
 
   const copyLink = useCallback(async () => {
     try {
@@ -51,14 +48,6 @@ export default function QuizResultClient({ result }: Props) {
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
       <AppNavbar
-        title={
-          <>
-            {siteName.substring(0, 2)}
-            <span className="mx-2 h-5 w-[2px] translate-y-[1.5px] rounded-full bg-blue-600" />
-            {siteName.substring(2)}
-          </>
-        }
-        onTitleClick={() => router.push("/")}
       />
 
       <main className="mx-auto max-w-3xl px-6 pb-40 pt-32">

@@ -2,7 +2,11 @@
   "site": {
     "name": "河图作品勘鉴",
     "title": "河图作品勘鉴 - 河图音乐作品收录与鉴赏",
-    "description": "河图音乐作品收录与鉴赏。"
+    "description": "河图音乐作品收录与鉴赏。",
+    "logo": {
+      "part1": "河图",
+      "part2": "作品勘鉴"
+    }
   },
   "nav": {
     "backToHome": "返回首页",
@@ -10,7 +14,8 @@
     "back": "返回",
     "about": "关于",
     "login": "登录",
-    "loading": "加载中…"
+    "loading": "加载中…",
+    "share": "分享"
   },
   "error": {
     "title": "出错了",

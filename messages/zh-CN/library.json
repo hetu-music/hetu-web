@@ -20,10 +20,6 @@
     },
     "defaultDesc": "你一定想知道，戏里讲了什么故事"
   },
-  "logo": {
-    "part1": "河图",
-    "part2": "作品勘鉴"
-  },
   "titleTooltip": "点击刷新页面",
   "reset": "重置",
   "advancedFilter": "高级筛选",

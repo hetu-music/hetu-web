@@ -3,7 +3,12 @@
 import { InstallButton } from "@/components/pwa/useInstallAction";
 import LocaleSwitcher from "@/components/shared/LocaleSwitcher";
 import MoreMenu, { type MoreMenuAction } from "@/components/shared/MoreMenu";
-import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
+import {
+  NAV_ACTIONS_CLASS,
+  NAV_BAR_CLASS,
+  NAV_BAR_INNER_CLASS,
+  NAV_BUTTON_CLASS,
+} from "@/components/shared/nav-button";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/utils";
@@ -40,8 +45,8 @@ export default function PageTopBar({ title }: { title?: string }) {
   );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#FAFAFA]/80 dark:bg-[#0B0F19]/80 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2">
+    <nav className={NAV_BAR_CLASS}>
+      <div className={NAV_BAR_INNER_CLASS}>
         <div className="flex items-center gap-1 sm:gap-3 min-w-0">
           <div className="flex items-center gap-1 -ml-2 shrink-0">
             <button
@@ -76,7 +81,7 @@ export default function PageTopBar({ title }: { title?: string }) {
           )}
         </div>
 
-        <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
+        <div className={NAV_ACTIONS_CLASS}>
           <div className="hidden md:flex items-center gap-2">
             <InstallButton className={NAV_BUTTON_CLASS} />
             <LocaleSwitcher />

@@ -8,7 +8,6 @@ import type { ImageryCategory, ImageryItem } from "@/lib/types";
 import { useIntersection } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 
 import React, {
@@ -217,7 +216,6 @@ const CategoryButton = memo(function CategoryButton({
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function ImageryClient({ items, categories }: Props) {
-  const router = useRouter();
   const t = useTranslations("common.imagery");
   const tSite = useTranslations("common.site");
   const { setPlayerVisible } = usePlayerStore();
@@ -596,23 +594,11 @@ export default function ImageryClient({ items, categories }: Props) {
 
   const handleClose = useCallback(() => setPanelOpen(false), []);
 
-  const handleTitleReset = useCallback(() => {
-    router.push("/");
-  }, [router]);
-
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-slate-800 dark:text-slate-200">
       <AppNavbar
         ref={navRef}
-        title={
-          <>
-            {tSite("name").substring(0, 2)}
-            <span className="mx-2 h-5 w-[2px] translate-y-[1.5px] rounded-full bg-blue-600" />
-            {tSite("name").substring(2)}
-          </>
-        }
-        onTitleClick={handleTitleReset}
         onAboutClick={() => setShowAbout(true)}
       />
 

@@ -283,9 +283,10 @@ export default function MusicLibraryClient({
   }, [filteredSongs, itemsPerPage, safePage]);
 
   const handleShare = useCallback(async () => {
+    // 与卷首那句同一句话，卷首在句末接「……」，这里也一样
     const shareData = {
-      title: "河图作品勘鉴",
-      text: "你一定想知道，戏里讲了什么故事。",
+      title: tCommon("site.name"),
+      text: `${t("hero.defaultDesc")}……`,
       url: window.location.href,
     };
 
@@ -304,7 +305,7 @@ export default function MusicLibraryClient({
     } catch {
       // Clipboard unavailable.
     }
-  }, [t]);
+  }, [t, tCommon]);
 
   const handleTitleReset = useCallback(() => {
     sessionStorage.removeItem("music_library_scrollY");

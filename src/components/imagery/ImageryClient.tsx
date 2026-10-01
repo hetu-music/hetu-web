@@ -224,6 +224,43 @@ const CategoryButton = memo(function CategoryButton({
 
 // ─── main component ───────────────────────────────────────────────────────────
 
+/**
+ * 平滑滚到 top，滚停了再调 done。只用在进页时的一次性跳转，不提供取消：
+ * 作为 effect 的清理去取消，依赖一变就会把面板永远卡在不打开
+ * 老 Safari 没有 scrollend，逐帧看位置：到了，或连续几帧不动（滚到底到不了），都算停
+ */
+function smoothScrollThen(top: number, done: () => void) {
+  const target = Math.max(0, top);
+  if (Math.abs(window.scrollY - target) < 2) {
+    done();
+    return;
+  }
+  let raf = 0;
+  let last = -1;
+  let still = 0;
+  const stop = () => {
+    cancelAnimationFrame(raf);
+    clearTimeout(timer);
+    window.removeEventListener("scrollend", finish);
+  };
+  const finish = () => {
+    stop();
+    done();
+  };
+  const tick = () => {
+    const y = window.scrollY;
+    still = y === last ? still + 1 : 0;
+    last = y;
+    if (Math.abs(y - target) < 2 || still >= 6) finish();
+    else raf = requestAnimationFrame(tick);
+  };
+  window.addEventListener("scrollend", finish);
+  // 兜底：无论如何 1.5 秒后打开
+  const timer = setTimeout(finish, 1500);
+  window.scrollTo({ top: target, behavior: "smooth" });
+  raf = requestAnimationFrame(tick);
+}
+
 export default function ImageryClient({ items, categories }: Props) {
   const t = useTranslations("common.imagery");
   // ── category hierarchy ───────────────────────────────────────────────────
@@ -514,9 +551,6 @@ export default function ImageryClient({ items, categories }: Props) {
       setSelectedItem(d.item);
       setPanelOpen(true);
       syncWordParam(d.item.id);
-      // 面板打开后 Drawer/Sheet 会给背景加 aria-hidden，需要先让按钮失焦
-      // 避免 "aria-hidden on focused element" 的无障碍警告
-      (document.activeElement as HTMLElement)?.blur();
       // Dismiss tooltip immediately when panel opens
       hoveredBtnRef.current = null;
       setHoveredData(null);
@@ -584,12 +618,18 @@ export default function ImageryClient({ items, categories }: Props) {
       syncWordParam(null);
       return;
     }
-    rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
-    requestAnimationFrame(() => {
-      setPanelSide("right");
-      setSelectedItem(item);
-      setPanelOpen(true);
-    });
+    const open = () => {
+      // 行高是边滚边量的，按估算滚过去可能差一点；停下后附近的行都量过了，再校正一次
+      rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+      requestAnimationFrame(() => {
+        setPanelSide("right");
+        setSelectedItem(item);
+        setPanelOpen(true);
+      });
+    };
+    const target = rowVirtualizer.getOffsetForIndex(rowIndex, "center")?.[0];
+    if (target === undefined) open();
+    else smoothScrollThen(target, open);
   }, [widthMeasured, scrollMargin, wordRows, items, rowVirtualizer]);
 
   // ── render ────────────────────────────────────────────────────────────────

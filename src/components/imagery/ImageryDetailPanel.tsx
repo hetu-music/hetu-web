@@ -5,7 +5,7 @@ import {
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
-} from "@/components/ui/drawer-vaul";
+} from "@/components/ui/drawer";
 import {
   Sheet,
   SheetContent,
@@ -377,52 +377,8 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
     });
   }, [selectedItem]);
 
-  // 面板开启时锁定页面滚动
-  useEffect(() => {
-    if (!open) return;
-
-    const html = document.documentElement;
-    const body = document.body;
-
-    const prev = {
-      htmlOverflow: html.style.overflow,
-      htmlTouchAction: html.style.touchAction,
-      htmlOverscrollBehavior: html.style.overscrollBehavior,
-      bodyOverflow: body.style.overflow,
-      bodyTouchAction: body.style.touchAction,
-      bodyOverscrollBehavior: body.style.overscrollBehavior,
-    };
-
-    // overflow:hidden 阻止窗口滚动，且不改变 window.scrollY。
-    // 不能用 position:fixed —— 它会将 scrollY 重置为 0，
-    // 破坏依赖 window.scrollY 定位的 useWindowVirtualizer。
-    html.style.overflow = "hidden";
-    html.style.touchAction = "none";
-    html.style.overscrollBehavior = "none";
-    body.style.overflow = "hidden";
-    body.style.touchAction = "none";
-    body.style.overscrollBehavior = "none";
-
-    // 额外阻止 iOS Safari 橡皮筋回弹，同时放行面板内部滚动容器的触摸事件
-    const preventTouchMove = (e: TouchEvent) => {
-      const target = e.target as Element | null;
-      if (target?.closest(".overflow-y-auto")) return;
-      e.preventDefault();
-    };
-    document.addEventListener("touchmove", preventTouchMove, {
-      passive: false,
-    });
-
-    return () => {
-      html.style.overflow = prev.htmlOverflow;
-      html.style.touchAction = prev.htmlTouchAction;
-      html.style.overscrollBehavior = prev.htmlOverscrollBehavior;
-      body.style.overflow = prev.bodyOverflow;
-      body.style.touchAction = prev.bodyTouchAction;
-      body.style.overscrollBehavior = prev.bodyOverscrollBehavior;
-      document.removeEventListener("touchmove", preventTouchMove);
-    };
-  }, [open]);
+  // 锁滚动交给 Base UI：它只把 html 设成 overflow:hidden，不用 position:fixed，
+  // 不会把 scrollY 归零、打乱依赖 window.scrollY 的 useWindowVirtualizer
 
   const handleLyricistClick = useCallback((name: string) => {
     setActiveLyricist((prev) => (name === "" || prev === name ? null : name));
@@ -441,7 +397,11 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
   if (!isDesktop) {
     return (
       <Drawer open={open} onOpenChange={(v) => !v && onClose()}>
-        <DrawerContent className="h-[65dvh]">
+        <DrawerContent
+          // 意象页独有的半透明毛玻璃面板（DESIGN.md 第四节）
+          className="h-[65dvh] bg-[#FAFAFA]/96 dark:bg-[#0B0F19]/96 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/50"
+          contentClassName="flex flex-col overflow-hidden px-0 pb-0"
+        >
           {/* Accessible title/description (visually hidden) */}
           <DrawerTitle className="sr-only">
             {selectedItem?.name ?? t("detailPanel.title")}
@@ -471,15 +431,14 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()} modal={false}>
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side={panelSide}
-        className={[
-          "top-(--nav-h) h-[calc(100vh-var(--nav-h))] w-[min(440px,42vw)] p-0 border-none shadow-2xl transition-all duration-500",
+        className={
           panelSide === "right"
-            ? "border-l border-slate-200/50 dark:border-white/5"
-            : "border-r border-slate-200/50 dark:border-white/5",
-        ].join(" ")}
+            ? "top-(--nav-h) h-[calc(100dvh-var(--nav-h))] w-[min(440px,42vw)] border-l border-slate-200/50 dark:border-white/5"
+            : "top-(--nav-h) h-[calc(100dvh-var(--nav-h))] w-[min(440px,42vw)] border-r border-slate-200/50 dark:border-white/5"
+        }
       >
         {/* Accessible title/description (visually hidden) */}
         <SheetTitle className="sr-only">

@@ -1,13 +1,14 @@
 "use client";
 
-import { Drawer as BaseDrawer } from "@base-ui/react/drawer";
-import * as React from "react";
 import { PanelHeader } from "@/components/ui/dialog";
 import { useOverlayHost } from "@/components/ui/overlay-host";
 import { cn } from "@/lib/utils/utils";
+import { Drawer as BaseDrawer } from "@base-ui/react/drawer";
+import * as React from "react";
 
 /** 窄屏的底部面板，往下拖可以收起（默认 swipeDirection="down"） */
 const Drawer = BaseDrawer.Root;
+const DrawerTrigger = BaseDrawer.Trigger;
 const DrawerClose = BaseDrawer.Close;
 const DrawerTitle = BaseDrawer.Title;
 const DrawerDescription = BaseDrawer.Description;
@@ -44,10 +45,10 @@ function DrawerContent({
             "relative flex w-full min-h-0 max-h-[calc(100dvh-var(--nav-h))] flex-col outline-none touch-none",
             "rounded-t-2xl bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_-20px_50px_-20px_rgba(15,23,42,0.35)]",
             // 位移交给 Base UI 写进 --drawer-swipe-movement-y，transform 只能由这里统一给出
-            "[transform:translateY(var(--drawer-swipe-movement-y))] transition-transform duration-400 ease-page data-swiping:duration-0",
-            "data-starting-style:[transform:translateY(100%)] data-ending-style:[transform:translateY(100%)] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+            "transform-[translateY(var(--drawer-swipe-movement-y))] transition-transform duration-400 ease-page data-swiping:duration-0",
+            "data-starting-style:transform-[translateY(100%)] data-ending-style:transform-[translateY(100%)] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
             // 往上拖过头时，底下补一截同色，不露出页面
-            "after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-12 after:bg-[inherit] after:content-['']",
+            "after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-12 after:bg-inherit after:content-['']",
             className,
           )}
           {...props}
@@ -73,4 +74,12 @@ function DrawerContent({
   );
 }
 
-export { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle };
+export {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+  DrawerTrigger
+};
+

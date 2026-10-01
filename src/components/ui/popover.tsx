@@ -1,36 +1,53 @@
 "use client";
 
+import { Popover as BasePopover } from "@base-ui/react/popover";
 import * as React from "react";
-import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { useOverlayHost } from "@/components/ui/overlay-host";
 import { cn } from "@/lib/utils/utils";
 
-const Popover = PopoverPrimitive.Root;
-const PopoverTrigger = PopoverPrimitive.Trigger;
-const PopoverAnchor = PopoverPrimitive.Anchor;
+/** 宽屏下拉：点外面或按 Esc 收起，不锁滚动、不圈焦点 */
+const Popover = BasePopover.Root;
+const PopoverTrigger = BasePopover.Trigger;
+const PopoverClose = BasePopover.Close;
 
-const PopoverContent = React.forwardRef<
-  React.ComponentRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = "start", sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
-    <PopoverPrimitive.Content
-      ref={ref}
-      align={align}
-      sideOffset={sideOffset}
-      className={cn(
-        // 浮层用页面底色，不用纯白（DESIGN.md 第五节）
-        "z-50 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] p-0 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] outline-none",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
-        "data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2",
-        className,
-      )}
-      {...props}
-    />
-  </PopoverPrimitive.Portal>
-));
-PopoverContent.displayName = PopoverPrimitive.Content.displayName;
+type PopoverContentProps = Omit<
+  React.ComponentProps<typeof BasePopover.Popup>,
+  "className"
+> & {
+  className?: string;
+  align?: "start" | "center" | "end";
+  sideOffset?: number;
+};
 
-export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };
+/** 页面底色、细描边、柔和投影（DESIGN.md「浮层」） */
+function PopoverContent({
+  className,
+  align = "start",
+  sideOffset = 12,
+  ...props
+}: PopoverContentProps) {
+  const host = useOverlayHost();
+  return (
+    <BasePopover.Portal container={host}>
+      {/* 触发按钮多在 fixed 的顶栏里，用 fixed 定位，页面滚动时也贴得住 */}
+      <BasePopover.Positioner
+        align={align}
+        sideOffset={sideOffset}
+        positionMethod="fixed"
+        className="z-60"
+      >
+        <BasePopover.Popup
+          className={cn(
+            "rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] px-4 py-2 outline-none",
+            "transition-[opacity,translate] duration-200 ease-page",
+            "data-starting-style:opacity-0 data-starting-style:-translate-y-1 data-ending-style:opacity-0 data-ending-style:-translate-y-1",
+            className,
+          )}
+          {...props}
+        />
+      </BasePopover.Positioner>
+    </BasePopover.Portal>
+  );
+}
+
+export { Popover, PopoverClose, PopoverContent, PopoverTrigger };

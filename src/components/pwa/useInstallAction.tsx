@@ -5,14 +5,12 @@ import { usePWAInstall } from "@/components/pwa/PWARegistration";
 import { Download } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
 
 const noopSubscribe = () => () => undefined;
 
 /**
  * 安装为 PWA 的入口：浏览器可安装时直接弹出安装，iOS 改为弹出手动安装说明。
- * `prompt` 是 iOS 说明弹窗，须渲染在入口之外、不会随菜单收起而卸载的地方；
- * 它挂到 body 上，因为顶栏的 backdrop-filter 会把其中 fixed 元素困在顶栏里。
+ * `prompt` 是 iOS 说明面板，须渲染在入口之外、不会随菜单收起而卸载的地方。
  */
 export function useInstallAction() {
   const { isInstallable, install, isIOS, isStandalone } = usePWAInstall();
@@ -31,15 +29,9 @@ export function useInstallAction() {
       else void install();
     },
     // 说明面板一直挂着，收起时才有退场动画
-    prompt: mounted
-      ? createPortal(
-          <IOSInstallPrompt
-            isOpen={showIOSPrompt}
-            onClose={() => setShowIOSPrompt(false)}
-          />,
-          document.body,
-        )
-      : null,
+    prompt: mounted ? (
+      <IOSInstallPrompt open={showIOSPrompt} onOpenChange={setShowIOSPrompt} />
+    ) : null,
   };
 }
 

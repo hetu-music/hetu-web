@@ -7,8 +7,13 @@ import { cn } from "@/lib/utils/utils";
 import { Globe, Moon, Sun, SunMoon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
-import React, { useCallback, useId, useMemo, useState } from "react";
-import { MenuList, MenuPanel, type MenuItem, useDismiss } from "./overlay";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import React, { useCallback, useMemo, useState } from "react";
+import { MenuList, type MenuItem } from "./menu";
 
 /** 顶栏 20px 图标的实际线宽（lucide 默认 2/24） */
 const ICON_STROKE = (2 * 20) / 24;
@@ -80,24 +85,14 @@ function IconMenu({
   onHover?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const scope = useId();
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(open, close, scope);
 
   return (
-    <div
-      data-dismiss-scope={scope}
-      className="relative flex items-center"
-      onMouseEnter={onHover}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
         disabled={disabled}
         title={title}
         aria-label={title}
-        aria-expanded={open}
-        aria-haspopup="true"
+        onMouseEnter={onHover}
         className={cn(
           NAV_BUTTON_CLASS,
           open && "text-(--tone) dark:text-(--tone)",
@@ -105,19 +100,19 @@ function IconMenu({
         )}
       >
         {icon}
-      </button>
-      <MenuPanel open={open} align="right" className="w-36">
+      </PopoverTrigger>
+      <PopoverContent align="end" aria-label={title} className="w-36">
         <MenuList
           items={items}
           active={active}
           size="sm"
           onSelect={(id, e) => {
-            close();
+            setOpen(false);
             onSelect(id, e);
           }}
         />
-      </MenuPanel>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

@@ -5,6 +5,8 @@ import {
   useInstallAction,
 } from "@/components/pwa/useInstallAction";
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import { OverlayHostContext } from "@/components/ui/overlay-host";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/utils";
 import {
@@ -16,19 +18,14 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
-import React, { useCallback, useId, useState } from "react";
+import React, { useState } from "react";
 import {
   ScriptMenu,
   ThemeMenu,
   useScriptChoice,
   useThemeChoice,
 } from "./choices";
-import {
-  BottomSheet,
-  InlineOptions,
-  SheetHostContext,
-  useDismiss,
-} from "./overlay";
+import { InlineOptions } from "./menu";
 import { BackHome, SiteLogo, UserButton } from "./parts";
 
 // 「关于」只在点开时才用到，单独分包
@@ -86,12 +83,9 @@ export default function TopBar({
   const [aboutOpen, setAboutOpen] = useState(false);
   // 点开过一次才去加载「关于」；之后留着，收起时才放得完退场动画
   const [aboutLoaded, setAboutLoaded] = useState(false);
-  const moreScope = useId();
-  const closeMore = useCallback(() => setMoreOpen(false), []);
-  useDismiss(moreOpen, closeMore, moreScope);
 
   return (
-    <SheetHostContext.Provider value={sheetHost}>
+    <OverlayHostContext.Provider value={sheetHost}>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#FAFAFA]/80 dark:bg-[#0B0F19]/80 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1 sm:gap-3 min-w-0">
@@ -139,25 +133,23 @@ export default function TopBar({
               <ThemeMenu />
             </div>
 
-            <div data-dismiss-scope={moreScope} className="flex md:hidden">
-              <button
-                type="button"
-                onClick={() => setMoreOpen(!moreOpen)}
-                className={cn(
-                  NAV_BUTTON_CLASS,
-                  moreOpen && "text-(--tone) dark:text-(--tone)",
-                )}
-                title={tNav("more")}
-                aria-label={tNav("more")}
-                aria-expanded={moreOpen}
-                aria-haspopup="dialog"
-              >
-                <MoreHorizontal size={20} />
-              </button>
+            <div className="flex md:hidden">
               <MoreSheet
                 open={moreOpen}
-                onClose={closeMore}
-                scope={moreScope}
+                onOpenChange={setMoreOpen}
+                trigger={
+                  <button
+                    type="button"
+                    className={cn(
+                      NAV_BUTTON_CLASS,
+                      moreOpen && "text-(--tone) dark:text-(--tone)",
+                    )}
+                    title={tNav("more")}
+                    aria-label={tNav("more")}
+                  >
+                    <MoreHorizontal size={20} />
+                  </button>
+                }
                 actions={actions}
                 home={exit.kind === "back"}
                 install={install}
@@ -169,27 +161,27 @@ export default function TopBar({
         {children}
       </nav>
 
-      {/* 底部面板挂在顶栏外：顶栏的 backdrop-filter 会把 fixed 元素困住 */}
+      {/* 浮层挂在顶栏外：顶栏的 backdrop-filter 会把 fixed 元素困住 */}
       <div ref={setSheetHost} />
 
       {aboutLoaded && <About open={aboutOpen} onOpenChange={setAboutOpen} />}
-    </SheetHostContext.Provider>
+    </OverlayHostContext.Provider>
   );
 }
 
 /** 窄屏的「更多」：本页操作一行一项，下面是主题与文字 */
 function MoreSheet({
   open,
-  onClose,
-  scope,
+  onOpenChange,
+  trigger,
   actions,
   home,
   install,
   script,
 }: {
   open: boolean;
-  onClose: () => void;
-  scope: string;
+  onOpenChange: (open: boolean) => void;
+  trigger: React.ReactElement;
   actions: TopBarAction[];
   /** 内页窄屏放不下回主页，收在这里 */
   home: boolean;
@@ -201,6 +193,7 @@ function MoreSheet({
   const installAction = useInstallAction();
   const theme = useThemeChoice();
   const scriptChoice = useScriptChoice();
+  const onClose = () => onOpenChange(false);
 
   const rows: TopBarAction[] = [
     ...actions,
@@ -228,65 +221,63 @@ function MoreSheet({
 
   return (
     <>
-      <BottomSheet
-        open={open}
-        onClose={onClose}
-        title={tNav("more")}
-        scope={scope}
-      >
-        {rows.length > 0 && (
-          <ul className="mb-3 pb-3 border-b border-slate-200/70 dark:border-slate-800">
-            {rows.map(({ icon: Icon, ...row }) => (
-              <li key={row.key}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    row.onClick();
-                  }}
-                  className="group flex w-full items-center gap-3 py-3 text-left text-sm tracking-widest text-slate-700 dark:text-slate-300 hover:text-(--tone) transition-colors"
-                >
-                  <Icon
-                    size={16}
-                    className="shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-(--tone) transition-colors"
-                  />
-                  {row.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-8">
-          <dt className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-            {tNav("theme")}
-          </dt>
-          <dd>
-            <InlineOptions
-              items={theme.items}
-              active={theme.active}
-              onSelect={theme.select}
-            />
-          </dd>
-          {script && (
-            <>
-              <dt className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-                {tNav("script")}
-              </dt>
-              <dd>
-                <InlineOptions
-                  items={scriptChoice.items}
-                  active={scriptChoice.active}
-                  disabled={scriptChoice.pending}
-                  onSelect={(id) => {
-                    onClose();
-                    scriptChoice.select(id);
-                  }}
-                />
-              </dd>
-            </>
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerTrigger render={trigger} />
+        <DrawerContent title={tNav("more")}>
+          {rows.length > 0 && (
+            <ul className="mb-3 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+              {rows.map(({ icon: Icon, ...row }) => (
+                <li key={row.key}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      row.onClick();
+                    }}
+                    className="group flex w-full items-center gap-3 py-3 text-left text-sm tracking-widest text-slate-700 dark:text-slate-300 hover:text-(--tone) transition-colors"
+                  >
+                    <Icon
+                      size={16}
+                      className="shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-(--tone) transition-colors"
+                    />
+                    {row.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-        </dl>
-      </BottomSheet>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-8">
+            <dt className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+              {tNav("theme")}
+            </dt>
+            <dd>
+              <InlineOptions
+                items={theme.items}
+                active={theme.active}
+                onSelect={theme.select}
+              />
+            </dd>
+            {script && (
+              <>
+                <dt className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                  {tNav("script")}
+                </dt>
+                <dd>
+                  <InlineOptions
+                    items={scriptChoice.items}
+                    active={scriptChoice.active}
+                    disabled={scriptChoice.pending}
+                    onSelect={(id) => {
+                      onClose();
+                      scriptChoice.select(id);
+                    }}
+                  />
+                </dd>
+              </>
+            )}
+          </dl>
+        </DrawerContent>
+      </Drawer>
       {/* iOS 的安装说明要在面板收起后仍然留着 */}
       {installAction.prompt}
     </>

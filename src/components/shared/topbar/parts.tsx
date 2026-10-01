@@ -6,14 +6,9 @@ import { usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/utils";
 import { ArrowLeft, ChevronDown, Home, User } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useId, useState } from "react";
-import {
-  BottomSheet,
-  MenuList,
-  MenuPanel,
-  type MenuItem,
-  useDismiss,
-} from "./overlay";
+import { ResponsivePanel } from "@/components/ui/responsive-panel";
+import { useCallback, useState } from "react";
+import { MenuList, type MenuItem } from "./menu";
 
 /** 站内导航深度：进入内页前递增，返回时据此判断有没有站内历史可退 */
 const NAV_DEPTH_KEY = "__hetu_web_nav_depth";
@@ -164,63 +159,68 @@ export function PlaceNav({
   menuTitle: string;
 }) {
   const [open, setOpen] = useState(false);
-  const scope = useId();
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(open, close, scope);
 
   const activeLabel = items.find((i) => i.id === active)?.label;
   const select = (id: string) => {
-    close();
+    setOpen(false);
     onSelect(id);
   };
 
-  return (
-    <div data-dismiss-scope={scope} className="relative min-w-0">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-haspopup="true"
-        aria-label={menuTitle}
-        className="group flex min-w-0 max-w-full items-baseline gap-2 px-2 py-1.5"
+  const trigger = (
+    <button
+      type="button"
+      aria-label={menuTitle}
+      className="group flex min-w-0 max-w-full items-baseline gap-2 px-2 py-1.5"
+    >
+      <span className="hidden sm:block min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+        {title}
+      </span>
+      <span
+        aria-hidden
+        className="hidden sm:block text-slate-300 dark:text-slate-600"
       >
-        <span className="hidden sm:block min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
-          {title}
-        </span>
-        <span
-          aria-hidden
-          className="hidden sm:block text-slate-300 dark:text-slate-600"
-        >
-          ·
-        </span>
-        {/* 当前项与三角标自成一组居中对齐；整组再按基线与题名对齐 */}
-        <span
+        ·
+      </span>
+      {/* 当前项与三角标自成一组居中对齐；整组再按基线与题名对齐 */}
+      <span
+        className={cn(
+          "flex shrink-0 items-center gap-1.5 whitespace-nowrap font-serif text-sm tracking-wider transition-colors",
+          open
+            ? "text-slate-900 dark:text-slate-100"
+            : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100",
+        )}
+      >
+        <span className="hidden sm:inline">{activeLabel}</span>
+        <span className="sm:hidden">{label ?? activeLabel}</span>
+        <ChevronDown
+          size={14}
           className={cn(
-            "flex shrink-0 items-center gap-1.5 whitespace-nowrap font-serif text-sm tracking-wider transition-colors",
-            open
-              ? "text-slate-900 dark:text-slate-100"
-              : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100",
+            "shrink-0 text-slate-400 transition-transform duration-300",
+            open && "rotate-180",
           )}
-        >
-          <span className="hidden sm:inline">{activeLabel}</span>
-          <span className="sm:hidden">{label ?? activeLabel}</span>
-          <ChevronDown
-            size={14}
-            className={cn(
-              "shrink-0 text-slate-400 transition-transform duration-300",
-              open && "rotate-180",
-            )}
+        />
+      </span>
+    </button>
+  );
+
+  return (
+    <div className="min-w-0">
+      <ResponsivePanel
+        open={open}
+        onOpenChange={setOpen}
+        title={menuTitle}
+        trigger={trigger}
+        popoverClassName="w-52"
+      >
+        {(layout) => (
+          <MenuList
+            items={items}
+            active={active}
+            size={layout === "popover" ? "sm" : "lg"}
+            onSelect={select}
           />
-        </span>
-      </button>
-
-      <MenuPanel open={open} className="w-52">
-        <MenuList items={items} active={active} size="sm" onSelect={select} />
-      </MenuPanel>
-
-      <BottomSheet open={open} onClose={close} title={menuTitle} scope={scope}>
-        <MenuList items={items} active={active} size="lg" onSelect={select} />
-      </BottomSheet>
+        )}
+      </ResponsivePanel>
     </div>
   );
 }

@@ -636,6 +636,8 @@ export default function QjtxClient({ events }: { events: TimelineEvent[] }) {
           overflow-x: hidden !important;
           -ms-overflow-style: none !important;
           scrollbar-width: none !important;
+          /* 全站在 html 上固定留出了滚动条的位置；这页不要滚动条，也不要那道空位 */
+          scrollbar-gutter: auto !important;
         }
 
         ::-webkit-scrollbar {

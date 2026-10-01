@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils/utils";
 import { INK_TONE } from "@/lib/utils/utils-tone";
 import { useTranslations } from "next-intl";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import React, { useEffect } from "react";
+import React from "react";
 
 /** 个人中心：左栏卷首与目录，右栏为当前一节 */
 export default function ProfileClient() {
@@ -27,16 +27,6 @@ export default function ProfileClient() {
       throttleMs: 300,
     }),
   );
-
-  // 各节长短不一，切换时滚动条出现或消失会让页面左右跳动
-  useEffect(() => {
-    const htmlEl = document.documentElement;
-    const originalGutter = htmlEl.style.scrollbarGutter;
-    htmlEl.style.scrollbarGutter = "stable";
-    return () => {
-      htmlEl.style.scrollbarGutter = originalGutter;
-    };
-  }, []);
 
   return (
     <div

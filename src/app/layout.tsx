@@ -3,9 +3,11 @@ import "./globals.css";
 
 // PWA Viewport 配置
 export const viewport: Viewport = {
+  // 与页面底色（globals.css 的 --background）一致；水合后由 BrowserChromeColor 接管，
+  // 跟上手动切的主题和打开的浮层
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0f19" },
   ],
   width: "device-width",
   initialScale: 1,

@@ -401,7 +401,6 @@ export default function ImageryDetailPanel(props: DetailPanelProps) {
           // 意象页独有的半透明毛玻璃面板（DESIGN.md 第四节）
           className="h-[65dvh] bg-[#FAFAFA]/96 dark:bg-[#0B0F19]/96 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/50"
           contentClassName="flex flex-col overflow-hidden px-0 pb-0"
-          transparentBackdrop
         >
           {/* Accessible title/description (visually hidden) */}
           <DrawerTitle className="sr-only">

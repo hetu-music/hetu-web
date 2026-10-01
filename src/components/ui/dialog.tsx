@@ -4,6 +4,7 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { CHROME_TONES, EdgeChrome } from "@/components/ui/browser-chrome";
 import { useOverlayHost } from "@/components/ui/overlay-host";
 import { cn } from "@/lib/utils/utils";
 
@@ -44,25 +45,25 @@ function PanelHeader({
 }
 
 // 进出场：居中弹窗动透明度和一点缩放（独立的 scale 属性，不与居中用的 translate 冲突）；
-// 看图只淡入淡出整层，缩放留给图片自己，标题和工具栏不跟着缩
+// 看图只淡入淡出整层，缩放留给图片自己，标题和工具栏不跟着缩。
+// 弹窗不压暗页面，遮罩透明，只用来接住点击：iOS 26 的 Safari 给状态栏、底栏涂的是一整块纯色，
+// 压暗的页面和它接不齐（见 ui/browser-chrome）。看图的黑底是查看器本身，照旧
 const STYLES = {
   page: {
-    backdrop:
-      "z-60 bg-slate-950/30 backdrop-blur-[2px] transition-opacity duration-300 ease-page",
+    backdrop: "z-60",
     popup:
       "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] z-60 w-[calc(100vw-2rem)] max-w-lg max-h-[85dvh] rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] transition-[opacity,scale] duration-300 ease-page",
   },
   // 原来的样子：白底、圆角、题头带整道底线。后台与「关于」在用
   classic: {
-    backdrop:
-      "z-60 bg-slate-900/20 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-200",
+    backdrop: "z-60",
     popup:
       "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] z-60 w-full max-w-md max-h-[85vh] rounded-2xl border border-black/5 dark:border-white/10 bg-white dark:bg-[#111] shadow-2xl transition-[opacity,scale] duration-200",
   },
   // 全屏看图：黑底铺满，内容自己排布
   viewer: {
     backdrop:
-      "z-60 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ease-page data-ending-style:duration-200",
+      "z-60 bg-(--scrim-viewer) backdrop-blur-sm transition-opacity duration-300 ease-page data-ending-style:duration-200",
     popup:
       "group z-60 inset-0 size-full transition-opacity duration-300 ease-page data-ending-style:duration-200",
   },
@@ -109,6 +110,11 @@ function DialogContent({
         {title && <PanelHeader title={title} description={description} />}
         {children}
       </BaseDialog.Popup>
+      {variant === "viewer" ? (
+        <EdgeChrome tone={CHROME_TONES.viewer} edges={["top", "bottom"]} />
+      ) : (
+        <EdgeChrome tone={CHROME_TONES.page} edges={["top"]} />
+      )}
     </BaseDialog.Portal>
   );
 }

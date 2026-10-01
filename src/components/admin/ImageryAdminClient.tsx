@@ -355,7 +355,7 @@ export default function ImageryAdminClient({ initialCategories }: Props) {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-70 animate-in fade-in slide-in-from-bottom-4">
           <div
             className={cn(
               "px-6 py-3 rounded-full shadow-xl flex items-center gap-3 border backdrop-blur-md",

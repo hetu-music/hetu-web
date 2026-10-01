@@ -153,5 +153,28 @@
     "hint2": "在菜单靠下的位置，可能要往下滑",
     "step3": "点右上角的「添加」",
     "done": "知道了"
+  },
+  "imageViewer": {
+    "help": "操作提示",
+    "close": "关闭",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "rotateLeft": "逆时针旋转",
+    "rotateRight": "顺时针旋转",
+    "reset": "重置",
+    "hintZoom": "滚轮或双指缩放图片",
+    "hintDoubleClick": "双击放大或复原",
+    "hintDrag": "放大后拖动查看",
+    "hintRotate": "R、L 键旋转图片",
+    "hintReset": "0 键复原",
+    "hintClose": "Esc 键关闭"
+  },
+  "pagination": {
+    "first": "第一页",
+    "prev": "上一页",
+    "next": "下一页",
+    "last": "最后一页",
+    "choose": "选择页数",
+    "jumpTo": "跳到"
   }
 }

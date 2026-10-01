@@ -281,7 +281,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
               setImageModal({
                 src: getCoverUrl(song),
                 alt: song.album || song.title,
-                title: `${song.title} - 封面`,
+                title: t("coverTitle", { title: song.title }),
               })
             }
           />
@@ -304,8 +304,8 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
               onOpen={() =>
                 setImageModal({
                   src: getNmnUrl(song),
-                  alt: `${song.title} - 乐谱`,
-                  title: "乐谱",
+                  alt: t("scoreTitle", { title: song.title }),
+                  title: t("scoreTitle", { title: song.title }),
                 })
               }
             />

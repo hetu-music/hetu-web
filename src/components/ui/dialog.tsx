@@ -49,14 +49,21 @@ const STYLES = {
     backdrop:
       "z-60 bg-slate-950/30 backdrop-blur-[2px] transition-opacity duration-300 ease-page",
     popup:
-      "z-60 w-[calc(100vw-2rem)] max-w-lg max-h-[85dvh] rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] transition-[opacity,scale] duration-300 ease-page",
+      "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-60 w-[calc(100vw-2rem)] max-w-lg max-h-[85dvh] rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] transition-[opacity,scale] duration-300 ease-page",
   },
   // 后台沿用原来的样子，等后台统一改版时再说
   admin: {
     backdrop:
-      "z-50 bg-slate-900/20 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-200",
+      "z-60 bg-slate-900/20 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-200",
     popup:
-      "z-50 w-full max-w-md max-h-[85vh] rounded-2xl border border-black/5 dark:border-white/10 bg-white dark:bg-[#111] shadow-2xl transition-[opacity,scale] duration-200",
+      "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-60 w-full max-w-md max-h-[85vh] rounded-2xl border border-black/5 dark:border-white/10 bg-white dark:bg-[#111] shadow-2xl transition-[opacity,scale] duration-200",
+  },
+  // 全屏看图：黑底铺满，内容自己排布
+  viewer: {
+    backdrop:
+      "z-60 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ease-page",
+    popup:
+      "z-60 inset-0 size-full transition-[opacity,scale] duration-300 ease-page",
   },
 };
 
@@ -91,7 +98,7 @@ function DialogContent({
       />
       <BaseDialog.Popup
         className={cn(
-          "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col outline-none",
+          "fixed flex flex-col outline-none",
           "data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]",
           styles.popup,
           className,

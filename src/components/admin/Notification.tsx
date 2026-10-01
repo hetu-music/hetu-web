@@ -8,7 +8,7 @@ interface NotificationProps {
 
 const Notification: React.FC<NotificationProps> = ({ onClose }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-white dark:bg-[#151921] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-8 w-full max-w-4xl relative max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 shrink-0">

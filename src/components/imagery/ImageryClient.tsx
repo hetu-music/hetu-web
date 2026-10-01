@@ -878,7 +878,7 @@ export default function ImageryClient({ items, categories }: Props) {
             {hoveredData && isDesktop && (
               <div
                 key={hoveredData.itemId}
-                className="fixed z-50 pointer-events-none"
+                className="fixed z-60 pointer-events-none"
                 style={{
                   left: hoveredData.x,
                   top: hoveredData.y - 8,

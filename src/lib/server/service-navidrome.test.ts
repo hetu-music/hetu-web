@@ -131,6 +131,7 @@ describe("runAudioSync", () => {
     vi.mocked(applySyncPlan).mockResolvedValue({
       upserted: 1,
       deleted: 0,
+      mediaUpdated: 0,
       hasAudioChanged: [1],
     });
     const result = await runAudioSync();
@@ -148,6 +149,7 @@ describe("runAudioSync", () => {
     vi.mocked(applySyncPlan).mockResolvedValue({
       upserted: 0,
       deleted: 0,
+      mediaUpdated: 0,
       hasAudioChanged: Array.from({ length: 20 }, (_, i) => i + 1),
     });
     await runAudioSync();
@@ -160,6 +162,7 @@ describe("runAudioSync", () => {
     vi.mocked(applySyncPlan).mockResolvedValue({
       upserted: 3,
       deleted: 0,
+      mediaUpdated: 0,
       hasAudioChanged: [],
     });
     await runAudioSync();
@@ -180,7 +183,8 @@ describe("updateAudioMapping", () => {
     vi.mocked(fetchNavidromeSong).mockResolvedValue(track);
     const result = await updateAudioMapping(1, "t1");
     expect(result.nav).toEqual(track);
-    expect(setSongMapping).toHaveBeenCalledWith(expect.anything(), 1, "t1");
+    // 把查到的曲目整个传下去，格式与时长一并写入映射
+    expect(setSongMapping).toHaveBeenCalledWith(expect.anything(), 1, track);
     expect(revalidatePath).toHaveBeenCalledWith("/zh-CN/song/1");
   });
 

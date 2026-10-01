@@ -26,6 +26,7 @@ function emptyPlan(over: Partial<SyncPlan> = {}): SyncPlan {
     upserts: [],
     deletes: [],
     unchanged: 0,
+    mediaUpdates: [],
     suspicious: [],
     review: [],
     missing: [],
@@ -70,7 +71,7 @@ describe("applySyncPlan", () => {
         upserts: [
           {
             song: song(1),
-            nav: { id: "a", title: "歌1" },
+            nav: { id: "a", title: "歌1", suffix: "mp3", duration: 226 },
             previous: null,
             loose: false,
           },
@@ -83,9 +84,10 @@ describe("applySyncPlan", () => {
       }),
     );
 
-    expect(upsert.upsert).toHaveBeenCalledWith([{ id: 1, navid_id: "a" }], {
-      onConflict: "id",
-    });
+    expect(upsert.upsert).toHaveBeenCalledWith(
+      [{ id: 1, navid_id: "a", suffix: "mp3", duration: 226 }],
+      { onConflict: "id" },
+    );
     expect(del.in).toHaveBeenCalledWith("id", [2]);
     expect(setTrue.update).toHaveBeenCalledWith({ has_audio: true });
     expect(setTrue.in).toHaveBeenCalledWith("id", [1]);
@@ -93,8 +95,23 @@ describe("applySyncPlan", () => {
     expect(result).toEqual({
       upserted: 1,
       deleted: 1,
+      mediaUpdated: 0,
       hasAudioChanged: [1, 2],
     });
+  });
+
+  it("只更新保留映射的格式、时长", async () => {
+    const upsert = makeQueryBuilder({ data: null, error: null });
+    const client = createMockSupabaseClient([upsert]);
+    const rows = [{ id: 3, navid_id: "c", suffix: "flac", duration: 309 }];
+
+    const result = await applySyncPlan(
+      client,
+      emptyPlan({ mediaUpdates: rows }),
+    );
+
+    expect(upsert.upsert).toHaveBeenCalledWith(rows, { onConflict: "id" });
+    expect(result.mediaUpdated).toBe(1);
   });
 
   it("空计划不访问数据库", async () => {
@@ -121,12 +138,17 @@ describe("setSongMapping", () => {
     const update = makeQueryBuilder({ data: null, error: null });
     const client = createMockSupabaseClient([owner, upsert, update]);
 
-    await setSongMapping(client, 1, "a");
+    await setSongMapping(client, 1, {
+      id: "a",
+      title: "歌1",
+      suffix: "mp3",
+      duration: 226,
+    });
 
     expect(owner.eq).toHaveBeenCalledWith("navid_id", "a");
     expect(owner.neq).toHaveBeenCalledWith("id", 1);
     expect(upsert.upsert).toHaveBeenCalledWith(
-      { id: 1, navid_id: "a" },
+      { id: 1, navid_id: "a", suffix: "mp3", duration: 226 },
       { onConflict: "id" },
     );
     expect(update.update).toHaveBeenCalledWith({ has_audio: true });
@@ -138,7 +160,9 @@ describe("setSongMapping", () => {
       makeQueryBuilder({ data: { id: 9 }, error: null }),
       upsert,
     ]);
-    await expect(setSongMapping(client, 1, "a")).rejects.toMatchObject({
+    await expect(
+      setSongMapping(client, 1, { id: "a", title: "歌1" }),
+    ).rejects.toMatchObject({
       name: "MappingConflictError",
       songId: 9,
     });

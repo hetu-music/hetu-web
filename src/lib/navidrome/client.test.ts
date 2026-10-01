@@ -47,7 +47,7 @@ describe("fetchNavidromeLibrary", () => {
     const page = Array.from({ length: 500 }, (_, i) => ({
       id: `s${i}`,
       title: `t${i}`,
-      bitRate: 320,
+      genre: "古风",
     }));
     const fetch = mockFetch(
       subsonic({ searchResult3: { song: page } }),
@@ -57,7 +57,7 @@ describe("fetchNavidromeLibrary", () => {
     const songs = await fetchNavidromeLibrary(config);
 
     expect(songs).toHaveLength(501);
-    expect(songs[0]).not.toHaveProperty("bitRate");
+    expect(songs[0]).not.toHaveProperty("genre");
     const secondUrl = new URL(fetch.mock.calls[1][0]);
     expect(secondUrl.pathname).toBe("/rest/search3");
     expect(secondUrl.searchParams.get("songOffset")).toBe("500");

@@ -4,6 +4,7 @@ import {
   buildStreamUrl,
   signStreamPath,
   streamLinkConfigFromEnv,
+  streamModeFor,
 } from "./stream-link";
 
 const config = { baseUrl: "https://relay.example.com", secret: "k3y" };
@@ -39,7 +40,47 @@ describe("signStreamPath", () => {
   });
 });
 
+describe("streamModeFor", () => {
+  it("mp3 直接发原文件，大小写不敏感", () => {
+    expect(streamModeFor("mp3")).toBe("original");
+    expect(streamModeFor("MP3")).toBe("original");
+  });
+
+  it("无损、其他格式、不知道格式时都转码", () => {
+    expect(streamModeFor("flac")).toBe("transcode");
+    // m4a 可能是 ALAC，ogg 旧版 iOS 播不了
+    expect(streamModeFor("m4a")).toBe("transcode");
+    expect(streamModeFor("ogg")).toBe("transcode");
+    expect(streamModeFor("")).toBe("transcode");
+    expect(streamModeFor(null)).toBe("transcode");
+    expect(streamModeFor(undefined)).toBe("transcode");
+  });
+});
+
 describe("buildStreamUrl", () => {
+  it("原文件走 /file/，签名覆盖该路径，不带起播位置", () => {
+    const url = new URL(
+      buildStreamUrl(config, {
+        navidId: "abc",
+        userId: "u",
+        duration: 200,
+        mode: "original",
+        timeOffset: 90,
+        now: NOW,
+      }),
+    );
+    expect(url.pathname).toBe("/file/abc");
+    expect(url.searchParams.has("t")).toBe(false);
+    const expires = Number(url.searchParams.get("e"));
+    expect(url.searchParams.get("s")).toBe(
+      signStreamPath("/file/abc", "u", expires, "k3y"),
+    );
+    // 同一首的转码链接签名不同，改路径验不过
+    expect(url.searchParams.get("s")).not.toBe(
+      signStreamPath("/stream/abc", "u", expires, "k3y"),
+    );
+  });
+
   it("签名覆盖路径、用户与过期时间", () => {
     const url = new URL(
       buildStreamUrl(config, {

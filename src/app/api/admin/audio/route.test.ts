@@ -115,6 +115,7 @@ describe("POST /api/admin/audio/sync", () => {
     vi.mocked(runAudioSync).mockResolvedValue({
       upserted: 2,
       deleted: 1,
+      mediaUpdated: 0,
       hasAudioChanged: [3],
     });
     const res = await POST(request("POST"));
@@ -122,6 +123,7 @@ describe("POST /api/admin/audio/sync", () => {
     expect(await res.json()).toEqual({
       upserted: 2,
       deleted: 1,
+      mediaUpdated: 0,
       hasAudioChanged: [3],
     });
   });

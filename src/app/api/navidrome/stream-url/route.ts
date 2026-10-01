@@ -9,6 +9,8 @@ import {
 import {
   buildStreamUrl,
   streamLinkConfigFromEnv,
+  streamModeFor,
+  type StreamMode,
 } from "@/lib/navidrome/stream-link";
 
 /**
@@ -18,8 +20,27 @@ import {
 const HOURLY_SONG_LIMIT = 60;
 const DAILY_SONG_LIMIT = 400;
 
-/** 取时长最多等这么久，超时就不带时长，不耽误起播 */
+/** 现场向 Navidrome 取曲目信息最多等这么久，超时就不带时长、按转码处理 */
 const DURATION_TIMEOUT_MS = 3000;
+
+/**
+ * navid_song 里还没有格式、时长时（尚未跑过同步回填），现场问 Navidrome。
+ * 取不到就不带时长、按转码处理，不影响播放
+ */
+async function fetchMediaLive(
+  navidId: string,
+): Promise<{ suffix: string | null; duration: number | null }> {
+  const navidrome = navidromeConfigFromEnv();
+  if (!navidrome) return { suffix: null, duration: null };
+  try {
+    const song = await fetchNavidromeSong(navidrome, navidId, {
+      timeoutMs: DURATION_TIMEOUT_MS,
+    });
+    return { suffix: song?.suffix ?? null, duration: song?.duration ?? null };
+  } catch {
+    return { suffix: null, duration: null };
+  }
+}
 
 /**
  * 登记一次取流并检查额度，返回 true 表示放行。
@@ -94,7 +115,7 @@ export const GET = withAuth(
 
     const { data: navidRow, error: navidErr } = await serviceClient
       .from(TABLES.NAVID_SONG)
-      .select("navid_id")
+      .select("navid_id, suffix, duration")
       .eq("id", songId)
       .maybeSingle();
 
@@ -116,31 +137,33 @@ export const GET = withAuth(
       return NextResponse.json({ error: "Too many songs" }, { status: 429 });
     }
 
-    const navidSongId = navidRow.navid_id as string;
+    const row = navidRow as {
+      navid_id: string;
+      suffix: string | null;
+      duration: number | null;
+    };
+    const navidSongId = row.navid_id;
 
-    // opus 流没有 Content-Length，浏览器读不出 audio.duration，时长要从元数据取；
-    // 也用来算链接的过期时间。取不到不影响播放
-    let duration: number | null = null;
-    const navidrome = navidromeConfigFromEnv();
-    if (navidrome) {
-      try {
-        const song = await fetchNavidromeSong(navidrome, navidSongId, {
-          timeoutMs: DURATION_TIMEOUT_MS,
-        });
-        duration = song?.duration ?? null;
-      } catch {
-        // 降级为 null
-      }
-    }
+    // 格式决定发原文件还是转码；时长给进度条用（opus 流没有 Content-Length，
+    // 浏览器读不出 audio.duration），也用来算链接的过期时间。
+    // 两项都由同步写进 navid_song，缺了才现场取
+    const { suffix, duration } =
+      row.suffix != null && row.duration != null
+        ? row
+        : await fetchMediaLive(navidSongId);
+    const mode: StreamMode = streamModeFor(suffix);
 
     return NextResponse.json({
       url: buildStreamUrl(linkConfig, {
         navidId: navidSongId,
         userId: user.id,
         duration,
+        mode,
         timeOffset,
       }),
       duration,
+      // 原文件支持分段请求，浏览器能原生跳转；转码流跳转要带 timeOffset 重新取
+      seekable: mode === "original",
     });
   },
 );

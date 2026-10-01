@@ -166,6 +166,100 @@ describe("GET /api/navidrome/stream-url — 限流", () => {
   });
 });
 
+function stubSong(song: object) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        "subsonic-response": {
+          status: "ok",
+          song: { id: "track-abc", title: "歌", duration: 245, ...song },
+        },
+      }),
+    })),
+  );
+}
+
+describe("GET /api/navidrome/stream-url — 格式与时长来源", () => {
+  it("映射里有格式、时长时直接用，不问 Navidrome", async () => {
+    mockNavidRow = { navid_id: "track-abc", suffix: "mp3", duration: 226 };
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      duration: number;
+      seekable: boolean;
+    };
+    expect(fetch).not.toHaveBeenCalled();
+    expect(new URL(body.url).pathname).toBe("/file/track-abc");
+    expect(body.duration).toBe(226);
+    expect(body.seekable).toBe(true);
+  });
+
+  it("映射里是无损格式时转码", async () => {
+    mockNavidRow = { navid_id: "track-abc", suffix: "flac", duration: 309 };
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      duration: number;
+    };
+    expect(fetch).not.toHaveBeenCalled();
+    expect(new URL(body.url).pathname).toBe("/stream/track-abc");
+    expect(body.duration).toBe(309);
+  });
+
+  it("尚未回填（缺任一项）时现场取", async () => {
+    mockNavidRow = { navid_id: "track-abc", suffix: "mp3", duration: null };
+    stubSong({ suffix: "mp3" });
+    const body = (await (await GET(makeRequest())).json()) as {
+      duration: number;
+    };
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(body.duration).toBe(245);
+  });
+});
+
+describe("GET /api/navidrome/stream-url — 原文件与转码（现场取）", () => {
+  it("mp3 发原文件，可原生跳转", async () => {
+    stubSong({ suffix: "mp3" });
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      seekable: boolean;
+    };
+    expect(new URL(body.url).pathname).toBe("/file/track-abc");
+    expect(body.seekable).toBe(true);
+  });
+
+  it("原文件不带起播位置，由浏览器自己跳", async () => {
+    stubSong({ suffix: "mp3" });
+    const url = await getUrl("?songId=42&timeOffset=63");
+    expect(url.searchParams.has("t")).toBe(false);
+  });
+
+  it("flac 转码，不能原生跳转", async () => {
+    stubSong({ suffix: "flac" });
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      seekable: boolean;
+    };
+    expect(new URL(body.url).pathname).toBe("/stream/track-abc");
+    expect(body.seekable).toBe(false);
+  });
+
+  it("取不到曲目信息时按转码处理", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    );
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      seekable: boolean;
+    };
+    expect(new URL(body.url).pathname).toBe("/stream/track-abc");
+    expect(body.seekable).toBe(false);
+  });
+});
+
 describe("GET /api/navidrome/stream-url — 播放链接", () => {
   it("返回中继上的签名路径，不带任何 Navidrome 凭证", async () => {
     const res = await GET(makeRequest());

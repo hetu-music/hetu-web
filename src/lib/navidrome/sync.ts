@@ -25,9 +25,28 @@ export type NavSong = {
   track?: number;
   duration?: number;
   path?: string;
+  /** 文件扩展名（mp3、flac…），播放时据此决定发原文件还是转码 */
+  suffix?: string;
 };
 
-export type MappingRow = { id: number; navid_id: string };
+/**
+ * navid_song 的一行。suffix 与 duration 是同步时从曲库抄来的，
+ * 播放时直接读，不用每次再问 Navidrome；尚未回填时为 null
+ */
+export type MappingRow = {
+  id: number;
+  navid_id: string;
+  suffix?: string | null;
+  duration?: number | null;
+};
+
+/** 写入 navid_song 的曲目信息 */
+export function mediaOf(nav: NavSong): {
+  suffix: string | null;
+  duration: number | null;
+} {
+  return { suffix: nav.suffix ?? null, duration: nav.duration ?? null };
+}
 
 export type ReviewItem = {
   song: DbSong;
@@ -47,6 +66,8 @@ export type SyncPlan = {
   deletes: MappingRow[];
   /** 现有映射仍然有效，保持不动 */
   unchanged: number;
+  /** 保持不动的映射里，格式或时长与曲库不一致（含尚未回填）的，只更新这两项 */
+  mediaUpdates: Required<MappingRow>[];
   /** 保留下来但时长对不上的映射（不改动，只提示） */
   suspicious: { song: DbSong; nav: NavSong }[];
   /** 需要人工确认的歌曲（不会自动写入） */
@@ -276,6 +297,19 @@ export function planSync(
       suspicious.push({ song, nav });
   }
 
+  const mediaUpdates: SyncPlan["mediaUpdates"] = [];
+  for (const row of existing) {
+    const nav = kept.get(row.id) === row.navid_id && navById.get(row.navid_id);
+    if (!nav) continue;
+    const media = mediaOf(nav);
+    if (
+      (row.suffix ?? null) !== media.suffix ||
+      (row.duration ?? null) !== media.duration
+    ) {
+      mediaUpdates.push({ id: row.id, navid_id: row.navid_id, ...media });
+    }
+  }
+
   const used = new Set([...kept.values(), ...upserts.map((u) => u.nav.id)]);
   const unusedNav = navSongs.filter((n) => !used.has(n.id));
 
@@ -283,6 +317,7 @@ export function planSync(
     upserts,
     deletes,
     unchanged: kept.size,
+    mediaUpdates,
     suspicious,
     review,
     missing,

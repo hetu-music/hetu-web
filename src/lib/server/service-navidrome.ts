@@ -164,7 +164,7 @@ export async function updateAudioMapping(
     if (!nav) throw new AudioNotFoundError("Navidrome 中不存在该曲目");
   }
 
-  await setSongMapping(supabase, songId, navidId);
+  await setSongMapping(supabase, songId, nav);
   if (Boolean(song.has_audio) !== (navidId !== null)) {
     await revalidateAudioPages([songId]);
   }

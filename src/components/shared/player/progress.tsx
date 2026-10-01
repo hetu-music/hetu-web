@@ -82,17 +82,24 @@ export function useProgress() {
     ),
   );
 
-  // 跳转发出后，新流就绪或取流失败（isLoading 落回 false）时交还给实际位置
-  useEffect(
-    () =>
-      usePlayerStore.subscribe((s, prev) => {
-        if (!prev.isLoading || s.isLoading) return;
-        if (draggingRef.current || previewRef.current === null) return;
-        previewRef.current = null;
-        refresh();
-      }),
-    [refresh],
-  );
+  // 跳转发出后交还给实际位置：转码流在新流就绪或取流失败（isLoading 落回 false）时，
+  // 原文件在浏览器原生跳转完成（seeked）时
+  useEffect(() => {
+    const release = () => {
+      if (draggingRef.current || previewRef.current === null) return;
+      previewRef.current = null;
+      refresh();
+    };
+    const unsubscribe = usePlayerStore.subscribe((s, prev) => {
+      if (prev.isLoading && !s.isLoading) release();
+    });
+    const audio = getAudio();
+    audio?.addEventListener("seeked", release);
+    return () => {
+      unsubscribe();
+      audio?.removeEventListener("seeked", release);
+    };
+  }, [refresh]);
 
   const preview = useCallback(
     (t: number) => {
@@ -213,7 +220,7 @@ export function ProgressLine({
       <div className="absolute inset-x-0 top-2 h-px bg-slate-200 dark:bg-slate-800" />
       <div
         ref={fillRef}
-        className="absolute inset-x-0 top-[7px] h-0.5 origin-left bg-(--tone) group-hover:top-1.5 group-hover:h-1 group-focus-visible:top-1.5 group-focus-visible:h-1"
+        className="absolute inset-x-0 top-1.75 h-0.5 origin-left bg-(--tone) group-hover:top-1.5 group-hover:h-1 group-focus-visible:top-1.5 group-focus-visible:h-1"
         style={{ transform: "scaleX(0)", transition: HOVER_TRANSITION }}
       />
     </div>

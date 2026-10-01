@@ -7,7 +7,13 @@
  * 残缺的数据会让同步计划把大量映射误判为缺失或失效。
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { DbSong, MappingRow, SyncPlan } from "./sync";
+import {
+  mediaOf,
+  type DbSong,
+  type MappingRow,
+  type NavSong,
+  type SyncPlan,
+} from "./sync";
 
 const MUSIC = "music";
 const NAVID_SONG = "navid_song";
@@ -40,7 +46,11 @@ export async function loadSyncState(
       MUSIC,
       "id,title,album,discnumber,track,length,has_audio",
     ),
-    fetchAllStrict<MappingRow>(supabase, NAVID_SONG, "id,navid_id"),
+    fetchAllStrict<MappingRow>(
+      supabase,
+      NAVID_SONG,
+      "id,navid_id,suffix,duration",
+    ),
   ]);
   return { songs, mappings };
 }
@@ -48,6 +58,8 @@ export async function loadSyncState(
 export type ApplyResult = {
   upserted: number;
   deleted: number;
+  /** 只更新了格式、时长的映射数 */
+  mediaUpdated: number;
   /** has_audio 发生变化的歌曲 ID，调用方据此刷新页面缓存 */
   hasAudioChanged: number[];
 };
@@ -71,9 +83,19 @@ export async function applySyncPlan(
 ): Promise<ApplyResult> {
   if (plan.upserts.length > 0) {
     const { error } = await supabase.from(NAVID_SONG).upsert(
-      plan.upserts.map((u) => ({ id: u.song.id, navid_id: u.nav.id })),
+      plan.upserts.map((u) => ({
+        id: u.song.id,
+        navid_id: u.nav.id,
+        ...mediaOf(u.nav),
+      })),
       { onConflict: "id" },
     );
+    if (error) throw error;
+  }
+  if (plan.mediaUpdates.length > 0) {
+    const { error } = await supabase
+      .from(NAVID_SONG)
+      .upsert(plan.mediaUpdates, { onConflict: "id" });
     if (error) throw error;
   }
   if (plan.deletes.length > 0) {
@@ -98,6 +120,7 @@ export async function applySyncPlan(
   return {
     upserted: plan.upserts.length,
     deleted: plan.deletes.length,
+    mediaUpdated: plan.mediaUpdates.length,
     hasAudioChanged: plan.hasAudioChanges.map((c) => c.song.id),
   };
 }
@@ -110,15 +133,16 @@ export class MappingConflictError extends Error {
 }
 
 /**
- * 手动设置单首歌的映射；navidId 为 null 表示解除关联。
- * has_audio 随映射一起更新。一个曲目只能关联一首歌，冲突时抛 MappingConflictError。
+ * 手动设置单首歌的映射；nav 为 null 表示解除关联。
+ * has_audio 随映射一起更新，格式与时长一并写入。
+ * 一个曲目只能关联一首歌，冲突时抛 MappingConflictError。
  */
 export async function setSongMapping(
   supabase: SupabaseClient,
   songId: number,
-  navidId: string | null,
+  nav: NavSong | null,
 ): Promise<void> {
-  if (navidId === null) {
+  if (nav === null) {
     const { error } = await supabase.from(NAVID_SONG).delete().eq("id", songId);
     if (error) throw error;
     await setHasAudio(supabase, [songId], false);
@@ -128,7 +152,7 @@ export async function setSongMapping(
   const { data: owner, error: ownerError } = await supabase
     .from(NAVID_SONG)
     .select("id")
-    .eq("navid_id", navidId)
+    .eq("navid_id", nav.id)
     .neq("id", songId)
     .limit(1)
     .maybeSingle();
@@ -137,7 +161,10 @@ export async function setSongMapping(
 
   const { error } = await supabase
     .from(NAVID_SONG)
-    .upsert({ id: songId, navid_id: navidId }, { onConflict: "id" });
+    .upsert(
+      { id: songId, navid_id: nav.id, ...mediaOf(nav) },
+      { onConflict: "id" },
+    );
   if (error) throw error;
   await setHasAudio(supabase, [songId], true);
 }

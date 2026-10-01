@@ -50,7 +50,7 @@ function DrawerContent({
         className={cn(
           "fixed inset-0 z-60 touch-none",
           !transparentBackdrop &&
-          "bg-(--scrim) backdrop-blur-[2px] mask-[linear-gradient(to_bottom,transparent_var(--nav-h),black_var(--nav-h))] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+            "bg-slate-950/30 backdrop-blur-[2px] mask-[linear-gradient(to_bottom,transparent_var(--nav-h),black_var(--nav-h))] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
         )}
       />
       {/* Viewport 只用来接拖动的事件，不占位置（display: contents）。
@@ -102,6 +102,5 @@ export {
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
-  DrawerTrigger
+  DrawerTrigger,
 };
-

@@ -37,7 +37,7 @@ export default function Loading() {
 
       <p
         aria-hidden
-        className="absolute bottom-12 inset-x-6 text-center font-kaiti text-[15px] tracking-wider text-slate-400 dark:text-slate-500"
+        className="absolute bottom-12 inset-x-6 text-center font-kaiti italic text-[15px] tracking-wider text-slate-400 dark:text-slate-500"
       >
         {tHero("defaultDesc")}……
       </p>

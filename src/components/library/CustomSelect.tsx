@@ -1,9 +1,12 @@
 "use client";
 
-import { Combobox } from "@base-ui/react/combobox";
-import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useTranslations } from "next-intl";
-import React, { useMemo, useState } from "react";
+import {
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import {
   Popover,
@@ -12,6 +15,9 @@ import {
 } from "@/components/ui/popover";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import { cn } from "@/lib/utils/utils";
+import { Check, ChevronDown, Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
+import React, { useMemo, useState } from "react";
 
 interface Option {
   value: string;
@@ -124,7 +130,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
 
   // 宽屏下拉与窄屏底部面板共用的列表：搜索、全选、选项、清除
   const panel = (
-    <Combobox.Root
+    <Combobox
       inline
       open={open}
       onOpenChange={handleOpenChange}
@@ -143,7 +149,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     >
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-slate-200/70 px-4 dark:border-slate-800">
         <Search className="shrink-0 text-slate-400" size={14} />
-        <Combobox.Input
+        <ComboboxInput
           placeholder={t("search")}
           aria-label={label}
           className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-300 dark:placeholder:text-slate-500"
@@ -172,22 +178,18 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         </button>
       )}
 
-      <Combobox.Empty className="py-8 text-center font-kaiti text-sm text-slate-400 empty:hidden dark:text-slate-500">
-        {t("noMatch")}
-      </Combobox.Empty>
-      <Combobox.List className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 empty:p-0">
+      <ComboboxEmpty className="py-8 text-center">{t("noMatch")}</ComboboxEmpty>
+      <ComboboxList className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain py-1">
         {(optionValue: string) => {
           const isSelected = value.includes(optionValue);
           return (
-            <Combobox.Item
+            <ComboboxItem
               key={optionValue}
               value={optionValue}
+              // 选中的只变颜色，停在上面也不变回灰
               className={cn(
-                "flex cursor-pointer select-none items-center gap-3 px-4 py-2 text-sm outline-none transition-colors",
-                "data-highlighted:bg-slate-900/[0.03] dark:data-highlighted:bg-white/[0.04]",
-                isSelected
-                  ? "text-(--tone)"
-                  : "text-slate-600 data-highlighted:text-slate-900 dark:text-slate-300 dark:data-highlighted:text-slate-100",
+                isSelected &&
+                "text-(--tone) data-highlighted:text-(--tone) dark:text-(--tone) dark:data-highlighted:text-(--tone)",
               )}
             >
               <span className="min-w-0 flex-1 truncate">
@@ -199,10 +201,10 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                 aria-hidden
                 className={cn("shrink-0", !isSelected && "invisible")}
               />
-            </Combobox.Item>
+            </ComboboxItem>
           );
         }}
-      </Combobox.List>
+      </ComboboxList>
 
       {hasSelection && (
         <button
@@ -216,7 +218,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           {t("clearAll")}
         </button>
       )}
-    </Combobox.Root>
+    </Combobox>
   );
 
   const trigger = (
@@ -296,7 +298,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       <PopoverContent
         sideOffset={6}
         initialFocus={false}
-        className="flex w-(--anchor-width) min-w-[180px] max-h-[min(420px,calc(var(--available-height)-8px))] flex-col overflow-hidden p-0"
+        className="flex w-(--anchor-width) min-w-45 max-h-[min(420px,calc(var(--available-height)-8px))] flex-col overflow-hidden p-0"
       >
         {panel}
       </PopoverContent>

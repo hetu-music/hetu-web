@@ -1,14 +1,20 @@
 "use client";
 
 import TopBar from "@/components/shared/topbar/TopBar";
-import { usePlayerStore } from "@/store/player-store";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import { usePlayerStore } from "@/store/player-store";
 import { useIntersection } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useTranslations } from "next-intl";
 
+import {
+  GRAY_PALETTE,
+  PALETTE_FULL,
+  PALETTE_TEXT,
+  sortLevel1Categories,
+} from "@/lib/imagery/palette";
 import React, {
   memo,
   useCallback,
@@ -19,12 +25,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  GRAY_PALETTE,
-  PALETTE_FULL,
-  PALETTE_TEXT,
-  sortLevel1Categories,
-} from "@/lib/imagery/palette";
 import type { SongResult } from "./ImageryDetailPanel";
 import ImageryDetailPanel from "./ImageryDetailPanel";
 
@@ -190,19 +190,17 @@ const CategoryButton = memo(function CategoryButton({
   return (
     <button
       onClick={onClick}
-      className={`group relative py-1.5 text-[14px] transition-all duration-700 font-serif whitespace-nowrap ${
-        isActive
+      className={`group relative py-1.5 text-[14px] transition-all duration-700 font-serif whitespace-nowrap ${isActive
           ? "text-slate-900 dark:text-white tracking-[0.25em]"
           : "text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 tracking-[0.2em] hover:tracking-[0.25em]"
-      }`}
+        }`}
     >
       {label}
       <span
-        className={`absolute bottom-0 left-0 h-[1.5px] transition-all duration-1000 ease-out origin-left ${
-          isActive
+        className={`absolute bottom-0 left-0 h-[1.5px] transition-all duration-1000 ease-out origin-left ${isActive
             ? "w-[calc(100%-0.25em)] scale-x-100 opacity-80"
             : "w-[calc(100%-0.25em)] scale-x-0 opacity-0"
-        }`}
+          }`}
         style={{
           backgroundColor: accentColor,
           boxShadow: isActive ? `0 1px 10px ${accentColor}22` : "none",
@@ -298,8 +296,8 @@ export default function ImageryClient({ items, categories }: Props) {
       activeL1Id === null
         ? []
         : categories
-            .filter((c) => c.level === 2 && c.parent_id === activeL1Id)
-            .sort((a, b) => a.name.localeCompare(b.name, "zh")),
+          .filter((c) => c.level === 2 && c.parent_id === activeL1Id)
+          .sort((a, b) => a.name.localeCompare(b.name, "zh")),
     [categories, activeL1Id],
   );
   const [selectedItem, setSelectedItem] = useState<ImageryItem | null>(null);
@@ -663,12 +661,12 @@ export default function ImageryClient({ items, categories }: Props) {
       </header>
 
       {/* ── category filter ── */}
-      <div className="sticky top-(--nav-h) z-20 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm border-b border-slate-200/70 dark:border-slate-800">
+      <div className="sticky top-(--nav-h) z-20 bg-[#FAFAFA]/40 dark:bg-[#0B0F19]/40 backdrop-blur-2xl border-b border-slate-200/10 dark:border-slate-800/20 transition-all duration-1000">
         <div className="max-w-5xl mx-auto px-6 py-2.5">
           {/* L1 filter row */}
           <div className="flex items-center gap-8 overflow-x-auto no-scrollbar py-1 mask-linear-fade-edges">
             {/* Start spacer for mask */}
-            <div className="min-w-[8px]" />
+            <div className="min-w-2" />
 
             <CategoryButton
               label={t("all")}
@@ -700,7 +698,7 @@ export default function ImageryClient({ items, categories }: Props) {
             })}
 
             {/* End spacer for mask */}
-            <div className="min-w-[8px]" />
+            <div className="min-w-2" />
           </div>
 
           {/* L2 sub-filter row — calligraphic list */}
@@ -711,7 +709,7 @@ export default function ImageryClient({ items, categories }: Props) {
               <div className="grid grid-cols-3 sm:flex sm:items-center gap-y-4 gap-x-6 sm:gap-6 sm:flex-wrap pt-3 border-t border-slate-200/20 dark:border-slate-800/10">
                 {/* On desktop, we keep the spacer; on mobile grid, we skip it or use it as a grid item if needed.
                     Actually, let's keep it and adjust the grid flow. */}
-                <div className="hidden sm:block min-w-[8px]" />
+                <div className="hidden sm:block min-w-2" />
 
                 {level2Categories.map((cat) => {
                   const isActive = activeL2Id === cat.id;
@@ -725,11 +723,10 @@ export default function ImageryClient({ items, categories }: Props) {
                     <button
                       key={cat.id}
                       onClick={() => setActiveL2Id(isActive ? null : cat.id)}
-                      className={`group relative text-[12px] transition-all duration-700 font-serif tracking-widest whitespace-nowrap py-1 ${
-                        isActive
+                      className={`group relative text-[12px] transition-all duration-700 font-serif tracking-widest whitespace-nowrap py-1 ${isActive
                           ? "text-slate-700 dark:text-slate-300"
                           : "text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 hover:tracking-[0.15em]"
-                      }`}
+                        }`}
                     >
                       <span
                         className={`inline-block transition-all duration-700 font-system ${isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"} mr-1.5`}
@@ -763,9 +760,9 @@ export default function ImageryClient({ items, categories }: Props) {
         style={
           mounted
             ? {
-                animation: "main-fade-in 1s ease-out both",
-                animationDelay: "200ms",
-              }
+              animation: "main-fade-in 1s ease-out both",
+              animationDelay: "200ms",
+            }
             : undefined
         }
       >

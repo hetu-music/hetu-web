@@ -1,70 +1,127 @@
-import React from "react";
-import { Share, PlusSquare, X } from "lucide-react";
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import { type LucideIcon, PlusSquare, Share, X } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useEffect } from "react";
+
+const EASE = [0.23, 1, 0.32, 1] as const;
+const NUMERALS = ["一", "二", "三"];
 
 interface IOSInstallPromptProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const IOSInstallPrompt: React.FC<IOSInstallPromptProps> = ({
+/**
+ * iOS 不支持网页直接发起安装，只能教用户自己从浏览器菜单里添加。
+ * 引号里的词照搬系统界面上的原词（简体系统叫「共享」，繁体叫「分享」），
+ * 用户对着屏幕找得到；旁边的图标也照系统按钮的样子画。
+ */
+export default function IOSInstallPrompt({
   isOpen,
   onClose,
-}) => {
-  if (!isOpen) return null;
+}: IOSInstallPromptProps) {
+  const t = useTranslations("common.installGuide");
+  const tNav = useTranslations("common.nav");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
+  const steps: { text: string; hint?: string; icon?: LucideIcon }[] = [
+    { text: t("step1"), hint: t("hint1"), icon: Share },
+    { text: t("step2"), hint: t("hint2"), icon: PlusSquare },
+    { text: t("step3") },
+  ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center pointer-events-none">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto transition-opacity animate-in fade-in duration-300"
-        onClick={onClose}
-      />
-
-      {/* Modal Card */}
-      <div className="relative w-full max-w-sm m-4 p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl pointer-events-auto animate-in slide-in-from-bottom-8 duration-300 flex flex-col gap-4 border border-slate-200 dark:border-slate-800">
-        {/* Header */}
-        <div className="flex justify-between items-start">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-            如何安装 PWA 应用
-          </h3>
-          <button
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            className="fixed inset-0 z-60 bg-slate-950/30 backdrop-blur-[2px]"
+          />
+          <motion.div
+            key="sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("title")}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.4, ease: EASE }}
+            className="fixed inset-x-0 bottom-0 z-60 mx-auto max-w-md rounded-t-2xl bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_-20px_50px_-20px_rgba(15,23,42,0.35)] pb-[env(safe-area-inset-bottom)]"
           >
-            <X size={20} />
-          </button>
-        </div>
+            <div className="flex items-center justify-between px-6 pt-5 pb-2">
+              <p className="font-serif text-xs tracking-[0.4em] text-(--tone)">
+                {t("title")}
+              </p>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={tNav("close")}
+                className="p-1 -mr-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          由于 iOS 系统的限制，需要您手动安装：
-        </p>
+            <div className="px-6 pb-6">
+              <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                {t("intro")}
+              </p>
 
-        {/* Steps */}
-        <div className="flex flex-col gap-4 mt-2">
-          {/* Step 1 */}
-          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-            <span className="text-sm font-medium">1. 点击浏览器底部的</span>
-            <Share size={18} className="text-blue-500" />
-            <span className="text-sm font-bold">分享</span>
-            <span className="text-sm font-medium">按钮</span>
-          </div>
+              <ol className="mt-5 space-y-4">
+                {steps.map(({ text, hint, icon: Icon }, i) => (
+                  <li key={i} className="flex gap-4">
+                    <span className="w-4 shrink-0 font-serif text-sm leading-6 text-(--tone)">
+                      {NUMERALS[i]}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-2 text-sm leading-6 text-slate-800 dark:text-slate-200">
+                        {text}
+                        {Icon && (
+                          <Icon
+                            size={16}
+                            aria-hidden
+                            className="shrink-0 text-slate-400 dark:text-slate-500"
+                          />
+                        )}
+                      </p>
+                      {hint && (
+                        <p className="mt-0.5 text-xs leading-5 text-slate-400 dark:text-slate-500">
+                          {hint}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
 
-          {/* Step 2 */}
-          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-            <span className="text-sm font-medium">2. 向下滚动并选择</span>
-            <PlusSquare
-              size={18}
-              className="text-slate-500 dark:text-slate-400"
-            />
-            <span className="text-sm font-bold">添加到主屏幕</span>
-          </div>
-        </div>
-
-        {/* Decorative arrow pointing down (only relevant for mobile potentially) */}
-        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-white dark:bg-slate-900 rotate-45 border-b border-r border-slate-200 dark:border-slate-800 hidden sm:hidden" />
-      </div>
-    </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="py-2 text-xs tracking-widest text-(--tone) transition-opacity hover:opacity-70"
+                >
+                  {t("done")}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
-};
-
-export default IOSInstallPrompt;
+}

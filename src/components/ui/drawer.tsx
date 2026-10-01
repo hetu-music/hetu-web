@@ -1,7 +1,7 @@
 "use client";
 
-import { PanelHeader } from "@/components/ui/dialog";
 import { CHROME_TONES, EdgeChrome } from "@/components/ui/browser-chrome";
+import { PanelHeader } from "@/components/ui/dialog";
 import { useOverlayHost } from "@/components/ui/overlay-host";
 import { cn } from "@/lib/utils/utils";
 import { Drawer as BaseDrawer } from "@base-ui/react/drawer";
@@ -43,13 +43,14 @@ function DrawerContent({
   return (
     <BaseDrawer.Portal container={host}>
       {/* 遮罩随拖动的进度变淡；拖动中不要过渡，松手后按甩出的速度收尾。
-          压暗从顶栏下沿往上淡到透明：iOS 26 的 Safari 给状态栏涂的是不会过渡的纯色，
-          贴着它的地方不压暗，状态栏就不用跟着变，开关面板时上沿不会出现断层（见 ui/browser-chrome） */}
+          顶栏那一截裁掉，不压暗也不模糊，交界落在顶栏下沿的细线上：iOS 26 的 Safari 给状态栏涂的是
+          不会过渡的纯色，贴着它的顶栏保持原样，状态栏就不用跟着变，开关面板时上沿不会出现断层
+          （见 ui/browser-chrome）。裁切不影响点击，点在顶栏上照样算点外面 */}
       <BaseDrawer.Backdrop
         className={cn(
           "fixed inset-0 z-60 touch-none",
           !transparentBackdrop &&
-            "bg-[linear-gradient(to_bottom,transparent,var(--scrim)_var(--nav-h))] backdrop-blur-[2px] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+          "bg-(--scrim) backdrop-blur-[2px] mask-[linear-gradient(to_bottom,transparent_var(--nav-h),black_var(--nav-h))] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
         )}
       />
       {/* Viewport 只用来接拖动的事件，不占位置（display: contents）。
@@ -101,5 +102,6 @@ export {
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
-  DrawerTrigger,
+  DrawerTrigger
 };
+

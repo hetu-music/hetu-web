@@ -10,14 +10,15 @@ import { useEffect, useSyncExternalStore } from "react";
  *   拿它的 background-color 涂状态栏、底栏（WebKit LocalFrameView::fixedContainerEdges）。
  *   找不到就让滚出视口的页面内容透到栏下面（fixed 元素伸出视口的部分不会画上去）。
  *   · 那一层或它的祖先带 backdrop-filter，就不取色，直接涂页面底色。顶栏带毛玻璃，所以状态栏平时是页面底色；
- *   · 没有背景、没有模糊、没有子元素的层当它不存在。浮层的遮罩是透明的，会让状态栏一下子透出内容；
- *   · 背景色要能直接读出（rgb、var），Tailwind 的 bg-x/30 编译成 color-mix()，读不到；
+ *   · 铺满全屏的半透明层算「压暗层」，若这条边原来已有颜色（顶栏、播放条），保留原来的，不跟着变暗；
+ *   · 没有背景、没有模糊、没有子元素的层当它不存在（透明遮罩会让状态栏一下子透出内容）；
+ *   · 背景色要能直接读出（rgb、var），Tailwind 的 bg-black/80 编译成 color-mix()，读不到；
  *   · 透明度低于 0.1、高度不超过 10px 的层不算。
- *   所以浮层打开时在贴边处铺一条 12px 高的条（见 EdgeChrome）：它是普通的候选，
- *   Safari 拿它的颜色涂栏。条自己的背景只画在内容区里，而内容区被内边距挤成了 0 高，
- *   所以页面上看不见；Safari 读的是样式，不受影响。
- *   公开页的浮层不压暗页面，只在上沿铺一条页面底色，让状态栏保持原样；底部面板贴着下沿，
- *   底栏自然取到面板的颜色。看图铺满黑底，上下都铺黑条，两条栏跟着变暗。
+ *   栏是一整块纯色，换色也不会过渡，跟不上遮罩的淡入淡出，压暗的页面和它总接不齐。所以：
+ *   · 窄屏的浮层一律是底部面板：底栏取面板的颜色；遮罩的压暗在顶栏处淡到透明，
+ *     又带模糊，状态栏照旧是页面底色。开关面板时两条栏都不变，没有断层（见 ui/drawer）；
+ *   · 看图铺满黑底，用 EdgeChrome 在上下沿铺黑条，两条栏跟着变黑；
+ *   · 意象页的面板不压暗，遮罩透明，用 EdgeChrome 在上沿铺一条页面底色，状态栏保持原样。
  * - 其余浏览器（Android 上的 Chrome、Edge、三星浏览器，iOS 18 及以前的 Safari，添加到主屏的 PWA）
  *   读 theme-color。这里把它对齐页面底色，手动切的深浅色也跟上；看图时换成压暗后的颜色。
  */
@@ -31,7 +32,7 @@ export type ChromeTone = Record<Mode, string> & {
 // 与 globals.css 的 --background 一致
 const PAGE: Record<Mode, string> = { light: "#fafafa", dark: "#0b0f19" };
 
-/** 半透明的黑色盖在 base 上之后的颜色 */
+/** 半透明的黑色盖在 base 上之后的颜色，即 Safari 涂栏的颜色 */
 function darken(base: string, alpha: number) {
   return (
     "#" +
@@ -46,8 +47,8 @@ function darken(base: string, alpha: number) {
 }
 
 export const CHROME_TONES = {
-  /** 保持页面底色：公开页弹窗、底部面板 */
-  page: { ...PAGE, css: "var(--background)" },
+  /** 页面底色 */
+  plain: { ...PAGE, css: "var(--background)" },
   /** 看图的黑底，与 globals.css 的 --scrim-viewer 同值 */
   viewer: {
     light: darken(PAGE.light, 0.8),
@@ -78,7 +79,9 @@ const EDGE_CLASS = {
 
 /**
  * 放在浮层的 Portal 里、排在弹窗之后（要压在最上面才取得到）。
- * 浮层挂着（含退场动画）的这段时间，浏览器栏按 tone 着色
+ * 浮层挂着（含退场动画）的这段时间，在贴边处铺一条 12px 高的条，浏览器栏按 tone 着色。
+ * 条自己的背景只画在内容区里，而内容区被内边距挤成了 0 高，所以页面上看不见；
+ * Safari 读的是样式，不受影响
  */
 export function EdgeChrome({
   tone,

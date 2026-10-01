@@ -46,17 +46,18 @@ function PanelHeader({
 
 // 进出场：居中弹窗动透明度和一点缩放（独立的 scale 属性，不与居中用的 translate 冲突）；
 // 看图只淡入淡出整层，缩放留给图片自己，标题和工具栏不跟着缩。
-// 弹窗不压暗页面，遮罩透明，只用来接住点击：iOS 26 的 Safari 给状态栏、底栏涂的是一整块纯色，
-// 压暗的页面和它接不齐（见 ui/browser-chrome）。看图的黑底是查看器本身，照旧
+// 带压暗的居中弹窗只在宽屏用，窄屏一律是底部面板（见 ui/browser-chrome）
 const STYLES = {
   page: {
-    backdrop: "z-60",
+    backdrop:
+      "z-60 bg-(--scrim) backdrop-blur-[2px] transition-opacity duration-300 ease-page",
     popup:
       "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] z-60 w-[calc(100vw-2rem)] max-w-lg max-h-[85dvh] rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] transition-[opacity,scale] duration-300 ease-page",
   },
   // 原来的样子：白底、圆角、题头带整道底线。后台与「关于」在用
   classic: {
-    backdrop: "z-60",
+    backdrop:
+      "z-60 bg-(--scrim-classic) backdrop-blur-sm transition-opacity duration-200",
     popup:
       "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] z-60 w-full max-w-md max-h-[85vh] rounded-2xl border border-black/5 dark:border-white/10 bg-white dark:bg-[#111] shadow-2xl transition-[opacity,scale] duration-200",
   },
@@ -110,10 +111,9 @@ function DialogContent({
         {title && <PanelHeader title={title} description={description} />}
         {children}
       </BaseDialog.Popup>
-      {variant === "viewer" ? (
+      {/* 看图铺满黑底，浏览器栏跟着变黑 */}
+      {variant === "viewer" && (
         <EdgeChrome tone={CHROME_TONES.viewer} edges={["top", "bottom"]} />
-      ) : (
-        <EdgeChrome tone={CHROME_TONES.page} edges={["top"]} />
       )}
     </BaseDialog.Portal>
   );

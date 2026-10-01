@@ -47,8 +47,10 @@
   /* 顶栏高度（TopBar 的 h-20）：吸顶的二级栏、侧面板都从这里往下排 */
   --nav-h: 5rem;
 
-  /* 看图的黑底。iOS 26 的 Safari 给状态栏、底栏取色只认能直接读出的颜色，
-     Tailwind 的 bg-black/80 会编译成 color-mix() 读不到，所以写成 rgb()（见 ui/browser-chrome） */
+  /* 浮层遮罩。看图的黑底要让 iOS 26 的 Safari 读出来给状态栏、底栏着色，它只认能直接读出的颜色，
+     Tailwind 的 bg-black/80 会编译成 color-mix() 读不到，所以都写成 rgb()（见 ui/browser-chrome） */
+  --scrim: rgb(2 6 24 / 0.3);
+  --scrim-classic: rgb(15 23 43 / 0.2);
   --scrim-viewer: rgb(0 0 0 / 0.8);
 }
 
@@ -56,6 +58,7 @@
   --background: #0b0f19;
   --foreground: #ededed;
   --tone: hsl(224 48% 72%);
+  --scrim-classic: rgb(0 0 0 / 0.6);
 }
 
 /* ── 3. 基础样式 ─────────────────────────────────────────────────────────────── */

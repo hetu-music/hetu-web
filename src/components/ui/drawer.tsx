@@ -26,6 +26,8 @@ type DrawerContentProps = Omit<
   title?: string;
   /** 只给读屏用的说明 */
   description?: string;
+  /** 遮罩不着色（意象词云：面板后面的词还要看得见）。遮罩本身仍在，用来接住点击 */
+  transparentBackdrop?: boolean;
 };
 
 function DrawerContent({
@@ -33,14 +35,23 @@ function DrawerContent({
   contentClassName,
   title,
   description,
+  transparentBackdrop = false,
   children,
   ...props
 }: DrawerContentProps) {
   const host = useOverlayHost();
   return (
     <BaseDrawer.Portal container={host}>
-      {/* 遮罩透明，只用来接住点击、挡住页面滚动：不压暗页面（见 ui/dialog 的 STYLES） */}
-      <BaseDrawer.Backdrop className="fixed inset-0 z-60 touch-none" />
+      {/* 遮罩随拖动的进度变淡；拖动中不要过渡，松手后按甩出的速度收尾。
+          压暗从顶栏下沿往上淡到透明：iOS 26 的 Safari 给状态栏涂的是不会过渡的纯色，
+          贴着它的地方不压暗，状态栏就不用跟着变，开关面板时上沿不会出现断层（见 ui/browser-chrome） */}
+      <BaseDrawer.Backdrop
+        className={cn(
+          "fixed inset-0 z-60 touch-none",
+          !transparentBackdrop &&
+            "bg-[linear-gradient(to_bottom,transparent,var(--scrim)_var(--nav-h))] backdrop-blur-[2px] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+        )}
+      />
       {/* Viewport 只用来接拖动的事件，不占位置（display: contents）。
           它若是一层铺满全屏的透明 fixed 层，iOS 26 的 Safari 贴边取色会先碰到它（见 browser-chrome） */}
       <BaseDrawer.Viewport className="contents">
@@ -76,7 +87,10 @@ function DrawerContent({
           </BaseDrawer.Content>
         </BaseDrawer.Popup>
       </BaseDrawer.Viewport>
-      <EdgeChrome tone={CHROME_TONES.page} edges={["top"]} />
+      {/* 透明的遮罩 Safari 当它不存在，状态栏会透出内容；铺一条页面底色让它保持原样 */}
+      {transparentBackdrop && (
+        <EdgeChrome tone={CHROME_TONES.plain} edges={["top"]} />
+      )}
     </BaseDrawer.Portal>
   );
 }

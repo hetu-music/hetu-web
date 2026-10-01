@@ -45,7 +45,7 @@ export default function TrackPicker({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-      <DialogContent variant="admin" className="max-w-2xl">
+      <DialogContent variant="classic" className="max-w-2xl">
         <DialogHeader className="flex-col items-start gap-1">
           <div className="flex w-full items-center justify-between gap-4">
             <DialogTitle className="text-lg">

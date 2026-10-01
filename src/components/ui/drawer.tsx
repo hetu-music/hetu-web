@@ -25,6 +25,8 @@ type DrawerContentProps = Omit<
   title?: string;
   /** 只给读屏用的说明 */
   description?: string;
+  /** 遮罩不着色（意象词云：面板后面的词还要看得见）。遮罩本身仍在，用来接住点击 */
+  transparentBackdrop?: boolean;
 };
 
 function DrawerContent({
@@ -32,6 +34,7 @@ function DrawerContent({
   contentClassName,
   title,
   description,
+  transparentBackdrop = false,
   children,
   ...props
 }: DrawerContentProps) {
@@ -39,7 +42,13 @@ function DrawerContent({
   return (
     <BaseDrawer.Portal container={host}>
       {/* 遮罩随拖动的进度变淡；拖动中不要过渡，松手后按甩出的速度收尾 */}
-      <BaseDrawer.Backdrop className="fixed inset-0 z-60 bg-slate-950/30 backdrop-blur-[2px] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]" />
+      <BaseDrawer.Backdrop
+        className={cn(
+          "fixed inset-0 z-60",
+          !transparentBackdrop &&
+            "bg-slate-950/30 backdrop-blur-[2px] opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-400 ease-page data-swiping:duration-0 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+        )}
+      />
       <BaseDrawer.Viewport className="fixed inset-0 z-60 flex items-end justify-center touch-none">
         <BaseDrawer.Popup
           className={cn(

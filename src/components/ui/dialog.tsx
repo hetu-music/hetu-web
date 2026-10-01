@@ -52,8 +52,8 @@ const STYLES = {
     popup:
       "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] z-60 w-[calc(100vw-2rem)] max-w-lg max-h-[85dvh] rounded-xl border border-slate-200/70 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)] transition-[opacity,scale] duration-300 ease-page",
   },
-  // 后台沿用原来的样子，等后台统一改版时再说
-  admin: {
+  // 原来的样子：白底、圆角、题头带整道底线。后台与「关于」在用
+  classic: {
     backdrop:
       "z-60 bg-slate-900/20 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-200",
     popup:

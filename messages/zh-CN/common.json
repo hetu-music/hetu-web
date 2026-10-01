@@ -71,21 +71,22 @@
     "title": "关于",
     "description": "关于河图作品勘鉴项目的说明",
     "tabs": {
-      "intro": "序",
-      "types": "凡例",
-      "thanks": "致谢"
+      "intro": "项目介绍",
+      "types": "类型说明",
+      "maintainers": "维护团队"
     },
     "introSection": {
+      "title": "简介",
       "content": "本项目为河图作品勘鉴，致力于收录整理河图的音乐作品资料，为听众提供便捷的筛选与搜索服务。"
     },
     "feedbackSection": {
-      "title": "来函",
+      "title": "数据与反馈",
       "content": "数据来源于创作者微博及各大音乐平台。若发现误漏，可以注册本站账号或通过下方联系方式进行反馈。",
       "weibo": "微博"
     },
     "thanksSection": {
-      "title": "鸣谢",
-      "content": "正版河图吧吧主<highlight>顾大一</highlight>及众位网友整理的《歌手河图作品发布勘鉴》，为本项目提供了宝贵参考资料。"
+      "title": "特别鸣谢",
+      "content": "正版河图吧吧主 <highlight>{name}</highlight> 及众位网友整理的《歌手河图作品发布勘鉴》，为本项目提供了宝贵参考资料。"
     },
     "typeDescriptions": {
       "原创": "河图原创作品。",
@@ -97,11 +98,10 @@
       "参与": "以非主创身份参与的作品。"
     },
     "maintainersSection": {
-      "title": "维护",
-      "loading": "名录载入中……",
-      "loadError": "名录暂时取不到",
-      "empty": "暂无名录",
-      "unknown": "佚名"
+      "loading": "加载数据中...",
+      "loadError": "获取贡献者失败",
+      "empty": "暂无贡献者信息",
+      "unknown": "未知贡献者"
     }
   },
   "player": {

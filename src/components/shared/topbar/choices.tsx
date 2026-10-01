@@ -4,13 +4,16 @@ import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import { LANGUAGES, useLocaleSwitch, useMounted } from "@/hooks/ui";
 import { runThemeTransition } from "@/lib/theme-transition";
 import { cn } from "@/lib/utils/utils";
-import { Languages, Monitor, Moon, Sun } from "lucide-react";
+import { Globe, Moon, Sun, SunMoon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import React, { useCallback, useId, useMemo, useState } from "react";
 import { MenuList, MenuPanel, type MenuItem, useDismiss } from "./overlay";
 
-/** 主题三选一：浅色、深色、跟随系统 */
+/** 顶栏 20px 图标的实际线宽（lucide 默认 2/24） */
+const ICON_STROKE = (2 * 20) / 24;
+
+/** 主题三选一：跟随系统、浅色、深色 */
 export function useThemeChoice() {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const mounted = useMounted();
@@ -18,9 +21,9 @@ export function useThemeChoice() {
 
   const items = useMemo<MenuItem[]>(
     () => [
+      { id: "system", label: tNav("themeSystem") },
       { id: "light", label: tNav("themeLight") },
       { id: "dark", label: tNav("themeDark") },
-      { id: "system", label: tNav("themeSystem") },
     ],
     [tNav],
   );
@@ -121,16 +124,28 @@ function IconMenu({
 export function ThemeMenu() {
   const tNav = useTranslations("common.nav");
   const { items, active, resolved, select } = useThemeChoice();
-  // 图标表示当前的设定：跟随系统时显示屏幕，免得和手动选的浅色深色混淆
+  // 图标表示当前的设定：跟随系统时显示半日半月，免得和手动选的浅色深色混淆。
+  // 半日半月与太阳的主体只是一小块，光芒是细线，按 20px 画会比旁边的图标小一号；
+  // 放大图形、线宽仍按 20px 图标的 1.67px，再用负外边距把占位收回 20px，按钮不变大
   const icon =
     active === undefined ? (
       <span className="block w-5 h-5" />
     ) : active === "system" ? (
-      <Monitor size={20} />
+      <SunMoon
+        size={24}
+        absoluteStrokeWidth
+        strokeWidth={ICON_STROKE}
+        className="-m-0.5"
+      />
     ) : resolved === "dark" ? (
       <Moon size={20} />
     ) : (
-      <Sun size={20} />
+      <Sun
+        size={22}
+        absoluteStrokeWidth
+        strokeWidth={ICON_STROKE}
+        className="-m-px"
+      />
     );
   return (
     <IconMenu
@@ -148,7 +163,7 @@ export function ScriptMenu() {
   const { items, active, select, pending, prefetch } = useScriptChoice();
   return (
     <IconMenu
-      icon={<Languages size={20} />}
+      icon={<Globe size={20} />}
       title={tNav("script")}
       items={items}
       active={active}

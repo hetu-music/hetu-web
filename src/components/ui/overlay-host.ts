@@ -10,6 +10,10 @@ import { createContext, useContext } from "react";
  */
 export const OverlayHostContext = createContext<HTMLElement | null>(null);
 
+/**
+ * 给 Base UI Portal 的 container。没有挂载点时必须给 undefined（挂到 body），
+ * 不能给 null：Base UI 把 null 当成「挂载点还没准备好」，浮层就不渲染
+ */
 export function useOverlayHost() {
-  return useContext(OverlayHostContext);
+  return useContext(OverlayHostContext) ?? undefined;
 }

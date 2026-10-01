@@ -154,7 +154,7 @@ const SongFilters: React.FC<SongFiltersProps> = ({
             onValueChange={(v) =>
               setYearRangeIndices([v[0], v[1]] as [number, number])
             }
-            minStepsBetweenThumbs={0}
+            minStepsBetweenValues={0}
             aria-label={t("yearRange")}
           />
         </div>

@@ -21,7 +21,8 @@ type DrawerContentProps = Omit<
   className?: string;
   /** 面板里可滚动的内容区 */
   contentClassName?: string;
-  title: string;
+  /** 不给就不渲染标准题头，由调用方在内容里自己放 DrawerTitle */
+  title?: string;
   /** 只给读屏用的说明 */
   description?: string;
 };
@@ -58,7 +59,7 @@ function DrawerContent({
               aria-hidden
               className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-slate-300/80 dark:bg-slate-700"
             />
-            <PanelHeader title={title} description={description} />
+            {title && <PanelHeader title={title} description={description} />}
           </div>
           <BaseDrawer.Content
             className={cn(
@@ -80,6 +81,5 @@ export {
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
-  DrawerTrigger
+  DrawerTrigger,
 };
-

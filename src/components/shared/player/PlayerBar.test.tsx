@@ -292,10 +292,11 @@ describe("播放条", () => {
 });
 
 describe("队列", () => {
-  it("打开后列出曲目，当前曲标 aria-current，缺歌手写佚名", () => {
+  // 面板由 Base UI 在下一拍挂进 portal，打开后要等它出现
+  it("打开后列出曲目，当前曲标 aria-current，缺歌手写佚名", async () => {
     renderPlayer();
     fireEvent.click(screen.getByRole("button", { name: /队列/ }));
-    const dialog = screen.getByRole("dialog", { name: "播放队列" });
+    const dialog = await screen.findByRole("dialog", { name: "播放队列" });
     expect(dialog.textContent).toContain("2 首");
     expect(screen.getByRole("button", { current: true }).textContent).toContain(
       "歌一",
@@ -303,10 +304,10 @@ describe("队列", () => {
     expect(dialog.textContent).toContain("佚名");
   });
 
-  it("清空要点两次", () => {
+  it("清空要点两次", async () => {
     renderPlayer();
     fireEvent.click(screen.getByRole("button", { name: /队列/ }));
-    fireEvent.click(screen.getByRole("button", { name: "清空" }));
+    fireEvent.click(await screen.findByRole("button", { name: "清空" }));
     expect(usePlayerStore.getState().queue).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "确认清空" }));
     expect(usePlayerStore.getState().queue).toHaveLength(0);
@@ -314,11 +315,12 @@ describe("队列", () => {
     expect(screen.queryByRole("slider")).toBeNull();
   });
 
-  it("Esc 关闭", () => {
+  it("Esc 关闭", async () => {
     renderPlayer();
     fireEvent.click(screen.getByRole("button", { name: /队列/ }));
-    fireEvent.keyDown(window, { key: "Escape" });
-    // AnimatePresence 退场动画期间节点还在，等它结束
-    return vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const dialog = await screen.findByRole("dialog", { name: "播放队列" });
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    // 退场过渡期间节点还在，等它卸载
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });

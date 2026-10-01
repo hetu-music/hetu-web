@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScriptMenu,
   ThemeMenu,
@@ -28,10 +28,10 @@ import {
 import { InlineOptions } from "./menu";
 import { BackHome, SiteLogo, UserButton } from "./parts";
 
-// 「关于」只在点开时才用到，单独分包
-const About = dynamic(() => import("@/components/library/About"), {
-  ssr: false,
-});
+// 「关于」只在点开时才用到，单独分包；空闲时或指针靠近时先预取，
+// 免得第一次点击还要等下载（开发环境下还要等现编译）
+const loadAbout = () => import("@/components/library/About");
+const About = dynamic(loadAbout, { ssr: false });
 
 /**
  * 出口只有两种：入口页放站名（旁边常驻「关于」），内页放「返回 · 回主页」。
@@ -83,6 +83,18 @@ export default function TopBar({
   const [aboutOpen, setAboutOpen] = useState(false);
   // 点开过一次才去加载「关于」；之后留着，收起时才放得完退场动画
   const [aboutLoaded, setAboutLoaded] = useState(false);
+  const hasAbout = exit.kind === "logo";
+
+  useEffect(() => {
+    if (!hasAbout) return;
+    // Safari 没有 requestIdleCallback
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => void loadAbout());
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(() => void loadAbout(), 1500);
+    return () => window.clearTimeout(id);
+  }, [hasAbout]);
 
   return (
     <OverlayHostContext.Provider value={sheetHost}>
@@ -98,9 +110,11 @@ export default function TopBar({
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
-            {exit.kind === "logo" && (
+            {hasAbout && (
               <button
                 type="button"
+                onPointerEnter={() => void loadAbout()}
+                onFocus={() => void loadAbout()}
                 onClick={() => {
                   setAboutLoaded(true);
                   setAboutOpen(true);

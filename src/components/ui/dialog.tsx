@@ -4,6 +4,7 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { CHROME_TONES, EdgeChrome } from "@/components/ui/browser-chrome";
 import { useOverlayHost } from "@/components/ui/overlay-host";
 import { cn } from "@/lib/utils/utils";
 
@@ -44,7 +45,8 @@ function PanelHeader({
 }
 
 // 进出场：居中弹窗动透明度和一点缩放（独立的 scale 属性，不与居中用的 translate 冲突）；
-// 看图只淡入淡出整层，缩放留给图片自己，标题和工具栏不跟着缩
+// 看图只淡入淡出整层，缩放留给图片自己，标题和工具栏不跟着缩。
+// 带压暗的居中弹窗只在宽屏用，窄屏一律是底部面板（见 ui/browser-chrome）
 const STYLES = {
   page: {
     backdrop:
@@ -62,7 +64,7 @@ const STYLES = {
   // 全屏看图：黑底铺满，内容自己排布
   viewer: {
     backdrop:
-      "z-60 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ease-page data-ending-style:duration-200",
+      "z-60 bg-(--scrim-viewer) backdrop-blur-sm transition-opacity duration-300 ease-page data-ending-style:duration-200",
     popup:
       "group z-60 inset-0 size-full transition-opacity duration-300 ease-page data-ending-style:duration-200",
   },
@@ -109,6 +111,10 @@ function DialogContent({
         {title && <PanelHeader title={title} description={description} />}
         {children}
       </BaseDialog.Popup>
+      {/* 看图铺满黑底，浏览器栏跟着变黑 */}
+      {variant === "viewer" && (
+        <EdgeChrome tone={CHROME_TONES.viewer} edges={["top", "bottom"]} />
+      )}
     </BaseDialog.Portal>
   );
 }

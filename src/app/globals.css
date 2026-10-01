@@ -46,6 +46,10 @@
   --tone: hsl(224 38% 36%);
   /* 顶栏高度（TopBar 的 h-20）：吸顶的二级栏、侧面板都从这里往下排 */
   --nav-h: 5rem;
+
+  /* 看图的黑底。要让 iOS 26 的 Safari 读出来给状态栏、底栏着色，它只认能直接读出的颜色，
+     Tailwind 的 bg-black/80 会编译成 color-mix() 读不到，所以写成 rgb()（见 ui/browser-chrome） */
+  --scrim-viewer: rgb(0 0 0 / 0.8);
 }
 
 .dark {

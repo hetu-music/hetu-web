@@ -8,7 +8,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import { TYPE_ORDER } from "@/lib/constants";
 import { Award, Mail, User, X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -136,6 +138,8 @@ const About = ({
   onOpenChange: (open: boolean) => void;
 }) => {
   const t = useTranslations("common.about");
+  // 宽屏是居中弹窗，窄屏是底部面板（DESIGN.md「浮层」）
+  const isDesktop = useIsDesktop();
   // 切到「维护者」页签才去拉，之后留在缓存里
   const [wantContributors, setWantContributors] = useState(false);
   const {
@@ -158,6 +162,177 @@ const About = ({
 
   const mainContributor = contributors.find((c) => c.sort_order === 2);
 
+  const body = (
+    <Tabs
+      defaultValue="about"
+      className="flex flex-col"
+      onValueChange={(value) => {
+        if (value === "maintainer") setWantContributors(true);
+      }}
+    >
+      <TabsList className="px-6">
+        <TabsTrigger value="about">{t("tabs.intro")}</TabsTrigger>
+        <TabsTrigger value="types">{t("tabs.types")}</TabsTrigger>
+        <TabsTrigger value="maintainer">{t("tabs.maintainers")}</TabsTrigger>
+      </TabsList>
+
+      <AnimatedHeight>
+        {/* About Tab */}
+        <TabsContent value="about" className="max-h-[65vh]">
+          <div className="space-y-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+            <div className="space-y-2">
+              <h3 className="font-semibold text-slate-900 dark:text-white">
+                {t("introSection.title")}
+              </h3>
+              <p>{t("introSection.content")}</p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-semibold text-slate-900 dark:text-white">
+                {t("feedbackSection.title")}
+              </h3>
+              <p>{t("feedbackSection.content")}</p>
+              <div className="flex flex-col gap-2 mt-2">
+                <a
+                  href="mailto:feedback@hetu-music.com"
+                  className="w-fit inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-(--tone) hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                >
+                  <Mail size={16} />
+                  <span>feedback@hetu-music.com</span>
+                </a>
+                <a
+                  href="https://weibo.com/u/3509434894"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-fit inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-[#e6162d] dark:text-[#ff4d4f] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                >
+                  <WeiboIcon size={18} />
+                  <span>{t("feedbackSection.weibo")}</span>
+                </a>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl bg-linear-to-br from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10 border border-amber-100 dark:border-amber-900/20 text-sm">
+              <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-500 font-bold">
+                <Award size={18} />
+                <span>{t("thanksSection.title")}</span>
+              </div>
+              <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                {t.rich("thanksSection.content", {
+                  name: mainContributor?.name || "顾大一",
+                  highlight: (chunks) => (
+                    <span className="font-semibold text-slate-900 dark:text-white">
+                      {chunks}
+                    </span>
+                  ),
+                })}
+              </p>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Types Tab */}
+        <TabsContent value="types" className="max-h-[65vh] px-6 py-4">
+          <div className="grid grid-cols-1 gap-3">
+            {TYPE_ORDER.map((type, idx) => {
+              const colors = typeColors[type] ?? fallbackColors;
+              return (
+                <div
+                  key={type}
+                  style={{ animationDelay: `${idx * 40}ms` }}
+                  className={`
+                        animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both
+                        relative overflow-hidden rounded-xl
+                        border-l-[3px] ${colors.border}
+                        bg-linear-to-r ${colors.bg} to-transparent
+                        border border-slate-100 dark:border-slate-800/50
+                        ${colors.hoverBorder}
+                        transition-colors duration-200
+                      `}
+                >
+                  <div className="px-4 py-3">
+                    <div
+                      className={`text-sm font-semibold ${colors.text} mb-1`}
+                    >
+                      {type}
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                      {t(`typeDescriptions.${type}`)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* Maintainer Tab */}
+        <TabsContent value="maintainer" className="max-h-[65vh]">
+          <div className="space-y-4">
+            {contributorsLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm">
+                  {t("maintainersSection.loading")}
+                </span>
+              </div>
+            ) : contributorsError ? (
+              <div className="flex flex-col items-center justify-center py-12 text-red-500 gap-2">
+                <span className="text-xl">⚠️</span>
+                <span className="text-sm">{contributorsError}</span>
+              </div>
+            ) : contributors.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+                <User size={32} className="opacity-20" />
+                <span className="text-sm">{t("maintainersSection.empty")}</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {[...contributors]
+                  .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
+                  .map((contributor, idx) => (
+                    <div
+                      key={idx}
+                      style={{ animationDelay: `${idx * 40}ms` }}
+                      className="animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both flex items-start gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 hover:border-(--tone)/30 dark:hover:border-slate-700 transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm font-bold shrink-0">
+                        {contributor.name?.charAt(0).toUpperCase() ?? "?"}
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <div className="font-semibold text-slate-900 dark:text-white text-sm">
+                          {contributor.name ?? t("maintainersSection.unknown")}
+                        </div>
+                        {contributor.intro && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                            {contributor.intro}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </AnimatedHeight>
+    </Tabs>
+  );
+
+  if (!isDesktop) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent
+          title={t("title")}
+          description={t("description")}
+          contentClassName="flex flex-col overflow-hidden px-0 pb-[env(safe-area-inset-bottom)]"
+        >
+          {body}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent variant="classic" className="overflow-hidden">
@@ -172,167 +347,7 @@ const About = ({
           {t("description")}
         </DialogDescription>
 
-        <Tabs
-          defaultValue="about"
-          className="flex flex-col"
-          onValueChange={(value) => {
-            if (value === "maintainer") setWantContributors(true);
-          }}
-        >
-          <TabsList className="px-6">
-            <TabsTrigger value="about">{t("tabs.intro")}</TabsTrigger>
-            <TabsTrigger value="types">{t("tabs.types")}</TabsTrigger>
-            <TabsTrigger value="maintainer">
-              {t("tabs.maintainers")}
-            </TabsTrigger>
-          </TabsList>
-
-          <AnimatedHeight>
-            {/* About Tab */}
-            <TabsContent value="about" className="max-h-[65vh]">
-              <div className="space-y-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-slate-900 dark:text-white">
-                    {t("introSection.title")}
-                  </h3>
-                  <p>{t("introSection.content")}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-slate-900 dark:text-white">
-                    {t("feedbackSection.title")}
-                  </h3>
-                  <p>{t("feedbackSection.content")}</p>
-                  <div className="flex flex-col gap-2 mt-2">
-                    <a
-                      href="mailto:feedback@hetu-music.com"
-                      className="w-fit inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-(--tone) hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
-                    >
-                      <Mail size={16} />
-                      <span>feedback@hetu-music.com</span>
-                    </a>
-                    <a
-                      href="https://weibo.com/u/3509434894"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-fit inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-[#e6162d] dark:text-[#ff4d4f] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
-                    >
-                      <WeiboIcon size={18} />
-                      <span>{t("feedbackSection.weibo")}</span>
-                    </a>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-xl bg-linear-to-br from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10 border border-amber-100 dark:border-amber-900/20 text-sm">
-                  <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-500 font-bold">
-                    <Award size={18} />
-                    <span>{t("thanksSection.title")}</span>
-                  </div>
-                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
-                    {t.rich("thanksSection.content", {
-                      name: mainContributor?.name || "顾大一",
-                      highlight: (chunks) => (
-                        <span className="font-semibold text-slate-900 dark:text-white">
-                          {chunks}
-                        </span>
-                      ),
-                    })}
-                  </p>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Types Tab */}
-            <TabsContent value="types" className="max-h-[65vh] px-6 py-4">
-              <div className="grid grid-cols-1 gap-3">
-                {TYPE_ORDER.map((type, idx) => {
-                  const colors = typeColors[type] ?? fallbackColors;
-                  return (
-                    <div
-                      key={type}
-                      style={{ animationDelay: `${idx * 40}ms` }}
-                      className={`
-                        animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both
-                        relative overflow-hidden rounded-xl
-                        border-l-[3px] ${colors.border}
-                        bg-linear-to-r ${colors.bg} to-transparent
-                        border border-slate-100 dark:border-slate-800/50
-                        ${colors.hoverBorder}
-                        transition-colors duration-200
-                      `}
-                    >
-                      <div className="px-4 py-3">
-                        <div
-                          className={`text-sm font-semibold ${colors.text} mb-1`}
-                        >
-                          {type}
-                        </div>
-                        <div className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                          {t(`typeDescriptions.${type}`)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </TabsContent>
-
-            {/* Maintainer Tab */}
-            <TabsContent value="maintainer" className="max-h-[65vh]">
-              <div className="space-y-4">
-                {contributorsLoading ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
-                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">
-                      {t("maintainersSection.loading")}
-                    </span>
-                  </div>
-                ) : contributorsError ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-red-500 gap-2">
-                    <span className="text-xl">⚠️</span>
-                    <span className="text-sm">{contributorsError}</span>
-                  </div>
-                ) : contributors.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
-                    <User size={32} className="opacity-20" />
-                    <span className="text-sm">
-                      {t("maintainersSection.empty")}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {[...contributors]
-                      .sort(
-                        (a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999),
-                      )
-                      .map((contributor, idx) => (
-                        <div
-                          key={idx}
-                          style={{ animationDelay: `${idx * 40}ms` }}
-                          className="animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both flex items-start gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 hover:border-(--tone)/30 dark:hover:border-slate-700 transition-colors"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm font-bold shrink-0">
-                            {contributor.name?.charAt(0).toUpperCase() ?? "?"}
-                          </div>
-                          <div className="flex-1 min-w-0 pt-0.5">
-                            <div className="font-semibold text-slate-900 dark:text-white text-sm">
-                              {contributor.name ??
-                                t("maintainersSection.unknown")}
-                            </div>
-                            {contributor.intro && (
-                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                                {contributor.intro}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </AnimatedHeight>
-        </Tabs>
+        {body}
       </DialogContent>
     </Dialog>
   );

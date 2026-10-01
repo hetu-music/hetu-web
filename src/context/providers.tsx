@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import React from "react";
 import { ChunkErrorHandler } from "@/components/shared/ChunkErrorHandler";
+import { BrowserChromeColor } from "@/components/ui/browser-chrome";
 import GlobalPlayer from "@/components/shared/GlobalPlayer";
 import { UserProvider } from "@/context/UserContext";
 import { FavoritesProvider } from "@/context/FavoritesContext";
@@ -37,6 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <NuqsAdapter>
         <QueryClientProvider client={queryClient}>
           <ChunkErrorHandler />
+          <BrowserChromeColor />
           <UserProvider>
             <FavoritesProvider>
               {children}

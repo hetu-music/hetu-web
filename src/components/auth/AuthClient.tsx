@@ -13,6 +13,7 @@ import {
   FIELD_LABEL_CLASS,
 } from "@/components/shared/form-field";
 import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
+import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useMounted } from "@/hooks/ui";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -349,12 +350,7 @@ export default function AuthClient({
               hasGallery ? "lg:px-16 xl:px-24" : "lg:text-center",
             )}
           >
-            <p className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-600">
-              {t("copyright", {
-                year: new Date().getFullYear(),
-                name: tSite("name"),
-              })}
-            </p>
+            <SiteMark />
           </footer>
         </div>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
@@ -100,6 +101,14 @@ function triggerHaptic(ms = 8) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
     navigator.vibrate(ms);
   }
+}
+
+/** 把选中的意象写进网址（?w=<id>），可以直接分享；用原生 history 改，不触发导航 */
+function syncWordParam(id: number | null) {
+  const url = new URL(window.location.href);
+  if (id === null) url.searchParams.delete("w");
+  else url.searchParams.set("w", String(id));
+  window.history.replaceState(null, "", url);
 }
 
 function seededShuffle<T>(list: T[], seed: number): T[] {
@@ -217,7 +226,6 @@ const CategoryButton = memo(function CategoryButton({
 
 export default function ImageryClient({ items, categories }: Props) {
   const t = useTranslations("common.imagery");
-  const tSite = useTranslations("common.site");
   // ── category hierarchy ───────────────────────────────────────────────────
   const catMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -306,6 +314,7 @@ export default function ImageryClient({ items, categories }: Props) {
   const isDesktop = useIsDesktop();
   const cloudRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(960);
+  const [widthMeasured, setWidthMeasured] = useState(false);
   const [scrollMargin, setScrollMargin] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [marqueeSeed, setMarqueeSeed] = useState(0);
@@ -313,18 +322,6 @@ export default function ImageryClient({ items, categories }: Props) {
     threshold: 0.05,
   });
   const headerVisible = headerEntry?.isIntersecting ?? true;
-
-  // Hide global scrollbar only on this page
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    html.classList.add("no-scrollbar");
-    body.classList.add("no-scrollbar");
-    return () => {
-      html.classList.remove("no-scrollbar");
-      body.classList.remove("no-scrollbar");
-    };
-  }, []);
 
   // Trigger entrance animation after first paint
   useEffect(() => {
@@ -455,6 +452,7 @@ export default function ImageryClient({ items, categories }: Props) {
     });
     ro.observe(el);
     setContainerWidth(el.getBoundingClientRect().width);
+    setWidthMeasured(true);
     return () => ro.disconnect();
   }, []);
 
@@ -515,6 +513,7 @@ export default function ImageryClient({ items, categories }: Props) {
       setPanelSide(clickX > (cloudRight * 3) / 4 ? "left" : "right");
       setSelectedItem(d.item);
       setPanelOpen(true);
+      syncWordParam(d.item.id);
       // 面板打开后 Drawer/Sheet 会给背景加 aria-hidden，需要先让按钮失焦
       // 避免 "aria-hidden on focused element" 的无障碍警告
       (document.activeElement as HTMLElement)?.blur();
@@ -564,7 +563,34 @@ export default function ImageryClient({ items, categories }: Props) {
     setHoveredData(null);
   }, []);
 
-  const handleClose = useCallback(() => setPanelOpen(false), []);
+  const handleClose = useCallback(() => {
+    setPanelOpen(false);
+    syncWordParam(null);
+  }, []);
+
+  // 从网址 ?w=<意象id> 进来（如歌曲页的意象书眉）：先把这个词滚到视口中间，
+  // 再打开它的面板。要等容器宽度量好、分好行，滚动位置才准，所以只在那之后做一次
+  const deepLinkDone = useRef(false);
+  useEffect(() => {
+    if (deepLinkDone.current || !widthMeasured || scrollMargin === 0) return;
+    deepLinkDone.current = true;
+    const id = Number(new URLSearchParams(window.location.search).get("w"));
+    if (!id) return;
+    const rowIndex = wordRows.findIndex((row) =>
+      row.some((d) => d.item.id === id),
+    );
+    const item = items.find((i) => i.id === id);
+    if (rowIndex < 0 || !item) {
+      syncWordParam(null);
+      return;
+    }
+    rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+    requestAnimationFrame(() => {
+      setPanelSide("right");
+      setSelectedItem(item);
+      setPanelOpen(true);
+    });
+  }, [widthMeasured, scrollMargin, wordRows, items, rowVirtualizer]);
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -644,7 +670,7 @@ export default function ImageryClient({ items, categories }: Props) {
               ))}
           </h1>
           <p
-            className={`font-serif text-base md:text-xl text-slate-500 dark:text-slate-400 tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
+            className={`font-kaiti text-base md:text-xl text-slate-500 dark:text-slate-400 tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
             style={{ animationDelay: "1650ms" }}
           >
             {t("subtitle", { count: wordDisplayList.length })}
@@ -845,9 +871,7 @@ export default function ImageryClient({ items, categories }: Props) {
       {/* ── footer ── */}
       <footer className="max-w-5xl mx-auto px-8 pb-12">
         <div className="border-t border-slate-100 dark:border-slate-800 pt-8 text-center">
-          <p className="text-xs text-slate-400 dark:text-slate-600 font-mono">
-            &copy; {new Date().getFullYear()} {tSite("name")}
-          </p>
+          <SiteMark />
         </div>
       </footer>
 

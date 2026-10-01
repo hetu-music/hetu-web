@@ -275,6 +275,23 @@ const PanelBody = memo(function PanelBody({
 
 // ─── Panel header ──────────────────────────────────────────────────────────────
 
+/** 分类与出现次数，写法同歌曲页的意象书眉（ImageryCaption）：分类一行衬线小字，数目一行楷体 */
+function PanelMeta({ path, count }: { path: string[]; count: number }) {
+  const t = useTranslations("common.imagery");
+  return (
+    <div className="space-y-1">
+      {path.length > 0 && (
+        <p className="font-serif text-xs tracking-[0.2em] text-slate-500 dark:text-slate-400">
+          {path.join(" · ")}
+        </p>
+      )}
+      <p className="font-kaiti text-sm text-slate-600 dark:text-slate-300">
+        {t("detailPanel.appears", { count })}
+      </p>
+    </div>
+  );
+}
+
 function PanelHeader({
   selectedItem,
   selectedPalette,
@@ -286,7 +303,6 @@ function PanelHeader({
   selectedCategoryPath: string[];
   isDesktop: boolean;
 }) {
-  const t = useTranslations("common.imagery");
   if (!selectedItem) return null;
 
   if (isDesktop) {
@@ -311,19 +327,7 @@ function PanelHeader({
         >
           {selectedItem.name}
         </h2>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-xs text-slate-500 dark:text-slate-400 tracking-widest">
-            {t("detailPanel.appears", { count: selectedItem.count })}
-          </span>
-          {selectedCategoryPath.length > 0 && (
-            <>
-              <span className="text-slate-200 dark:text-slate-700">·</span>
-              <span className="text-xs text-slate-400 dark:text-slate-500 tracking-wide">
-                {selectedCategoryPath.join(" › ")}
-              </span>
-            </>
-          )}
-        </div>
+        <PanelMeta path={selectedCategoryPath} count={selectedItem.count} />
         <div
           className="mt-5 h-[1.5px] w-12 rounded-full"
           style={{ backgroundColor: selectedPalette.accent, opacity: 0.6 }}
@@ -341,15 +345,7 @@ function PanelHeader({
         >
           {selectedItem.name}
         </h2>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 dark:text-slate-500 tracking-wide">
-          <span>{t("detailPanel.appears", { count: selectedItem.count })}</span>
-          {selectedCategoryPath.length > 0 && (
-            <>
-              <span className="text-slate-200 dark:text-slate-700">·</span>
-              <span>{selectedCategoryPath.join(" › ")}</span>
-            </>
-          )}
-        </div>
+        <PanelMeta path={selectedCategoryPath} count={selectedItem.count} />
       </div>
     </div>
   );

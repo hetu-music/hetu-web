@@ -17,7 +17,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useMemo } from "react";
 
 /**
- * 没有目录的页面（个人中心、登录注册）共用的顶栏，与歌曲页一致：
+ * 没有目录的页面（个人中心）用的顶栏，与歌曲页一致：
  * 左侧返回与回主页，右侧宽屏平铺安装、语言、主题，窄屏收进「更多」。
  */
 export default function PageTopBar({ title }: { title?: string }) {

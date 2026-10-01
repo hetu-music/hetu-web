@@ -24,15 +24,24 @@ interface AppNavbarProps {
   /** 分享本页：宽屏平铺在顶栏，窄屏收进「更多」 */
   onShare?: () => void;
   titleTooltip?: string;
+  /** 登录注册页本身就是登录入口，不需要用户按钮 */
+  showUser?: boolean;
   className?: string;
 }
 
 /**
- * 首页、意象、测试等以站名开头的页面共用的顶栏。外壳、间距与歌曲页一致，
+ * 首页、意象、测试、登录注册等以站名开头的页面共用的顶栏。外壳、间距与歌曲页一致，
  * 只是左侧放站名而不是返回按钮。
  */
 const AppNavbar = forwardRef<HTMLElement, AppNavbarProps>(function AppNavbar(
-  { onTitleClick, onAboutClick, onShare, titleTooltip, className },
+  {
+    onTitleClick,
+    onAboutClick,
+    onShare,
+    titleTooltip,
+    showUser = true,
+    className,
+  },
   ref,
 ) {
   const router = useRouter();
@@ -87,19 +96,21 @@ const AppNavbar = forwardRef<HTMLElement, AppNavbarProps>(function AppNavbar(
               <Info size={20} />
             </button>
           )}
-          <button
-            onClick={openUserPanel}
-            className={cn(
-              NAV_BUTTON_CLASS,
-              "disabled:opacity-50 disabled:cursor-wait",
-            )}
-            title={
-              !loaded ? tNav("loading") : user ? user.name : tNav("login")
-            }
-            disabled={!loaded}
-          >
-            <User size={20} className={user ? "text-(--tone)" : ""} />
-          </button>
+          {showUser && (
+            <button
+              onClick={openUserPanel}
+              className={cn(
+                NAV_BUTTON_CLASS,
+                "disabled:opacity-50 disabled:cursor-wait",
+              )}
+              title={
+                !loaded ? tNav("loading") : user ? user.name : tNav("login")
+              }
+              disabled={!loaded}
+            >
+              <User size={20} className={user ? "text-(--tone)" : ""} />
+            </button>
+          )}
 
           {/* 宽屏平铺 分享、安装、语言 和 主题切换 */}
           <div className="hidden md:flex items-center gap-2">

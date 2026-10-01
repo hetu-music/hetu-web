@@ -12,7 +12,7 @@ import {
   FIELD_ERROR_CLASS,
   FIELD_LABEL_CLASS,
 } from "@/components/shared/form-field";
-import PageTopBar from "@/components/shared/PageTopBar";
+import AppNavbar from "@/components/shared/AppNavbar";
 import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
 import { useMounted } from "@/hooks/ui";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -158,7 +158,7 @@ export default function AuthClient({
         } as React.CSSProperties
       }
     >
-      <PageTopBar />
+      <AppNavbar showUser={false} />
 
       <div
         className={cn(

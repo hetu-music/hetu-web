@@ -33,6 +33,10 @@ function SheetContent({
   const host = useOverlayHost();
   return (
     <BaseDialog.Portal container={host}>
+      {/* 透明的遮罩，只为接住点击：模态时 Base UI 只把点在遮罩上算作「点外面」。
+          不放的话它自己垫的那层没有 z-index，词云里带层级的元素会压在上面，
+          点下去既不收起面板，还会直接点开别的词 */}
+      <BaseDialog.Backdrop className="fixed inset-0 z-60" />
       <BaseDialog.Popup
         className={cn(
           "fixed z-60 flex flex-col bg-[#FAFAFA] dark:bg-[#0B0F19] shadow-2xl outline-none",

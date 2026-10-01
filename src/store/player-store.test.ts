@@ -401,6 +401,20 @@ describe("seek", () => {
   });
 });
 
+describe("seek：转码流", () => {
+  it("取流期间就显示目标位置，不回到旧流的起点", () => {
+    usePlayerStore.setState({
+      currentTrack: track(1),
+      trackDuration: 200,
+      seekBase: 0,
+    });
+    usePlayerStore.getState().seek(150);
+    const { seekBase, isLoading } = usePlayerStore.getState();
+    expect(isLoading).toBe(true);
+    expect(seekBase).toBe(150);
+  });
+});
+
 describe("seek：原文件（seekable）", () => {
   function stubSeekable() {
     vi.stubGlobal(

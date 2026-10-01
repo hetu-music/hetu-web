@@ -88,7 +88,10 @@ export default function SyncPanel({
   const loose = plan.upserts.filter((u) => u.loose);
   const exact = plan.upserts.filter((u) => !u.loose);
   const changeCount =
-    plan.upserts.length + plan.deletes.length + plan.hasAudioChanges.length;
+    plan.upserts.length +
+    plan.deletes.length +
+    plan.mediaUpdates.length +
+    plan.hasAudioChanges.length;
 
   return (
     <section className="mb-10 rounded-3xl border border-slate-200/70 bg-white/95 px-6 py-5 shadow-[0_16px_48px_-28px_rgba(15,23,42,0.35)] dark:border-slate-800/70 dark:bg-slate-900/75">
@@ -109,7 +112,7 @@ export default function SyncPanel({
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               {changeCount === 0
                 ? "曲库与歌曲的关联和元数据一致，无需同步。"
-                : `按标题与时长自动配对：新增/替换 ${plan.upserts.length} 条，删除失效 ${plan.deletes.length} 条，has_audio 变化 ${plan.hasAudioChanges.length} 首。已有且仍有效的关联不会被改动。`}
+                : `按标题与时长自动配对：新增/替换 ${plan.upserts.length} 条，删除失效 ${plan.deletes.length} 条，更新格式与时长 ${plan.mediaUpdates.length} 条，has_audio 变化 ${plan.hasAudioChanges.length} 首。已有且仍有效的关联只会更新格式与时长，不会改动指向。`}
             </p>
           </div>
         </div>

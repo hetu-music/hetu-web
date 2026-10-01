@@ -2,6 +2,10 @@
 
 import { create } from "zustand";
 import { getAudio } from "@/lib/player/audio-engine";
+import {
+  createRetryBudget,
+  createStallWatchdog,
+} from "@/lib/player/stall-watchdog";
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────────
 
@@ -492,7 +496,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
       });
     },
 
-    // 原文件直接改 currentTime；转码的 opus 流不支持原生 seek，改用 timeOffset 重新请求流
+    // 原文件直接改 currentTime；转码流不支持原生 seek，改用 timeOffset 重新请求流
     seek: (time) => {
       const s = get();
       if (!s.currentTrack) return;
@@ -509,6 +513,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>(
         if (audio.paused) safePlay();
         return;
       }
+      // 加载中显示的是 seekBase（新流的起点），这里就先改成目标位置，
+      // 免得取流期间显示旧流的起点（比如回到 0:00）。与 isLoading 同一次写入，
+      // 订阅方不会看到「已改起点、还没进加载」的中间状态
+      set({ seekBase: targetTime, isLoading: true });
       get()._fetchAndSetSrc(s.currentTrack.songId, false, targetTime);
     },
 
@@ -615,6 +623,32 @@ if (typeof window !== "undefined") {
     });
     ["play", "pause", "seeked", "ratechange", "durationchange"].forEach((e) =>
       audio.addEventListener(e, syncMediaSessionPosition),
+    );
+
+    // 卡顿自愈：转码流中途断线后 Safari 会一直停在缓冲里（按钮显示播放中、时间不走），
+    // 进度 8 秒没动就从当前位置重新取流，等同于用户手动拖一下。
+    // 2 分钟内最多自动恢复 3 次，再卡就停下报网络错误，不无限重试
+    const stallBudget = createRetryBudget(3, 120_000);
+    const stallWatchdog = createStallWatchdog(8_000, () => {
+      const s = usePlayerStore.getState();
+      if (audio.paused || s.isLoading || !s.currentTrack) return;
+      if (!stallBudget.take()) {
+        _shouldPlayAfterLoad = false;
+        audio.pause();
+        s._setError("network");
+        return;
+      }
+      console.warn("[Player] 播放卡住，从当前位置重新取流");
+      s.seek(s.seekBase + audio.currentTime);
+    });
+    audio.addEventListener("playing", () =>
+      stallWatchdog.start(audio.currentTime),
+    );
+    audio.addEventListener("timeupdate", () =>
+      stallWatchdog.progress(audio.currentTime),
+    );
+    ["pause", "ended", "emptied", "error"].forEach((e) =>
+      audio.addEventListener(e, stallWatchdog.stop),
     );
   }, 0);
 }

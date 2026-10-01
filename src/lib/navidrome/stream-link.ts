@@ -14,7 +14,6 @@
  * t 不参与签名：改它只能换起播位置，拿不到别的东西。
  */
 import crypto from "crypto";
-import type { NavSong } from "./sync";
 
 export type StreamLinkConfig = {
   /** 中继的对外地址，如 https://pre.hetu-music.com */
@@ -48,12 +47,11 @@ const ORIGINAL_SUFFIXES = new Set(["mp3"]);
 
 export type StreamMode = "transcode" | "original";
 
-/** 曲目信息取不到时一律转码：转码对任何源都能播 */
-export function streamModeFor(song: NavSong | null): StreamMode {
-  if (!song?.suffix) return "transcode";
-  if (!ORIGINAL_SUFFIXES.has(song.suffix.toLowerCase())) return "transcode";
-  if (song.bitDepth && song.bitDepth > 0) return "transcode";
-  return "original";
+/** 按文件扩展名决定；不知道格式时一律转码，转码对任何源都能播 */
+export function streamModeFor(suffix: string | null | undefined): StreamMode {
+  return suffix && ORIGINAL_SUFFIXES.has(suffix.toLowerCase())
+    ? "original"
+    : "transcode";
 }
 
 /** Navidrome 的曲目 ID 只有字母数字，其余字符一律拒绝，免得拼进路径出问题 */

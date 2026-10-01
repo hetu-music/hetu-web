@@ -227,6 +227,53 @@ describe("planSync", () => {
   });
 });
 
+describe("planSync 格式与时长", () => {
+  it("保留的映射缺格式、时长（尚未回填）时补上", () => {
+    const plan = planSync(
+      [song(1)],
+      [nav("a", { title: "歌1", suffix: "mp3", duration: 226 })],
+      [{ id: 1, navid_id: "a" }],
+    );
+    expect(plan.unchanged).toBe(1);
+    expect(plan.mediaUpdates).toEqual([
+      { id: 1, navid_id: "a", suffix: "mp3", duration: 226 },
+    ]);
+  });
+
+  it("与曲库一致时不更新", () => {
+    const plan = planSync(
+      [song(1)],
+      [nav("a", { title: "歌1", suffix: "mp3", duration: 226 })],
+      [{ id: 1, navid_id: "a", suffix: "mp3", duration: 226 }],
+    );
+    expect(plan.mediaUpdates).toEqual([]);
+  });
+
+  it("文件换了格式（同一 ID）时跟着更新", () => {
+    const plan = planSync(
+      [song(1)],
+      [nav("a", { title: "歌1", suffix: "flac", duration: 226 })],
+      [{ id: 1, navid_id: "a", suffix: "mp3", duration: 226 }],
+    );
+    expect(plan.mediaUpdates).toEqual([
+      { id: 1, navid_id: "a", suffix: "flac", duration: 226 },
+    ]);
+  });
+
+  it("新写入、失效的映射不进 mediaUpdates（由 upserts / deletes 处理）", () => {
+    const plan = planSync(
+      [song(1), song(2)],
+      [nav("new", { title: "歌1", suffix: "mp3" })],
+      [
+        { id: 1, navid_id: "gone" },
+        { id: 2, navid_id: "gone2" },
+      ],
+    );
+    expect(plan.upserts.map((u) => u.nav.id)).toEqual(["new"]);
+    expect(plan.mediaUpdates).toEqual([]);
+  });
+});
+
 describe("baseTitle", () => {
   it("去掉全角/半角括号里的版本说明", () => {
     expect(baseTitle("卫玠辞（剧情版）")).toBe("卫玠辞");

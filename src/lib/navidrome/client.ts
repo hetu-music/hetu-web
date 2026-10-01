@@ -48,8 +48,6 @@ type RawSong = {
   duration?: number;
   path?: string;
   suffix?: string;
-  bitRate?: number;
-  bitDepth?: number;
 };
 
 /** 只保留同步、管理页面和播放用得到的字段 */
@@ -63,8 +61,6 @@ function toNavSong(raw: RawSong): NavSong {
     duration: raw.duration,
     path: raw.path,
     suffix: raw.suffix,
-    bitRate: raw.bitRate,
-    bitDepth: raw.bitDepth,
   };
 }
 

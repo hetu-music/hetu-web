@@ -88,7 +88,9 @@ async function main() {
     `Navidrome 曲目 ${navSongs.length}，歌曲 ${songs.length}，现有映射 ${existing.length}`,
   );
 
-  section(`保持不变 ${plan.unchanged}`);
+  section(
+    `保持不变 ${plan.unchanged}（其中更新格式、时长 ${plan.mediaUpdates.length}）`,
+  );
   for (const s of plan.suspicious) {
     console.log(`  ! 时长不符 ${describeSong(s.song)} ↔ ${describeNav(s.nav)}`);
   }
@@ -134,7 +136,7 @@ async function main() {
   section("执行");
   const result = await applySyncPlan(supabase, plan);
   console.log(
-    `  ✓ 写入映射 ${result.upserted}，删除映射 ${result.deleted}，has_audio 变化 ${result.hasAudioChanged.length}`,
+    `  ✓ 写入映射 ${result.upserted}，删除映射 ${result.deleted}，更新格式、时长 ${result.mediaUpdated}，has_audio 变化 ${result.hasAudioChanged.length}`,
   );
   if (plan.hasAudioChanges.length > 0) await revalidateSite();
 }

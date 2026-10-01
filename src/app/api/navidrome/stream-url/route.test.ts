@@ -181,9 +181,45 @@ function stubSong(song: object) {
   );
 }
 
-describe("GET /api/navidrome/stream-url — 原文件与转码", () => {
+describe("GET /api/navidrome/stream-url — 格式与时长来源", () => {
+  it("映射里有格式、时长时直接用，不问 Navidrome", async () => {
+    mockNavidRow = { navid_id: "track-abc", suffix: "mp3", duration: 226 };
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      duration: number;
+      seekable: boolean;
+    };
+    expect(fetch).not.toHaveBeenCalled();
+    expect(new URL(body.url).pathname).toBe("/file/track-abc");
+    expect(body.duration).toBe(226);
+    expect(body.seekable).toBe(true);
+  });
+
+  it("映射里是无损格式时转码", async () => {
+    mockNavidRow = { navid_id: "track-abc", suffix: "flac", duration: 309 };
+    const body = (await (await GET(makeRequest())).json()) as {
+      url: string;
+      duration: number;
+    };
+    expect(fetch).not.toHaveBeenCalled();
+    expect(new URL(body.url).pathname).toBe("/stream/track-abc");
+    expect(body.duration).toBe(309);
+  });
+
+  it("尚未回填（缺任一项）时现场取", async () => {
+    mockNavidRow = { navid_id: "track-abc", suffix: "mp3", duration: null };
+    stubSong({ suffix: "mp3" });
+    const body = (await (await GET(makeRequest())).json()) as {
+      duration: number;
+    };
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(body.duration).toBe(245);
+  });
+});
+
+describe("GET /api/navidrome/stream-url — 原文件与转码（现场取）", () => {
   it("mp3 发原文件，可原生跳转", async () => {
-    stubSong({ suffix: "mp3", bitRate: 320 });
+    stubSong({ suffix: "mp3" });
     const body = (await (await GET(makeRequest())).json()) as {
       url: string;
       seekable: boolean;
@@ -199,7 +235,7 @@ describe("GET /api/navidrome/stream-url — 原文件与转码", () => {
   });
 
   it("flac 转码，不能原生跳转", async () => {
-    stubSong({ suffix: "flac", bitDepth: 16 });
+    stubSong({ suffix: "flac" });
     const body = (await (await GET(makeRequest())).json()) as {
       url: string;
       seekable: boolean;

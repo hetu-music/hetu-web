@@ -41,29 +41,19 @@ describe("signStreamPath", () => {
 });
 
 describe("streamModeFor", () => {
-  const song = (extra: object) => ({ id: "a", title: "t", ...extra });
-
   it("mp3 直接发原文件，大小写不敏感", () => {
-    expect(streamModeFor(song({ suffix: "mp3", bitRate: 320 }))).toBe(
-      "original",
-    );
-    expect(streamModeFor(song({ suffix: "MP3", bitDepth: 0 }))).toBe(
-      "original",
-    );
+    expect(streamModeFor("mp3")).toBe("original");
+    expect(streamModeFor("MP3")).toBe("original");
   });
 
-  it("无损、其他格式、带位深、取不到信息时都转码", () => {
-    expect(streamModeFor(song({ suffix: "flac", bitDepth: 16 }))).toBe(
-      "transcode",
-    );
+  it("无损、其他格式、不知道格式时都转码", () => {
+    expect(streamModeFor("flac")).toBe("transcode");
     // m4a 可能是 ALAC，ogg 旧版 iOS 播不了
-    expect(streamModeFor(song({ suffix: "m4a" }))).toBe("transcode");
-    expect(streamModeFor(song({ suffix: "ogg" }))).toBe("transcode");
-    expect(streamModeFor(song({ suffix: "mp3", bitDepth: 24 }))).toBe(
-      "transcode",
-    );
-    expect(streamModeFor(song({}))).toBe("transcode");
+    expect(streamModeFor("m4a")).toBe("transcode");
+    expect(streamModeFor("ogg")).toBe("transcode");
+    expect(streamModeFor("")).toBe("transcode");
     expect(streamModeFor(null)).toBe("transcode");
+    expect(streamModeFor(undefined)).toBe("transcode");
   });
 });
 

@@ -4,7 +4,7 @@ import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
-import { useIntersection } from "@mantine/hooks";
+import { useIntersection } from "@/hooks/ui/useIntersection";
 import { useQuery } from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useTranslations } from "next-intl";
@@ -318,7 +318,7 @@ export default function ImageryClient({ items, categories }: Props) {
   const [scrollMargin, setScrollMargin] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [marqueeSeed, setMarqueeSeed] = useState(0);
-  const { ref: headerRef, entry: headerEntry } = useIntersection({
+  const { ref: headerRef, entry: headerEntry } = useIntersection<HTMLElement>({
     threshold: 0.05,
   });
   const headerVisible = headerEntry?.isIntersecting ?? true;

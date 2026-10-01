@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import type { UserInfo } from "@/context/UserContext";
 
@@ -43,7 +44,8 @@ function makeUser(id: string): UserInfo {
 
 /** 把 context 的关键状态平铺到 DOM 上，便于断言 */
 function Probe() {
-  const { favorites, favoriteSongs, loaded, isLoggedIn } = useFavorites();
+  const { favorites, favoriteSongs, loaded, isLoggedIn, toggleFavorite } =
+    useFavorites();
   return (
     <div>
       <span data-testid="ids">{favorites.join(",")}</span>
@@ -52,15 +54,24 @@ function Probe() {
       </span>
       <span data-testid="loaded">{String(loaded)}</span>
       <span data-testid="logged-in">{String(isLoggedIn)}</span>
+      <button onClick={() => toggleFavorite(3)}>toggle-3</button>
+      <button onClick={() => toggleFavorite(8)}>toggle-8</button>
     </div>
   );
 }
 
 function renderWithProvider() {
+  // 每个用例一份新的缓存，互不串数据
+  const client = new QueryClient();
   return render(
     <FavoritesProvider>
       <Probe />
     </FavoritesProvider>,
+    {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    },
   );
 }
 
@@ -226,5 +237,73 @@ describe("FavoritesProvider — 切换用户", () => {
 
     expect(screen.getByTestId("ids").textContent).toBe("");
     expect(screen.getByTestId("logged-in").textContent).toBe("false");
+  });
+});
+
+describe("FavoritesProvider — 收藏与取消", () => {
+  it("取消收藏立即生效，并发出 DELETE", async () => {
+    mockUser = makeUser("u1");
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => ({
+      ok: true,
+      json: async () =>
+        init?.method
+          ? {}
+          : {
+              songIds: [3, 7],
+              songs: [
+                { id: 3, title: "倾尽天下" },
+                { id: 7, title: "如花" },
+              ],
+            },
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    renderWithProvider();
+    await waitFor(() =>
+      expect(screen.getByTestId("ids").textContent).toBe("3,7"),
+    );
+
+    await act(async () => {
+      screen.getByText("toggle-3").click();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ids").textContent).toBe("7"),
+    );
+    expect(screen.getByTestId("songs").textContent).toBe("如花");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/public/collections",
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ songId: 3 }),
+      }),
+    );
+  });
+
+  it("加收藏失败时回滚", async () => {
+    mockUser = makeUser("u1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => ({
+        ok: !init?.method,
+        json: async () => ({
+          songIds: [3],
+          songs: [{ id: 3, title: "倾尽天下" }],
+        }),
+      })) as unknown as typeof fetch,
+    );
+
+    renderWithProvider();
+    await waitFor(() =>
+      expect(screen.getByTestId("ids").textContent).toBe("3"),
+    );
+
+    await act(async () => {
+      screen.getByText("toggle-8").click();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ids").textContent).toBe("3"),
+    );
   });
 });

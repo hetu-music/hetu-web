@@ -1,4 +1,4 @@
-import { useDebouncedValue } from "@mantine/hooks";
+import { useDebouncedValue } from "@/hooks/ui/useDebouncedValue";
 import { useMemo, useState } from "react";
 import { FILTER_OPTION_ALL } from "@/lib/constants";
 import type { SongDetail } from "@/lib/types";

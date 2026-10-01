@@ -42,7 +42,7 @@
   "imagery": {
     "title": "意象词云",
     "description": "在 {count} 个精选意象中发现河图音乐的诗意世界。涵盖 {categoryNames} 等分类，探索山川、日月、草木、时令在歌词中的流转。",
-    "subtitle": "行过 {count} ，长歌踏雪去何方",
+    "subtitle": "{count} 回眸遍，长歌踏雪去何方",
     "all": "全部",
     "noData": "暂无数据",
     "times": "{count} 次",

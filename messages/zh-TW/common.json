@@ -42,7 +42,7 @@
   "imagery": {
     "title": "意象詞雲",
     "description": "在 {count} 個精選意象中發現河圖音樂的詩意世界。涵蓋 {categoryNames} 等分類，探索山川、日月、草木、時令在歌詞中的流轉。",
-    "subtitle": "行過 {count} ，長歌踏雪去何方",
+    "subtitle": "{count} 回眸遍，長歌踏雪去何方",
     "all": "全部",
     "noData": "暫無數據",
     "times": "{count} 次",

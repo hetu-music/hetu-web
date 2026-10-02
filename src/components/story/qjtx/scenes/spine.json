@@ -1,0 +1,11 @@
+{
+  "opening": { "width": 2.6, "cinnabar": 1, "tremor": 0, "alpha": 1 },
+  "nodes": {
+    "27": { "width": 1.4, "cinnabar": 0.35, "tremor": 0.12, "alpha": 0.8 },
+    "28": { "width": 1.5, "cinnabar": 0.35, "tremor": 0.1, "alpha": 0.85 },
+    "29": { "width": 1.5, "cinnabar": 0.45, "tremor": 0.08, "alpha": 0.85 },
+    "30": { "width": 1.6, "cinnabar": 0.6, "tremor": 0.06, "alpha": 0.9 },
+    "31": { "width": 2.2, "cinnabar": 0.95, "tremor": 0.03, "alpha": 1 }
+  },
+  "eventLength": 0.9
+}

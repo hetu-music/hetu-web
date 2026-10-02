@@ -1,0 +1,81 @@
+{
+  "id": 28,
+  "image": "28",
+  "intensity": 2,
+  "grade": {
+    "exposure": 0.92,
+    "contrast": 1.06,
+    "saturation": 0.82,
+    "tint": [1, 0.97, 0.92]
+  },
+  "atmosphere": { "kind": "dust", "density": 0.7 },
+  "parallax": 0.7,
+  "inkOrigin": [0.495, 0.55],
+  "titleColor": "#f1e9da",
+  "beats": [
+    {
+      "kind": "come",
+      "length": 1,
+      "camera": { "x": 0.495, "y": 0.55, "zoom": 2.4, "ax": 0.5, "ay": 0.55 }
+    },
+    {
+      "kind": "open",
+      "length": 1.8,
+      "cut": "ink",
+      "camera": { "x": 0.6, "y": 0.42, "zoom": 1.15 }
+    },
+    {
+      "kind": "title",
+      "length": 1.3,
+      "camera": { "x": 0.62, "y": 0.4, "zoom": 1.12 },
+      "text": { "x": 0.82, "y": 0.07, "w": 0.075, "h": 0.42, "vertical": true, "shade": 0.35 }
+    },
+    {
+      "kind": "text",
+      "length": 1.3,
+      "lines": [1, 3],
+      "camera": { "x": 0.64, "y": 0.4, "zoom": 1.2 },
+      "text": { "x": 0.66, "y": 0.07, "w": 0.24, "h": 0.4, "vertical": true, "shade": 0.45 }
+    },
+    {
+      "kind": "text",
+      "length": 1.1,
+      "lines": [4, 5],
+      "camera": { "x": 0.6, "y": 0.44, "zoom": 1.28 },
+      "text": { "x": 0.7, "y": 0.08, "w": 0.18, "h": 0.4, "vertical": true, "shade": 0.45 }
+    },
+    {
+      "kind": "text",
+      "length": 1.2,
+      "lines": [6, 7],
+      "camera": { "x": 0.76, "y": 0.36, "zoom": 1.55 },
+      "text": { "x": 0.64, "y": 0.08, "w": 0.16, "h": 0.36, "vertical": true, "shade": 0.5 }
+    },
+    {
+      "kind": "text",
+      "length": 1.3,
+      "lines": [8, 10],
+      "camera": { "x": 0.62, "y": 0.42, "zoom": 1.25 },
+      "text": { "x": 0.66, "y": 0.07, "w": 0.24, "h": 0.4, "vertical": true, "shade": 0.45 }
+    },
+    {
+      "kind": "text",
+      "length": 1.1,
+      "lines": [11, 11],
+      "camera": { "x": 0.52, "y": 0.52, "zoom": 1.5 },
+      "text": { "x": 0.62, "y": 0.2, "w": 0.08, "h": 0.42, "vertical": true, "shade": 0.4 }
+    },
+    {
+      "kind": "colophon",
+      "length": 0.8,
+      "camera": { "x": 0.56, "y": 0.62, "zoom": 1.6 },
+      "text": { "x": 0.44, "y": 0.84, "w": 0.3, "h": 0.05, "shade": 0.35 }
+    },
+    {
+      "kind": "close",
+      "length": 1.4,
+      "cut": "ink",
+      "camera": { "x": 0.495, "y": 0.55, "zoom": 2.4, "ax": 0.5, "ay": 0.55 }
+    }
+  ]
+}

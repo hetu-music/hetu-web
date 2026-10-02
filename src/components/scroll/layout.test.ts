@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BAND_HEIGHT,
+  yearInscriptionAt,
   layoutScroll,
   type ScrollWork,
   TIER_SIZE,
@@ -84,5 +85,17 @@ describe("layoutScroll", () => {
     expect(yearAt(layout, y2015.from + 1)?.year).toBe(2015);
     expect(yearAt(layout, y2016.to)?.year).toBe(2016);
     expect(yearAt(layout, layout.width + 999)?.year).toBe(2016);
+  });
+
+  it("yearInscriptionAt 只认题字所在的那一块", () => {
+    const [y2015] = layout.years;
+    const center = (y2015.from + y2015.to) / 2;
+    expect(yearInscriptionAt(layout, center, BAND_HEIGHT / 2)?.year).toBe(2015);
+    // 卷面上沿、下沿不算
+    expect(yearInscriptionAt(layout, center, 10)).toBeNull();
+    // 年与年之间的空卷不算
+    expect(
+      yearInscriptionAt(layout, y2015.to + 100, BAND_HEIGHT / 2),
+    ).toBeNull();
   });
 });

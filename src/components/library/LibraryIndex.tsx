@@ -1,20 +1,12 @@
 "use client";
 
 import { FIELD_LABEL_CLASS } from "@/components/shared/form-field";
-import {
-  PRIMARY_BUTTON_CLASS,
-  TEXT_BUTTON_CLASS,
-} from "@/components/shared/text-button";
 import { InlineOptions } from "@/components/shared/topbar/menu";
-import { ResponsivePanel } from "@/components/ui/responsive-panel";
 import { Slider } from "@/components/ui/slider";
-import type { LyricsSearchState } from "@/hooks/library/useLyricsIndex";
 import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import type { FilterOptions } from "@/lib/types";
-import { cn } from "@/lib/utils/utils";
-import { Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useState } from "react";
+import React from "react";
 import CustomSelect from "./CustomSelect";
 
 /** 检索要用到的全部筛选状态，由 MusicLibraryClient 汇总后传下来 */
@@ -59,60 +51,6 @@ export function countActiveFilters(f: LibraryFilters): number {
   ].filter(Boolean).length;
 }
 
-/** 搜索框：只有一道底线，聚焦时换成强调色 */
-export function SearchField({
-  value,
-  onChange,
-  lyricsState,
-  className,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  lyricsState: LyricsSearchState;
-  className?: string;
-}) {
-  const t = useTranslations("library.search");
-  return (
-    <label
-      className={cn(
-        "flex items-center gap-2 border-b border-slate-300 dark:border-slate-700 focus-within:border-(--tone) transition-colors",
-        className,
-      )}
-    >
-      <Search size={14} className="shrink-0 text-slate-400" aria-hidden />
-      <input
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={
-          lyricsState === "ready"
-            ? t("placeholderWithLyrics")
-            : t("placeholderNoLyrics")
-        }
-        className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 [&::-webkit-search-cancel-button]:hidden"
-      />
-      {value ? (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          aria-label={t("clear")}
-          className="shrink-0 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-        >
-          <X size={14} />
-        </button>
-      ) : (
-        lyricsState === "loading" && (
-          // 歌词索引还在建：一圈细线转着，建好后占位字会多出「歌词」
-          <span
-            aria-hidden
-            className="block size-3 shrink-0 animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600"
-          />
-        )
-      )}
-    </label>
-  );
-}
-
 function useTypeLabel() {
   const tCommon = useTranslations("common");
   const tEnum = useTranslations("enums");
@@ -131,7 +69,6 @@ export default function LibraryIndex({
 }: {
   filters: LibraryFilters;
 }) {
-  const t = useTranslations("library");
   const tFilter = useTranslations("library.filter");
   const tCommon = useTranslations("common");
   const tEnum = useTranslations("enums");
@@ -251,57 +188,6 @@ export default function LibraryIndex({
           </div>
         ))}
       </dl>
-
-      <p className="mt-10 flex items-baseline gap-3 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
-        <span className="tabular-nums">
-          {t("catalog.result", { count: f.resultCount })}
-        </span>
-        {f.isAnyActive && (
-          <>
-            <span aria-hidden className="text-slate-300 dark:text-slate-600">
-              ·
-            </span>
-            <button
-              type="button"
-              onClick={f.reset}
-              className={PRIMARY_BUTTON_CLASS}
-            >
-              {t("catalog.reset")}
-            </button>
-          </>
-        )}
-      </p>
     </div>
-  );
-}
-
-/** 工具栏上的「筛选」文字按钮：宽屏在下方展开，窄屏从底部拉出 */
-export function IndexPanelButton({ filters }: { filters: LibraryFilters }) {
-  const t = useTranslations("library.catalog");
-  const [open, setOpen] = useState(false);
-  const active = countActiveFilters(filters);
-
-  return (
-    <ResponsivePanel
-      open={open}
-      onOpenChange={setOpen}
-      title={t("index")}
-      align="end"
-      popoverClassName="w-[26rem] max-h-[calc(var(--available-height)-8px)] overflow-y-auto thin-scrollbar p-6"
-      trigger={
-        <button
-          type="button"
-          className={cn(
-            TEXT_BUTTON_CLASS,
-            "shrink-0 py-2",
-            active > 0 && "text-(--tone) dark:text-(--tone)",
-          )}
-        >
-          {active > 0 ? t("filterActive", { count: active }) : t("filter")}
-        </button>
-      }
-    >
-      {() => <LibraryIndex filters={filters} />}
-    </ResponsivePanel>
   );
 }

@@ -75,7 +75,9 @@ export default function GalleryHang({
         return (
           <section
             key={room.key}
-            className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-x-16"
+            // 夜展切过来时按年份找到这一间；滚动时也靠它判断此刻在哪一年
+            data-room-year={room.year ?? "unknown"}
+            className="scroll-mt-[calc(var(--nav-h)+1.5rem)] lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-x-16"
           >
             {/* 展签：宽屏停在左侧，读完这一间才被推走 */}
             <header

@@ -179,3 +179,28 @@ export function yearAt(layout: ScrollLayout, x: number): YearSpan | null {
   }
   return layout.years[layout.years.length - 1] ?? null;
 }
+
+/** 年份题字的字号（卷面单位）：写在每年画群正中、卷面高度的一半处 */
+export const INSCRIPTION_SIZE = 420;
+
+/**
+ * 卷面上某点是否落在某年的题字上（点空白处才算，点在画上由画自己接）。
+ * 题字宽按每个数字约 0.6 个字号估算，不超出这一年画群的范围。
+ */
+export function yearInscriptionAt(
+  layout: ScrollLayout,
+  x: number,
+  y: number,
+): YearSpan | null {
+  if (Math.abs(y - BAND_HEIGHT / 2) > INSCRIPTION_SIZE * 0.55) return null;
+  for (const span of layout.years) {
+    const center = (span.from + span.to) / 2;
+    const digits = span.year ? String(span.year).length : 2;
+    const half = Math.min(
+      (span.to - span.from) / 2,
+      (digits * 0.6 * INSCRIPTION_SIZE) / 2,
+    );
+    if (Math.abs(x - center) <= half) return span;
+  }
+  return null;
+}

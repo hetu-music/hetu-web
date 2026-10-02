@@ -50,7 +50,10 @@
     "lit": "{names} · {count} 首"
   },
   "hall": {
-    "works": "{count} 首"
+    "works": "{count} 首",
+    "special": "特展",
+    "detailOnly": "细检所得",
+    "backToNight": "回到夜展"
   },
   "search": {
     "placeholderWithLyrics": "搜索歌曲、创作者、歌词...",
@@ -81,9 +84,8 @@
     "close": "收起"
   },
   "view": {
-    "hall": "近赏",
-    "grid": "远观",
-    "list": "目录"
+    "night": "夜展",
+    "hall": "近赏"
   },
   "noFilteredSongs": "没有符合条件的歌曲",
   "linkCopied": "链接已复制到剪贴板",
@@ -91,6 +93,18 @@
     "hint": "滚动或拖动，沿卷而行　·　点一幅，走近看",
     "newer": "较新一幅",
     "older": "较早一幅",
-    "back": "退回远观"
+    "back": "退回远观",
+    "enterRoom": "走进这一年的展室"
+  },
+  "seek": {
+    "label": "寻",
+    "placeholder": "寻一首歌、一个名字、一句词",
+    "imagery": "意象",
+    "imageryFilter": "检索意象",
+    "noImagery": "没有这个意象",
+    "detail": "细检",
+    "detailActive": "细检 · {count}",
+    "close": "收起",
+    "gather": "近赏这 {count} 首"
   }
 }

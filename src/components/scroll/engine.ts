@@ -11,7 +11,13 @@ import type {
   Sprite,
   Texture,
 } from "pixi.js";
-import { BAND_HEIGHT, type Placement, type ScrollLayout } from "./layout";
+import {
+  BAND_HEIGHT,
+  type Placement,
+  type ScrollLayout,
+  type YearSpan,
+  yearInscriptionAt,
+} from "./layout";
 
 export interface EngineWork {
   id: number;
@@ -36,6 +42,28 @@ export interface EngineEvents {
   onFrame: (camera: Camera, view: { width: number; height: number }) => void;
   /** 第一次有人动它：收起操作提示 */
   onInteract: () => void;
+  /** 鼠标停在某年的题字上（空白处），可以点进那一年的展室 */
+  onYearHover: (span: YearSpan | null) => void;
+  /** 点了某年的题字 */
+  onYearTap: (year: number | null) => void;
+  /** WebGL 上下文丢了（移动端内存紧张时会发生），由页面改用近赏 */
+  onContextLost: () => void;
+}
+
+/** 镜头的去处：恢复上次的位置、落在某一年，或者都不给（从引首开卷） */
+export interface EngineInitial {
+  camera?: Camera;
+  /** 恢复时直接推近到这一幅 */
+  focusId?: number | null;
+  /** 从近赏切过来：落在这一年 */
+  year?: number | null;
+}
+
+/** 离开主页前记下的状态，回来时原样恢复 */
+export interface EngineState {
+  /** 远观时的镜头（推近时是推近前的那个） */
+  camera: Camera;
+  focusId: number | null;
 }
 
 export interface ScrollEngine {
@@ -45,6 +73,9 @@ export interface ScrollEngine {
   step: (direction: -1 | 1) => void;
   /** 远观时沿卷平移，单位是屏宽 */
   pan: (screens: number) => void;
+  /** 点灯：只让这些画亮着，其余沉进暗处；null 全亮 */
+  setLit: (ids: Set<number> | null) => void;
+  getState: () => EngineState;
   destroy: () => void;
 }
 
@@ -72,6 +103,11 @@ const INTRO_SWEEP_MS = 1400;
 const INTRO_MAX_MS = 3200;
 /** 同时下载的封面数 */
 const LOAD_CONCURRENCY = 6;
+/** 点灯：命中的画从镜头正中往两边一盏盏亮，相隔多久、最晚多久 */
+const LIT_STAGGER_MS = 10;
+const LIT_MAX_MS = 900;
+/** 没命中的画沉到多暗 */
+const UNLIT_ALPHA = 0.09;
 
 const easeInOut = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -161,6 +197,10 @@ interface Item {
   appearAt: number;
   appear: number;
   hiResLoading: boolean;
+  /** 点灯：0 沉在暗处，1 亮着；litAt 之前不动（亮灯的先后） */
+  lit: number;
+  litTarget: number;
+  litAt: number;
 }
 
 export async function createScrollEngine(
@@ -168,8 +208,11 @@ export async function createScrollEngine(
   layout: ScrollLayout,
   works: Map<number, EngineWork>,
   events: EngineEvents,
-  options: { serifFont: string },
+  options: { serifFont: string; initial?: EngineInitial },
 ): Promise<ScrollEngine> {
+  const initial = options.initial ?? {};
+  // 什么都没给才从引首开卷；恢复或从近赏切来时直接落在该在的地方
+  const opening = !initial.camera && initial.year === undefined;
   const PIXI = await import("pixi.js");
   const app: Application = new PIXI.Application();
   await app.init({
@@ -244,6 +287,9 @@ export async function createScrollEngine(
       appearAt: Infinity,
       appear: 0,
       hiResLoading: false,
+      lit: 1,
+      litTarget: 1,
+      litAt: 0,
     };
     items.set(placement.id, item);
 
@@ -266,9 +312,26 @@ export async function createScrollEngine(
       focus(placement.id);
     });
   }
-  // 点在暗处：退回远观
-  app.stage.on("pointertap", () => {
-    if (!dragMoved && focused !== null) unfocus();
+  // 点在暗处：推近时退回远观；远观时点在某年的题字上，走进那一年的展室
+  app.stage.on("pointertap", (e: FederatedPointerEvent) => {
+    if (dragMoved) return;
+    if (focused !== null) {
+      unfocus();
+      return;
+    }
+    const span = yearAtScreen(e.global.x, e.global.y);
+    if (span) events.onYearTap(span.year);
+  });
+  let hoveredYear: YearSpan | null = null;
+  app.stage.on("pointermove", (e: FederatedPointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    // 停在画上时不算停在题字上
+    const span =
+      e.target === app.stage ? yearAtScreen(e.global.x, e.global.y) : null;
+    if (span === hoveredYear) return;
+    hoveredYear = span;
+    app.stage.cursor = span ? "pointer" : "default";
+    events.onYearHover(span);
   });
 
   // ── 镜头 ──────────────────────────────────────────────────────────────
@@ -279,14 +342,21 @@ export async function createScrollEngine(
   const isNarrow = () => view().width < 768;
 
   const cam: Camera = { x: 0, y: BAND_HEIGHT / 2, zoom: farZoom() };
-  // 开卷：镜头先对着引首（题名），停一会儿再向左滑进画里
   const { frontispiece } = layout;
-  cam.x = (frontispiece.from + frontispiece.to) / 2;
-  // 窄屏放不下整段引首：开卷时先拉远到装得下，滑进画里时再推回远观的高度
-  cam.zoom = Math.min(
-    cam.zoom,
-    (view().width * 0.92) / (frontispiece.to - frontispiece.from),
-  );
+  if (initial.camera) {
+    Object.assign(cam, initial.camera);
+  } else if (initial.year !== undefined) {
+    const span = layout.years.find((y) => y.year === initial.year);
+    if (span) cam.x = (span.from + span.to) / 2;
+  } else {
+    // 开卷：镜头先对着引首（题名），停一会儿再向左滑进画里
+    cam.x = (frontispiece.from + frontispiece.to) / 2;
+    // 窄屏放不下整段引首：开卷时先拉远到装得下，滑进画里时再推回远观的高度
+    cam.zoom = Math.min(
+      cam.zoom,
+      (view().width * 0.92) / (frontispiece.to - frontispiece.from),
+    );
+  }
   const target: Camera = { ...cam };
   /** 画群最右缘：最新那一年的右边界 */
   const worksRight = layout.years[layout.years.length - 1]?.to ?? 0;
@@ -319,6 +389,22 @@ export async function createScrollEngine(
     const minY = halfH - 200;
     const maxY = BAND_HEIGHT - halfH + 200;
     target.y = minY > maxY ? BAND_HEIGHT / 2 : clamp(target.y, minY, maxY);
+  };
+  // 恢复或落在某年时，位置要落在卷面范围之内（视口大小可能和上次不同）
+  if (!opening) {
+    clampTarget();
+    Object.assign(cam, target);
+  }
+
+  /** 屏幕上一点落在哪一年的题字上（推近时不算） */
+  const yearAtScreen = (gx: number, gy: number) => {
+    if (focused !== null) return null;
+    const { width, height } = view();
+    return yearInscriptionAt(
+      layout,
+      cam.x + (gx - width / 2) / cam.zoom,
+      cam.y + (gy - height / 2) / cam.zoom,
+    );
   };
 
   const flyTo = (to: Camera, duration = FLIGHT_MS) => {
@@ -605,21 +691,25 @@ export async function createScrollEngine(
 
   // ── 加载封面：离开场镜头近的先下 ──────────────────────────────────────
   let destroyed = false;
-  const introAt = performance.now() + INTRO_START_MS;
-  // 画从画群的右缘起，随着镜头滑进来依次亮起
-  const rightEdge = worksRight;
-  const openingTimer = setTimeout(() => {
-    if (!interacted && focused === null)
-      flyTo(openingCamera(), OPENING_GLIDE_MS);
-  }, OPENING_HOLD_MS);
+  // 开卷时画从画群的右缘起，随着镜头滑进来依次亮起；
+  // 恢复或从近赏切来时从镜头所在处往两边亮，不必等
+  const introAt = performance.now() + (opening ? INTRO_START_MS : 150);
+  const revealFrom = opening ? worksRight : cam.x;
+  const openingTimer = opening
+    ? setTimeout(() => {
+        if (!interacted && focused === null)
+          flyTo(openingCamera(), OPENING_GLIDE_MS);
+      }, OPENING_HOLD_MS)
+    : undefined;
   const queue = [...items.values()].sort(
     (a, b) =>
-      Math.abs(rightEdge - a.placement.x) - Math.abs(rightEdge - b.placement.x),
+      Math.abs(revealFrom - a.placement.x) -
+      Math.abs(revealFrom - b.placement.x),
   );
   const introDelay = (item: Item) => {
-    // 从右往左扫：离右缘越远亮得越晚
-    const screens = ((rightEdge - item.placement.x) * farZoom()) / view().width;
-    return Math.min(Math.max(screens, 0) * INTRO_SWEEP_MS, INTRO_MAX_MS);
+    const screens =
+      (Math.abs(revealFrom - item.placement.x) * farZoom()) / view().width;
+    return Math.min(screens * INTRO_SWEEP_MS, INTRO_MAX_MS);
   };
   const markReady = (item: Item) => {
     item.appearAt = Math.max(performance.now(), introAt + introDelay(item));
@@ -656,6 +746,56 @@ export async function createScrollEngine(
     }
   };
   for (let i = 0; i < LOAD_CONCURRENCY; i++) void worker();
+
+  // ── 点灯 ──────────────────────────────────────────────────────────────
+  function setLit(ids: Set<number> | null) {
+    const now = performance.now();
+    const centerOf = (item: Item) => item.placement.x + item.placement.size / 2;
+    // 新亮起的从镜头正中往两边一盏盏亮；沉下去的一起沉
+    const rising = [...items.values()]
+      .filter(
+        (item) =>
+          (ids === null || ids.has(item.placement.id)) && item.litTarget === 0,
+      )
+      .sort(
+        (a, b) => Math.abs(centerOf(a) - cam.x) - Math.abs(centerOf(b) - cam.x),
+      );
+    rising.forEach((item, i) => {
+      item.litTarget = 1;
+      item.litAt = now + Math.min(i * LIT_STAGGER_MS, LIT_MAX_MS);
+    });
+    if (ids) {
+      for (const item of items.values()) {
+        if (ids.has(item.placement.id)) continue;
+        item.litTarget = 0;
+        item.litAt = now;
+      }
+    }
+  }
+
+  function getState(): EngineState {
+    return {
+      camera: {
+        ...(focused !== null && farBeforeFocus ? farBeforeFocus : target),
+      },
+      focusId: focused,
+    };
+  }
+
+  // 恢复到推近状态：不飞，直接就位
+  if (initial.focusId != null && items.has(initial.focusId)) {
+    const far = { ...target };
+    focus(initial.focusId);
+    farBeforeFocus = far;
+    flight = null;
+    Object.assign(cam, target);
+  }
+
+  const onContextLost = (e: Event) => {
+    e.preventDefault();
+    events.onContextLost();
+  };
+  canvas.addEventListener("webglcontextlost", onContextLost);
 
   // ── 每一帧 ────────────────────────────────────────────────────────────
   const dimTint = Math.round(BASE_LIGHT * 255);
@@ -716,10 +856,17 @@ export async function createScrollEngine(
       item.lightTarget = lit ? 1 : 0;
       item.light = lerp(item.light, item.lightTarget, 1 - Math.exp(-dt * 5));
 
-      const shade = Math.round(lerp(dimTint, 255, item.light));
+      if (now >= item.litAt) {
+        item.lit = lerp(item.lit, item.litTarget, 1 - Math.exp(-dt * 4));
+      }
+      // 没点着灯的沉进暗处：更淡，也更暗；停上去仍会亮一点，方便认
+      const glow = Math.max(item.lit, item.light * 0.6);
+      const shade = Math.round(
+        lerp(dimTint, 255, item.light) * lerp(0.55, 1, item.lit),
+      );
       item.sprite.tint = (shade << 16) | (shade << 8) | shade;
-      item.halo.alpha = (0.035 + 0.11 * item.light) * item.appear;
-      item.node.alpha = easeInOut(item.appear);
+      item.halo.alpha = (0.035 + 0.11 * item.light) * item.appear * item.lit;
+      item.node.alpha = easeInOut(item.appear) * lerp(UNLIT_ALPHA, 1, glow);
       item.node.scale.set(1 + 0.035 * item.light * (focused === p.id ? 0 : 1));
     }
 
@@ -731,10 +878,13 @@ export async function createScrollEngine(
     unfocus,
     step,
     pan,
+    setLit,
+    getState,
     destroy: () => {
       destroyed = true;
       clearTimeout(openingTimer);
       window.removeEventListener("keydown", onKey);
+      canvas.removeEventListener("webglcontextlost", onContextLost);
       app.destroy(true, { children: true, texture: true });
     },
   };

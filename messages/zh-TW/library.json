@@ -50,7 +50,10 @@
     "lit": "{names} · {count} 首"
   },
   "hall": {
-    "works": "{count} 首"
+    "works": "{count} 首",
+    "special": "特展",
+    "detailOnly": "細檢所得",
+    "backToNight": "回到夜展"
   },
   "search": {
     "placeholderWithLyrics": "搜尋歌曲、創作者、歌詞...",
@@ -81,9 +84,8 @@
     "close": "收起"
   },
   "view": {
-    "hall": "近賞",
-    "grid": "遠觀",
-    "list": "目錄"
+    "night": "夜展",
+    "hall": "近賞"
   },
   "noFilteredSongs": "沒有符合條件的歌曲",
   "linkCopied": "連結已複製到剪貼簿",
@@ -91,6 +93,18 @@
     "hint": "滾動或拖動，沿卷而行　·　點一幅，走近看",
     "newer": "較新一幅",
     "older": "較早一幅",
-    "back": "退回遠觀"
+    "back": "退回遠觀",
+    "enterRoom": "走進這一年的展室"
+  },
+  "seek": {
+    "label": "尋",
+    "placeholder": "尋一首歌、一個名字、一句詞",
+    "imagery": "意象",
+    "imageryFilter": "檢索意象",
+    "noImagery": "沒有這個意象",
+    "detail": "細檢",
+    "detailActive": "細檢 · {count}",
+    "close": "收起",
+    "gather": "近賞這 {count} 首"
   }
 }

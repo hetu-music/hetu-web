@@ -55,6 +55,8 @@ export const CHROME_TONES = {
     dark: darken(PAGE.dark, 0.8),
     css: "var(--scrim-viewer)",
   },
+  /** 主页夜展：不论站内主题都是深色，两条栏也跟着深 */
+  night: { light: PAGE.dark, dark: PAGE.dark, css: PAGE.dark },
 } satisfies Record<string, ChromeTone>;
 
 // 开着的浮层，后开的在上面

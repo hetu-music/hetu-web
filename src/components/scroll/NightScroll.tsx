@@ -1,7 +1,9 @@
 "use client";
 
 import SongPlayActions from "@/components/shared/SongPlayActions";
-import TopBar from "@/components/shared/topbar/TopBar";
+import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
+import { CHROME_TONES, EdgeChrome } from "@/components/ui/browser-chrome";
+import { useFavorites } from "@/context/FavoritesContext";
 import { Link } from "@/i18n/navigation";
 import type { LibraryImagery, LibraryImageryItem, Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
@@ -16,26 +18,93 @@ import React, {
   useRef,
   useState,
 } from "react";
-import type { Camera, EngineWork, ScrollEngine } from "./engine";
-import { BAND_HEIGHT, layoutScroll, yearAt } from "./layout";
+import type {
+  Camera,
+  EngineInitial,
+  EngineState,
+  EngineWork,
+  ScrollEngine,
+} from "./engine";
+import {
+  BAND_HEIGHT,
+  INSCRIPTION_SIZE,
+  layoutScroll,
+  type YearSpan,
+  yearAt,
+} from "./layout";
 
-/** 年份题字的字号（卷面单位） */
-const INSCRIPTION_SIZE = 420;
 /** 推近后的说明里最多列几个意象 */
 const MARK_LIMIT = 6;
+/** 离开主页去歌曲页前记下镜头，回来时原样恢复 */
+const NIGHT_STATE_KEY = "hetu_night_scroll_state";
+
+/** 浏览器能不能画 WebGL；不能就只开近赏 */
+function supportsWebGL() {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
 
 /**
- * 夜展长卷：全部作品挂在一卷横向铺开的夜色里，从右往左读。
+ * 读出上次离开时记下的镜头。只读不删：开发模式下 effect 会连跑两次，
+ * 读到就删的话第二次就读不到了；等画面真正建好再删（见 clearSavedState）
+ */
+function readSavedState(): EngineState | null {
+  try {
+    const raw = sessionStorage.getItem(NIGHT_STATE_KEY);
+    return raw ? (JSON.parse(raw) as EngineState) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedState() {
+  try {
+    sessionStorage.removeItem(NIGHT_STATE_KEY);
+  } catch {
+    // 无痕模式下可能读写不了，忽略
+  }
+}
+
+interface NightScrollProps {
+  songs: Song[];
+  imagery: LibraryImagery;
+  /** 点灯：亮着的作品；null 全亮 */
+  lit: Set<number> | null;
+  /** 顶栏，由主页给出（出口、视图切换、寻与它的面板） */
+  topBar: React.ReactNode;
+  /** 底部一行：点着的灯与入口；没点灯时为 null，显示操作提示 */
+  lampLine: React.ReactNode | null;
+  /** 从近赏切过来时落在这一年；undefined 表示从引首开卷 */
+  initialYear?: number | null;
+  /** 镜头所在的年份变了（切到近赏时对准这一年） */
+  onYearChange: (year: number | null) => void;
+  /** 点了某年的题字，或左下角的年份：走进那一年的展室 */
+  onEnterYear: (year: number | null) => void;
+  /** 画不了 WebGL，或上下文丢了：改用近赏 */
+  onUnavailable: () => void;
+}
+
+/**
+ * 夜展：全部作品挂在一卷横向铺开的夜色里，从右往左读。
  * 滚轮、拖动沿卷平移；点一幅，镜头推近，其余的画退进暗处；Esc 或点暗处退回远观。
+ * 点卷上的年份大字，走进那一年的展室（近赏）。
  * 画面由 WebGL 画（engine.ts），题字与说明是 DOM，按镜头位置对齐。
  */
 export default function NightScroll({
   songs,
   imagery,
-}: {
-  songs: Song[];
-  imagery: LibraryImagery;
-}) {
+  lit,
+  topBar,
+  lampLine,
+  initialYear,
+  onYearChange,
+  onEnterYear,
+  onUnavailable,
+}: NightScrollProps) {
   const t = useTranslations("library");
   const tCommon = useTranslations("common");
   const tEnum = useTranslations("enums");
@@ -49,6 +118,7 @@ export default function NightScroll({
 
   const [hovered, setHovered] = useState<number | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
+  const [hoveredYear, setHoveredYear] = useState<YearSpan | null>(null);
   const [touched, setTouched] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -74,10 +144,20 @@ export default function NightScroll({
     [layout],
   );
 
-  // 镜头每动一帧：题字层跟着平移缩放，悬停题名贴到那幅画下，左下角写当前年份
-  // 每帧都要读到最新的悬停，记在 ref 里（由 onHover 同时写入）
+  // 每帧都要读到的东西放在 ref 里：悬停的那幅、当前年份、几个回调
   const hoveredRef = useRef<number | null>(null);
-  const lastYear = useRef<string>("");
+  const currentYear = useRef<number | null | undefined>(undefined);
+  const callbacks = useRef({ onYearChange, onEnterYear, onUnavailable });
+  useEffect(() => {
+    callbacks.current = { onYearChange, onEnterYear, onUnavailable };
+  });
+  const litRef = useRef(lit);
+  useEffect(() => {
+    litRef.current = lit;
+    engineRef.current?.setLit(lit);
+  }, [lit]);
+
+  // 镜头每动一帧：题字层跟着平移缩放，悬停题名贴到那幅画下，左下角写当前年份
   const onFrame = useCallback(
     (cam: Camera, view: { width: number; height: number }) => {
       const tx = view.width / 2 - cam.x * cam.zoom;
@@ -92,10 +172,14 @@ export default function NightScroll({
         label.style.transform = `translate(${tx + (p.x + p.size / 2) * cam.zoom}px, ${ty + (p.y + p.size) * cam.zoom + 14}px) translateX(-50%)`;
       }
       const span = yearAt(layout, cam.x);
-      const text = span?.year ? String(span.year) : tCommon("unknown");
-      if (yearRef.current && text !== lastYear.current) {
-        yearRef.current.textContent = text;
-        lastYear.current = text;
+      const year = span ? span.year : null;
+      if (year !== currentYear.current) {
+        currentYear.current = year;
+        if (yearRef.current) {
+          yearRef.current.textContent =
+            year !== null ? String(year) : tCommon("unknown");
+        }
+        callbacks.current.onYearChange(year);
       }
       if (progressRef.current) {
         const ratio = Math.min(1, Math.max(0, cam.x / layout.width));
@@ -109,6 +193,10 @@ export default function NightScroll({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    if (!supportsWebGL()) {
+      callbacks.current.onUnavailable();
+      return;
+    }
     let cancelled = false;
     let engine: ScrollEngine | null = null;
 
@@ -129,39 +217,66 @@ export default function NightScroll({
     const serifFont = getComputedStyle(probe).fontFamily;
     probe.remove();
 
-    void import("./engine").then(async ({ createScrollEngine }) => {
-      if (cancelled) return;
-      engine = await createScrollEngine(
-        host,
-        layout,
-        works,
-        {
-          onHover: (id) => {
-            hoveredRef.current = id;
-            setHovered(id);
+    const saved = readSavedState();
+    const initial: EngineInitial = saved
+      ? { camera: saved.camera, focusId: saved.focusId }
+      : initialYear !== undefined
+        ? { year: initialYear }
+        : {};
+
+    import("./engine")
+      .then(async ({ createScrollEngine }) => {
+        if (cancelled) return;
+        engine = await createScrollEngine(
+          host,
+          layout,
+          works,
+          {
+            onHover: (id) => {
+              hoveredRef.current = id;
+              setHovered(id);
+            },
+            onFocus: setFocused,
+            onFrame,
+            onInteract: () => setTouched(true),
+            onYearHover: setHoveredYear,
+            onYearTap: (year) => callbacks.current.onEnterYear(year),
+            onContextLost: () => callbacks.current.onUnavailable(),
           },
-          onFocus: setFocused,
-          onFrame,
-          onInteract: () => setTouched(true),
-        },
-        { serifFont },
-      );
-      if (cancelled) {
-        engine.destroy();
-        return;
-      }
-      engineRef.current = engine;
-      setReady(true);
-    });
+          { serifFont, initial },
+        );
+        if (cancelled) {
+          engine.destroy();
+          return;
+        }
+        engine.setLit(litRef.current);
+        engineRef.current = engine;
+        clearSavedState();
+        // 恢复或从近赏切来的，不再放开卷提示
+        if (saved || initialYear !== undefined) setTouched(true);
+        setReady(true);
+      })
+      .catch(() => callbacks.current.onUnavailable());
 
     return () => {
       cancelled = true;
       engine?.destroy();
       engineRef.current = null;
     };
-    // 画面只建一次；onFrame 用 ref 取最新的悬停
+    // 画面只建一次；回调与点灯经 ref 取最新的
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout]);
+
+  /** 去歌曲页之前记下镜头，回来时恢复到这里 */
+  const saveState = useCallback(() => {
+    const state = engineRef.current?.getState();
+    if (!state) return;
+    try {
+      sessionStorage.setItem(NIGHT_STATE_KEY, JSON.stringify(state));
+    } catch {
+      // 存不了就算了，回来时从引首开卷
+    }
+  }, []);
 
   const focusedSong = focused !== null ? songById.get(focused) : undefined;
   const hoveredSong =
@@ -173,7 +288,9 @@ export default function NightScroll({
       className="dark fixed inset-0 overflow-hidden bg-[#0B0F19] text-slate-200 select-none [--tone:var(--tone-dark)]"
       style={{ "--tone-dark": INK_TONE.dark } as React.CSSProperties}
     >
-      <TopBar exit={{ kind: "logo" }} />
+      {/* 不论站内主题，状态栏与底栏都跟着夜色（见 ui/browser-chrome） */}
+      <EdgeChrome tone={CHROME_TONES.night} edges={["top", "bottom"]} />
+      {topBar}
 
       {/* 卷上的字：引首题名与年份题字，随镜头移动；推近时退淡 */}
       <div
@@ -197,21 +314,37 @@ export default function NightScroll({
             count={songs.filter((s) => !s.dispute_note).length}
           />
         )}
-        {layout.years.map((span) => (
-          <span
-            key={span.year ?? "unknown"}
-            className="absolute whitespace-nowrap font-serif font-semibold tabular-nums leading-none text-white/[0.045]"
-            style={{
-              left: (span.from + span.to) / 2,
-              top: BAND_HEIGHT / 2,
-              fontSize: INSCRIPTION_SIZE,
-              transform: "translate(-50%, -50%)",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {span.year ?? tCommon("unknown")}
-          </span>
-        ))}
+        {layout.years.map((span) => {
+          const hot = hoveredYear?.year === span.year;
+          return (
+            <span
+              key={span.year ?? "unknown"}
+              className={cn(
+                "absolute whitespace-nowrap font-serif font-semibold tabular-nums leading-none transition-colors duration-700",
+                hot ? "text-white/[0.13]" : "text-white/[0.045]",
+              )}
+              style={{
+                left: (span.from + span.to) / 2,
+                top: BAND_HEIGHT / 2,
+                fontSize: INSCRIPTION_SIZE,
+                transform: "translate(-50%, -50%)",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {span.year ?? tCommon("unknown")}
+              {/* 停在题字上：底下浮一行「走进这一年的展室」 */}
+              <span
+                className={cn(
+                  "absolute left-1/2 top-full -translate-x-1/2 whitespace-nowrap font-sans font-normal text-slate-300 transition-opacity duration-500",
+                  hot ? "opacity-100" : "opacity-0",
+                )}
+                style={{ fontSize: 30, letterSpacing: "0.4em", marginTop: 24 }}
+              >
+                {t("scroll.enterRoom")}
+              </span>
+            </span>
+          );
+        })}
       </div>
 
       {/* WebGL 画面 */}
@@ -250,20 +383,27 @@ export default function NightScroll({
         typeLabel={(v) => (tEnum.has(`type.${v}`) ? tEnum(`type.${v}`) : v)}
         onStep={(d) => engineRef.current?.step(d)}
         onClose={() => engineRef.current?.unfocus()}
+        onOpen={saveState}
       />
 
-      {/* 左下：此刻看到哪一年，与一道全卷的细线 */}
+      {/* 左下：此刻看到哪一年（点一下走进这一年的展室），与一道全卷的细线 */}
       <div
         className={cn(
-          "pointer-events-none absolute bottom-8 left-6 md:left-10 flex items-end gap-5 transition-opacity duration-1000",
-          ready && focused === null ? "opacity-100" : "opacity-0",
+          "absolute bottom-8 left-6 md:left-10 flex items-end gap-5 transition-opacity duration-1000",
+          ready && focused === null
+            ? "opacity-100"
+            : "pointer-events-none opacity-0",
         )}
       >
-        <span
-          ref={yearRef}
-          className="font-serif text-3xl tabular-nums text-slate-300"
-        />
-        <span className="mb-2 block h-px w-28 bg-white/10">
+        <button
+          type="button"
+          onClick={() => onEnterYear(currentYear.current ?? null)}
+          title={t("scroll.enterRoom")}
+          className="font-serif text-3xl tabular-nums text-slate-300 hover:text-white transition-colors"
+        >
+          <span ref={yearRef} />
+        </button>
+        <span aria-hidden className="mb-2 block h-px w-28 bg-white/10">
           <span
             ref={progressRef}
             className="block h-px w-full origin-left bg-(--tone)"
@@ -271,15 +411,26 @@ export default function NightScroll({
         </span>
       </div>
 
-      {/* 操作提示，动过一次就收起 */}
-      <p
+      {/* 底部正中：点着的灯；没点灯时是操作提示，动过一次就收起 */}
+      <div
         className={cn(
-          "pointer-events-none absolute bottom-24 md:bottom-8 inset-x-0 text-center text-xs tracking-[0.35em] text-slate-500 transition-opacity duration-1000",
-          ready && !touched ? "opacity-100 delay-[2500ms]" : "opacity-0",
+          "absolute inset-x-0 bottom-24 md:bottom-8 flex justify-center px-6 transition-opacity duration-1000",
+          ready && focused === null
+            ? "opacity-100"
+            : "pointer-events-none opacity-0",
         )}
       >
-        {t("scroll.hint")}
-      </p>
+        {lampLine ?? (
+          <p
+            className={cn(
+              "pointer-events-none text-center text-xs tracking-[0.35em] text-slate-500 transition-opacity duration-1000",
+              touched ? "opacity-0" : "opacity-100 delay-[2500ms]",
+            )}
+          >
+            {t("scroll.hint")}
+          </p>
+        )}
+      </div>
 
       {/* 给读屏与搜索引擎的作品清单 */}
       <nav className="sr-only" aria-label={t("hero.title")}>
@@ -371,14 +522,19 @@ function NearCaption({
   typeLabel,
   onStep,
   onClose,
+  onOpen,
 }: {
   song: Song | undefined;
   marks: LibraryImageryItem[];
   typeLabel: (type: string) => string;
   onStep: (direction: -1 | 1) => void;
   onClose: () => void;
+  /** 去歌曲页之前 */
+  onOpen: () => void;
 }) {
   const t = useTranslations("library");
+  const tSong = useTranslations("song");
+  const { isFavorite, toggleFavorite, isLoggedIn } = useFavorites();
   // 换下一幅时说明先淡出再淡入，内容跟着镜头到了才换
   const [shown, setShown] = useState<Song | undefined>(undefined);
   useEffect(() => {
@@ -403,6 +559,7 @@ function NearCaption({
         Boolean,
       )
     : [];
+  const favorited = shown ? isFavorite(shown.id) : false;
 
   return (
     <aside
@@ -418,8 +575,21 @@ function NearCaption({
     >
       {shown && (
         <>
-          <p className="text-xs tracking-[0.35em] text-(--tone)">
-            {eyebrow.join(" · ")}
+          <p className="flex items-baseline gap-4 text-xs tracking-[0.35em] text-(--tone)">
+            <span>{eyebrow.join(" · ")}</span>
+            {shown.dispute_note && (
+              <span
+                title={tSong("labels.disputedHint")}
+                className="tracking-wider text-amber-500"
+              >
+                {tSong("labels.disputed")}
+              </span>
+            )}
+            {favorited && (
+              <span className="tracking-wider text-rose-400">
+                {t("catalog.favorited")}
+              </span>
+            )}
           </p>
           <h2 className="mt-4 font-serif text-4xl md:text-5xl xl:text-6xl font-semibold leading-[1.1] tracking-tight text-slate-50 text-balance">
             {shown.title}
@@ -439,12 +609,27 @@ function NearCaption({
           <div className="mt-10 flex items-center gap-6 text-xs tracking-widest">
             <Link
               href={`/song/${shown.id}`}
-              onClick={bumpNavDepth}
+              onClick={() => {
+                onOpen();
+                bumpNavDepth();
+              }}
               className="text-(--tone) hover:opacity-75 transition-opacity"
             >
               {t("wall.open")}
             </Link>
             <SongPlayActions song={shown} />
+            {isLoggedIn && (
+              <button
+                type="button"
+                onClick={() => toggleFavorite(shown.id)}
+                aria-pressed={favorited}
+                className={cn(TEXT_BUTTON_CLASS, "hover:text-rose-400")}
+              >
+                {favorited
+                  ? tSong("actions.unfavorite")
+                  : tSong("actions.favorite")}
+              </button>
+            )}
           </div>
           <div className="mt-8 flex items-center gap-4 text-xs tracking-widest text-slate-500">
             <button

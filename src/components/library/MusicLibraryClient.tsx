@@ -1,21 +1,17 @@
 "use client";
 
-import TopBar from "@/components/shared/topbar/TopBar";
-import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
+import SectionHeading from "@/components/detail/SectionHeading";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
-import Pagination from "@/components/shared/Pagination";
-import { useFavorites } from "@/context/FavoritesContext";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { useFilteredSongs } from "@/hooks/library/useFilteredSongs";
-import { extractLyricsSnippet } from "@/hooks/library/useLyricsIndex";
+import { extractLyricsSnippetParts } from "@/hooks/library/useLyricsIndex";
 import { useMusicLibraryState } from "@/hooks/library/useMusicLibraryState";
-import { useMouseDragScroll } from "@/hooks/ui/useMouseDragScroll";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { useRouter } from "@/i18n/navigation";
 import {
   DEFAULT_MUSIC_LIBRARY_VIEW_MODE,
   FILTER_OPTION_ALL,
   FILTER_OPTION_UNKNOWN,
-  MUSIC_LIBRARY_VIEW_MODES,
   type MusicLibraryViewMode,
 } from "@/lib/constants";
 import type { MusicLibraryClientProps } from "@/lib/types";
@@ -26,91 +22,32 @@ import {
   decodeFilterParam,
   encodeFilterParam,
 } from "@/lib/utils/utils-song";
-import {
-  LayoutGrid,
-  List,
-  Mic2,
-  RotateCcw,
-  Search,
-  Share2,
-  SlidersHorizontal,
-  X,
-  XCircle,
-} from "lucide-react";
+import { INK_TONE } from "@/lib/utils/utils-tone";
+import { Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import GridCard from "./GridCard";
+import { CatalogGrid, CatalogList, FolioPager } from "./CatalogEntries";
 import HeroSection from "./HeroSection";
-import ListRow from "./ListRow";
-import SongFilters from "./SongFilters";
+import LibraryIndex, {
+  IndexDrawerButton,
+  type LibraryFilters,
+  SearchField,
+} from "./LibraryIndex";
 
-const VIEW_MODE_ICONS: Record<MusicLibraryViewMode, React.ReactNode> = {
-  grid: <LayoutGrid size={18} />,
-  list: <List size={18} />,
-};
-
-/** 类型标签：文字切换，当前项下方一道强调色短线（同个人中心的目录） */
-const TYPE_TAB_CLASS =
-  "relative flex h-full shrink-0 items-center whitespace-nowrap font-serif text-[15px] tracking-wider transition-colors select-none";
-
-function TypeTab({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        TYPE_TAB_CLASS,
-        active
-          ? "text-slate-900 dark:text-slate-100"
-          : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) transition-opacity",
-          active ? "opacity-100" : "opacity-0",
-        )}
-      />
-      {label}
-    </button>
-  );
-}
-
-/** 工具栏的图标按钮：同顶栏，选中只变色 */
-function toolButtonClass(active: boolean) {
-  return cn(
-    NAV_BUTTON_CLASS,
-    "shrink-0",
-    active && "text-(--tone) dark:text-(--tone)",
-  );
-}
-
-const NAV_DEPTH_KEY = "__hetu_web_nav_depth";
-
+/**
+ * 主页：一部集子的扉页与总目。
+ * 宽屏两栏同歌曲页：左栏检索，右栏总目；窄屏检索收进吸顶栏与底部面板。
+ */
 export default function MusicLibraryClient({
   initialSongsData,
 }: MusicLibraryClientProps) {
   const router = useRouter();
   const t = useTranslations("library");
   const tCommon = useTranslations("common");
-  const tEnum = useTranslations("enums");
-  const { isLoggedIn } = useFavorites();
   const [mounted, setMounted] = useState(false);
   const [activeSongId, setActiveSongId] = useState<number | null>(null);
   const [mountKey, setMountKey] = useState(0);
   const { showScrollTop, scrollToTop } = useScrollTop();
-  const { containerRef, hasDraggedRef, dragHandlers } =
-    useMouseDragScroll<HTMLDivElement>();
 
   const filterOptions = useMemo(
     () => calculateFilterOptions(initialSongsData),
@@ -142,8 +79,6 @@ export default function MusicLibraryClient({
     setViewMode,
     currentPage,
     setPaginationPage,
-    showAdvancedFilters,
-    setShowAdvancedFilters,
     resetAllFilters,
     handleSongClick,
     isRestoringScroll,
@@ -259,8 +194,27 @@ export default function MusicLibraryClient({
     return () => clearTimeout(timer);
   }, [mounted, filteredSongs, mountKey, notifyDataReady, viewMode]);
 
-  // 歌词由 player-store 订阅 currentTrack 变化后自动按需 fetch，此处无需处理
+  // ── 计数 ────────────────────────────────────────────────────────────────
+  // 存疑的歌照常列出，但不计入首数（同 countCatalogSongs）
+  const catalogTotal = useMemo(
+    () => countCatalogSongs(initialSongsData),
+    [initialSongsData],
+  );
+  const typeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const type of filterOptions.allTypes) {
+      const songs =
+        type === FILTER_OPTION_ALL
+          ? initialSongsData
+          : type === FILTER_OPTION_UNKNOWN
+            ? initialSongsData.filter((s) => !s.type || s.type.length === 0)
+            : initialSongsData.filter((s) => s.type?.includes(type));
+      counts.set(type, countCatalogSongs(songs));
+    }
+    return counts;
+  }, [filterOptions.allTypes, initialSongsData]);
 
+  // ── 图录分页（目录不分页，一页列完） ─────────────────────────────────────
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredSongs.length / itemsPerPage)),
     [filteredSongs.length, itemsPerPage],
@@ -282,8 +236,20 @@ export default function MusicLibraryClient({
     return filteredSongs.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredSongs, itemsPerPage, safePage]);
 
+  // 翻页后回到总目开头，不回页顶的扉页
+  const turnPage = useCallback(
+    (page: number) => {
+      setPaginationPage(page);
+      document
+        .getElementById("catalog")
+        ?.scrollIntoView({ block: "start", behavior: "instant" });
+    },
+    [setPaginationPage],
+  );
+
+  // ── 其他交互 ────────────────────────────────────────────────────────────
   const handleShare = useCallback(async () => {
-    // 与卷首那句同一句话，卷首在句末接「……」，这里也一样
+    // 与扉页那句同一句话，扉页在句末接「……」，这里也一样
     const shareData = {
       title: tCommon("site.name"),
       text: `${t("hero.defaultDesc")}……`,
@@ -310,35 +276,25 @@ export default function MusicLibraryClient({
   const handleTitleReset = useCallback(() => {
     sessionStorage.removeItem("music_library_scrollY");
     resetAllFilters();
-    setSearchQuery("");
     window.scrollTo({ top: 0, behavior: "instant" });
     router.refresh();
-  }, [router, resetAllFilters, setSearchQuery]);
+  }, [router, resetAllFilters]);
 
-  const navigateToSong = useCallback(
+  const handleNavigate = useCallback(
     (songId: number) => {
       setActiveSongId(songId);
       handleSongClick();
-
-      const navDepth = parseInt(
-        sessionStorage.getItem(NAV_DEPTH_KEY) || "0",
-        10,
-      );
-      sessionStorage.setItem(NAV_DEPTH_KEY, String(navDepth + 1));
-      router.push(`/song/${songId}`);
     },
-    [handleSongClick, router],
+    [handleSongClick],
   );
 
-  const getLyricsSnippet = useCallback(
+  const getSnippet = useCallback(
     (songId: number) => {
-      if (!searchQueryForFiltering || lyricsState !== "ready") {
-        return undefined;
-      }
+      if (!searchQueryForFiltering || lyricsState !== "ready") return null;
 
       // 只有命中确实发生在歌词字段上才展示片段——靠标题/专辑命中的歌
       // 不会在这个 Map 里，避免展示一段与命中无关的歌词。
-      return extractLyricsSnippet(
+      return extractLyricsSnippetParts(
         lyricsMap.get(songId) || "",
         lyricMatchesById.get(songId),
       );
@@ -346,8 +302,45 @@ export default function MusicLibraryClient({
     [lyricsMap, lyricMatchesById, lyricsState, searchQueryForFiltering],
   );
 
+  const filters: LibraryFilters = {
+    options: filterOptions,
+    typeCounts,
+    type: filterType,
+    setType: setFilterType,
+    sliderYears,
+    yearRange: yearRangeIndices,
+    setYearRange: setYearRangeIndices,
+    genre: filterGenre,
+    setGenre: setFilterGenre,
+    artist: filterArtist,
+    setArtist: setFilterArtist,
+    lyricist: filterLyricist,
+    setLyricist: setFilterLyricist,
+    composer: filterComposer,
+    setComposer: setFilterComposer,
+    arranger: filterArranger,
+    setArranger: setFilterArranger,
+    resultCount: countCatalogSongs(filteredSongs),
+    isAnyActive: isAnyFilterActive,
+    reset: resetAllFilters,
+  };
+
+  const entriesProps = {
+    activeSongId,
+    onNavigate: handleNavigate,
+    getSnippet,
+  };
+
   return (
-    <div className="min-h-screen bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
+    <div
+      className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
+      style={
+        {
+          "--tone-light": INK_TONE.light,
+          "--tone-dark": INK_TONE.dark,
+        } as React.CSSProperties
+      }
+    >
       <TopBar
         exit={{
           kind: "logo",
@@ -364,242 +357,83 @@ export default function MusicLibraryClient({
         ]}
       />
 
-      <main className="mx-auto max-w-7xl px-6 pb-20 pt-32">
-        <section className="mb-6 md:mb-16">
-          <div className="flex items-end justify-between gap-8">
-            <HeroSection songCount={countCatalogSongs(filteredSongs)} />
-          </div>
-        </section>
+      <main className="relative pt-32 md:pt-40 pb-32 max-w-6xl mx-auto px-6 animate-in fade-in duration-700">
+        <HeroSection songCount={catalogTotal} />
 
-        {/* 曲目工具栏：吸顶，底下只有一道细线。标签、搜索、按钮都放在等高的
-            一行里竖直居中，当前标签与聚焦的搜索框在细线上亮一段强调色。
-            窄屏分两行：上面搜索与按钮，下面类型标签，两行各有一道细线分开；
-            标签行右缘淡出，提示还能横向滑动 */}
-        <section className="sticky top-(--nav-h) z-40 -mx-6 mb-10 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95">
-          <div className="flex flex-col-reverse border-b border-slate-200/70 dark:border-slate-800 md:h-12 md:flex-row md:gap-8">
-            <div
-              ref={containerRef}
-              {...dragHandlers}
-              className="no-scrollbar flex h-12 min-w-0 cursor-grab gap-6 overflow-x-auto mask-[linear-gradient(to_right,black_calc(100%-2rem),transparent)] active:cursor-grabbing md:h-full md:mask-none"
-            >
-              {filterOptions.allTypes.map((type) => {
-                if (type === FILTER_OPTION_ALL && isAnyFilterActive) {
-                  return (
-                    <button
-                      key="reset"
-                      type="button"
-                      onClick={(event) => {
-                        if (hasDraggedRef.current) {
-                          event.preventDefault();
-                          return;
-                        }
-                        resetAllFilters();
-                        scrollToTop();
-                      }}
-                      className={cn(
-                        TYPE_TAB_CLASS,
-                        "gap-1.5 text-(--tone) hover:opacity-75",
-                      )}
-                    >
-                      <RotateCcw size={13} />
-                      {t("reset")}
-                    </button>
-                  );
-                }
+        <section id="catalog" className="scroll-mt-[calc(var(--nav-h)+1.5rem)]">
+          <SectionHeading label={t("catalog.heading")}>
+            <ViewSwitch
+              value={viewMode}
+              onChange={(mode) => setViewMode(mode)}
+            />
+          </SectionHeading>
 
-                const tabLabel = (() => {
-                  if (type === FILTER_OPTION_ALL) return tCommon("all");
-                  if (type === FILTER_OPTION_UNKNOWN) return tCommon("unknown");
-                  return tEnum.has(`type.${type}`)
-                    ? tEnum(`type.${type}`)
-                    : type;
-                })();
-
-                return (
-                  <TypeTab
-                    key={type}
-                    label={tabLabel}
-                    active={filterType === type}
-                    onClick={() => {
-                      if (hasDraggedRef.current) return;
-                      setFilterType(type);
-                    }}
-                  />
-                );
-              })}
-            </div>
-
-            <div className="flex h-11 items-center gap-1 border-b border-slate-200/70 dark:border-slate-800 md:ml-auto md:h-full md:border-0">
-              {/* 搜索：平时没有边框，只靠放大镜与占位字辨认；聚焦时细线上亮一段强调色 */}
-              <label className="group relative flex h-full min-w-0 flex-1 items-center gap-2 md:w-60 md:flex-none">
-                <Search size={15} className="shrink-0 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder={
-                    lyricsState === "ready"
-                      ? t("search.placeholderWithLyrics")
-                      : t("search.placeholderNoLyrics")
-                  }
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  className="h-full min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
-                />
-                {searchQuery ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="shrink-0 p-1 text-slate-300 transition-colors hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
-                  >
-                    <XCircle size={14} />
-                  </button>
-                ) : lyricsState === "loading" ? (
-                  <span className="block h-3 w-3 shrink-0 animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600" />
-                ) : lyricsState === "ready" ? (
-                  <Mic2
-                    size={13}
-                    className="shrink-0 text-(--tone) opacity-50"
-                  />
-                ) : null}
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) opacity-0 transition-opacity group-focus-within:opacity-100"
-                />
-              </label>
-
-              {/* 搜索与按钮之间一道竖线，分开「找」与「怎么看」 */}
-              <span
-                aria-hidden
-                className="mx-2 h-4 w-px shrink-0 bg-slate-200 dark:bg-slate-800"
+          <div className="mt-12 grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-x-16">
+            {/* 宽屏左栏：检索。比视口高时自己滚，不随正文滚走 */}
+            <aside className="hidden lg:block lg:sticky lg:top-[calc(var(--nav-h)+1.5rem)] lg:self-start lg:max-h-[calc(100dvh-var(--nav-h)-3rem)] overflow-y-auto thin-scrollbar pr-2">
+              <h2 className="sr-only">{t("catalog.index")}</h2>
+              <SearchField
+                value={searchQuery}
+                onChange={setSearchQuery}
+                lyricsState={lyricsState}
+                className="mb-10"
               />
+              <LibraryIndex filters={filters} layout="aside" />
+            </aside>
 
-              <button
-                type="button"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                aria-pressed={showAdvancedFilters}
-                className={toolButtonClass(showAdvancedFilters)}
-                title={t("advancedFilter")}
-              >
-                {showAdvancedFilters ? (
-                  <X size={18} />
-                ) : (
-                  <SlidersHorizontal size={18} />
-                )}
-              </button>
-              {MUSIC_LIBRARY_VIEW_MODES.map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setViewMode(mode)}
-                  aria-pressed={viewMode === mode}
-                  className={toolButtonClass(viewMode === mode)}
-                  title={mode === "grid" ? t("view.grid") : t("view.list")}
-                >
-                  {VIEW_MODE_ICONS[mode]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {showAdvancedFilters && (
-            <div className="animate-in slide-in-from-top-2 fade-in border-b border-slate-200/70 pb-6 pt-5 duration-300 dark:border-slate-800">
-              <SongFilters
-                yearRangeIndices={yearRangeIndices}
-                setYearRangeIndices={setYearRangeIndices}
-                sliderYears={sliderYears}
-                selectedGenre={filterGenre}
-                setSelectedGenre={setFilterGenre}
-                selectedArtist={filterArtist}
-                setSelectedArtist={setFilterArtist}
-                selectedLyricist={filterLyricist}
-                setSelectedLyricist={setFilterLyricist}
-                selectedComposer={filterComposer}
-                setSelectedComposer={setFilterComposer}
-                selectedArranger={filterArranger}
-                setSelectedArranger={setFilterArranger}
-                filterOptions={filterOptions}
-              />
-            </div>
-          )}
-        </section>
-
-        <section
-          className={cn(
-            "min-h-[50vh] transition-opacity duration-200",
-            isRestoringScroll ? "opacity-0 **:animate-none!" : "opacity-100",
-          )}
-        >
-          {filteredSongs.length > 0 ? (
-            <>
-              {viewMode === "grid" ? (
-                <div
-                  key={`grid-page-${safePage}-${mountKey}`}
-                  className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                >
-                  {paginatedSongs.map((song, index) => (
-                    <GridCard
-                      key={song.id}
-                      song={song}
-                      isActive={activeSongId === song.id}
-                      lyricsSnippet={getLyricsSnippet(song.id)}
-                      onClick={() => navigateToSong(song.id)}
-                      className="animate-in slide-in-from-bottom-8 fade-in duration-700 fill-mode-both"
-                      style={{
-                        animationDelay: `${(index % 8) * 40}ms`,
-                        animationFillMode: "both",
-                      }}
-                    />
-                  ))}
+            <div className="min-w-0">
+              {/* 窄屏：搜索与「筛选」吸顶，其余检索项在底部面板里 */}
+              <div className="lg:hidden sticky top-(--nav-h) z-40 -mx-6 mb-10 px-6 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm border-b border-slate-200/70 dark:border-slate-800">
+                <div className="flex items-center gap-5">
+                  <SearchField
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    lyricsState={lyricsState}
+                    className="min-w-0 flex-1 border-b-0"
+                  />
+                  <IndexDrawerButton filters={filters} />
                 </div>
-              ) : (
-                <div
-                  key={`list-page-${safePage}-${mountKey}`}
-                  className="flex flex-col gap-2"
-                >
-                  <div className="mb-2 hidden px-4 py-2 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500 md:flex">
-                    <div className="mr-6 w-16">{t("listHeader.cover")}</div>
-                    <div className="grow">{t("listHeader.title")}</div>
-                    <div className="ml-8 w-8" />
-                    <div className="ml-8 w-8" />
-                    {isLoggedIn && <div className="ml-8 w-8" />}
-                    <div className="ml-8 w-24 text-center">
-                      {t("listHeader.type")}
-                    </div>
-                    <div className="ml-8 w-24 text-center">
-                      {t("listHeader.genre")}
-                    </div>
-                    <div className="ml-8 w-16">{t("listHeader.year")}</div>
-                    <div className="ml-8 w-16">{t("listHeader.time")}</div>
-                  </div>
-                  {paginatedSongs.map((song, index) => (
-                    <ListRow
-                      key={song.id}
-                      song={song}
-                      isActive={activeSongId === song.id}
-                      lyricsSnippet={getLyricsSnippet(song.id)}
-                      onClick={() => navigateToSong(song.id)}
-                      className="animate-in slide-in-from-bottom-8 fade-in duration-700 fill-mode-both"
-                      style={{
-                        animationDelay: `${(index % 8) * 40}ms`,
-                        animationFillMode: "both",
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-12 flex justify-center">
-                <Pagination
-                  currentPage={safePage}
-                  totalPages={totalPages}
-                  onPageChange={setPaginationPage}
-                />
               </div>
-            </>
-          ) : (
-            <p className="py-20 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
-              {t("noFilteredSongs")}
-            </p>
-          )}
+
+              <div
+                className={cn(
+                  "min-h-[50vh] transition-opacity duration-200",
+                  isRestoringScroll
+                    ? "opacity-0 **:animate-none!"
+                    : "opacity-100",
+                )}
+              >
+                {filteredSongs.length === 0 ? (
+                  <p className="py-20 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+                    {t("noFilteredSongs")}
+                  </p>
+                ) : viewMode === "list" ? (
+                  <div
+                    key={`list-${mountKey}`}
+                    className="animate-in fade-in duration-500"
+                  >
+                    <CatalogList
+                      songs={filteredSongs}
+                      grouped={!searchQueryForFiltering}
+                      {...entriesProps}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    key={`grid-${safePage}-${mountKey}`}
+                    className="animate-in fade-in duration-500"
+                  >
+                    <CatalogGrid songs={paginatedSongs} {...entriesProps} />
+                    <FolioPager
+                      page={safePage}
+                      total={totalPages}
+                      onChange={turnPage}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
       </main>
 
@@ -607,6 +441,45 @@ export default function MusicLibraryClient({
         showScrollTop={showScrollTop}
         onScrollToTop={scrollToTop}
       />
+    </div>
+  );
+}
+
+/** 「目录 · 图录」：放在总目题头右侧的文字切换 */
+function ViewSwitch({
+  value,
+  onChange,
+}: {
+  value: MusicLibraryViewMode;
+  onChange: (mode: MusicLibraryViewMode) => void;
+}) {
+  const t = useTranslations("library.view");
+  // 目录在前：先文字后图，与书的次序一致
+  const modes = ["list", "grid"] as const;
+  return (
+    <div className="flex shrink-0 items-baseline gap-3">
+      {modes.map((mode, i) => (
+        <React.Fragment key={mode}>
+          {i > 0 && (
+            <span aria-hidden className="text-slate-300 dark:text-slate-600">
+              ·
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => onChange(mode)}
+            aria-pressed={value === mode}
+            className={cn(
+              "text-xs tracking-widest transition-colors",
+              value === mode
+                ? "text-(--tone)"
+                : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
+            )}
+          >
+            {t(mode)}
+          </button>
+        </React.Fragment>
+      ))}
     </div>
   );
 }

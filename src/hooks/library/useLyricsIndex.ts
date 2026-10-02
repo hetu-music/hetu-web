@@ -127,6 +127,13 @@ export function useLyricsIndex(songs: Song[]): UseLyricsIndexResult {
   };
 }
 
+export interface LyricsSnippetParts {
+  before: string;
+  /** 命中的那一段，展示时用强调色标出 */
+  match: string;
+  after: string;
+}
+
 /**
  * 从歌词文本中截取 Fuse 实际命中的那一段，用于搜索结果展示。
  *
@@ -138,12 +145,12 @@ export function useLyricsIndex(songs: Song[]): UseLyricsIndexResult {
  * @param lyricsText - 处理后的纯文本歌词
  * @param ranges     - Fuse 给出的命中字符区间 [start, end]（闭区间）
  */
-export function extractLyricsSnippet(
+export function extractLyricsSnippetParts(
   lyricsText: string,
   ranges: MatchRanges | undefined,
   maxLength = 36,
-): string {
-  if (!lyricsText || !ranges?.length) return "";
+): LyricsSnippetParts | null {
+  if (!lyricsText || !ranges?.length) return null;
 
   // 取最长的那段命中，信息量最大
   let best = ranges[0];
@@ -154,5 +161,19 @@ export function extractLyricsSnippet(
   const [matchStart, matchEnd] = best;
   const start = Math.max(0, matchStart - 8);
   const end = Math.min(lyricsText.length, matchEnd + 1 + maxLength);
-  return lyricsText.slice(start, end).trim();
+  return {
+    before: lyricsText.slice(start, matchStart).trimStart(),
+    match: lyricsText.slice(matchStart, matchEnd + 1),
+    after: lyricsText.slice(matchEnd + 1, end).trimEnd(),
+  };
+}
+
+/** 同上，拼成一句 */
+export function extractLyricsSnippet(
+  lyricsText: string,
+  ranges: MatchRanges | undefined,
+  maxLength = 36,
+): string {
+  const parts = extractLyricsSnippetParts(lyricsText, ranges, maxLength);
+  return parts ? (parts.before + parts.match + parts.after).trim() : "";
 }

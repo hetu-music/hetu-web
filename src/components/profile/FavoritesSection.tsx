@@ -2,15 +2,14 @@
 
 import ProfileSectionHeading from "@/components/profile/ProfileSectionHeading";
 import { bumpNavDepth, formatDate } from "@/components/profile/profile-ui";
+import SongPlayActions from "@/components/shared/SongPlayActions";
 import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
 import { useFavorites } from "@/context/FavoritesContext";
-import { useUserContext } from "@/context/UserContext";
 import { useTwoStepConfirm } from "@/hooks/ui";
 import { Link } from "@/i18n/navigation";
 import type { Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
-import { usePlayerStore } from "@/store/player-store";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -119,7 +118,7 @@ function FavoriteRow({ song }: { song: Song }) {
         </div>
 
         <div className="mt-1.5 sm:mt-0 flex items-center gap-4 shrink-0">
-          <PlayActions song={song} artist={artist} />
+          <SongPlayActions song={song} />
           <button
             type="button"
             onClick={() => toggleFavorite(song.id)}
@@ -133,49 +132,5 @@ function FavoriteRow({ song }: { song: Song }) {
         </div>
       </div>
     </li>
-  );
-}
-
-/** 播放与加入播放列表：只有开通权益、且这首有音频时才出现 */
-function PlayActions({ song, artist }: { song: Song; artist?: string }) {
-  const t = useTranslations("profile.favorites");
-  const { user, loaded } = useUserContext();
-  const { currentTrack, isPlaying, queue, play, toggle, enqueue } =
-    usePlayerStore();
-
-  if (!loaded || !user?.hasBenefits || !song.has_audio) return null;
-
-  const track = {
-    songId: song.id,
-    title: song.title,
-    artist,
-    coverUrl: getCoverUrl(song),
-  };
-  const isCurrent = currentTrack?.songId === song.id;
-  const playing = isCurrent && isPlaying;
-  const queued = queue.some((q) => q.songId === song.id);
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => (isCurrent ? toggle() : play(track))}
-        aria-pressed={playing}
-        className={cn(
-          TEXT_BUTTON_CLASS,
-          playing && "text-(--tone) dark:text-(--tone)",
-        )}
-      >
-        {playing ? t("pause") : t("play")}
-      </button>
-      <button
-        type="button"
-        onClick={() => enqueue(track)}
-        disabled={queued}
-        className={cn(TEXT_BUTTON_CLASS, queued && "disabled:opacity-100")}
-      >
-        {queued ? t("queued") : t("enqueue")}
-      </button>
-    </>
   );
 }

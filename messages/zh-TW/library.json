@@ -4,6 +4,8 @@
   },
   "hero": {
     "title": "謠歌",
+    "eyebrow": "作品勘鑒 · 凡 {count} 首",
+    "otherVolumes": "別卷",
     "featureEntrances": {
       "qjtx": {
         "label": "傾盡天下",
@@ -21,22 +23,25 @@
     "defaultDesc": "你一定想知道，戲裡講了什麼故事"
   },
   "titleTooltip": "點擊重新整理頁面",
-  "reset": "重設",
-  "advancedFilter": "高級篩選",
+  "catalog": {
+    "heading": "總目",
+    "index": "檢索",
+    "filter": "篩選",
+    "filterActive": "篩選 · {count}",
+    "result": "得 {count} 首",
+    "reset": "復原",
+    "lyricist": "詞",
+    "composer": "曲",
+    "lyricsAndMusic": "詞曲",
+    "favorited": "已收藏",
+    "prev": "前頁",
+    "next": "後頁",
+    "page": "第 {current} 頁，共 {total} 頁"
+  },
   "search": {
-    "placeholder": "搜尋歌名、專輯、作詞、作曲…",
     "placeholderWithLyrics": "搜尋歌曲、創作者、歌詞...",
     "placeholderNoLyrics": "搜尋歌曲、創作者...",
-    "noResults": "未找到匹配的歌曲",
-    "noResultsHint": "請嘗試其他關鍵詞或清除篩選條件"
-  },
-  "listHeader": {
-    "cover": "封面",
-    "title": "歌名 / 作詞 / 作曲",
-    "type": "類型",
-    "genre": "流派",
-    "year": "年份",
-    "time": "時長"
+    "clear": "清除"
   },
   "filter": {
     "type": "類型",
@@ -61,25 +66,9 @@
     "selectedCount": "已選 {count} 項",
     "close": "收起"
   },
-  "sort": {
-    "label": "排序",
-    "dateDesc": "最新優先",
-    "dateAsc": "最早優先",
-    "titleAsc": "標題 A-Z"
-  },
   "view": {
-    "grid": "網格",
-    "list": "列表"
-  },
-  "pagination": {
-    "prev": "上一頁",
-    "next": "下一頁",
-    "page": "第 {current} 頁，共 {total} 頁"
-  },
-  "card": {
-    "play": "播放",
-    "enqueue": "加入佇列",
-    "favorite": "收藏"
+    "grid": "圖錄",
+    "list": "目錄"
   },
   "noFilteredSongs": "沒有符合條件的歌曲",
   "linkCopied": "連結已複製到剪貼簿"

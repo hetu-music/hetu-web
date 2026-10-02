@@ -9,7 +9,6 @@ import {
 } from "react";
 import {
   parseAsArrayOf,
-  parseAsBoolean,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
@@ -43,8 +42,6 @@ export interface MusicLibraryState {
   setViewMode: (mode: MusicLibraryViewMode) => void;
   currentPage: number;
   setPaginationPage: (page: number) => void;
-  showAdvancedFilters: boolean;
-  setShowAdvancedFilters: (show: boolean) => void;
   resetAllFilters: () => void;
   handleSongClick: () => void;
   isRestoringScroll: boolean;
@@ -139,11 +136,6 @@ export function useMusicLibraryState(
     "page",
     parseAsInteger.withDefault(1).withOptions({ shallow: true }),
   );
-  const [showAdvancedFilters, setShowAdvancedFiltersState] =
-    useSyncedQueryState<boolean>(
-      "advanced",
-      parseAsBoolean.withDefault(false).withOptions({ shallow: true }),
-    );
 
   const yearRangeIndices = useMemo<[number, number]>(() => {
     const maxIndex = getMaxYearIndex();
@@ -279,13 +271,6 @@ export function useMusicLibraryState(
     [setCurrentPageState],
   );
 
-  const setShowAdvancedFilters = useCallback(
-    (show: boolean) => {
-      setShowAdvancedFiltersState(show);
-    },
-    [setShowAdvancedFiltersState],
-  );
-
   const resetAllFilters = useCallback(() => {
     setSearchQueryState("");
     setFilterTypeState(FILTER_OPTION_ALL);
@@ -297,7 +282,6 @@ export function useMusicLibraryState(
     setYearStartState(0);
     setYearEndState(getMaxYearIndex());
     setCurrentPageState(1);
-    setShowAdvancedFiltersState(false);
   }, [
     getMaxYearIndex,
     setCurrentPageState,
@@ -308,7 +292,6 @@ export function useMusicLibraryState(
     setFilterLyricistState,
     setFilterTypeState,
     setSearchQueryState,
-    setShowAdvancedFiltersState,
     setYearEndState,
     setYearStartState,
   ]);
@@ -334,8 +317,6 @@ export function useMusicLibraryState(
     setViewMode,
     currentPage: Math.max(1, currentPage),
     setPaginationPage,
-    showAdvancedFilters,
-    setShowAdvancedFilters,
     resetAllFilters,
     handleSongClick,
     isRestoringScroll,

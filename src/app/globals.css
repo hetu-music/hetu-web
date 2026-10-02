@@ -155,35 +155,6 @@
 
 /* ── 5. 业务动画 ─────────────────────────────────────────────────────────────── */
 
-/* 古典水墨涟漪动画 */
-@keyframes classical-ripple {
-  0% {
-    transform: scale(0.5);
-    opacity: 0.9;
-  }
-
-  100% {
-    transform: scale(2.8);
-    opacity: 0;
-  }
-}
-
-.classical-ripple-anim {
-  animation: classical-ripple 4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-
-/* 功能入口字符浮动 */
-@keyframes feature-drift {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-7px);
-  }
-}
-
 /* 意象页背景字幕滚动 */
 @keyframes imagery-marquee-ltr {
   from {

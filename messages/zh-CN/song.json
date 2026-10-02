@@ -31,7 +31,9 @@
   },
   "actions": {
     "play": "播放",
+    "pause": "暂停",
     "enqueue": "加入队列",
+    "queued": "已在队列",
     "favorite": "收藏",
     "unfavorite": "取消收藏",
     "lyrics": "歌词",

@@ -1,6 +1,7 @@
 "use client";
 
 import NaviPlayer from "@/components/detail/NaviPlayer";
+import VerticalExcerpt from "@/components/shared/VerticalExcerpt";
 import type { SongDetail, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
@@ -185,21 +186,10 @@ export default function SongHero({
 
         {/* 宽屏：竖排摘句 */}
         {excerptColumns.length > 0 && (
-          <div
-            aria-hidden
-            className="hidden lg:flex absolute right-0 top-0 flex-row-reverse items-start gap-5"
-          >
-            <span className="w-px h-20 mt-1 bg-(--tone)/60" />
-            {excerptColumns.map((col, i) => (
-              <span
-                key={i}
-                className="font-calligraphy text-[1.7rem] leading-none tracking-[0.35em] text-slate-700/85 dark:text-slate-300/85 [writing-mode:vertical-rl]"
-                style={{ marginTop: i * 3 + "rem" }}
-              >
-                {col}
-              </span>
-            ))}
-          </div>
+          <VerticalExcerpt
+            columns={excerptColumns}
+            className="hidden lg:flex absolute right-0 top-0"
+          />
         )}
       </div>
     </header>

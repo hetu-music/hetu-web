@@ -26,10 +26,6 @@
     "confirmClear": "确认清除",
     "empty": "还没有收藏任何曲目",
     "savedAt": "收藏于 {date}",
-    "play": "播放",
-    "pause": "暂停",
-    "enqueue": "加入播放列表",
-    "queued": "已在播放列表",
     "unfavorite": "取消收藏"
   },
   "annotations": {

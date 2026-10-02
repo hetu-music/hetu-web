@@ -1,23 +1,27 @@
 "use client";
 
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
-import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
+import {
+  PRIMARY_BUTTON_CLASS,
+  TEXT_BUTTON_CLASS,
+} from "@/components/shared/text-button";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useFilteredSongs } from "@/hooks/library/useFilteredSongs";
 import { extractLyricsSnippetParts } from "@/hooks/library/useLyricsIndex";
 import { useMusicLibraryState } from "@/hooks/library/useMusicLibraryState";
+import { useReveal } from "@/hooks/ui/useReveal";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { useRouter } from "@/i18n/navigation";
 import {
   DEFAULT_MUSIC_LIBRARY_VIEW_MODE,
   FILTER_OPTION_ALL,
   FILTER_OPTION_UNKNOWN,
-  type MusicLibraryViewMode,
 } from "@/lib/constants";
 import type { MusicLibraryClientProps, Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import {
   buildCorpus,
+  featuredByYear,
   kinOf,
   songsWithAll,
   topImagery,
@@ -39,12 +43,14 @@ import { useTranslations } from "next-intl";
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { CatalogList } from "./CatalogEntries";
 import CoverWall from "./CoverWall";
+import GalleryHang from "./GalleryHang";
 import ImageryBar from "./ImageryBar";
 import {
   IndexPanelButton,
@@ -64,10 +70,20 @@ const YEAR_SIGNATURE = 2;
 const PREVIEW_DELAY = 120;
 /** 鼠标离开墙后题签多留一会儿，好移上去点里面的按钮 */
 const PREVIEW_LINGER = 320;
+/** 作品少于这个数的年份不设主作 */
+const FEATURE_MIN_WORKS = 6;
+/** 远观、近赏之间切换时，封面从原位飞到新位的时长与缓动（同全站 ease-page） */
+const FLIP_MS = 1000;
+const FLIP_EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
+
+type Scale = "hall" | "grid" | "list";
 
 /**
- * 主页：千面墙。全部封面从新到旧密排，检索与意象只改明暗不删格子；
- * 点选一首，与它共有意象的作品一同亮起，整页换成它封面的颜色。另有文字目录作第二视图。
+ * 主页：一座展厅，两种距离。
+ * 近赏（默认）：按年分间，作品挂开、留出空墙，滚到哪一排哪一排才亮灯；
+ * 远观：全部封面密排成一面墙，检索与意象只改明暗不删格子，点选一首则同类相认。
+ * 一旦检索或点亮意象就自动退到远观看全貌，清空后再走回近赏；两种距离之间封面原地飞过去。
+ * 另有文字目录。
  */
 export default function MusicLibraryClient({
   initialSongsData,
@@ -258,6 +274,104 @@ export default function MusicLibraryClient({
     return filteredSongs.filter((s) => withAll.has(s.id));
   }, [filteredSongs, filterImagery, corpus]);
   const anyActive = isAnyFilterActive || filterImagery.length > 0;
+  const featured = useMemo(
+    () => featuredByYear(initialSongsData, corpus, FEATURE_MIN_WORKS),
+    [initialSongsData, corpus],
+  );
+
+  // ── 距离：近赏 / 远观 / 目录 ──────────────────────────────────────────────
+  // 检索或点亮意象时，近赏自动退到远观看全貌；清空后走回近赏
+  const scale: Scale = viewMode === "hall" && anyActive ? "grid" : viewMode;
+  // 画面上实际排出的那一种比 scale 晚一拍：先在旧排法上量好每张封面的位置，
+  // 换了排法再让它们从旧位置飞过去（FLIP）
+  const [shown, setShown] = useState<Scale>(scale);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const flipFrom = useRef<Map<string, DOMRect> | null>(null);
+  const lastShown = useRef(shown);
+
+  useEffect(() => {
+    if (shown === scale) return;
+    const container = contentRef.current;
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (container && !reduce && shown !== "list" && scale !== "list") {
+      const rects = new Map<string, DOMRect>();
+      container.querySelectorAll<HTMLElement>("[data-flip]").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.bottom > 0 && r.top < window.innerHeight) {
+          rects.set(el.dataset.flip ?? "", r);
+        }
+      });
+      flipFrom.current = rects;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShown(scale);
+  }, [scale, shown]);
+
+  useLayoutEffect(() => {
+    if (lastShown.current === shown) return;
+    lastShown.current = shown;
+    const container = contentRef.current;
+    if (!container) return;
+
+    // 两种排法的页面高度差得很多：已经滚过展厅开头的，回到开头
+    const toolbar = toolbarRef.current;
+    const stuck = toolbar
+      ? parseFloat(getComputedStyle(toolbar).top) + toolbar.offsetHeight
+      : 0;
+    const top = container.getBoundingClientRect().top + window.scrollY - stuck;
+    if (window.scrollY > top) window.scrollTo({ top, behavior: "instant" });
+
+    const from = flipFrom.current;
+    flipFrom.current = null;
+    if (!from) return;
+    let moved = 0;
+    container.querySelectorAll<HTMLElement>("[data-flip]").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight) return;
+      // 近赏的画外面还套着一层「滚到才亮」；飞过来的画直接算亮着
+      const reveal = el.closest<HTMLElement>("[data-reveal]");
+      if (reveal && reveal.dataset.shown === undefined) {
+        reveal.style.transition = "none";
+        reveal.dataset.shown = "";
+        requestAnimationFrame(() => (reveal.style.transition = ""));
+      }
+      const before = from.get(el.dataset.flip ?? "");
+      if (before) {
+        el.animate(
+          [
+            {
+              transformOrigin: "0 0",
+              transform: `translate(${before.left - r.left}px, ${before.top - r.top}px) scale(${before.width / r.width})`,
+            },
+            { transformOrigin: "0 0", transform: "none" },
+          ],
+          {
+            duration: FLIP_MS,
+            easing: FLIP_EASE,
+            delay: Math.min(moved++ * 5, 250),
+            fill: "backwards",
+          },
+        );
+      } else {
+        // 原先不在视野里的，等飞过来的落定一半再淡入
+        el.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 700,
+          delay: FLIP_MS * 0.5,
+          easing: "ease-out",
+          fill: "backwards",
+        });
+      }
+    });
+  }, [shown]);
+
+  useReveal(contentRef, [shown, mountKey]);
+
+  // 意象栏平时收起，点「意象」才展开；已经点亮了意象时一直展开着
+  const [imageryOpen, setImageryOpen] = useState(false);
+  const imageryShown = imageryOpen || filterImagery.length > 0;
 
   // ── 点选与停留 ──────────────────────────────────────────────────────────
   // 点选只对当时的检索结果有效：检索一变，选中自然作废，墙回到按检索点灯
@@ -438,7 +552,11 @@ export default function MusicLibraryClient({
     reset: handleReset,
   };
 
-  const masthead = <Masthead songCount={catalogTotal} />;
+  const selectScale = (mode: Scale) => {
+    // 近赏只挂全部作品：检索着的时候点「近赏」，等于清空检索、走回展厅
+    if (mode === "hall" && anyActive) handleReset();
+    setViewMode(mode);
+  };
 
   return (
     <div
@@ -472,7 +590,7 @@ export default function MusicLibraryClient({
           },
         ]}
       >
-        {viewMode === "grid" && (
+        {shown === "grid" && (
           <WallCaption
             song={captionSong}
             pinned={!!pinned}
@@ -496,18 +614,36 @@ export default function MusicLibraryClient({
       </TopBar>
 
       <main className="relative pt-(--nav-h) pb-32">
-        {/* 工具栏：搜索、结果、筛选、视图一行，下面一行意象 */}
-        <div className="sticky top-(--nav-h) z-40 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm border-b border-slate-200/70 dark:border-slate-800">
+        {/* 工具栏：一行很淡的小字，界面退到画的后面；意象一行平时收起 */}
+        <div
+          ref={toolbarRef}
+          className="sticky top-(--nav-h) z-40 bg-[#FAFAFA]/95 dark:bg-[#0B0F19]/95 backdrop-blur-sm border-b border-slate-200/60 dark:border-slate-800/70"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className="flex h-12 items-center gap-4 md:gap-6">
+            <div className="flex h-11 items-center gap-4 md:gap-6">
               <SearchField
                 value={searchQuery}
                 onChange={setSearchQuery}
                 lyricsState={lyricsState}
-                className="min-w-0 flex-1 md:flex-none md:w-72 border-b-0"
+                className="min-w-0 flex-1 md:flex-none md:w-64 border-b-0"
               />
+              {imagery.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setImageryOpen(!imageryOpen)}
+                  aria-expanded={imageryShown}
+                  className={cn(
+                    TEXT_BUTTON_CLASS,
+                    "shrink-0 py-2",
+                    imageryShown && "text-(--tone) dark:text-(--tone)",
+                  )}
+                >
+                  {t("wall.imageryLabel")}
+                </button>
+              )}
+              <IndexPanelButton filters={filters} />
               {anyActive && (
-                <p className="flex shrink-0 items-baseline gap-3 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                <p className="hidden md:flex shrink-0 items-baseline gap-3 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
                   <span className="tabular-nums">
                     {t("catalog.result", { count: resultCount })}
                   </span>
@@ -529,41 +665,67 @@ export default function MusicLibraryClient({
                   </button>
                 </p>
               )}
-              <div className="ml-auto flex shrink-0 items-center gap-5">
-                <IndexPanelButton filters={filters} />
-                <ViewSwitch value={viewMode} onChange={setViewMode} />
+              <div className="ml-auto flex shrink-0 items-center">
+                <ViewSwitch value={scale} onChange={selectScale} />
               </div>
             </div>
             {imagery.items.length > 0 && (
-              <div className="border-t border-slate-200/50 dark:border-slate-800/60">
-                <ImageryBar
-                  top={topItems}
-                  all={imagery.items}
-                  selected={filterImagery}
-                  onToggle={(id) => {
-                    setPin(null);
-                    toggleImagery(id);
-                  }}
-                />
+              <div
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] duration-500 ease-page",
+                  imageryShown
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0",
+                )}
+              >
+                <div className="min-h-0 overflow-hidden" inert={!imageryShown}>
+                  <div className="border-t border-slate-200/50 dark:border-slate-800/60">
+                    <ImageryBar
+                      top={topItems}
+                      all={imagery.items}
+                      selected={filterImagery}
+                      onToggle={(id) => {
+                        setPin(null);
+                        toggleImagery(id);
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
         </div>
 
         <div
+          ref={contentRef}
           className={cn(
             "max-w-7xl mx-auto px-4 sm:px-6 pt-6 transition-opacity duration-200",
             isRestoringScroll ? "opacity-0 **:animate-none!" : "opacity-100",
           )}
         >
-          {viewMode === "grid" ? (
-            <div
-              key={`wall-${mountKey}`}
-              className="animate-in fade-in duration-700"
-            >
+          {shown === "hall" ? (
+            <div key={`hall-${mountKey}`}>
+              <Masthead
+                songCount={catalogTotal}
+                variant="hall"
+                className="pt-10 md:pt-16 pb-24 md:pb-36"
+              />
+              <GalleryHang
+                songs={initialSongsData}
+                yearSignatures={yearSig}
+                featured={featured}
+                imageryById={imageryById}
+                bySong={corpus.bySong}
+                activeSongId={activeSongId}
+                onPreview={handlePreview}
+                onNavigate={handleNavigate}
+              />
+            </div>
+          ) : shown === "grid" ? (
+            <div key={`wall-${mountKey}`}>
               <CoverWall
                 songs={initialSongsData}
-                masthead={masthead}
+                masthead={<Masthead songCount={catalogTotal} variant="tile" />}
                 lit={lit}
                 pinnedId={pinned?.id ?? null}
                 yearSignatures={yearSig}
@@ -579,7 +741,11 @@ export default function MusicLibraryClient({
               key={`list-${mountKey}`}
               className="max-w-4xl animate-in fade-in duration-500"
             >
-              <div className="pt-4 pb-14">{masthead}</div>
+              <Masthead
+                songCount={catalogTotal}
+                variant="tile"
+                className="pt-4 pb-14"
+              />
               {matched.length === 0 ? (
                 <p className="py-20 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
                   {t("noFilteredSongs")}
@@ -606,16 +772,16 @@ export default function MusicLibraryClient({
   );
 }
 
-/** 「封面 · 目录」：工具栏右侧的文字切换 */
+/** 「近赏 · 远观 · 目录」：工具栏右侧的文字切换 */
 function ViewSwitch({
   value,
   onChange,
 }: {
-  value: MusicLibraryViewMode;
-  onChange: (mode: MusicLibraryViewMode) => void;
+  value: Scale;
+  onChange: (mode: Scale) => void;
 }) {
   const t = useTranslations("library.view");
-  const modes = ["grid", "list"] as const;
+  const modes = ["hall", "grid", "list"] as const;
   return (
     <div className="flex shrink-0 items-baseline gap-3">
       {modes.map((mode, i) => (

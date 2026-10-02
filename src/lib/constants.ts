@@ -2,9 +2,10 @@ import type { SongFieldConfig } from "@/lib/types";
 
 export const FILTER_OPTION_ALL = "全部";
 export const FILTER_OPTION_UNKNOWN = "未知";
-export const MUSIC_LIBRARY_VIEW_MODES = ["grid", "list"] as const;
+/** hall 近赏（展厅挂法）、grid 远观（密排的墙）、list 目录 */
+export const MUSIC_LIBRARY_VIEW_MODES = ["hall", "grid", "list"] as const;
 export type MusicLibraryViewMode = (typeof MUSIC_LIBRARY_VIEW_MODES)[number];
-export const DEFAULT_MUSIC_LIBRARY_VIEW_MODE: MusicLibraryViewMode = "grid";
+export const DEFAULT_MUSIC_LIBRARY_VIEW_MODE: MusicLibraryViewMode = "hall";
 export const MUSIC_LIBRARY_ITEMS_PER_PAGE = 24;
 
 // 歌曲字段配置

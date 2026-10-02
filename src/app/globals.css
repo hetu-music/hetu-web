@@ -333,6 +333,29 @@
   animation: folio-sweep 1.6s cubic-bezier(0.23, 1, 0.32, 1) infinite;
 }
 
+/* 主页刊头：每个字从下方的遮罩里升起（父元素 overflow: hidden） */
+@keyframes hall-rise {
+  from {
+    transform: translateY(105%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+.hall-rise {
+  display: inline-block;
+  animation: hall-rise 1.3s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: var(--rise-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hall-rise {
+    animation: none;
+  }
+}
+
 /* 登录页封面墙：每列封面重复两遍，平移半个自身高度即可无缝循环 */
 @keyframes cover-drift-up {
   from {

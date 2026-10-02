@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LibraryImagery } from "@/lib/types";
 import {
   buildCorpus,
+  featuredByYear,
   kinOf,
   songsWithAll,
   topImagery,
@@ -85,5 +86,30 @@ describe("yearSignatures", () => {
     expect([...yearSignatures(songs, corpus, 2).keys()].sort()).toEqual([
       2015, 2016,
     ]);
+  });
+});
+
+describe("featuredByYear", () => {
+  const songs = [
+    { id: 10, year: 2015, hascover: true },
+    { id: 11, year: 2015, hascover: true },
+    { id: 12, year: 2015, hascover: false },
+    { id: 13, year: 2016, hascover: true },
+  ];
+
+  it("取有封面、意象最多的一首", () => {
+    expect(featuredByYear(songs, corpus, 2).get(2015)).toBe(11);
+  });
+
+  it("作品太少的年份不设主作", () => {
+    expect(featuredByYear(songs, corpus, 2).has(2016)).toBe(false);
+  });
+
+  it("没有封面的不当主作", () => {
+    const only = [
+      { id: 12, year: 2017, hascover: false },
+      { id: 15, year: 2017, hascover: null },
+    ];
+    expect(featuredByYear(only, corpus, 2).has(2017)).toBe(false);
   });
 });

@@ -9,6 +9,9 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import React, { memo, useMemo } from "react";
 
+const LIGHT_STAGGER_MS = 9;
+const LIGHT_MAX_MS = 900;
+
 /** 墙上的格子：一张封面，或一年开头的年份字块 */
 type Cell =
   | { kind: "song"; song: Song }
@@ -70,6 +73,18 @@ export default function CoverWall({
     return result;
   }, [songs]);
 
+  // 点灯时亮起的作品按编年次序一盏盏亮：越往后亮得越晚，像一道光扫过墙面
+  const lightDelay = useMemo(() => {
+    const delays = new Map<number, number>();
+    let rank = 0;
+    for (const song of songs) {
+      if (lit && !lit.has(song.id)) continue;
+      delays.set(song.id, Math.min(rank * LIGHT_STAGGER_MS, LIGHT_MAX_MS));
+      rank++;
+    }
+    return delays;
+  }, [songs, lit]);
+
   return (
     <div
       // 点在格子之间的空隙上，算作放下当前选中的那首
@@ -101,6 +116,7 @@ export default function CoverWall({
             key={cell.song.id}
             song={cell.song}
             dim={lit !== null && !lit.has(cell.song.id)}
+            lightDelay={lightDelay.get(cell.song.id) ?? 0}
             pinned={pinnedId === cell.song.id}
             onPreview={onPreview}
             onPin={onPin}
@@ -149,6 +165,7 @@ function YearCell({
 const SongCell = memo(function SongCell({
   song,
   dim,
+  lightDelay,
   pinned,
   onPreview,
   onPin,
@@ -156,6 +173,8 @@ const SongCell = memo(function SongCell({
 }: {
   song: Song;
   dim: boolean;
+  /** 由暗转亮时等多久（毫秒）；转暗不等 */
+  lightDelay: number;
   pinned: boolean;
   onPreview: CoverWallProps["onPreview"];
   onPin: CoverWallProps["onPin"];
@@ -169,6 +188,8 @@ const SongCell = memo(function SongCell({
     <Link
       href={`/song/${song.id}`}
       title={song.title}
+      data-flip={song.id}
+      style={{ transitionDelay: dim ? "0ms" : `${lightDelay}ms` }}
       aria-current={pinned ? "true" : undefined}
       onPointerEnter={(e) => {
         if (e.pointerType === "mouse") onPreview(song, imgOf(e.currentTarget));
@@ -189,8 +210,9 @@ const SongCell = memo(function SongCell({
         hasCover
           ? "bg-slate-200 dark:bg-slate-800"
           : "bg-slate-100 dark:bg-slate-900",
-        "transition-[opacity,filter] duration-500 ease-page",
-        dim && "opacity-[0.14] grayscale hover:opacity-50",
+        // 暗处的画仍留着一点颜色，不压成灰雾
+        "transition-[opacity,filter] duration-700 ease-page",
+        dim && "opacity-25 saturate-[.35] hover:opacity-60",
         // 选中的那张：内描一圈强调色
         "after:pointer-events-none after:absolute after:inset-0 after:ring-inset after:transition-shadow",
         pinned
@@ -206,8 +228,11 @@ const SongCell = memo(function SongCell({
           height={176}
           sizes="(min-width: 768px) 96px, 80px"
           className={cn(
-            "size-full object-cover transition-transform duration-700 ease-page",
-            pinned ? "scale-[1.06]" : "group-hover:scale-[1.06]",
+            "size-full object-cover transition-[filter,scale] duration-700 ease-page",
+            // 平时收一点色，整面墙是一个安静的面；停上去灯才打亮
+            pinned
+              ? "scale-[1.06]"
+              : "saturate-[.85] group-hover:saturate-100 group-hover:scale-[1.06]",
           )}
         />
       ) : (

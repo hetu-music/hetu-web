@@ -49,6 +49,9 @@
     "noMarks": "未標意象",
     "lit": "{names} · {count} 首"
   },
+  "hall": {
+    "works": "{count} 首"
+  },
   "search": {
     "placeholderWithLyrics": "搜尋歌曲、創作者、歌詞...",
     "placeholderNoLyrics": "搜尋歌曲、創作者...",
@@ -78,7 +81,8 @@
     "close": "收起"
   },
   "view": {
-    "grid": "封面",
+    "hall": "近賞",
+    "grid": "遠觀",
     "list": "目錄"
   },
   "noFilteredSongs": "沒有符合條件的歌曲",

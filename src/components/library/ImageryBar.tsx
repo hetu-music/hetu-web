@@ -89,7 +89,7 @@ export default function ImageryBar({
             item={item}
             on={selected.includes(item.id)}
             onToggle={onToggle}
-            className="text-xl md:text-[1.4rem]"
+            className="text-lg md:text-xl"
           />
         ))}
       </div>

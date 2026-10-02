@@ -120,3 +120,44 @@ export function yearSignatures(
   }
   return result;
 }
+
+/**
+ * 每一年的主作：展厅里挂大一号的那幅。取有封面的作品里写到意象最多的一首，
+ * 同数时取较早收录的（id 小）；作品太少的年份不设主作，免得一间屋只挂一幅大的。
+ */
+export function featuredByYear(
+  songs: ReadonlyArray<{
+    id: number;
+    year?: number | null;
+    hascover?: boolean | null;
+  }>,
+  corpus: ImageryCorpus,
+  minWorks: number,
+): Map<number, number> {
+  const byYear = new Map<number, (typeof songs)[number][]>();
+  for (const song of songs) {
+    if (!song.year) continue;
+    const list = byYear.get(song.year);
+    if (list) list.push(song);
+    else byYear.set(song.year, [song]);
+  }
+
+  const result = new Map<number, number>();
+  for (const [year, list] of byYear) {
+    if (list.length < minWorks) continue;
+    let best: { id: number; size: number } | null = null;
+    for (const song of list) {
+      if (song.hascover !== true) continue;
+      const size = corpus.bySong.get(song.id)?.size ?? 0;
+      if (
+        !best ||
+        size > best.size ||
+        (size === best.size && song.id < best.id)
+      ) {
+        best = { id: song.id, size };
+      }
+    }
+    if (best && best.size > 0) result.set(year, best.id);
+  }
+  return result;
+}

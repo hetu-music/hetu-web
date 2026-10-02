@@ -7,6 +7,8 @@ import {
 } from "@/lib/imagery/palette";
 import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
 import type {
+  LibraryImagery,
+  LibraryImageryItem,
   RelatedSong,
   SongImageryMark,
   SongImageryView,
@@ -92,26 +94,8 @@ function baseTitle(title: string): string {
   return title.replace(/\s*[（(][^（）()]*[）)]\s*$/, "").trim();
 }
 
-export async function getSongImagery(
-  songId: number,
-  locale: string,
-): Promise<SongImageryView> {
-  let index: ImageryIndex;
-  let aliases: CreditAliasMap;
-  try {
-    [index, aliases] = await Promise.all([
-      loadImageryIndex(),
-      getCreditAliases(),
-    ]);
-  } catch (e) {
-    console.error("[getSongImagery] 加载意象索引失败", e);
-    return { marks: [], related: [] };
-  }
-  const tr =
-    locale === "zh-TW"
-      ? (s: string) => toTraditional(s) ?? s
-      : (s: string) => s;
-
+/** 全库的意象统计：分类路径、一级分类配色、每首歌的意象集合与每个意象的作品数 */
+function analyseIndex(index: ImageryIndex) {
   const catById = new Map(index.categories.map((c) => [c.id, c]));
   const l1Color = new Map(
     sortLevel1Categories(index.categories).map((c, i) => [
@@ -143,8 +127,34 @@ export async function getSongImagery(
     for (const id of set) df.set(id, (df.get(id) ?? 0) + 1);
   }
 
-  // ── 本曲意象 ──
   const imageryName = new Map(index.imagery.map((i) => [i.id, i.name]));
+  return { pathOf, l1Color, imageryBySong, df, imageryName };
+}
+
+export async function getSongImagery(
+  songId: number,
+  locale: string,
+): Promise<SongImageryView> {
+  let index: ImageryIndex;
+  let aliases: CreditAliasMap;
+  try {
+    [index, aliases] = await Promise.all([
+      loadImageryIndex(),
+      getCreditAliases(),
+    ]);
+  } catch (e) {
+    console.error("[getSongImagery] 加载意象索引失败", e);
+    return { marks: [], related: [] };
+  }
+  const tr =
+    locale === "zh-TW"
+      ? (s: string) => toTraditional(s) ?? s
+      : (s: string) => s;
+
+  const { pathOf, l1Color, imageryBySong, df, imageryName } =
+    analyseIndex(index);
+
+  // ── 本曲意象 ──
   const byImagery = new Map<number, SongImageryMark>();
   for (const occ of index.occurrences) {
     if (occ.song_id !== songId) continue;
@@ -215,4 +225,62 @@ export async function getSongImagery(
   }
 
   return { marks, related };
+}
+
+/**
+ * 主页封面墙用的意象数据：每首歌写到哪些意象，以及这些意象的名称、配色与作品数。
+ * 只含计入曲库的歌（存疑的歌在墙上照常出现，但不参与意象点灯与相认）。
+ */
+export async function getLibraryImagery(
+  locale: string,
+): Promise<LibraryImagery> {
+  let index: ImageryIndex;
+  try {
+    index = await loadImageryIndex();
+  } catch (e) {
+    console.error("[getLibraryImagery] 加载意象索引失败", e);
+    return { bySong: {}, items: [] };
+  }
+  const tr =
+    locale === "zh-TW"
+      ? (s: string) => toTraditional(s) ?? s
+      : (s: string) => s;
+  const { pathOf, l1Color, imageryBySong, df, imageryName } =
+    analyseIndex(index);
+
+  // 同一意象在不同出处可能归在不同分类下，配色取出现最多的那个一级分类
+  const l1Votes = new Map<number, Map<number, number>>();
+  for (const occ of index.occurrences) {
+    const l1 = pathOf(occ.category_id)[0];
+    if (!l1) continue;
+    let votes = l1Votes.get(occ.imagery_id);
+    if (!votes) l1Votes.set(occ.imagery_id, (votes = new Map()));
+    votes.set(l1.id, (votes.get(l1.id) ?? 0) + 1);
+  }
+  const l1Of = (imageryId: number) => {
+    let best: number | undefined;
+    let bestCount = 0;
+    for (const [id, count] of l1Votes.get(imageryId) ?? []) {
+      if (count > bestCount) [best, bestCount] = [id, count];
+    }
+    return best;
+  };
+
+  const items: LibraryImageryItem[] = [];
+  for (const [id, songCount] of df) {
+    const name = imageryName.get(id);
+    if (!name) continue;
+    const l1 = l1Of(id);
+    items.push({
+      id,
+      name: tr(name),
+      accent: (l1 !== undefined && l1Color.get(l1)) || GRAY_PALETTE.accent,
+      songCount,
+    });
+  }
+
+  const bySong: Record<number, number[]> = {};
+  for (const [songId, set] of imageryBySong) bySong[songId] = [...set];
+
+  return { bySong, items };
 }

@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import MusicLibraryClient from "@/components/library/MusicLibraryClient";
+import { getLibraryImagery } from "@/lib/server/service-song-imagery";
 import { getSongs } from "@/lib/server/service-songs";
 import { countCatalogSongs } from "@/lib/utils/utils-song";
-import { Song } from "@/lib/types";
+import type { LibraryImagery, Song } from "@/lib/types";
 import Loading from "@/components/shared/Loading";
 import ErrorState from "@/components/shared/Error";
 
@@ -65,11 +66,16 @@ export default async function MusicLibraryPage({ params }: Props) {
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "common" });
   let songsData: Song[] = [];
+  let imagery: LibraryImagery = { bySong: {}, items: [] };
   let error: Error | null = null;
 
   try {
     // forListView = true 只获取列表展示需要的字段，排除歌词等大字段
-    songsData = await getSongs(undefined, undefined, true, locale);
+    // 意象取不到时墙照常显示，只是不能按意象点灯（getLibraryImagery 自己兜底）
+    [songsData, imagery] = await Promise.all([
+      getSongs(undefined, undefined, true, locale),
+      getLibraryImagery(locale),
+    ]);
   } catch (err) {
     console.error("Error fetching songs:", err);
     error = err instanceof Error ? err : new Error("未知错误");
@@ -83,7 +89,7 @@ export default async function MusicLibraryPage({ params }: Props) {
     <>
       <h1 className="sr-only">{t("site.title")}</h1>
       <Suspense fallback={<Loading />}>
-        <MusicLibraryClient initialSongsData={songsData} />
+        <MusicLibraryClient initialSongsData={songsData} imagery={imagery} />
       </Suspense>
     </>
   );

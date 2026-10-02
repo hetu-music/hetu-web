@@ -66,6 +66,7 @@ export type SongDetail = Song & {
 // 音乐库客户端组件属性
 export interface MusicLibraryClientProps {
   initialSongsData: Song[];
+  imagery: LibraryImagery;
 }
 
 // 歌曲详情客户端组件属性
@@ -96,6 +97,22 @@ export interface RelatedSong {
   hascover: boolean | null;
   /** 共享的意象，越少见越靠前 */
   shared: string[];
+}
+
+/** 主页封面墙的意象数据，见 getLibraryImagery */
+export interface LibraryImageryItem {
+  id: number;
+  name: string;
+  /** 一级分类配色 */
+  accent: string;
+  /** 全库写到该意象的作品数 */
+  songCount: number;
+}
+
+export interface LibraryImagery {
+  /** 歌曲 id → 写到的意象 id */
+  bySong: Record<number, number[]>;
+  items: LibraryImageryItem[];
 }
 
 export interface SongImageryView {

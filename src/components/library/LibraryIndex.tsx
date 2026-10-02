@@ -6,7 +6,7 @@ import {
   TEXT_BUTTON_CLASS,
 } from "@/components/shared/text-button";
 import { InlineOptions } from "@/components/shared/topbar/menu";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import { ResponsivePanel } from "@/components/ui/responsive-panel";
 import { Slider } from "@/components/ui/slider";
 import type { LyricsSearchState } from "@/hooks/library/useLyricsIndex";
 import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
@@ -124,15 +124,12 @@ function useTypeLabel() {
 }
 
 /**
- * 检索：类型、年份与五个下拉，排成一行行文字。
- * 宽屏在总目左栏（aside），窄屏收进底部面板（drawer）；搜索框两处都单独放。
+ * 检索：类型、年份与五个下拉，排成一行行文字；放在「筛选」浮层里，搜索框另放在工具栏上
  */
 export default function LibraryIndex({
   filters: f,
-  layout,
 }: {
   filters: LibraryFilters;
-  layout: "aside" | "drawer";
 }) {
   const t = useTranslations("library");
   const tFilter = useTranslations("library.filter");
@@ -200,53 +197,17 @@ export default function LibraryIndex({
 
   return (
     <div>
-      {/* 类型：宽屏竖排成目录并注明首数；窄屏是一行「·」隔开的文字 */}
       <h3 className={FIELD_LABEL_CLASS}>{tFilter("type")}</h3>
-      {layout === "aside" ? (
-        <ol className="mt-3">
-          {f.options.allTypes.map((type) => {
-            const current = f.type === type;
-            return (
-              <li key={type}>
-                <button
-                  type="button"
-                  onClick={() => f.setType(type)}
-                  aria-pressed={current}
-                  className={cn(
-                    "relative flex w-full items-baseline justify-between gap-4 py-1.5 pl-4 text-left font-serif text-[15px] tracking-wider transition-colors",
-                    current
-                      ? "text-slate-900 dark:text-slate-100"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100",
-                  )}
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-full bg-(--tone) transition-opacity",
-                      current ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <span className="truncate">{typeLabel(type)}</span>
-                  <span className="shrink-0 font-sans text-xs tabular-nums text-slate-400 dark:text-slate-500">
-                    {f.typeCounts.get(type) ?? 0}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
-        <div className="mt-1">
-          <InlineOptions
-            items={f.options.allTypes.map((type) => ({
-              id: type,
-              label: typeLabel(type),
-            }))}
-            active={f.type}
-            onSelect={(id) => f.setType(id)}
-          />
-        </div>
-      )}
+      <div className="mt-1">
+        <InlineOptions
+          items={f.options.allTypes.map((type) => ({
+            id: type,
+            label: `${typeLabel(type)} ${f.typeCounts.get(type) ?? 0}`,
+          }))}
+          active={f.type}
+          onSelect={(id) => f.setType(id)}
+        />
+      </div>
 
       {/* 年份：标签与区间一行，滑轨在下；区间文字定宽右对齐，拖动时不跳 */}
       <div className="mt-10 grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3">
@@ -314,31 +275,33 @@ export default function LibraryIndex({
   );
 }
 
-/** 窄屏：吸顶栏里的「筛选」文字按钮，点开底部面板 */
-export function IndexDrawerButton({ filters }: { filters: LibraryFilters }) {
+/** 工具栏上的「筛选」文字按钮：宽屏在下方展开，窄屏从底部拉出 */
+export function IndexPanelButton({ filters }: { filters: LibraryFilters }) {
   const t = useTranslations("library.catalog");
   const [open, setOpen] = useState(false);
   const active = countActiveFilters(filters);
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
-      <DrawerTrigger
-        render={
-          <button
-            type="button"
-            className={cn(
-              TEXT_BUTTON_CLASS,
-              "shrink-0 py-2",
-              active > 0 && "text-(--tone) dark:text-(--tone)",
-            )}
-          />
-        }
-      >
-        {active > 0 ? t("filterActive", { count: active }) : t("filter")}
-      </DrawerTrigger>
-      <DrawerContent title={t("index")} className="max-h-[85vh]">
-        <LibraryIndex filters={filters} layout="drawer" />
-      </DrawerContent>
-    </Drawer>
+    <ResponsivePanel
+      open={open}
+      onOpenChange={setOpen}
+      title={t("index")}
+      align="end"
+      popoverClassName="w-[26rem] max-h-[calc(var(--available-height)-8px)] overflow-y-auto thin-scrollbar p-6"
+      trigger={
+        <button
+          type="button"
+          className={cn(
+            TEXT_BUTTON_CLASS,
+            "shrink-0 py-2",
+            active > 0 && "text-(--tone) dark:text-(--tone)",
+          )}
+        >
+          {active > 0 ? t("filterActive", { count: active }) : t("filter")}
+        </button>
+      }
+    >
+      {() => <LibraryIndex filters={filters} />}
+    </ResponsivePanel>
   );
 }

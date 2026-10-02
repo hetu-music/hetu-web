@@ -38,6 +38,17 @@
     "next": "後頁",
     "page": "第 {current} 頁，共 {total} 頁"
   },
+  "wall": {
+    "open": "展卷",
+    "kin": "同有此意 {count} 首",
+    "close": "收起",
+    "more": "更多意象",
+    "searchImagery": "檢索意象",
+    "noImagery": "沒有這個意象",
+    "imageryLabel": "意象",
+    "noMarks": "未標意象",
+    "lit": "{names} · {count} 首"
+  },
   "search": {
     "placeholderWithLyrics": "搜尋歌曲、創作者、歌詞...",
     "placeholderNoLyrics": "搜尋歌曲、創作者...",
@@ -67,7 +78,7 @@
     "close": "收起"
   },
   "view": {
-    "grid": "圖錄",
+    "grid": "封面",
     "list": "目錄"
   },
   "noFilteredSongs": "沒有符合條件的歌曲",

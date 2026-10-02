@@ -38,6 +38,9 @@ export interface MusicLibraryState {
   setFilterArranger: (arranger: string[]) => void;
   filterArtist: string[];
   setFilterArtist: (artist: string[]) => void;
+  /** 封面墙上点亮的意象，多个取交集 */
+  filterImagery: number[];
+  setFilterImagery: (imagery: number[]) => void;
   viewMode: MusicLibraryViewMode;
   setViewMode: (mode: MusicLibraryViewMode) => void;
   currentPage: number;
@@ -50,7 +53,7 @@ export interface MusicLibraryState {
 
 const STORAGE_KEY = "music_library_scrollY";
 
-function areStringArraysEqual(left: string[], right: string[]) {
+function areArraysEqual<T>(left: T[], right: T[]) {
   return (
     left.length === right.length &&
     left.every((value, index) => value === right[index])
@@ -79,7 +82,7 @@ export function useMusicLibraryState(
     parseAsArrayOf(parseAsString)
       .withDefault([])
       .withOptions({ shallow: true }),
-    { equals: areStringArraysEqual },
+    { equals: areArraysEqual },
   );
   const [filterLyricist, setFilterLyricistState] = useSyncedQueryState<
     string[]
@@ -88,7 +91,7 @@ export function useMusicLibraryState(
     parseAsArrayOf(parseAsString)
       .withDefault([])
       .withOptions({ shallow: true }),
-    { equals: areStringArraysEqual },
+    { equals: areArraysEqual },
   );
   const [filterComposer, setFilterComposerState] = useSyncedQueryState<
     string[]
@@ -97,7 +100,7 @@ export function useMusicLibraryState(
     parseAsArrayOf(parseAsString)
       .withDefault([])
       .withOptions({ shallow: true }),
-    { equals: areStringArraysEqual },
+    { equals: areArraysEqual },
   );
   const [filterArranger, setFilterArrangerState] = useSyncedQueryState<
     string[]
@@ -106,14 +109,21 @@ export function useMusicLibraryState(
     parseAsArrayOf(parseAsString)
       .withDefault([])
       .withOptions({ shallow: true }),
-    { equals: areStringArraysEqual },
+    { equals: areArraysEqual },
   );
   const [filterArtist, setFilterArtistState] = useSyncedQueryState<string[]>(
     "artist",
     parseAsArrayOf(parseAsString)
       .withDefault([])
       .withOptions({ shallow: true }),
-    { equals: areStringArraysEqual },
+    { equals: areArraysEqual },
+  );
+  const [filterImagery, setFilterImageryState] = useSyncedQueryState<number[]>(
+    "img",
+    parseAsArrayOf(parseAsInteger)
+      .withDefault([])
+      .withOptions({ shallow: true }),
+    { equals: areArraysEqual },
   );
   const [yearStart, setYearStartState] = useSyncedQueryState<number>(
     "yearStart",
@@ -244,6 +254,14 @@ export function useMusicLibraryState(
     [setCurrentPageState, setFilterArtistState],
   );
 
+  const setFilterImagery = useCallback(
+    (imagery: number[]) => {
+      setFilterImageryState(imagery);
+      setCurrentPageState(1);
+    },
+    [setCurrentPageState, setFilterImageryState],
+  );
+
   const setYearRangeIndices = useCallback(
     (range: [number, number]) => {
       const maxIndex = getMaxYearIndex();
@@ -279,6 +297,7 @@ export function useMusicLibraryState(
     setFilterComposerState([]);
     setFilterArrangerState([]);
     setFilterArtistState([]);
+    setFilterImageryState([]);
     setYearStartState(0);
     setYearEndState(getMaxYearIndex());
     setCurrentPageState(1);
@@ -289,6 +308,7 @@ export function useMusicLibraryState(
     setFilterArtistState,
     setFilterComposerState,
     setFilterGenreState,
+    setFilterImageryState,
     setFilterLyricistState,
     setFilterTypeState,
     setSearchQueryState,
@@ -313,6 +333,8 @@ export function useMusicLibraryState(
     setFilterArranger,
     filterArtist,
     setFilterArtist,
+    filterImagery,
+    setFilterImagery,
     viewMode,
     setViewMode,
     currentPage: Math.max(1, currentPage),

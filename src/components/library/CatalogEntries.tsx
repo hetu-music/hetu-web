@@ -2,7 +2,6 @@
 
 import SongPlayActions from "@/components/shared/SongPlayActions";
 import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
-import WorkCard from "@/components/shared/WorkCard";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useUserContext } from "@/context/UserContext";
 import type { LyricsSnippetParts } from "@/hooks/library/useLyricsIndex";
@@ -25,7 +24,7 @@ interface EntriesProps {
 // ── 共用的小件 ──────────────────────────────────────────────────────────────
 
 /** 署名一行：词曲同一人时合写 */
-function useCreditLine() {
+export function useCreditLine() {
   const t = useTranslations("library.catalog");
   return (song: Song) => {
     const lyricist = song.lyricist?.join(" / ");
@@ -258,111 +257,5 @@ function CatalogRow({
       </div>
       {snippet && <Snippet parts={snippet} className="mt-1" />}
     </li>
-  );
-}
-
-// ── 图录 ────────────────────────────────────────────────────────────────────
-
-/** 图录：封面网格，作品卡与歌曲页「同有此意」同一种 */
-export function CatalogGrid({
-  songs,
-  activeSongId,
-  onNavigate,
-  getSnippet,
-}: EntriesProps) {
-  const t = useTranslations("song");
-  const tEnum = useTranslations("enums");
-
-  return (
-    <ul className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-10">
-      {songs.map((song) => {
-        // 单曲的专辑名多半就是歌名，再写一遍是重复；这时改写演唱者
-        const subtitle =
-          song.album && song.album !== song.title
-            ? song.album
-            : song.artist?.join(" / ") || t("labels.single");
-        const type = song.type?.[0];
-        const meta = [
-          song.year,
-          type && (tEnum.has(`type.${type}`) ? tEnum(`type.${type}`) : type),
-        ].filter(Boolean);
-        const snippet = getSnippet(song.id);
-
-        return (
-          <li key={song.id} className="group/entry min-w-0">
-            <WorkCard
-              song={song}
-              active={activeSongId === song.id}
-              onNavigate={() => onNavigate(song.id)}
-            >
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 truncate">
-                {subtitle}
-              </p>
-              <p className="mt-1.5 flex items-baseline gap-2 overflow-hidden text-xs tracking-wider text-slate-400 dark:text-slate-500">
-                <span className="truncate tabular-nums">
-                  {meta.join(" · ")}
-                </span>
-                <EntryMarks song={song} />
-              </p>
-              {snippet && <Snippet parts={snippet} className="mt-2" />}
-            </WorkCard>
-            <EntryActions
-              song={song}
-              groupClass="group-hover/entry:opacity-100"
-              className="mt-3"
-            />
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-// ── 翻页 ────────────────────────────────────────────────────────────────────
-
-/** 图录的翻页：「前页 · 3 / 13 · 后页」三个文字 */
-export function FolioPager({
-  page,
-  total,
-  onChange,
-}: {
-  page: number;
-  total: number;
-  onChange: (page: number) => void;
-}) {
-  const t = useTranslations("library.catalog");
-  if (total <= 1) return null;
-
-  return (
-    <nav
-      aria-label={t("page", { current: page, total })}
-      className="mt-16 flex items-baseline justify-center gap-4"
-    >
-      <button
-        type="button"
-        onClick={() => onChange(page - 1)}
-        disabled={page <= 1}
-        className={TEXT_BUTTON_CLASS}
-      >
-        {t("prev")}
-      </button>
-      <span aria-hidden className="text-slate-300 dark:text-slate-600">
-        ·
-      </span>
-      <span className="text-xs tracking-widest tabular-nums text-slate-600 dark:text-slate-400">
-        <span className="text-(--tone)">{page}</span> / {total}
-      </span>
-      <span aria-hidden className="text-slate-300 dark:text-slate-600">
-        ·
-      </span>
-      <button
-        type="button"
-        onClick={() => onChange(page + 1)}
-        disabled={page >= total}
-        className={TEXT_BUTTON_CLASS}
-      >
-        {t("next")}
-      </button>
-    </nav>
   );
 }

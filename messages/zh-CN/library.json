@@ -38,6 +38,17 @@
     "next": "后页",
     "page": "第 {current} 页，共 {total} 页"
   },
+  "wall": {
+    "open": "展卷",
+    "kin": "同有此意 {count} 首",
+    "close": "收起",
+    "more": "更多意象",
+    "searchImagery": "检索意象",
+    "noImagery": "没有这个意象",
+    "imageryLabel": "意象",
+    "noMarks": "未标意象",
+    "lit": "{names} · {count} 首"
+  },
   "search": {
     "placeholderWithLyrics": "搜索歌曲、创作者、歌词...",
     "placeholderNoLyrics": "搜索歌曲、创作者...",
@@ -67,7 +78,7 @@
     "close": "收起"
   },
   "view": {
-    "grid": "图录",
+    "grid": "封面",
     "list": "目录"
   },
   "noFilteredSongs": "没有符合条件的歌曲",

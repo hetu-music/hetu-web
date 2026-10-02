@@ -86,5 +86,11 @@
     "list": "目錄"
   },
   "noFilteredSongs": "沒有符合條件的歌曲",
-  "linkCopied": "連結已複製到剪貼簿"
+  "linkCopied": "連結已複製到剪貼簿",
+  "scroll": {
+    "hint": "滾動或拖動，沿卷而行　·　點一幅，走近看",
+    "newer": "較新一幅",
+    "older": "較早一幅",
+    "back": "退回遠觀"
+  }
 }

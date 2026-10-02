@@ -4,6 +4,8 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - pixi.js@8.22.0
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild

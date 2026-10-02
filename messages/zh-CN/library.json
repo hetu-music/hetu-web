@@ -86,5 +86,11 @@
     "list": "目录"
   },
   "noFilteredSongs": "没有符合条件的歌曲",
-  "linkCopied": "链接已复制到剪贴板"
+  "linkCopied": "链接已复制到剪贴板",
+  "scroll": {
+    "hint": "滚动或拖动，沿卷而行　·　点一幅，走近看",
+    "newer": "较新一幅",
+    "older": "较早一幅",
+    "back": "退回远观"
+  }
 }

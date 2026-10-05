@@ -13,6 +13,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, X } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import LampChart from "./LampChart";
+import {
+  allCredits,
+  type Lamp,
+  lampKey,
+  lampLabel,
+  type LampTester,
+  makeTester,
+} from "./lamps";
 
 export interface ProtoImagery {
   id: number;
@@ -52,29 +61,6 @@ const LAMP_IMAGERY = 9;
 /** 「灯下」最多先挂几幅，其余到墙上看 */
 const GATHER_LIMIT = 18;
 
-/** 一盏灯：从哪里来、照亮哪些作品 */
-type Lamp =
-  | { kind: "imagery"; id: number }
-  | { kind: "quiz"; option: number }
-  | { kind: "mine" }
-  | { kind: "person"; name: string };
-
-const lampKey = (l: Lamp) =>
-  l.kind === "imagery"
-    ? `i${l.id}`
-    : l.kind === "quiz"
-      ? "quiz"
-      : l.kind === "mine"
-        ? "mine"
-        : `p${l.name}`;
-
-const credits = (s: Song) => [
-  ...(s.artist ?? []),
-  ...(s.lyricist ?? []),
-  ...(s.composer ?? []),
-  ...(s.arranger ?? []),
-];
-
 export default function HomeProto({
   songs,
   total,
@@ -109,59 +95,26 @@ export default function HomeProto({
     [imagery],
   );
 
-  // ── 灯：同一类的灯相加，不同类的灯相交 ─────────────────────────────────
-  const q = query.trim().toLowerCase();
-  const lampOn = q.length > 0 || lamps.length > 0;
-  const lit = useMemo(() => {
-    if (!lampOn) return null;
-    const sets: Set<number>[] = [];
-    if (q) {
-      sets.push(
-        new Set(
-          songs
-            .filter(
-              (s) =>
-                [s.title, s.album, ...credits(s), ...(s.creditAliases ?? [])]
-                  .filter(Boolean)
-                  .join(" ")
-                  .toLowerCase()
-                  .includes(q) || lyrics?.get(s.id)?.includes(q),
-            )
-            .map((s) => s.id),
-        ),
-      );
-    }
-    const imageryLamps = lamps.flatMap((l) =>
-      l.kind === "imagery"
-        ? [l.id]
-        : l.kind === "quiz"
-          ? question.options[l.option].imageryIds
-          : [],
-    );
-    if (imageryLamps.length > 0)
-      sets.push(
-        new Set(
-          songs
-            .filter((s) =>
-              (songImagery[s.id] ?? []).some((id) => imageryLamps.includes(id)),
-            )
-            .map((s) => s.id),
-        ),
-      );
-    if (lamps.some((l) => l.kind === "mine")) sets.push(new Set(favorites));
-    const people = lamps.flatMap((l) => (l.kind === "person" ? [l.name] : []));
-    if (people.length > 0)
-      sets.push(
-        new Set(
-          songs
-            .filter((s) => credits(s).some((n) => people.includes(n)))
-            .map((s) => s.id),
-        ),
-      );
-    if (sets.length === 0) return null;
-    const [firstSet, ...rest] = sets;
-    return new Set([...firstSet].filter((id) => rest.every((s) => s.has(id))));
-  }, [lampOn, q, songs, lyrics, lamps, question, songImagery, favorites]);
+  // ── 灯：同一组的灯相加，不同组的灯相交（见 lamps.ts）───────────────────
+  const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
+  const tester = useMemo(
+    () =>
+      makeTester(lamps, query, {
+        songImagery,
+        quizImagery: (option) => question.options[option]?.imageryIds ?? [],
+        favorites: favoriteSet,
+        lyrics,
+      }),
+    [lamps, query, songImagery, question, favoriteSet, lyrics],
+  );
+  const lampOn = tester.on;
+  const lit = useMemo(
+    () =>
+      tester.on
+        ? new Set(songs.filter((s) => tester.passes(s)).map((s) => s.id))
+        : null,
+    [tester, songs],
+  );
 
   const toggleLamp = useCallback((lamp: Lamp) => {
     setLamps((prev) => {
@@ -181,14 +134,22 @@ export default function HomeProto({
     setQuery("");
     setLamps([]);
   }, []);
-  const lampLabel = (l: Lamp) =>
-    l.kind === "imagery"
-      ? imageryById.get(l.id)?.name
-      : l.kind === "quiz"
-        ? `${question.title} · ${question.options[l.option].label}`
-        : l.kind === "mine"
-          ? "我的收藏"
-          : l.name;
+  const setYear = useCallback((range: { from: number; to: number } | null) => {
+    setLamps((prev) => [
+      ...prev.filter((l) => l.kind !== "year"),
+      ...(range ? [{ kind: "year" as const, ...range }] : []),
+    ]);
+  }, []);
+  const lampText = (l: Lamp) =>
+    lampLabel(l, {
+      imagery: (id) => imageryById.get(id)?.name,
+      quiz: (o) => `${question.title} · ${question.options[o].label}`,
+    });
+
+  // 灯谱：序厅里在灯台下展开；滚下去以后从顶栏打开
+  const [chartOpen, setChartOpen] = useState(false);
+  const [seekOpen, setSeekOpen] = useState(false);
+  const [gatherAll, setGatherAll] = useState(false);
 
   // ── 展室：按年分，每年挑一幅主作 ───────────────────────────────────────
   const rooms = useMemo(() => {
@@ -212,8 +173,8 @@ export default function HomeProto({
       const signature = [...tally.entries()]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 2)
-        .map(([id]) => imageryById.get(id)?.name)
-        .filter(Boolean) as string[];
+        .map(([id]) => imageryById.get(id))
+        .filter((i): i is ProtoImagery => !!i);
       return {
         year,
         key: year === null ? "unknown" : String(year),
@@ -258,14 +219,20 @@ export default function HomeProto({
           <button
             type="button"
             onClick={() => {
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              setTimeout(() => searchRef.current?.focus(), 500);
+              // 还在序厅：就地展开灯谱；滚下去了：从顶栏打开同一份灯谱
+              if (window.scrollY < window.innerHeight * 0.6) {
+                setChartOpen(true);
+                searchRef.current?.focus();
+              } else {
+                setSeekOpen(!seekOpen);
+              }
             }}
+            aria-expanded={seekOpen}
             aria-label="寻"
             title="寻"
             className={cn(
               "inline-flex size-10 items-center justify-center font-calligraphy text-2xl leading-none transition-colors",
-              lampOn
+              lampOn || seekOpen
                 ? "text-(--tone)"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white",
             )}
@@ -274,12 +241,95 @@ export default function HomeProto({
           </button>
         }
       >
-        {lampOn && (
+        <AnimatePresence initial={false}>
+          {seekOpen && (
+            <motion.div
+              key="seek"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.45, ease: EASE }}
+              className="overflow-hidden"
+            >
+              <div className="thin-scrollbar max-h-[calc(100dvh-var(--nav-h)-2rem)] overflow-y-auto overscroll-contain border-t border-slate-200/50 dark:border-slate-800/50">
+                <div className="mx-auto max-w-4xl px-6 pb-10 pt-8 md:px-16">
+                  <div className="flex items-end gap-6">
+                    <label className="min-w-0 flex-1 border-b border-slate-300 transition-colors focus-within:border-(--tone) dark:border-slate-700">
+                      <span className="sr-only">寻</span>
+                      <input
+                        type="search"
+                        autoFocus
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="寻一首歌、一个名字、一句词"
+                        className="w-full bg-transparent pb-3 font-serif text-2xl text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-50 dark:placeholder:text-slate-600 [&::-webkit-search-cancel-button]:hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setSeekOpen(false)}
+                      aria-label="收起"
+                      className="mb-3 shrink-0 p-1 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <p className="mb-8 mt-4 flex flex-wrap items-baseline gap-x-4 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                    {lampOn ? (
+                      <>
+                        <span className="tabular-nums text-(--tone)">
+                          亮 {lit?.size ?? 0} 首
+                        </span>
+                        <button
+                          type="button"
+                          onClick={putOut}
+                          className={TEXT_BUTTON_CLASS}
+                        >
+                          熄灯
+                        </button>
+                      </>
+                    ) : (
+                      <span className="font-kaiti text-sm tracking-normal">
+                        点亮几盏灯：照到的作品在墙上亮着，其余的暗下去
+                      </span>
+                    )}
+                  </p>
+                  <LampChart
+                    songs={songs}
+                    lamps={lamps}
+                    tester={tester}
+                    imagery={imagery}
+                    onToggle={toggleLamp}
+                    onSetYear={setYear}
+                    extra={
+                      isLoggedIn ? (
+                        <button
+                          type="button"
+                          aria-pressed={lamps.some((l) => l.kind === "mine")}
+                          onClick={() => toggleLamp({ kind: "mine" })}
+                          className={cn(
+                            "font-serif text-[15px] transition-colors",
+                            lamps.some((l) => l.kind === "mine")
+                              ? "text-(--tone)"
+                              : "text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white",
+                          )}
+                        >
+                          我的收藏
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {lampOn && !seekOpen && (
           <LampStrip
             query={query.trim()}
             lamps={lamps}
-            label={lampLabel}
-            count={litSongs.length}
+            label={lampText}
+            count={lit?.size ?? 0}
             onClearQuery={() => setQuery("")}
             onToggle={toggleLamp}
             onPutOut={putOut}
@@ -314,12 +364,37 @@ export default function HomeProto({
               />
             </label>
             <LampDesk
+              songs={songs}
+              tester={tester}
               imagery={imagery.slice(0, LAMP_IMAGERY)}
               lamps={lamps}
               onToggle={toggleLamp}
               question={question}
               mine={isLoggedIn}
+              chartOpen={chartOpen}
+              onToggleChart={() => setChartOpen(!chartOpen)}
             />
+            {/* 灯谱：全部的灯，在灯台下展开 */}
+            <div
+              className={cn(
+                "grid transition-[grid-template-rows] duration-500 ease-page",
+                chartOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+              )}
+            >
+              <div className="min-h-0 overflow-hidden" inert={!chartOpen}>
+                <div className="pt-10">
+                  <LampChart
+                    songs={songs}
+                    lamps={lamps}
+                    tester={tester}
+                    imagery={imagery}
+                    onToggle={toggleLamp}
+                    onSetYear={setYear}
+                    hideTypes
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -344,8 +419,16 @@ export default function HomeProto({
                 </span>
                 <span className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
                   亮 {litSongs.length} 首
-                  {litSongs.length > GATHER_LIMIT && " · 其余在墙上亮着"}
                 </span>
+                {litSongs.length > GATHER_LIMIT && (
+                  <button
+                    type="button"
+                    onClick={() => setGatherAll(!gatherAll)}
+                    className={cn(TEXT_BUTTON_CLASS, "ml-auto")}
+                  >
+                    {gatherAll ? "收起" : `展开全部 ${litSongs.length} 首`}
+                  </button>
+                )}
               </p>
               {litSongs.length === 0 ? (
                 <p className="mt-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
@@ -353,19 +436,21 @@ export default function HomeProto({
                 </p>
               ) : (
                 <ul className="mt-8 grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9">
-                  {litSongs.slice(0, GATHER_LIMIT).map((s) => (
-                    <li key={s.id}>
-                      <Link href={`/song/${s.id}`} className="group block">
-                        <Cover song={s} sizes="140px" small />
-                        <p className="mt-2 truncate font-serif text-[13px] text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-50">
-                          {s.title}
-                        </p>
-                        <p className="text-[10px] tracking-wider text-slate-400 dark:text-slate-500">
-                          {s.year}
-                        </p>
-                      </Link>
-                    </li>
-                  ))}
+                  {(gatherAll ? litSongs : litSongs.slice(0, GATHER_LIMIT)).map(
+                    (s) => (
+                      <li key={s.id}>
+                        <Link href={`/song/${s.id}`} className="group block">
+                          <Cover song={s} sizes="140px" small />
+                          <p className="mt-2 truncate font-serif text-[13px] text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-50">
+                            {s.title}
+                          </p>
+                          <p className="text-[10px] tracking-wider text-slate-400 dark:text-slate-500">
+                            {s.year}
+                          </p>
+                        </Link>
+                      </li>
+                    ),
+                  )}
                 </ul>
               )}
             </div>
@@ -441,7 +526,7 @@ export default function HomeProto({
                 if (el) roomEls.current.set(room.key, el);
                 else roomEls.current.delete(room.key);
               }}
-              onPerson={(name) => toggleLamp({ kind: "person", name })}
+              onLamp={toggleLamp}
             />
           ))}
         </main>
@@ -479,28 +564,77 @@ export default function HomeProto({
 // ── 灯台 ──────────────────────────────────────────────────────────────────
 
 function LampDesk({
+  songs,
+  tester,
   imagery,
   lamps,
   onToggle,
   question,
   mine,
+  chartOpen,
+  onToggleChart,
 }: {
+  songs: Song[];
+  tester: LampTester;
   imagery: ProtoImagery[];
   lamps: Lamp[];
   onToggle: (lamp: Lamp) => void;
   question: ProtoQuestion;
   mine: boolean;
+  chartOpen: boolean;
+  onToggleChart: () => void;
 }) {
+  // 类型是最常用的筛选，按收录数排在灯台第一排
+  const types = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of songs)
+      for (const t of s.type ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  }, [songs]);
   const [asking, setAsking] = useState(false);
   const answered = lamps.find((l) => l.kind === "quiz");
   const on = (lamp: Lamp) => lamps.some((l) => lampKey(l) === lampKey(lamp));
 
   return (
-    <div className="mt-6">
+    <div className="mt-6 grid grid-cols-[2.5rem_minmax(0,1fr)] items-baseline gap-x-4 gap-y-4">
+      <span className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+        类型
+      </span>
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        {types.map((value) => {
+          const lamp: Lamp = { kind: "type", value };
+          const active = on(lamp);
+          const n = tester.count(songs, lamp);
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={active}
+              disabled={!active && n === 0}
+              onClick={() => onToggle(lamp)}
+              className="inline-flex items-baseline gap-1 transition-colors disabled:opacity-30"
+            >
+              <span
+                className={cn(
+                  "font-serif text-[15px]",
+                  active
+                    ? "text-(--tone)"
+                    : "text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white",
+                )}
+              >
+                {value}
+              </span>
+              <span className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
+                {n}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <span className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+        意象
+      </span>
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-3">
-        <span className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-          灯
-        </span>
         {imagery.map((item) => {
           const active = on({ kind: "imagery", id: item.id });
           return (
@@ -553,12 +687,24 @@ function LampDesk({
             我的收藏
           </button>
         )}
+        <button
+          type="button"
+          aria-expanded={chartOpen}
+          onClick={onToggleChart}
+          className={cn(
+            TEXT_BUTTON_CLASS,
+            "ml-auto",
+            chartOpen && "text-(--tone) dark:text-(--tone)",
+          )}
+        >
+          {chartOpen ? "收起灯谱" : "全部灯 ›"}
+        </button>
       </div>
 
       {/* 寻曲的第一题：答了就是一盏灯 */}
       <div
         className={cn(
-          "grid transition-[grid-template-rows] duration-500 ease-page",
+          "col-span-2 grid transition-[grid-template-rows] duration-500 ease-page",
           asking ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
       >
@@ -703,7 +849,7 @@ interface RoomData {
   featuredId: number | null;
   plain: Song[];
   count: number;
-  signature: string[];
+  signature: ProtoImagery[];
 }
 
 function Room({
@@ -713,7 +859,7 @@ function Room({
   notes,
   storySong,
   setRef,
-  onPerson,
+  onLamp,
 }: {
   room: RoomData;
   index: number;
@@ -721,7 +867,7 @@ function Room({
   notes: Record<number, ProtoNote>;
   storySong: Song | null;
   setRef: (el: HTMLElement | null) => void;
-  onPerson: (name: string) => void;
+  onLamp: (lamp: Lamp) => void;
 }) {
   const dim = (id: number) =>
     lit && !lit.has(id) ? "opacity-[0.12] grayscale" : "opacity-100";
@@ -741,11 +887,18 @@ function Room({
         <span className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
           {room.count} 首
         </span>
-        {room.signature.length > 0 && (
-          <span className="font-serif text-base tracking-[0.2em] text-(--tone)">
-            {room.signature.join(" ")}
-          </span>
-        )}
+        {/* 这一年最常写到的意象：点一下就点亮 */}
+        {room.signature.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onLamp({ kind: "imagery", id: item.id })}
+            title={`点亮写到「${item.name}」的作品`}
+            className="font-serif text-base tracking-[0.2em] text-(--tone) transition-opacity hover:opacity-70"
+          >
+            {item.name}
+          </button>
+        ))}
       </header>
 
       {room.covered.length > 0 && (
@@ -802,19 +955,37 @@ function Room({
                   </div>
                   {featured && (
                     <>
-                      {/* 署名：点一个名字，就点亮他参与的作品 */}
+                      {/* 署名与类型：点一下就点亮这个人参与的、同一类的作品 */}
                       <p className="mt-1.5 flex flex-wrap gap-x-3 text-[11px] tracking-wider text-slate-400 dark:text-slate-500">
-                        {[...new Set(credits(song))].slice(0, 4).map((n) => (
+                        {[...new Set(allCredits(song))].slice(0, 4).map((n) => (
                           <button
                             key={n}
                             type="button"
-                            onClick={() => onPerson(n)}
+                            onClick={() => onLamp({ kind: "credit", name: n })}
                             title={`点亮 ${n} 参与的作品`}
                             className="transition-colors hover:text-(--tone)"
                           >
                             {n}
                           </button>
                         ))}
+                        {song.type?.[0] && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onLamp({
+                                  kind: "type",
+                                  value: song.type?.[0] ?? "",
+                                })
+                              }
+                              title={`点亮全部${song.type[0]}作品`}
+                              className="transition-colors hover:text-(--tone)"
+                            >
+                              {song.type[0]}
+                            </button>
+                          </>
+                        )}
                       </p>
                       {note && (
                         <blockquote className="mt-4 max-w-[26em] border-l border-slate-300 pl-3 dark:border-slate-700">

@@ -97,3 +97,10 @@ export default async function MusicLibraryPage({ params }: Props) {
 
 // 启用 ISR - 每2小时重新生成页面，减少服务器负载
 export const revalidate = 7200;
+
+// 只认 layout 里 generateStaticParams 生成的 locale，其余直接 404、不渲染。
+// 带点号的路径（/.env、/secrets.yml 等扫描器探测）不经过 proxy，会被当成
+// locale 匹配到这里；此前每个这样的路径都会渲染整页曲库并作为 ISR 条目缓存
+// （约 520KB/条），挤占内存缓存并在磁盘上堆积。
+// 不能放在 [locale]/layout：那样会传给 song/[id] 等子路由，所有歌曲页都会 404。
+export const dynamicParams = false;

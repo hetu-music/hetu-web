@@ -92,7 +92,17 @@ function assertServerOnly() {
 // 只缓存不带用户身份的客户端（service / 匿名）。带 accessToken 的客户端一律
 // 新建：此前是以 JWT 本身作为 Map 的 key，等于把一批用户令牌长期挂在进程全局
 // 变量上；而且上限 20 的 FIFO 淘汰在并发管理员较多时会反复失效，缓存本身也没
-// 起到作用。supabase-js 的 REST 客户端只是配置对象、不持有连接，新建成本极低。
+// 起到作用。
+//
+// 新建客户端必须关掉 auth 的会话机制：supabase-js 默认 autoRefreshToken: true，
+// 在 Node 里构造时就会起一个 30s 的 setInterval，闭包持有整个客户端且永不清除，
+// 于是每个新建的客户端都无法被 GC（实测 ~13KB/个，线上表现为内存只涨不降）。
+// 服务端只用 accessToken 发请求，不需要刷新、持久化或从 URL 恢复会话。
+const SERVER_AUTH_OPTIONS = {
+  autoRefreshToken: false,
+  persistSession: false,
+  detectSessionInUrl: false,
+} as const;
 
 const clientCache = new Map<string, SupabaseClient>();
 
@@ -100,7 +110,7 @@ function getCachedClient(url: string, key: string): SupabaseClient {
   const cacheKey = `${url}::${key}`;
   let client = clientCache.get(cacheKey);
   if (!client) {
-    client = createClient(url, key);
+    client = createClient(url, key, { auth: SERVER_AUTH_OPTIONS });
     clientCache.set(cacheKey, client);
   }
   return client;
@@ -167,6 +177,7 @@ export function getUserClient(accessToken?: string): SupabaseClient | null {
   // 带用户身份的客户端不进缓存，避免把 JWT 挂在进程级 Map 上
   if (accessToken) {
     return createClient(url, key, {
+      auth: SERVER_AUTH_OPTIONS,
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
     });
   }

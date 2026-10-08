@@ -11,6 +11,7 @@ import { Heart } from "lucide-react";
 import type React from "react";
 import CoverArt from "./CoverArt";
 import MultiTagDisplay from "./MultiTagDisplay";
+import SongTitleLink from "./SongTitleLink";
 import { useTranslations } from "next-intl";
 
 interface ListRowProps {
@@ -57,7 +58,9 @@ export default function ListRow({
             isActive ? "text-(--tone)" : "group-hover:text-(--tone)",
           )}
         >
-          {song.title}
+          <SongTitleLink songId={song.id} onNavigate={onClick}>
+            {song.title}
+          </SongTitleLink>
         </h3>
         <p className="truncate text-sm font-light text-slate-500 dark:text-slate-400">
           {song.lyricist?.join(" ") || "-"}{" "}

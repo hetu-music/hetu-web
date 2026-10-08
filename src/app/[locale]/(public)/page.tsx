@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { notFound } from "next/navigation";
+import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import MusicLibraryClient from "@/components/library/MusicLibraryClient";
 import { getSongs } from "@/lib/server/service-songs";
@@ -7,6 +9,7 @@ import { countCatalogSongs } from "@/lib/utils/utils-song";
 import { Song } from "@/lib/types";
 import Loading from "@/components/shared/Loading";
 import ErrorState from "@/components/shared/Error";
+import { routing } from "@/i18n/routing";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -15,6 +18,7 @@ type Props = {
 // 动态生成首页 SEO 元数据
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
   const t = await getTranslations({ locale, namespace: "common" });
   const tLib = await getTranslations({ locale, namespace: "library" });
 
@@ -62,6 +66,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // 服务端组件 - 使用 ISR
 export default async function MusicLibraryPage({ params }: Props) {
   const { locale } = await params;
+  // 带点号的路径（/.env、/secrets.yml 等扫描器探测）不经过 proxy，会被当成
+  // locale 匹配到这里。layout 也会 notFound()，但页面与 layout 并行渲染，
+  // 不在这里先拦，就会照常查整个曲库，生成约 520KB 的 ISR 条目进缓存；
+  // 先拦之后只缓存一个约 9KB 的 404。
+  //
+  // 不能改用 dynamicParams = false：revalidatePath 之后缓存条目被清空，
+  // Next 会把已预渲染的 /zh-CN 也当成未知参数直接 404，且不再重新生成
+  // （NoFallbackError，1.8.14 线上首页因此 404）。
+  if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "common" });
   let songsData: Song[] = [];
@@ -91,10 +104,3 @@ export default async function MusicLibraryPage({ params }: Props) {
 
 // 启用 ISR - 每2小时重新生成页面，减少服务器负载
 export const revalidate = 7200;
-
-// 只认 layout 里 generateStaticParams 生成的 locale，其余直接 404、不渲染。
-// 带点号的路径（/.env、/secrets.yml 等扫描器探测）不经过 proxy，会被当成
-// locale 匹配到这里；此前每个这样的路径都会渲染整页曲库并作为 ISR 条目缓存
-// （约 520KB/条），挤占内存缓存并在磁盘上堆积。
-// 不能放在 [locale]/layout：那样会传给 song/[id] 等子路由，所有歌曲页都会 404。
-export const dynamicParams = false;

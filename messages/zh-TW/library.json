@@ -1,6 +1,6 @@
 {
   "meta": {
-    "descriptionWithStats": "共收錄{count}首作品。最近收錄：{recentTitles}。提供歌曲資訊、歌詞、樂譜等詳細資料的查閱與篩選。"
+    "descriptionWithStats": "共收錄河圖{count}首音樂作品，提供歌詞、樂譜與創作資訊的查閱與篩選。最近收錄：{recentTitles}。"
   },
   "hero": {
     "title": "謠歌",

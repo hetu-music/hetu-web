@@ -1,6 +1,6 @@
 {
   "meta": {
-    "descriptionWithStats": "共收录{count}首作品。最近收录：{recentTitles}。提供歌曲信息、歌词、乐谱等详细资料的查阅与筛选。"
+    "descriptionWithStats": "共收录河图{count}首音乐作品，提供歌词、乐谱与创作信息的查阅与筛选。最近收录：{recentTitles}。"
   },
   "hero": {
     "title": "谣歌",

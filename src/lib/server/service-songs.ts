@@ -59,7 +59,7 @@ export const getSongs = cache(async function getSongs(
   locale: string = "zh-CN",
 ): Promise<Song[]> {
   const selectFields = forListView ? SONG_LIST_VIEW_FIELDS.join(",") : "*";
-  let songs: Song[] = [];
+  let songs: Song[];
 
   // 公共主表：高权限 + 分页全量获取
   if (table === TABLES.MUSIC && !accessToken) {

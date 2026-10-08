@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
     : "block-all-mixed-content; upgrade-insecure-requests;";
   // 开发模式下 React 要用 eval 还原调用栈，手机上的调试控制台也靠 eval 执行输入
   const devEval = isDev ? "'unsafe-eval'" : "";
-  let cspHeader = "";
+  let cspHeader: string;
 
   if (useNonce) {
     cspHeader = `

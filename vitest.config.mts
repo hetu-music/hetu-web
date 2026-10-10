@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
+// typescript-eslint 8.71.1 在 .mts 里误报 rootDir「只作类型使用」（#12892 引入），上游修复后删掉
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const rootDir = import.meta.dirname;
 
 export default defineConfig({

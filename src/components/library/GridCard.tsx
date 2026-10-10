@@ -8,6 +8,7 @@ import { getCoverUrl } from "@/lib/utils/utils-song";
 import { Heart } from "lucide-react";
 import type React from "react";
 import CoverArt from "./CoverArt";
+import SongTitleLink from "./SongTitleLink";
 import EnqueueButton from "@/components/shared/EnqueueButton";
 import PlayButton from "@/components/shared/PlayButton";
 import { useTranslations } from "next-intl";
@@ -123,7 +124,9 @@ export default function GridCard({
             )}
             title={song.title}
           >
-            {song.title}
+            <SongTitleLink songId={song.id} onNavigate={onClick}>
+              {song.title}
+            </SongTitleLink>
           </h3>
           <span className="shrink-0 text-xs tabular-nums tracking-wider text-slate-400 dark:text-slate-500">
             {song.year || FILTER_OPTION_UNKNOWN}

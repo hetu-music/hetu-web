@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SITE_URL } from "@/lib/constants";
 
 // PWA Viewport 配置
 export const viewport: Viewport = {
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://hetu-music.com"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "河图作品勘鉴 - 河图音乐作品收录与鉴赏",
     template: "%s - 河图作品勘鉴",

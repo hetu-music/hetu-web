@@ -6,6 +6,7 @@ import { getSongById } from "@/lib/server/service-songs";
 import { getSongImagery } from "@/lib/server/service-song-imagery";
 import { TABLES } from "@/lib/db/supabase-server";
 import { buildFolio, markLines, pickExcerpt } from "@/lib/utils/utils-folio";
+import { SITE_URL } from "@/lib/constants";
 
 type PageProps = {
   params: Promise<{ id: string; locale: string }>;
@@ -58,11 +59,11 @@ export async function generateMetadata({
     alternates: {
       canonical:
         locale === "zh-TW"
-          ? `https://hetu-music.com/zh-TW/song/${song.id}`
-          : `https://hetu-music.com/zh-CN/song/${song.id}`,
+          ? `${SITE_URL}/zh-TW/song/${song.id}`
+          : `${SITE_URL}/zh-CN/song/${song.id}`,
       languages: {
-        "zh-CN": `https://hetu-music.com/zh-CN/song/${song.id}`,
-        "zh-TW": `https://hetu-music.com/zh-TW/song/${song.id}`,
+        "zh-CN": `${SITE_URL}/zh-CN/song/${song.id}`,
+        "zh-TW": `${SITE_URL}/zh-TW/song/${song.id}`,
       },
     },
     openGraph: {

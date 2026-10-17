@@ -2,6 +2,7 @@ import QuizClient from "@/components/quiz/QuizClient";
 import { getQuizPoolSize, getQuizQuestions } from "@/lib/server/service-quiz";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/constants";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -21,10 +22,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // 内测期间不进入搜索引擎索引，正式上线时移除
     robots: { index: false, follow: true },
     alternates: {
-      canonical: `https://hetu-music.com/${locale}/quiz`,
+      canonical: `${SITE_URL}/${locale}/quiz`,
       languages: {
-        "zh-CN": "https://hetu-music.com/zh-CN/quiz",
-        "zh-TW": "https://hetu-music.com/zh-TW/quiz",
+        "zh-CN": `${SITE_URL}/zh-CN/quiz`,
+        "zh-TW": `${SITE_URL}/zh-TW/quiz`,
       },
     },
     openGraph: {

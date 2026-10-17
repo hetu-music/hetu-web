@@ -8,6 +8,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { serializeJsonLd } from "@/lib/utils/utils-common";
+import { SITE_URL } from "@/lib/constants";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -54,11 +55,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical:
         locale === "zh-TW"
-          ? "https://hetu-music.com/zh-TW/imagery"
-          : "https://hetu-music.com/zh-CN/imagery",
+          ? `${SITE_URL}/zh-TW/imagery`
+          : `${SITE_URL}/zh-CN/imagery`,
       languages: {
-        "zh-CN": "https://hetu-music.com/zh-CN/imagery",
-        "zh-TW": "https://hetu-music.com/zh-TW/imagery",
+        "zh-CN": `${SITE_URL}/zh-CN/imagery`,
+        "zh-TW": `${SITE_URL}/zh-TW/imagery`,
       },
     },
     openGraph: {
@@ -101,11 +102,11 @@ export default async function ImageryPage({ params }: Props) {
     "@type": "CollectionPage",
     name: `${t("imagery.title")} - ${t("site.name")}`,
     description: description,
-    url: "https://hetu-music.com/zh-CN/imagery",
+    url: `${SITE_URL}/zh-CN/imagery`,
     isPartOf: {
       "@type": "WebSite",
       name: t("site.name"),
-      url: "https://hetu-music.com",
+      url: SITE_URL,
     },
   };
 

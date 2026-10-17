@@ -10,6 +10,7 @@ import { Song } from "@/lib/types";
 import Loading from "@/components/shared/Loading";
 import ErrorState from "@/components/shared/Error";
 import { routing } from "@/i18n/routing";
+import { SITE_URL } from "@/lib/constants";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -45,13 +46,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     description,
     alternates: {
-      canonical:
-        locale === "zh-TW"
-          ? "https://hetu-music.com/zh-TW"
-          : "https://hetu-music.com/zh-CN",
+      canonical: locale === "zh-TW" ? `${SITE_URL}/zh-TW` : `${SITE_URL}/zh-CN`,
       languages: {
-        "zh-CN": "https://hetu-music.com/zh-CN",
-        "zh-TW": "https://hetu-music.com/zh-TW",
+        "zh-CN": `${SITE_URL}/zh-CN`,
+        "zh-TW": `${SITE_URL}/zh-TW`,
       },
     },
     openGraph: {

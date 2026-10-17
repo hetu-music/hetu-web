@@ -1,5 +1,9 @@
 import type { SongFieldConfig } from "@/lib/types";
 
+// 站点正式地址（canonical、sitemap、JSON-LD 都以它为准；根域名 301 到这里）。
+// 不用 NEXT_PUBLIC_SITE_URL：它本地是 localhost、CI 构建是占位值，且只用于清缓存
+export const SITE_URL = "https://www.hetu-music.com";
+
 export const FILTER_OPTION_ALL = "全部";
 export const FILTER_OPTION_UNKNOWN = "未知";
 export const MUSIC_LIBRARY_VIEW_MODES = ["grid", "list"] as const;

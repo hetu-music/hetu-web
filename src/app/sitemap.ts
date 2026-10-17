@@ -2,8 +2,7 @@ import { getSongLastModifiedMap, getSongs } from "@/lib/server/service-songs";
 import { getImageryLastModified } from "@/lib/server/service-imagery";
 import { getStoryLastModified } from "@/lib/server/service-story";
 import type { MetadataRoute } from "next";
-
-const SITE_URL = "https://hetu-music.com";
+import { SITE_URL } from "@/lib/constants";
 
 /**
  * lastModified 一律取自真实数据，不用 new Date()。

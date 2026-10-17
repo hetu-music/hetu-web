@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { serializeJsonLd } from "@/lib/utils/utils-common";
+import { SITE_URL } from "@/lib/constants";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -55,23 +56,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "Hetu",
       "Qing Jin Tian Xia",
     ],
-    authors: [{ url: "https://hetu-music.com" }],
+    authors: [{ url: SITE_URL }],
     creator: siteName,
     alternates: {
       canonical:
         locale === "zh-TW"
-          ? "https://hetu-music.com/zh-TW/story/qjtx"
-          : "https://hetu-music.com/zh-CN/story/qjtx",
+          ? `${SITE_URL}/zh-TW/story/qjtx`
+          : `${SITE_URL}/zh-CN/story/qjtx`,
       languages: {
-        "zh-CN": "https://hetu-music.com/zh-CN/story/qjtx",
-        "zh-TW": "https://hetu-music.com/zh-TW/story/qjtx",
+        "zh-CN": `${SITE_URL}/zh-CN/story/qjtx`,
+        "zh-TW": `${SITE_URL}/zh-TW/story/qjtx`,
       },
     },
     openGraph: {
       title: `${title} - ${siteName}`,
       description,
       type: "article",
-      url: "https://hetu-music.com/zh-CN/story/qjtx",
+      url: `${SITE_URL}/zh-CN/story/qjtx`,
       siteName: siteName,
       locale: locale.replace("-", "_"),
       images: [
@@ -113,18 +114,18 @@ export default async function QingJinTianXiaPage({ params }: Props) {
     "@type": "Article",
     headline: title,
     description,
-    image: "https://hetu-music.com/story/qjtx/31.avif",
+    image: `${SITE_URL}/story/qjtx/31.avif`,
     publisher: {
       "@type": "Organization",
       name: siteName,
       logo: {
         "@type": "ImageObject",
-        url: "https://hetu-music.com/icons/icon-512x512.png",
+        url: `${SITE_URL}/icons/icon-512x512.png`,
       },
     },
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": "https://hetu-music.com/zh-CN/story/qjtx",
+      "@id": `${SITE_URL}/zh-CN/story/qjtx`,
     },
   };
 

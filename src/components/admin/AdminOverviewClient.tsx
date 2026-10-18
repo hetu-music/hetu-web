@@ -9,13 +9,17 @@ import { useAudioAdmin } from "./audio-admin/useAudioAdmin";
 import AdminShell from "./kit/AdminShell";
 import { ADMIN_SECTIONS } from "./kit/AdminNavbar";
 import { SOLID_BUTTON_CLASS } from "./kit/styles";
+import { MISSING_GROUPS, type MissingGroup } from "./song-admin/types";
 
 export interface OverviewCounts {
   songs: number;
   pendingRequests: number;
   unpublished: number;
   incomplete: number;
+  /** 待完善里各组缺资料的歌数；一首歌可能同时缺几组 */
+  missingByGroup: Record<MissingGroup, number>;
   lacksImagery: number;
+  lacksScore: number;
 }
 
 /**
@@ -58,7 +62,12 @@ export default function AdminOverviewClient({
           href="/admin/songs?f=incomplete"
           count={counts.incomplete}
           label="资料待完善"
-          hint="缺歌词、署名、时长等关键字段"
+          hint="缺歌词、署名、日期等关键字段"
+          breakdown={MISSING_GROUPS.map((g) => ({
+            label: g.label,
+            count: counts.missingByGroup[g.key],
+            href: `/admin/songs?f=incomplete&miss=${g.key}`,
+          }))}
         />
         <TodoItem
           href="/admin/songs?f=imagery"
@@ -68,6 +77,21 @@ export default function AdminOverviewClient({
         />
         {isSuper && <AudioTodo />}
       </ol>
+
+      {/* 乐谱要另找来上传，不是漏填的资料，也没有期限，不和上面的待办混在一起 */}
+      <section className="mt-16">
+        <h2 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+          素材
+        </h2>
+        <ol className="mt-4 grid border-t border-slate-200/70 md:grid-cols-2 dark:border-slate-800">
+          <TodoItem
+            href="/admin/songs?f=score"
+            count={counts.lacksScore}
+            label="缺乐谱"
+            hint="找到简谱后，在歌曲的「封面与乐谱」里上传"
+          />
+        </ol>
+      </section>
 
       <nav className="mt-16">
         <h2 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
@@ -97,16 +121,20 @@ function TodoItem({
   count,
   label,
   hint,
+  breakdown,
 }: {
   href: string;
   /** null 表示还在取 */
   count: number | null;
   label: string;
   hint: string;
+  /** 分项，各自链到筛好的列表；为 0 的不列 */
+  breakdown?: { label: string; count: number; href: string }[];
 }) {
+  const parts = breakdown?.filter((b) => b.count > 0) ?? [];
   const done = count === 0;
   return (
-    <li className="border-b border-slate-200/70 md:odd:border-r md:odd:pr-8 md:even:pl-8 dark:border-slate-800">
+    <li className="border-b border-slate-200/70 md:odd:not-last:border-r md:odd:pr-8 md:even:pl-8 dark:border-slate-800">
       <Link href={href} className="group flex items-baseline gap-5 py-6">
         <span
           className={cn(
@@ -136,6 +164,32 @@ function TodoItem({
           </span>
         </span>
       </Link>
+      {/* 与上面的标签对齐：数字栏 4rem 加间距 1.25rem */}
+      {parts.length > 0 && (
+        <p className="-mt-3 mb-6 ml-[5.25rem] flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+          {parts.map((b, i) => (
+            <span key={b.href} className="flex items-baseline gap-x-3">
+              {i > 0 && (
+                <span
+                  aria-hidden
+                  className="text-slate-300 dark:text-slate-600"
+                >
+                  ·
+                </span>
+              )}
+              <Link
+                href={b.href}
+                className="text-slate-500 transition-colors hover:text-(--tone) dark:text-slate-400"
+              >
+                {b.label}
+                <span className="ml-1.5 tabular-nums text-slate-800 dark:text-slate-200">
+                  {b.count}
+                </span>
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
     </li>
   );
 }

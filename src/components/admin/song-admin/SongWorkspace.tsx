@@ -30,7 +30,8 @@ import SongFormField from "./SongFormFields";
 import SongImageryTab from "./SongImageryTab";
 import UsageNotesButton from "./UsageNotes";
 import { type SongWorkspaceState, useSongWorkspace } from "./useSongWorkspace";
-import { getMissingFields } from "./utils";
+import { MISSING_FIELD_LABEL_OVERRIDES, MISSING_GROUPS } from "./types";
+import { getMissingFields, isFieldEmpty, lacksScore } from "./utils";
 
 const TABS = ["info", "assets", "imagery", "audio"] as const;
 type Tab = (typeof TABS)[number];
@@ -149,7 +150,7 @@ export default function SongWorkspace({
           className={cn(tab !== "info" && tab !== "assets" && "hidden")}
         >
           <div className={cn(tab !== "info" && "hidden")}>
-            <InfoTab ws={ws} missing={missing} />
+            <InfoTab ws={ws} onOpenAssets={() => void setTab("assets")} />
           </div>
           {song && tab === "assets" && <AssetsTab ws={ws} song={song} />}
         </form>
@@ -258,18 +259,28 @@ function FieldGrid({
   );
 }
 
+/** 表单里放这个字段的那一段，待完善列表点组名时滚过去 */
+const sectionIdOf = (key: SongFormFieldKey) => {
+  const group = FIELD_GROUPS.find((g) => g.keys.includes(key));
+  return group ? `fields-${group.label}` : undefined;
+};
+
 function InfoTab({
   ws,
-  missing,
+  onOpenAssets,
 }: {
   ws: SongWorkspaceState;
-  missing: string[];
+  onOpenAssets: () => void;
 }) {
   return (
     <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-x-16">
       <div className="space-y-12">
         {FIELD_GROUPS.map((group, i) => (
-          <section key={group.label}>
+          <section
+            key={group.label}
+            id={`fields-${group.label}`}
+            className="scroll-mt-[calc(var(--nav-h)+5rem)]"
+          >
             <SectionHeading label={group.label}>
               {i === 0 && ws.song && (
                 <span className="flex items-baseline gap-3">
@@ -302,7 +313,7 @@ function InfoTab({
 
       {ws.song && (
         <aside className="mt-12 space-y-8 text-sm lg:sticky lg:top-[calc(var(--nav-h)+5rem)] lg:mt-0 lg:self-start">
-          <SideList title="待完善" items={missing} empty="都填好了" warn />
+          <MissingList song={ws.song} onOpenAssets={onOpenAssets} />
           <SideList
             title="与线上不同"
             items={[...ws.changedFields].map(
@@ -318,16 +329,74 @@ function InfoTab({
   );
 }
 
+/**
+ * 待完善按组列出（与歌曲列表的细分同一套分组），点组名滚到表单里那一段。
+ * 乐谱不算待完善，单独一行，点了切到「封面与乐谱」。
+ * 按暂存版判断：刚填还没暂存的字段要暂存后才从这里消失。
+ */
+function MissingList({
+  song,
+  onOpenAssets,
+}: {
+  song: SongDetail;
+  onOpenAssets: () => void;
+}) {
+  const groups = MISSING_GROUPS.map((group) => {
+    const fields = songFields.filter(
+      (f) => group.keys.includes(f.key) && isFieldEmpty(song, f),
+    );
+    return { ...group, fields };
+  }).filter((g) => g.fields.length > 0);
+
+  return (
+    <div>
+      <h3 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+        待完善
+      </h3>
+      {groups.length === 0 ? (
+        <p className="mt-2 font-kaiti text-slate-400">资料都填好了</p>
+      ) : (
+        <dl className="mt-2 space-y-1.5 leading-relaxed">
+          {groups.map((g) => (
+            <div key={g.key} className="flex gap-3">
+              <dt className="shrink-0">
+                <a
+                  href={`#${sectionIdOf(g.fields[0].key)}`}
+                  className="text-slate-700 transition-colors hover:text-(--tone) dark:text-slate-200"
+                >
+                  {g.label}
+                </a>
+              </dt>
+              <dd className={WARN_TEXT_CLASS}>
+                {g.fields
+                  .map((f) => MISSING_FIELD_LABEL_OVERRIDES[f.key] ?? f.label)
+                  .join("、")}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {lacksScore(song) && (
+        <button
+          type="button"
+          onClick={onOpenAssets}
+          className={cn(TEXT_BUTTON_CLASS, "mt-3 tracking-normal")}
+        >
+          还没有乐谱，去上传
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SideList({
   title,
   items,
   empty,
-  warn = false,
 }: {
   title: string;
   items: string[];
   empty: string;
-  warn?: boolean;
 }) {
   return (
     <div>
@@ -337,12 +406,7 @@ function SideList({
       {items.length === 0 ? (
         <p className="mt-2 font-kaiti text-slate-400">{empty}</p>
       ) : (
-        <p
-          className={cn(
-            "mt-2 leading-relaxed",
-            warn ? WARN_TEXT_CLASS : "text-slate-600 dark:text-slate-300",
-          )}
-        >
+        <p className="mt-2 leading-relaxed text-slate-600 dark:text-slate-300">
           {items.join("、")}
         </p>
       )}

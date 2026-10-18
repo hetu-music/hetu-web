@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils/utils";
 import type { PublishStatus } from "@/lib/utils/utils-song-diff";
 import AdminShell from "../kit/AdminShell";
 import {
+  AdminOptions,
   AdminToolbar,
   EmptyState,
   ErrorState,
@@ -21,12 +22,22 @@ import {
 } from "../kit/parts";
 import { META_CLASS, SOLID_BUTTON_CLASS, WARN_TEXT_CLASS } from "../kit/styles";
 import { AdminCoverArt } from "./shared";
+import { MISSING_GROUPS, type MissingGroup } from "./types";
 import UsageNotesButton from "./UsageNotes";
-import { getMissingFields } from "./utils";
+import {
+  getMissingFields,
+  getMissingGroups,
+  lacksScore,
+  summarizeMissing,
+} from "./utils";
 
 const ITEMS_PER_PAGE = 30;
 
-type Filter = "all" | "incomplete" | "unpublished" | "imagery";
+type Filter = "all" | "incomplete" | "unpublished" | "imagery" | "score";
+type Miss = "all" | MissingGroup;
+
+/** 表头与每一行共用的列宽 */
+const GRID_COLS = "lg:grid-cols-[3rem_2.5rem_minmax(0,1fr)_9rem_5rem_14rem]";
 
 /** 进不了寻曲测验的歌：类型允许入池，但意象标注不够 */
 function lacksImagery(song: SongDetail, count: number) {
@@ -62,6 +73,11 @@ export default function SongListClient({
     "f",
     parseAsString.withDefault("all").withOptions({ shallow: true }),
   );
+  // 待完善下再按缺哪组资料细分
+  const [miss, setMiss] = useSyncedQueryState<string>(
+    "miss",
+    parseAsString.withDefault("all").withOptions({ shallow: true }),
+  );
 
   const { songs, sortedSongs, error } = useSongs(
     initialSongs,
@@ -76,11 +92,23 @@ export default function SongListClient({
       unpublished: (s) =>
         (publishStatuses[s.id] ?? "unpublished") !== "published",
       imagery: (s) => lacksImagery(s, occurrenceCounts[s.id] ?? 0),
+      score: lacksScore,
     }),
     [occurrenceCounts, publishStatuses],
   );
   const activeFilter: Filter =
     filter in predicates ? (filter as Filter) : "all";
+  const activeMiss: Miss = MISSING_GROUPS.some((g) => g.key === miss)
+    ? (miss as MissingGroup)
+    : "all";
+  const missGroupsById = useMemo(
+    () => new Map(songs.map((s) => [s.id, getMissingGroups(s)])),
+    [songs],
+  );
+  const matchesMiss = (s: SongDetail) =>
+    activeFilter !== "incomplete" ||
+    activeMiss === "all" ||
+    (missGroupsById.get(s.id) ?? []).includes(activeMiss);
 
   const counts = useMemo(
     () =>
@@ -93,10 +121,11 @@ export default function SongListClient({
     [predicates, songs],
   );
 
-  const visibleSongs = useMemo(
-    () => sortedSongs.filter(predicates[activeFilter]),
-    [activeFilter, predicates, sortedSongs],
+  const visibleSongs = sortedSongs.filter(
+    (s) => predicates[activeFilter](s) && matchesMiss(s),
   );
+  const missCount = (group: MissingGroup) =>
+    songs.filter((s) => missGroupsById.get(s.id)?.includes(group)).length;
 
   const totalPages = Math.max(
     1,
@@ -117,6 +146,7 @@ export default function SongListClient({
     { key: "incomplete", label: "待完善", count: counts.incomplete },
     { key: "unpublished", label: "待发布", count: counts.unpublished },
     { key: "imagery", label: "意象不足", count: counts.imagery },
+    { key: "score", label: "缺乐谱", count: counts.score },
   ];
 
   return (
@@ -160,9 +190,31 @@ export default function SongListClient({
           active={activeFilter}
           onSelect={(key) => {
             setFilter(key);
+            setMiss("all");
             setCurrentPage(1);
           }}
         />
+        {activeFilter === "incomplete" && (
+          <div className="flex items-baseline gap-3">
+            <span className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+              缺
+            </span>
+            <AdminOptions
+              items={[
+                { id: "all" as Miss, label: "全部" },
+                ...MISSING_GROUPS.map((g) => ({
+                  id: g.key as Miss,
+                  label: `${g.label} ${missCount(g.key)}`,
+                })),
+              ]}
+              active={activeMiss}
+              onSelect={(id) => {
+                setMiss(id);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+        )}
       </AdminToolbar>
 
       {error && songs.length === 0 ? (
@@ -174,7 +226,8 @@ export default function SongListClient({
           <div
             className={cn(
               META_CLASS,
-              "hidden border-b border-slate-200/70 pb-2 lg:grid lg:grid-cols-[3rem_2.5rem_minmax(0,1fr)_10rem_6rem_10rem] lg:gap-4 dark:border-slate-800",
+              "hidden border-b border-slate-200/70 pb-2 lg:grid lg:gap-4 dark:border-slate-800",
+              GRID_COLS,
             )}
           >
             <span className="text-right">#</span>
@@ -223,7 +276,10 @@ function SongRow({
     <li className="border-b border-slate-200/70 dark:border-slate-800">
       <Link
         href={`/admin/songs/${song.id}`}
-        className="group grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1 py-3 transition-colors hover:bg-slate-100/60 lg:grid-cols-[3rem_2.5rem_minmax(0,1fr)_10rem_6rem_10rem] lg:gap-4 dark:hover:bg-slate-900/60"
+        className={cn(
+          "group grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1 py-3 transition-colors hover:bg-slate-100/60 lg:gap-4 dark:hover:bg-slate-900/60",
+          GRID_COLS,
+        )}
       >
         <span className="hidden text-right font-mono text-xs text-slate-400 tabular-nums lg:block">
           {song.id}
@@ -260,7 +316,7 @@ function SongRow({
           )}
           {missing.length > 0 && (
             <span className={WARN_TEXT_CLASS} title={missing.join("、")}>
-              缺 {missing.length} 项
+              缺{summarizeMissing(missing)}
             </span>
           )}
           <span

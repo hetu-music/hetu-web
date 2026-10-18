@@ -10,7 +10,11 @@ import {
 } from "@/lib/server/service-admin";
 import { getSongs } from "@/lib/server/service-songs";
 import type { SongDetail } from "@/lib/types";
-import { getMissingFields } from "@/components/admin/song-admin/utils";
+import { MISSING_GROUPS } from "@/components/admin/song-admin/types";
+import {
+  getMissingGroups,
+  lacksScore,
+} from "@/components/admin/song-admin/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +43,8 @@ export default async function AdminOverviewPage({ params }: Props) {
     getPendingRequestCount(isSuper),
   ]);
 
+  const missingGroups = songs.map(getMissingGroups);
+
   return (
     <AdminOverviewClient
       counts={{
@@ -47,7 +53,14 @@ export default async function AdminOverviewPage({ params }: Props) {
         unpublished: songs.filter(
           (s) => (statuses[s.id] ?? "unpublished") !== "published",
         ).length,
-        incomplete: songs.filter((s) => getMissingFields(s).length > 0).length,
+        incomplete: missingGroups.filter((g) => g.length > 0).length,
+        missingByGroup: Object.fromEntries(
+          MISSING_GROUPS.map((group) => [
+            group.key,
+            missingGroups.filter((g) => g.includes(group.key)).length,
+          ]),
+        ) as Record<(typeof MISSING_GROUPS)[number]["key"], number>,
+        lacksScore: songs.filter(lacksScore).length,
         lacksImagery: songs.filter(
           (s) =>
             isPoolEligible({ title: s.title, type: s.type ?? null }) &&

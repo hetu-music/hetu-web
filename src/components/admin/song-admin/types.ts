@@ -14,6 +14,8 @@ export type CreatorFieldKey = (typeof CREATOR_FIELD_KEYS)[number];
 /**
  * 判断「资料是否完善」时不计入的字段。
  * 这几项缺失属正常情况，不应把歌曲标记为待完善。
+ * 乐谱是要另找来上传的素材，不是漏填的资料：曾经算在里面，
+ * 结果 265 首待完善里有 220 首只缺乐谱，真缺资料的反而看不出来。另见 lacksScore。
  */
 export const NON_CRITICAL_FIELD_KEYS: readonly SongFormFieldKey[] = [
   "hascover",
@@ -23,6 +25,38 @@ export const NON_CRITICAL_FIELD_KEYS: readonly SongFormFieldKey[] = [
   "comment",
   "dispute_note",
   "lyrics_start",
+  "nmn_status",
+];
+
+export type MissingGroup = "lyrics" | "credits" | "basic";
+
+/**
+ * 待完善按资料分组：歌词影响正文、意象与寻曲测验，最要紧，单列一组。
+ * 其余关键字段都归「基本」。顺序即显示顺序。
+ */
+export const MISSING_GROUPS: readonly {
+  key: MissingGroup;
+  label: string;
+  keys: readonly SongFormFieldKey[];
+}[] = [
+  { key: "lyrics", label: "歌词", keys: ["lyrics"] },
+  { key: "credits", label: "署名", keys: CREATOR_FIELD_KEYS },
+  {
+    key: "basic",
+    label: "基本",
+    keys: [
+      "title",
+      "album",
+      "date",
+      "length",
+      "type",
+      "genre",
+      "track",
+      "tracktotal",
+      "discnumber",
+      "disctotal",
+    ],
+  },
 ];
 
 /** 待完善标签上与 songFields.label 不一致的显示名 */

@@ -7,6 +7,10 @@ import type {
 } from "@/lib/types";
 import {
   getMissingFields,
+  getMissingGroups,
+  getMissingLinks,
+  lacksScore,
+  summarizeMissing,
   isCreatorFieldKey,
   isCriticalField,
   isFieldEmpty,
@@ -59,13 +63,14 @@ function makeCompleteSong(overrides: SongOverrides = {}): SongDetail {
 }
 
 describe("isCriticalField", () => {
-  it("封面 / 外链 / 备注不计入完善度", () => {
+  it("封面 / 外链 / 备注 / 乐谱不计入完善度", () => {
     for (const key of [
       "hascover",
       "kugolink",
       "qmlink",
       "nelink",
       "comment",
+      "nmn_status",
     ] as const) {
       expect(isCriticalField(key)).toBe(false);
     }
@@ -73,7 +78,7 @@ describe("isCriticalField", () => {
 
   it("标题等字段计入完善度", () => {
     expect(isCriticalField("title")).toBe(true);
-    expect(isCriticalField("nmn_status")).toBe(true);
+    expect(isCriticalField("lyrics")).toBe(true);
   });
 });
 
@@ -147,10 +152,13 @@ describe("getMissingFields / isSongIncomplete", () => {
     expect(isSongIncomplete(song)).toBe(false);
   });
 
-  it("nmn_status 为 false 时算待完善", () => {
+  it("只缺乐谱不算待完善，另由 lacksScore 判断", () => {
     const song = makeCompleteSong({ nmn_status: false });
-    expect(getMissingFields(song)).toContain("乐谱");
-    expect(isSongIncomplete(song)).toBe(true);
+    expect(getMissingFields(song)).toEqual([]);
+    expect(isSongIncomplete(song)).toBe(false);
+    expect(lacksScore(song)).toBe(true);
+    expect(lacksScore(makeCompleteSong({ nmn_status: null }))).toBe(true);
+    expect(lacksScore(makeCompleteSong())).toBe(false);
   });
 
   // 两个函数此前是各写一遍的独立实现，合并后必须保持等价
@@ -166,6 +174,63 @@ describe("getMissingFields / isSongIncomplete", () => {
     for (const song of samples) {
       expect(isSongIncomplete(song)).toBe(getMissingFields(song).length > 0);
     }
+  });
+});
+
+describe("getMissingGroups", () => {
+  it("齐全时为空", () => {
+    expect(getMissingGroups(makeCompleteSong())).toEqual([]);
+  });
+
+  it("按歌词、署名、基本的顺序列出缺的组", () => {
+    const song = makeCompleteSong({ date: null, lyricist: [], lyrics: "" });
+    expect(getMissingGroups(song)).toEqual(["lyrics", "credits", "basic"]);
+  });
+
+  it("乐谱不属于任何一组", () => {
+    expect(getMissingGroups(makeCompleteSong({ nmn_status: false }))).toEqual(
+      [],
+    );
+  });
+
+  it("有缺失就至少落进一组", () => {
+    const samples = [
+      makeCompleteSong({ title: null }),
+      makeCompleteSong({ albumartist: [] }),
+      makeCompleteSong({ disctotal: null }),
+    ];
+    for (const song of samples) {
+      expect(getMissingGroups(song).length > 0).toBe(isSongIncomplete(song));
+    }
+  });
+});
+
+describe("getMissingLinks", () => {
+  it("三个平台都有时为空", () => {
+    expect(getMissingLinks(makeCompleteSong())).toEqual([]);
+  });
+
+  it("按网易云、酷狗、QQ音乐的顺序列出没填的，空白也算没填", () => {
+    const song = makeCompleteSong({ qmlink: null, nelink: "  " });
+    expect(getMissingLinks(song)).toEqual(["nelink", "qmlink"]);
+  });
+
+  it("缺链接不算待完善", () => {
+    const song = makeCompleteSong({ kugolink: null });
+    expect(isSongIncomplete(song)).toBe(false);
+  });
+});
+
+describe("summarizeMissing", () => {
+  it("两项以内全写出", () => {
+    expect(summarizeMissing(["歌词"])).toBe("歌词");
+    expect(summarizeMissing(["歌词", "作词"])).toBe("歌词、作词");
+  });
+
+  it("多了只写前两项和总数", () => {
+    expect(summarizeMissing(["歌词", "作词", "日期", "时长"])).toBe(
+      "歌词、作词等 4 项",
+    );
   });
 });
 

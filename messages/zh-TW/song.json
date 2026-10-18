@@ -65,7 +65,6 @@
   "scoreLoadError": "樂譜載入失敗",
   "copySuccess": "連結已複製到剪貼簿",
   "copyError": "複製失敗",
-  "shareCancel": "分享取消或失敗",
   "shareText": "來聽聽河圖的這首歌：{title}{artist}",
   "shareTitle": "歌曲詳情",
   "folio": {

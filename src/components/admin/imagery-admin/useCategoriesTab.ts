@@ -8,48 +8,28 @@ import { toCategoryPayload } from "@/lib/forms/imagery-form";
 import type { ImageryCategory } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import type { CategoryFormValues } from "@/lib/forms/imagery-form";
+import {
+  IMAGERY_KEYS,
+  useImageryCategoriesQuery,
+  useUpdateCache,
+} from "./queries";
 import type { ModalState } from "./types";
 import { buildTree, getCategoryPath } from "./utils";
-
-const PAGE_SIZE = 20;
 
 export function useCategoriesTab(
   initialCategories: ImageryCategory[],
   csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
-  const [categories, setCategories] =
-    useState<ImageryCategory[]>(initialCategories);
-  const [page, setPage] = useState(1);
+  const categoriesQuery = useImageryCategoriesQuery(initialCategories);
+  const categories = categoriesQuery.data ?? initialCategories;
+  const setCategories = useUpdateCache<ImageryCategory>(
+    IMAGERY_KEYS.categories,
+  );
   const [modal, setModal] = useState<ModalState>({ type: "none" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categoryTree = useMemo(() => buildTree(categories), [categories]);
-
-  const sortedCategories = useMemo(
-    () =>
-      [...categories].sort((left, right) =>
-        getCategoryPath(left.id, categories).localeCompare(
-          getCategoryPath(right.id, categories),
-          "zh-CN",
-        ),
-      ),
-    [categories],
-  );
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(sortedCategories.length / PAGE_SIZE),
-  );
-  const currentPage = Math.min(page, totalPages);
-  const pagedCategories = useMemo(
-    () =>
-      sortedCategories.slice(
-        (currentPage - 1) * PAGE_SIZE,
-        currentPage * PAGE_SIZE,
-      ),
-    [currentPage, sortedCategories],
-  );
 
   const openAdd = (parentId?: number) =>
     setModal({ type: "add-category", parentId });
@@ -110,16 +90,8 @@ export function useCategoriesTab(
 
   return {
     categories,
-    setCategories,
     categoryTree,
-    sortedCategories,
-    pagedCategories,
-    currentPage,
-    totalPages,
-    page,
-    setPage,
     modal,
-    setModal,
     isSubmitting,
     openAdd,
     openEdit,

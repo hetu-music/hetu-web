@@ -12,7 +12,7 @@ const Dialog = BaseDialog.Root;
 const DialogClose = BaseDialog.Close;
 
 /**
- * 公开页的浮层题头：一行衬线小字，右侧收起。居中弹窗与底部面板共用
+ * 公开页的浮层题头：一行加粗的衬线小字（与章节题头一样，字重来自 globals.css 的标题样式），右侧收起。居中弹窗与底部面板共用
  * （Drawer 的 Title、Close 就是 Dialog 的同一份实现）。
  */
 function PanelHeader({
@@ -26,7 +26,7 @@ function PanelHeader({
   const tNav = useTranslations("common.nav");
   return (
     <div className="flex shrink-0 items-center justify-between px-6 pt-5 pb-2">
-      <BaseDialog.Title className="font-serif text-xs font-normal tracking-[0.4em] text-(--tone)">
+      <BaseDialog.Title className="font-serif text-xs tracking-[0.4em] text-(--tone)">
         {title}
       </BaseDialog.Title>
       {description && (

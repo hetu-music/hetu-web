@@ -1,9 +1,6 @@
 "use client";
 
 import PlayingBars from "@/components/shared/PlayingBars";
-import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
-import { cn } from "@/lib/utils/utils";
-import { usePlayerStore } from "@/store/player-store";
 import {
   Drawer,
   DrawerContent,
@@ -16,9 +13,13 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
+import { useTwoStepConfirm } from "@/hooks/ui/useTwoStepConfirm";
+import { cn } from "@/lib/utils/utils";
+import { usePlayerStore } from "@/store/player-store";
 import { ListMusic, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 
 const ICON_BUTTON =
   "flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-700 md:size-9 dark:text-slate-500 dark:hover:text-slate-200";
@@ -69,7 +70,7 @@ export default function QueueControl() {
           side="top"
           align="end"
           sideOffset={20}
-          className="flex max-h-[26rem] w-[22rem] flex-col p-0"
+          className="flex max-h-104 w-88 flex-col p-0"
         >
           <QueueList Title={PopoverTitle} onClose={close} />
         </PopoverContent>
@@ -107,13 +108,8 @@ function QueueList({
   const removeFromQueue = usePlayerStore((s) => s.removeFromQueue);
   const clearQueue = usePlayerStore((s) => s.clearQueue);
 
-  const [confirmClear, setConfirmClear] = useState(false);
   // 「清空」点一下变成「确认清空」，几秒内不确认就复原
-  useEffect(() => {
-    if (!confirmClear) return;
-    const timer = setTimeout(() => setConfirmClear(false), 3000);
-    return () => clearTimeout(timer);
-  }, [confirmClear]);
+  const clearConfirm = useTwoStepConfirm();
 
   // 打开时把当前曲滚到列表中间。不用 scrollIntoView：窄屏面板正从屏幕外滑入，
   // scrollIntoView 会连带滚动整个页面
@@ -132,9 +128,7 @@ function QueueList({
       <div className="flex shrink-0 items-center justify-between gap-4 px-5 pt-5 pb-3">
         {/* 面板的名字只是「播放队列」，曲数放在标题外 */}
         <div className="font-serif text-xs tracking-[0.4em] text-(--tone)">
-          <Title className="inline text-xs font-normal">
-            {t("queueTitle")}
-          </Title>
+          <Title className="inline text-xs">{t("queueTitle")}</Title>
           <span className="ml-2 font-sans tracking-wider text-slate-400 dark:text-slate-500">
             {t("queueCount", { count: queue.length })}
           </span>
@@ -142,16 +136,16 @@ function QueueList({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() =>
-              confirmClear ? clearQueue() : setConfirmClear(true)
-            }
+            onClick={() => {
+              if (clearConfirm.request()) clearQueue();
+            }}
             className={cn(
               TEXT_BUTTON,
-              confirmClear &&
+              clearConfirm.confirming &&
                 "text-rose-500 hover:text-rose-500 dark:text-rose-500 dark:hover:text-rose-500",
             )}
           >
-            {confirmClear ? t("confirmClear") : t("clear")}
+            {clearConfirm.confirming ? t("confirmClear") : t("clear")}
           </button>
           <button
             type="button"

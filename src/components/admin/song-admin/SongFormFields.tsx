@@ -1,7 +1,5 @@
 import { Plus, X } from "lucide-react";
 import { Controller, useFieldArray, useFormContext } from "react-hook-form";
-import CoverUpload from "@/components/admin/CoverUpload";
-import ScoreUpload from "@/components/admin/ScoreUpload";
 import { genreColorMap, typeColorMap } from "@/lib/constants";
 import type {
   SongArrayFieldItem,
@@ -9,17 +7,20 @@ import type {
 } from "@/lib/forms/song-form";
 import type { SongFieldConfig } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
+import {
+  INPUT_CLASS,
+  INPUT_ERROR_CLASS,
+  LABEL_CLASS,
+  optionClass,
+  SELECT_CLASS,
+  TEXT_BUTTON_CLASS,
+} from "../kit/styles";
 import { FieldErrorMessage } from "./shared";
 import type { CreatorFieldKey } from "./types";
-import { getInputValue, hasSongId, isCreatorFieldKey } from "./utils";
+import { getInputValue, isCreatorFieldKey } from "./utils";
 
-function inputClass(hasError: boolean) {
-  return cn(
-    "w-full px-4 py-2.5 bg-white dark:bg-black/20 border rounded-xl outline-none transition-all",
-    hasError
-      ? "border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/10"
-      : "border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10",
-  );
+function inputClass(hasError: boolean, extra?: string) {
+  return cn(INPUT_CLASS, hasError && INPUT_ERROR_CLASS, extra);
 }
 
 /** 创作者类字段：可增删的多行输入 */
@@ -31,47 +32,87 @@ function CreatorFieldArrayInput({ fieldKey }: { fieldKey: CreatorFieldKey }) {
     name: fieldKey,
   });
   const errorMessage = getFieldState(fieldKey, formState).error?.message;
-  const baseClass = inputClass(Boolean(errorMessage));
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {fields.map((item, index) => (
-        <div key={item.id} className="flex gap-2">
+        <div key={item.id} className="flex items-center gap-2">
           <input
             {...register(`${fieldKey}.${index}.value`)}
-            className={baseClass}
+            className={inputClass(Boolean(errorMessage))}
           />
           <button
             type="button"
             onClick={() => remove(index)}
-            className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            className="p-1 text-slate-300 transition-colors hover:text-rose-500 dark:text-slate-600"
+            aria-label="移除这一项"
           >
-            <X size={18} />
+            <X size={14} />
           </button>
         </div>
       ))}
       <button
         type="button"
         onClick={() => append({ value: "" } satisfies SongArrayFieldItem)}
-        className="text-xs font-medium text-blue-600 hover:text-blue-500 flex items-center gap-1"
+        className={cn(TEXT_BUTTON_CLASS, "inline-flex items-center gap-1 py-1")}
       >
-        <Plus size={14} /> 添加一项
+        <Plus size={12} /> 添加一项
       </button>
       <FieldErrorMessage message={errorMessage} />
     </div>
   );
 }
 
-/** 按字段配置分派到对应的输入控件 */
-export default function SongFormField({
-  field,
-  csrfToken,
-  songId,
+/** 类型、流派：多选的文字开关，选中只变色 */
+function ToggleOptions({
+  options,
+  value,
+  onChange,
 }: {
-  field: SongFieldConfig;
-  csrfToken: string;
-  songId?: number;
+  options: string[];
+  value: string[];
+  onChange: (next: string[]) => void;
 }) {
+  return (
+    <div className="flex flex-wrap gap-x-4">
+      {options.map((opt) => {
+        const active = value.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            aria-pressed={active}
+            onClick={() =>
+              onChange(
+                active ? value.filter((x) => x !== opt) : [...value, opt],
+              )
+            }
+            className={optionClass(active)}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const BOOLEAN_OPTIONS: Partial<
+  Record<SongFieldConfig["key"], { value: string; label: string }[]>
+> = {
+  hascover: [
+    { value: "", label: "白底狐狸（默认）" },
+    { value: "false", label: "初号机（黑底）" },
+    { value: "true", label: "定制封面" },
+  ],
+  nmn_status: [
+    { value: "false", label: "无" },
+    { value: "true", label: "有" },
+  ],
+};
+
+/** 按字段配置分派到对应的输入控件 */
+function SongFormInput({ field }: { field: SongFieldConfig }) {
   const { control } = useFormContext<SongFormStateValues>();
 
   if (isCreatorFieldKey(field.key)) {
@@ -85,76 +126,54 @@ export default function SongFormField({
       render={({ field: controllerField, fieldState }) => {
         const value = controllerField.value;
         const errorMessage = fieldState.error?.message;
-        const baseClass = inputClass(Boolean(errorMessage));
+        const hasError = Boolean(errorMessage);
+        const text = getInputValue(
+          typeof value === "string" || typeof value === "number"
+            ? value
+            : undefined,
+        );
 
         if (field.key === "genre" || field.key === "type") {
-          const options =
-            field.key === "genre"
-              ? Object.keys(genreColorMap)
-              : Object.keys(typeColorMap);
+          const options = Object.keys(
+            field.key === "genre" ? genreColorMap : typeColorMap,
+          );
           const arr = Array.isArray(value)
             ? value.filter((item): item is string => typeof item === "string")
             : typeof value === "string"
               ? [value]
               : [];
-
           return (
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-2">
-                {options.map((opt) => {
-                  const isActive = arr.includes(opt);
-                  const colorClass =
-                    (field.key === "genre" ? genreColorMap : typeColorMap)[
-                      opt
-                    ] || "bg-slate-100 text-slate-600";
-
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => {
-                        const next = isActive
-                          ? arr.filter((x) => x !== opt)
-                          : [...arr, opt];
-                        controllerField.onChange(next);
-                      }}
-                      className={cn(
-                        "px-3 py-1 rounded-full text-xs font-medium border transition-all",
-                        isActive
-                          ? "ring-2 ring-offset-1 ring-blue-500 dark:ring-offset-[#151921]"
-                          : "opacity-80 grayscale-[0.3] hover:grayscale-0 hover:opacity-100",
-                        colorClass
-                          .replace("bg-", "bg-opacity-20 bg-")
-                          .replace("text-", "text-"),
-                      )}
-                      style={{
-                        backgroundColor: isActive ? undefined : "transparent",
-                        borderColor: isActive ? "transparent" : "currentColor",
-                      }}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
+            <>
+              <ToggleOptions
+                options={options}
+                value={arr}
+                onChange={controllerField.onChange}
+              />
               <FieldErrorMessage message={errorMessage} />
-            </div>
+            </>
           );
         }
 
         if (field.type === "textarea") {
+          const isLyrics = field.key === "lyrics";
           return (
             <>
               <textarea
                 {...controllerField}
-                value={getInputValue(
-                  typeof value === "string" || typeof value === "number"
-                    ? value
-                    : undefined,
-                )}
+                value={text}
                 onChange={(e) => controllerField.onChange(e.target.value)}
-                className={baseClass}
-                rows={4}
+                className={inputClass(
+                  hasError,
+                  // LRC 是原始数据用等宽；备注、争议是人写的话用楷体（DESIGN.md 第三节）
+                  cn(
+                    "resize-y",
+                    isLyrics
+                      ? "font-mono text-[15px] leading-7"
+                      : "font-kaiti text-[17px] leading-[1.85]",
+                  ),
+                )}
+                rows={isLyrics ? 18 : 4}
+                spellCheck={!isLyrics}
                 placeholder={field.placeholder ?? `请输入${field.label}`}
               />
               <FieldErrorMessage className="mt-1" message={errorMessage} />
@@ -163,71 +182,31 @@ export default function SongFormField({
         }
 
         if (field.type === "boolean") {
-          const isCover = field.key === "hascover";
-          const isScore = field.key === "nmn_status";
-
+          const options = BOOLEAN_OPTIONS[field.key] ?? [];
           return (
-            <div className="space-y-3">
-              <div className="flex gap-4">
-                <select
-                  {...controllerField}
-                  value={
-                    value === true ? "true" : value === false ? "false" : ""
-                  }
-                  onChange={(e) => {
-                    const nextValue =
-                      e.target.value === "true"
-                        ? true
-                        : e.target.value === "false"
-                          ? false
-                          : null;
-                    controllerField.onChange(nextValue);
-                  }}
-                  className={cn(
-                    baseClass,
-                    "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100",
-                    "[&>option]:bg-white [&>option]:dark:bg-slate-800 [&>option]:text-slate-900 [&>option]:dark:text-slate-100",
-                  )}
-                >
-                  {isCover ? (
-                    <>
-                      <option value="">白底狐狸 (默认)</option>
-                      <option value="false">初号机 (黑底)</option>
-                      <option value="true">定制封面</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="false">否 / 无</option>
-                      <option value="true">是 / 有</option>
-                    </>
-                  )}
-                </select>
-              </div>
-
-              {isCover && value === true && hasSongId(songId) && (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-slate-800">
-                  <CoverUpload
-                    songId={songId}
-                    csrfToken={csrfToken}
-                    onUploadSuccess={() => void 0}
-                    onUploadError={console.error}
-                  />
-                </div>
-              )}
-
-              {isScore && value === true && hasSongId(songId) && (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-slate-800">
-                  <ScoreUpload
-                    songId={songId}
-                    csrfToken={csrfToken}
-                    onUploadSuccess={() => void 0}
-                    onUploadError={console.error}
-                  />
-                </div>
-              )}
-
+            <>
+              <select
+                {...controllerField}
+                value={value === true ? "true" : value === false ? "false" : ""}
+                onChange={(e) =>
+                  controllerField.onChange(
+                    e.target.value === "true"
+                      ? true
+                      : e.target.value === "false"
+                        ? false
+                        : null,
+                  )
+                }
+                className={cn(SELECT_CLASS, hasError && INPUT_ERROR_CLASS)}
+              >
+                {options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
               <FieldErrorMessage message={errorMessage} />
-            </div>
+            </>
           );
         }
 
@@ -242,11 +221,7 @@ export default function SongFormField({
                     ? "date"
                     : "text"
               }
-              value={getInputValue(
-                typeof value === "string" || typeof value === "number"
-                  ? value
-                  : undefined,
-              )}
+              value={text}
               onChange={(e) =>
                 controllerField.onChange(
                   field.type === "number"
@@ -256,7 +231,7 @@ export default function SongFormField({
                     : e.target.value,
                 )
               }
-              className={baseClass}
+              className={inputClass(hasError, "tabular-nums")}
               placeholder={field.placeholder ?? `请输入${field.label}`}
             />
             <FieldErrorMessage className="mt-1" message={errorMessage} />
@@ -264,5 +239,34 @@ export default function SongFormField({
         );
       }}
     />
+  );
+}
+
+/** 一个字段：标签加输入。与线上版本不同的字段在标签旁标一个点 */
+export default function SongFormField({
+  field,
+  changed = false,
+  className,
+}: {
+  field: SongFieldConfig;
+  /** 暂存版与线上版不同 */
+  changed?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <label className={cn(LABEL_CLASS, "flex items-center gap-1.5")}>
+        {field.label}
+        {field.required && <span className="text-rose-500">*</span>}
+        {changed && (
+          <span
+            className="size-1.5 rounded-full bg-(--tone)"
+            title="与线上版本不同"
+            aria-label="与线上版本不同"
+          />
+        )}
+      </label>
+      <SongFormInput field={field} />
+    </div>
   );
 }

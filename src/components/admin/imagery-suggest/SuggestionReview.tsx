@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  AlertCircle,
-  Bot,
-  Loader2,
-  Pencil,
-  Sparkles,
-  Undo2,
-} from "lucide-react";
+import { Bot, Loader2, Pencil, Sparkles, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   type ImagerySuggestion,
@@ -18,6 +11,7 @@ import type {
   DictionaryOption,
 } from "@/lib/server/service-imagery-suggest";
 import { cn } from "@/lib/utils/utils";
+import { OUTLINE_BUTTON_CLASS, SOLID_BUTTON_CLASS } from "../kit/styles";
 import type {
   AiNote,
   ImagerySuggestionsState,
@@ -57,7 +51,7 @@ function CategorySelect({
         }
         onChange(e.target.value ? Number(e.target.value) : null);
       }}
-      className="max-w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+      className="max-w-full rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-700 outline-none focus:border-(--tone) dark:border-slate-700 dark:text-slate-200 [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]"
     >
       {value === null && <option value="">选择分类…</option>}
       {options.map((c) => (
@@ -87,12 +81,12 @@ function NameEditor({
         type="button"
         onClick={() => setEditing(true)}
         title="点击修改意象"
-        className="group/name flex items-center gap-1 font-semibold text-slate-900 hover:text-blue-600 dark:text-slate-100"
+        className="group/name flex items-center gap-1 text-slate-900 hover:text-(--tone) dark:text-slate-100"
       >
         {name}
         <Pencil
           size={12}
-          className="text-slate-300 group-hover/name:text-blue-500"
+          className="text-slate-300 group-hover/name:text-(--tone)"
         />
       </button>
     );
@@ -114,7 +108,7 @@ function NameEditor({
         if (e.key === "Enter") finish(e.currentTarget.value);
         if (e.key === "Escape") setEditing(false);
       }}
-      className="w-28 rounded-md border border-blue-400 bg-white px-2 py-0.5 text-sm font-semibold text-slate-900 outline-none dark:bg-slate-900 dark:text-slate-100"
+      className="w-28 rounded-md border border-(--tone) bg-transparent px-2 py-0.5 text-sm text-slate-900 outline-none dark:text-slate-100"
     />
   );
 }
@@ -151,26 +145,14 @@ function HistoryBadge({ suggestion }: { suggestion: ImagerySuggestion }) {
 function AiChip({ note }: { note: AiNote }) {
   const [label, className] =
     note.kind === "addition"
-      ? [
-          "AI 补充",
-          "bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300",
-        ]
+      ? ["AI 补充", "text-(--tone)"]
       : note.keep
-        ? [
-            "AI 保留",
-            "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300",
-          ]
-        : [
-            "AI 剔除",
-            "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-300",
-          ];
+        ? ["AI 保留", "text-slate-500 dark:text-slate-400"]
+        : ["AI 剔除", "text-rose-600 dark:text-rose-400"];
   return (
     <span
       title={note.reason}
-      className={cn(
-        "max-w-[16rem] truncate rounded-full px-2 py-0.5 text-[11px]",
-        className,
-      )}
+      className={cn("max-w-[16rem] truncate text-[11px]", className)}
     >
       {label}
       {note.reason && ` · ${note.reason}`}
@@ -214,17 +196,17 @@ function SuggestionRow({
   return (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+        "flex items-start gap-3 border-b border-l-2 border-b-slate-200/70 py-2.5 pl-3 transition-colors dark:border-b-slate-800",
         draft.checked
-          ? "border-blue-200 bg-blue-50/50 dark:border-blue-900/40 dark:bg-blue-900/10"
-          : "border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900/40",
+          ? "border-l-(--tone) bg-(--tone)/5"
+          : "border-l-transparent",
       )}
     >
       <input
         type="checkbox"
         checked={draft.checked}
         onChange={(e) => onUpdate({ checked: e.target.checked })}
-        className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
+        className="mt-1 h-4 w-4 shrink-0 accent-(--tone)"
         aria-label={`标注「${draft.name}」`}
       />
       <div className="min-w-0 flex-1 space-y-1.5">
@@ -239,7 +221,7 @@ function SuggestionRow({
               type="button"
               onClick={() => onRename(suggestion.name)}
               title="恢复原意象"
-              className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-blue-600"
+              className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-(--tone)"
             >
               <Undo2 size={11} />
               原：{suggestion.name}
@@ -247,7 +229,7 @@ function SuggestionRow({
           )}
           {!resolved && (
             <span
-              className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+              className="text-[11px] text-amber-600 dark:text-amber-400"
               title="词典中没有这个意象，保存时会新建"
             >
               新意象
@@ -255,7 +237,7 @@ function SuggestionRow({
           )}
           {alreadyAnnotated && (
             <span
-              className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-600 dark:bg-red-900/20 dark:text-red-300"
+              className="text-[11px] text-rose-600 dark:text-rose-400"
               title="这首歌已经标注过该意象，保存时会跳过"
             >
               已标注
@@ -285,7 +267,7 @@ function SuggestionRow({
                   "rounded-md border px-2 py-0.5 text-left text-xs transition-colors",
                   excluded
                     ? "border-dashed border-slate-200 text-slate-400 line-through dark:border-slate-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+                    : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300",
                 )}
               >
                 <span className="mr-1.5 font-mono text-[10px] text-slate-400">
@@ -370,7 +352,7 @@ export default function SuggestionReview({
             }}
             disabled={imagery.reviewing || imagery.generating}
             title="让 AI 逐个判断候选是否作为意象使用，并补充词典没匹配到的意象"
-            className="flex items-center gap-1.5 rounded-full border border-violet-200 px-4 py-1.5 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 disabled:opacity-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-900/20"
+            className={OUTLINE_BUTTON_CLASS}
           >
             {imagery.reviewing ? (
               <Loader2 size={14} className="animate-spin" />
@@ -384,7 +366,7 @@ export default function SuggestionReview({
           type="button"
           onClick={imagery.generate}
           disabled={imagery.generating || imagery.reviewing}
-          className="flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+          className={result ? OUTLINE_BUTTON_CLASS : SOLID_BUTTON_CLASS}
         >
           {imagery.generating ? (
             <Loader2 size={14} className="animate-spin" />
@@ -400,8 +382,8 @@ export default function SuggestionReview({
           className={cn(
             "text-sm",
             imagery.message.type === "error"
-              ? "text-red-600 dark:text-red-400"
-              : "text-emerald-600 dark:text-emerald-400",
+              ? "text-rose-600 dark:text-rose-400"
+              : "text-slate-600 dark:text-slate-300",
           )}
         >
           {imagery.message.text}
@@ -417,17 +399,16 @@ export default function SuggestionReview({
             ))}
           </datalist>
           {!result.published && (
-            <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/10 dark:text-amber-300">
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <p className="text-sm text-amber-700 dark:text-amber-400">
               歌曲尚未发布，可以先预览候选；发布后才能保存标注。
-            </div>
+            </p>
           )}
           {!result.hasLyrics ? (
-            <p className="text-sm text-slate-400">
+            <p className="font-kaiti text-base text-slate-400">
               这首歌还没有歌词，无法生成候选。
             </p>
           ) : suggestions.length === 0 ? (
-            <p className="text-sm text-slate-400">
+            <p className="font-kaiti text-base text-slate-400">
               歌词中没有找到词典里尚未标注的意象。
             </p>
           ) : (
@@ -445,13 +426,13 @@ export default function SuggestionReview({
                         !recommended.every((s) => drafts[s.imageryId].checked),
                       )
                     }
-                    className="hover:text-blue-600"
+                    className="hover:text-(--tone)"
                   >
                     全选 / 全不选
                   </button>
                 )}
               </div>
-              <div className="space-y-2">{renderRows(recommended)}</div>
+              <div>{renderRows(recommended)}</div>
 
               {others.length > 0 && (
                 <details
@@ -462,11 +443,11 @@ export default function SuggestionReview({
                     其他候选 {others.length}{" "}
                     个（其他歌里很少被标注，或被更长的意象包含，默认不勾选）
                   </summary>
-                  <div className="mt-2 space-y-2">{renderRows(others)}</div>
+                  <div className="mt-2">{renderRows(others)}</div>
                 </details>
               )}
 
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3">
                 <span className="text-sm text-slate-500">
                   已选 {imagery.selectedCount} 个
                 </span>
@@ -474,7 +455,7 @@ export default function SuggestionReview({
                   type="button"
                   onClick={imagery.save}
                   disabled={!canSave || imagery.saving}
-                  className="flex items-center gap-1.5 rounded-full bg-blue-600 px-5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
+                  className={SOLID_BUTTON_CLASS}
                 >
                   {imagery.saving && (
                     <Loader2 size={14} className="animate-spin" />

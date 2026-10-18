@@ -47,7 +47,7 @@ export default function CommentSheet() {
           <>
             <div className="flex shrink-0 items-start gap-4 px-6 pt-4 pb-4 border-b border-slate-200/70 dark:border-slate-800/70">
               <div className="min-w-0 flex-1">
-                <DrawerTitle className="font-serif text-xs font-normal tracking-[0.4em] text-(--tone)">
+                <DrawerTitle className="font-serif text-xs tracking-[0.4em] text-(--tone)">
                   {t(`slot.${slot.section}`)}
                 </DrawerTitle>
                 {quote && (

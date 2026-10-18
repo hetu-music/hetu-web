@@ -12,14 +12,19 @@
 import {
   apiCreateGlobalMeaning,
   apiDeleteGlobalMeaning,
-  apiGetMeanings,
   apiUpdateGlobalMeaning,
 } from "@/lib/api/client-api";
 import { toMeaningPayload } from "@/lib/forms/imagery-form";
 import type { MeaningFormValues } from "@/lib/forms/imagery-form";
 import type { ImageryMeaning } from "@/lib/types";
-import { useEffect, useMemo, useState } from "react";
-import type { ModalState } from "./types";
+import { useMemo, useState } from "react";
+import {
+  IMAGERY_KEYS,
+  useImageryMeaningsQuery,
+  useUpdateCache,
+} from "./queries";
+
+const NO_MEANINGS: ImageryMeaning[] = [];
 
 const PAGE_SIZE = 20;
 
@@ -27,26 +32,14 @@ export function useMeaningsTab(
   csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
-  const [meanings, setMeanings] = useState<ImageryMeaning[]>([]);
-  const [meaningsLoading, setMeaningsLoading] = useState(true);
+  const meaningsQuery = useImageryMeaningsQuery();
+  const meanings = meaningsQuery.data ?? NO_MEANINGS;
+  const setMeanings = useUpdateCache<ImageryMeaning>(IMAGERY_KEYS.meanings);
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [addingMeaning, setAddingMeaning] = useState(false);
   const [editingMeaningId, setEditingMeaningId] = useState<number | null>(null);
   const [meaningSubmitting, setMeaningSubmitting] = useState(false);
-  const [modal, setModal] = useState<ModalState>({ type: "none" });
-
-  useEffect(() => {
-    void apiGetMeanings()
-      .then((nextMeanings) => setMeanings(nextMeanings))
-      .catch((error: unknown) => {
-        showToast(
-          "error",
-          error instanceof Error ? error.message : "加载含义失败",
-        );
-      })
-      .finally(() => setMeaningsLoading(false));
-  }, [showToast]);
 
   const filteredMeanings = useMemo(() => {
     if (!searchTerm.trim()) return meanings;
@@ -92,7 +85,6 @@ export function useMeaningsTab(
     setAddingMeaning(false);
     setEditingMeaningId(null);
   };
-  const closeModal = () => setModal({ type: "none" });
 
   const handleCreate = async (values: MeaningFormValues) => {
     if (meaningSubmitting) return;
@@ -145,15 +137,14 @@ export function useMeaningsTab(
     }
   };
 
-  const handleDelete = async () => {
-    if (modal.type !== "delete-meaning" || meaningSubmitting) return;
+  const handleDelete = async (meaning: ImageryMeaning) => {
+    if (meaningSubmitting) return;
     setMeaningSubmitting(true);
     try {
-      await apiDeleteGlobalMeaning(modal.meaningId, csrfToken);
-      setMeanings((current) => current.filter((m) => m.id !== modal.meaningId));
-      if (editingMeaningId === modal.meaningId) resetEditor();
-      closeModal();
-      showToast("success", "含义已删除");
+      await apiDeleteGlobalMeaning(meaning.id, csrfToken);
+      setMeanings((current) => current.filter((m) => m.id !== meaning.id));
+      if (editingMeaningId === meaning.id) resetEditor();
+      showToast("success", `已删除含义「${meaning.label}」`);
     } catch (error) {
       showToast(
         "error",
@@ -166,7 +157,9 @@ export function useMeaningsTab(
 
   return {
     meanings,
-    meaningsLoading,
+    meaningsLoading: meaningsQuery.isPending,
+    meaningsError: meaningsQuery.error?.message ?? null,
+    refetchMeanings: meaningsQuery.refetch,
     searchTerm,
     setSearchTerm,
     page,
@@ -175,24 +168,14 @@ export function useMeaningsTab(
     editingMeaningId,
     editingMeaning,
     meaningSubmitting,
-    modal,
-    setModal,
     pagedMeanings,
     currentPage,
     totalPages,
     startAdd,
     startEdit,
     resetEditor,
-    closeModal,
     handleCreate,
     handleUpdate,
     handleDelete,
-    /** 触发删除确认 modal */
-    openDeleteModal: (meaning: ImageryMeaning) =>
-      setModal({
-        type: "delete-meaning",
-        meaningId: meaning.id,
-        label: meaning.label,
-      }),
   };
 }

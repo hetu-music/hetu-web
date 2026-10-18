@@ -4,6 +4,8 @@ import TopBar from "@/components/shared/topbar/TopBar";
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import Pagination from "@/components/shared/Pagination";
+import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
+import { addToast } from "@/components/ui/toast";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useFilteredSongs } from "@/hooks/library/useFilteredSongs";
 import { extractLyricsSnippet } from "@/hooks/library/useLyricsIndex";
@@ -19,6 +21,7 @@ import {
   type MusicLibraryViewMode,
 } from "@/lib/constants";
 import type { MusicLibraryClientProps } from "@/lib/types";
+import { sharePage } from "@/lib/utils/share";
 import { cn } from "@/lib/utils/utils";
 import {
   calculateFilterOptions,
@@ -38,7 +41,13 @@ import {
   XCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import GridCard from "./GridCard";
 import HeroSection from "./HeroSection";
 import ListRow from "./ListRow";
@@ -109,6 +118,7 @@ export default function MusicLibraryClient({
   const [activeSongId, setActiveSongId] = useState<number | null>(null);
   const [mountKey, setMountKey] = useState(0);
   const { showScrollTop, scrollToTop } = useScrollTop();
+  const listStartRef = useRef<HTMLDivElement>(null);
   const { containerRef, hasDraggedRef, dragHandlers } =
     useMouseDragScroll<HTMLDivElement>();
 
@@ -284,27 +294,11 @@ export default function MusicLibraryClient({
 
   const handleShare = useCallback(async () => {
     // 与卷首那句同一句话，卷首在句末接「……」，这里也一样
-    const shareData = {
+    const outcome = await sharePage({
       title: tCommon("site.name"),
       text: `${t("hero.defaultDesc")}……`,
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        // Share cancelled.
-      }
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      alert(t("linkCopied"));
-    } catch {
-      // Clipboard unavailable.
-    }
+    });
+    if (outcome === "copied") addToast("success", t("linkCopied"));
   }, [t, tCommon]);
 
   const handleTitleReset = useCallback(() => {
@@ -371,16 +365,26 @@ export default function MusicLibraryClient({
           </div>
         </section>
 
+        {/* 翻页后停在这里：工具栏刚好吸顶，下一页的第一行露在它下面，
+            和读者自己滚过卷首时一样。不能直接滚工具栏，它吸顶后量出的位置不是原位 */}
+        <div ref={listStartRef} aria-hidden className="scroll-mt-(--nav-h)" />
+
         {/* 曲目工具栏：吸顶，底下只有一道细线。标签、搜索、按钮都放在等高的
             一行里竖直居中，当前标签与聚焦的搜索框在细线上亮一段强调色。
             窄屏分两行：上面搜索与按钮，下面类型标签，两行各有一道细线分开；
-            标签行右缘淡出，提示还能横向滑动 */}
+            标签行右缘淡出，提示还能横向滑动。淡出是钉在行的右缘上的，不随滑动走开，
+            所以行尾补一段空白（gap-6 加 after:w-2，正好 2rem），滑到底时最后一项停在淡出之外 */}
         <section className="sticky top-(--nav-h) z-40 -mx-6 mb-10 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95">
-          <div className="flex flex-col-reverse border-b border-slate-200/70 dark:border-slate-800 md:h-12 md:flex-row md:gap-8">
+          <div
+            className={cn(
+              TAB_HAIRLINE_CLASS,
+              "flex flex-col-reverse md:h-12 md:flex-row md:gap-8",
+            )}
+          >
             <div
               ref={containerRef}
               {...dragHandlers}
-              className="no-scrollbar flex h-12 min-w-0 cursor-grab gap-6 overflow-x-auto mask-[linear-gradient(to_right,black_calc(100%-2rem),transparent)] active:cursor-grabbing md:h-full md:mask-none"
+              className="no-scrollbar flex h-12 min-w-0 cursor-grab gap-6 overflow-x-auto mask-[linear-gradient(to_right,black_calc(100%-2rem),transparent)] after:w-2 after:shrink-0 active:cursor-grabbing md:h-full md:mask-none md:after:hidden"
             >
               {filterOptions.allTypes.map((type) => {
                 if (type === FILTER_OPTION_ALL && isAnyFilterActive) {
@@ -429,7 +433,12 @@ export default function MusicLibraryClient({
               })}
             </div>
 
-            <div className="flex h-11 items-center gap-1 border-b border-slate-200/70 dark:border-slate-800 md:ml-auto md:h-full md:border-0">
+            <div
+              className={cn(
+                TAB_HAIRLINE_CLASS,
+                "flex h-11 items-center gap-1 md:ml-auto md:h-full md:before:hidden",
+              )}
+            >
               {/* 搜索：平时没有边框，只靠放大镜与占位字辨认；聚焦时细线上亮一段强调色 */}
               <label className="group relative flex h-full min-w-0 flex-1 items-center gap-2 md:w-60 md:flex-none">
                 <Search size={15} className="shrink-0 text-slate-400" />
@@ -587,13 +596,13 @@ export default function MusicLibraryClient({
                 </div>
               )}
 
-              <div className="mt-12 flex justify-center">
-                <Pagination
-                  currentPage={safePage}
-                  totalPages={totalPages}
-                  onPageChange={setPaginationPage}
-                />
-              </div>
+              <Pagination
+                className="mt-12"
+                currentPage={safePage}
+                totalPages={totalPages}
+                onPageChange={setPaginationPage}
+                scrollTarget={listStartRef}
+              />
             </>
           ) : (
             <p className="py-20 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">

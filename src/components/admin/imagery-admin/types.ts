@@ -1,20 +1,11 @@
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
 
-export type Tab = "imagery" | "categories" | "meanings" | "occurrences";
-
 export type ModalState =
   | { type: "none" }
   | { type: "add-imagery" }
   | { type: "edit-imagery"; item: ImageryItem }
   | { type: "add-category"; parentId?: number }
-  | { type: "edit-category"; category: ImageryCategory }
-  | { type: "delete-meaning"; meaningId: number; label: string }
-  | {
-      type: "delete-occurrence";
-      songId: number;
-      occurrenceId: number;
-      label: string;
-    };
+  | { type: "edit-category"; category: ImageryCategory };
 
 export type SongOption = {
   id: number;
@@ -26,9 +17,4 @@ export type SongOption = {
 
 export type CategoryNode = ImageryCategory & {
   children: CategoryNode[];
-};
-
-export type ToastMessage = {
-  type: "success" | "error";
-  text: string;
 };

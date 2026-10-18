@@ -7,8 +7,12 @@ import type {
 import {
   CREATOR_FIELD_KEYS,
   MISSING_FIELD_LABEL_OVERRIDES,
+  MISSING_GROUPS,
   NON_CRITICAL_FIELD_KEYS,
+  PLATFORM_LINKS,
   type CreatorFieldKey,
+  type MissingGroup,
+  type PlatformLinkKey,
 } from "./types";
 
 export function getInputValue(value: string | number | null | undefined) {
@@ -61,4 +65,32 @@ export function isSongIncomplete(song: SongDetail): boolean {
   return songFields.some(
     (field) => isCriticalField(field.key) && isFieldEmpty(song, field),
   );
+}
+
+/** 缺了哪几组资料，按 MISSING_GROUPS 的顺序 */
+export function getMissingGroups(song: SongDetail): MissingGroup[] {
+  return MISSING_GROUPS.filter((group) =>
+    songFields.some(
+      (field) => group.keys.includes(field.key) && isFieldEmpty(song, field),
+    ),
+  ).map((group) => group.key);
+}
+
+/** 没填的音乐平台链接，按 PLATFORM_LINKS 的顺序 */
+export function getMissingLinks(song: SongDetail): PlatformLinkKey[] {
+  return PLATFORM_LINKS.filter(({ key }) => {
+    const value = song[key];
+    return typeof value !== "string" || value.trim() === "";
+  }).map(({ key }) => key);
+}
+
+/** 还没有乐谱（只有 nmn_status 为 true 才算有） */
+export function lacksScore(song: SongDetail): boolean {
+  return song.nmn_status !== true;
+}
+
+/** 列表里一行写得下的缺失说明：「歌词、作词」，多了写「歌词、作词等 5 项」 */
+export function summarizeMissing(labels: readonly string[], max = 2): string {
+  if (labels.length <= max) return labels.join("、");
+  return `${labels.slice(0, max).join("、")}等 ${labels.length} 项`;
 }

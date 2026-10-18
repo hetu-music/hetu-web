@@ -2,11 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   categoryFormSchema,
   createCategoryFormValues,
-  createDeleteConfirmationFormValues,
   createImageryFormValues,
   createMeaningFormValues,
   createRelationFormValues,
-  deleteConfirmationFormSchema,
   imageryFormSchema,
   lyricTimetagItemSchema,
   relationFormSchema,
@@ -93,22 +91,6 @@ describe("relationFormSchema", () => {
   });
 });
 
-describe("deleteConfirmationFormSchema", () => {
-  it("输入“删除”通过", () => {
-    expect(
-      deleteConfirmationFormSchema.safeParse({ confirmationText: "删除" })
-        .success,
-    ).toBe(true);
-  });
-
-  it("其他文本拒绝（防止误删）", () => {
-    expect(
-      deleteConfirmationFormSchema.safeParse({ confirmationText: "确认" })
-        .success,
-    ).toBe(false);
-  });
-});
-
 describe("默认值工厂", () => {
   it("createImageryFormValues 无参数时返回空名称", () => {
     expect(createImageryFormValues()).toEqual({ name: "" });
@@ -139,12 +121,6 @@ describe("默认值工厂", () => {
       { value: "01:00" },
       { value: "02:00" },
     ]);
-  });
-
-  it("createDeleteConfirmationFormValues 返回空字符串", () => {
-    expect(createDeleteConfirmationFormValues()).toEqual({
-      confirmationText: "",
-    });
   });
 });
 

@@ -4,7 +4,8 @@ import type { SongComment } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import type { CommentThread as Thread } from "@/lib/utils/utils-comments";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useTwoStepConfirm } from "@/hooks/ui/useTwoStepConfirm";
 import CommentComposer from "./CommentComposer";
 import { useComments } from "./CommentsContext";
 
@@ -24,14 +25,8 @@ function CommentItem({
   const t = useTranslations("song.folio.comments");
   const { loggedIn, edit, remove, like } = useComments();
   const [editing, setEditing] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   // 「删除」点一下变成「确认删除」，几秒内不确认就复原
-  useEffect(() => {
-    if (!confirmDelete) return;
-    const timer = setTimeout(() => setConfirmDelete(false), 3000);
-    return () => clearTimeout(timer);
-  }, [confirmDelete]);
+  const deleteConfirm = useTwoStepConfirm();
 
   if (comment.deleted) {
     return (
@@ -121,12 +116,12 @@ function CommentItem({
             </button>
             <button
               type="button"
-              onClick={() =>
-                confirmDelete ? remove(comment.id) : setConfirmDelete(true)
-              }
-              className={confirmDelete ? "text-rose-500" : action}
+              onClick={() => {
+                if (deleteConfirm.request()) remove(comment.id);
+              }}
+              className={deleteConfirm.confirming ? "text-rose-500" : action}
             >
-              {confirmDelete ? t("confirmDelete") : t("delete")}
+              {deleteConfirm.confirming ? t("confirmDelete") : t("delete")}
             </button>
           </>
         )}

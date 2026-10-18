@@ -1,14 +1,13 @@
 "use client";
 
-import {
-  apiCreateImagery,
-  apiGetImageryItems,
-  apiUpdateImagery,
-} from "@/lib/api/client-api";
+import { apiCreateImagery, apiUpdateImagery } from "@/lib/api/client-api";
 import type { ImageryItem } from "@/lib/types";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ImageryFormValues } from "@/lib/forms/imagery-form";
+import { IMAGERY_KEYS, useImageryItemsQuery, useUpdateCache } from "./queries";
 import type { ModalState } from "./types";
+
+const NO_ITEMS: ImageryItem[] = [];
 
 const PAGE_SIZE = 20;
 
@@ -16,46 +15,13 @@ export function useImageryTab(
   csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
-  const [items, setItems] = useState<ImageryItem[]>([]);
-  const [itemsLoading, setItemsLoading] = useState(true);
-  const [itemsError, setItemsError] = useState<string | null>(null);
+  const itemsQuery = useImageryItemsQuery();
+  const items = itemsQuery.data ?? NO_ITEMS;
+  const setItems = useUpdateCache<ImageryItem>(IMAGERY_KEYS.items);
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState<ModalState>({ type: "none" });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const fetchItems = useCallback(async () => {
-    try {
-      const nextItems = await apiGetImageryItems();
-      setItems(nextItems);
-      setItemsError(null);
-      return nextItems;
-    } catch (error) {
-      setItemsError(error instanceof Error ? error.message : "加载意象失败");
-      return [];
-    }
-  }, []);
-
-  const refreshItems = useCallback(async () => {
-    setItemsLoading(true);
-    try {
-      return await fetchItems();
-    } finally {
-      setItemsLoading(false);
-    }
-  }, [fetchItems]);
-
-  useEffect(() => {
-    void apiGetImageryItems()
-      .then((nextItems) => {
-        setItems(nextItems);
-        setItemsError(null);
-      })
-      .catch((error: unknown) => {
-        setItemsError(error instanceof Error ? error.message : "加载意象失败");
-      })
-      .finally(() => setItemsLoading(false));
-  }, []);
 
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return items;
@@ -123,9 +89,8 @@ export function useImageryTab(
 
   return {
     items,
-    setItems,
-    itemsLoading,
-    itemsError,
+    itemsLoading: itemsQuery.isPending,
+    itemsError: itemsQuery.error?.message ?? null,
     searchTerm,
     setSearchTerm,
     page,
@@ -136,7 +101,7 @@ export function useImageryTab(
     pagedItems,
     currentPage,
     totalPages,
-    refreshItems,
+    refreshItems: itemsQuery.refetch,
     openAdd,
     openEdit,
     closeModal,

@@ -1,6 +1,6 @@
-# <img src="public/icons/icon-192x192.png" width="32" height="32" style="vertical-align: middle;" /> [河图作品勘鉴](https://hetu-music.com/)
+# <img src="public/icons/icon-192x192.png" width="32" height="32" style="vertical-align: middle;" /> [河图作品勘鉴](https://www.hetu-music.com/)
 
-[![Website](https://img.shields.io/badge/Website-hetu--music.com-brightgreen?style=flat-square)](https://hetu-music.com/)
+[![Website](https://img.shields.io/badge/Website-hetu--music.com-brightgreen?style=flat-square)](https://www.hetu-music.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3.6-black?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.3.0-blue?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0.3-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
@@ -15,13 +15,13 @@
 
 ### 中文
 一个专为古风音乐人 **河图** 打造的音乐作品数字化档案与鉴赏系统。
-网站地址：[hetu-music.com](https://hetu-music.com/)
+网站地址：[www.hetu-music.com](https://www.hetu-music.com/)
 
 提供作品检索、多维筛选、歌词意象、作品故事展示及后台管理等功能。支持 PWA 。
 
 ### English
 A digital archiving and appreciation system for the Gufeng musician **Hetu**.
-Website: [hetu-music.com](https://hetu-music.com/)
+Website: [www.hetu-music.com](https://www.hetu-music.com/)
 
 Provides features including search, multi-dimensional filtering, lyric imagery, stories, and an admin dashboard. PWA is supported.
 

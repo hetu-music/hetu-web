@@ -118,6 +118,7 @@
     "historyTitle": "我的提交记录",
     "historyCount": "共 {count} 条",
     "historyEmpty": "暂无提交记录",
+    "historyError": "提交记录没有取到，稍后再试",
     "status": {
       "pending": "待处理",
       "replied": "已回复",

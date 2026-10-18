@@ -1,9 +1,6 @@
 "use client";
 
 import PlayingBars from "@/components/shared/PlayingBars";
-import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
-import { cn } from "@/lib/utils/utils";
-import { usePlayerStore } from "@/store/player-store";
 import {
   Drawer,
   DrawerContent,
@@ -16,6 +13,9 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
+import { cn } from "@/lib/utils/utils";
+import { usePlayerStore } from "@/store/player-store";
 import { ListMusic, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -69,7 +69,7 @@ export default function QueueControl() {
           side="top"
           align="end"
           sideOffset={20}
-          className="flex max-h-[26rem] w-[22rem] flex-col p-0"
+          className="flex max-h-104 w-88 flex-col p-0"
         >
           <QueueList Title={PopoverTitle} onClose={close} />
         </PopoverContent>
@@ -132,9 +132,7 @@ function QueueList({
       <div className="flex shrink-0 items-center justify-between gap-4 px-5 pt-5 pb-3">
         {/* 面板的名字只是「播放队列」，曲数放在标题外 */}
         <div className="font-serif text-xs tracking-[0.4em] text-(--tone)">
-          <Title className="inline text-xs font-normal">
-            {t("queueTitle")}
-          </Title>
+          <Title className="inline text-xs">{t("queueTitle")}</Title>
           <span className="ml-2 font-sans tracking-wider text-slate-400 dark:text-slate-500">
             {t("queueCount", { count: queue.length })}
           </span>
@@ -148,7 +146,7 @@ function QueueList({
             className={cn(
               TEXT_BUTTON,
               confirmClear &&
-                "text-rose-500 hover:text-rose-500 dark:text-rose-500 dark:hover:text-rose-500",
+              "text-rose-500 hover:text-rose-500 dark:text-rose-500 dark:hover:text-rose-500",
             )}
           >
             {confirmClear ? t("confirmClear") : t("clear")}

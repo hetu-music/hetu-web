@@ -12,13 +12,19 @@
 import {
   apiCreateGlobalMeaning,
   apiDeleteGlobalMeaning,
-  apiGetMeanings,
   apiUpdateGlobalMeaning,
 } from "@/lib/api/client-api";
 import { toMeaningPayload } from "@/lib/forms/imagery-form";
 import type { MeaningFormValues } from "@/lib/forms/imagery-form";
 import type { ImageryMeaning } from "@/lib/types";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  IMAGERY_KEYS,
+  useImageryMeaningsQuery,
+  useUpdateCache,
+} from "./queries";
+
+const NO_MEANINGS: ImageryMeaning[] = [];
 
 const PAGE_SIZE = 20;
 
@@ -26,25 +32,14 @@ export function useMeaningsTab(
   csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
-  const [meanings, setMeanings] = useState<ImageryMeaning[]>([]);
-  const [meaningsLoading, setMeaningsLoading] = useState(true);
+  const meaningsQuery = useImageryMeaningsQuery();
+  const meanings = meaningsQuery.data ?? NO_MEANINGS;
+  const setMeanings = useUpdateCache<ImageryMeaning>(IMAGERY_KEYS.meanings);
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [addingMeaning, setAddingMeaning] = useState(false);
   const [editingMeaningId, setEditingMeaningId] = useState<number | null>(null);
   const [meaningSubmitting, setMeaningSubmitting] = useState(false);
-
-  useEffect(() => {
-    void apiGetMeanings()
-      .then((nextMeanings) => setMeanings(nextMeanings))
-      .catch((error: unknown) => {
-        showToast(
-          "error",
-          error instanceof Error ? error.message : "加载含义失败",
-        );
-      })
-      .finally(() => setMeaningsLoading(false));
-  }, [showToast]);
 
   const filteredMeanings = useMemo(() => {
     if (!searchTerm.trim()) return meanings;
@@ -162,7 +157,9 @@ export function useMeaningsTab(
 
   return {
     meanings,
-    meaningsLoading,
+    meaningsLoading: meaningsQuery.isPending,
+    meaningsError: meaningsQuery.error?.message ?? null,
+    refetchMeanings: meaningsQuery.refetch,
     searchTerm,
     setSearchTerm,
     page,

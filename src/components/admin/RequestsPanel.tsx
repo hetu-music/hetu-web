@@ -2,6 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import Pagination from "@/components/shared/Pagination";
 import { Link } from "@/i18n/navigation";
 import { apiGetAdminRequests, apiReplyRequest } from "@/lib/api/client-api";
 import type { RequestStatus, RequestType, UserRequest } from "@/lib/types";
@@ -375,26 +376,12 @@ export default function RequestsPanel({
       )}
 
       {totalPages > 1 && (
-        <div className="mt-8 flex items-center justify-center gap-6 text-sm">
-          <button
-            type="button"
-            onClick={() => void fetchPage(page - 1, typeFilter, statusFilter)}
-            disabled={page <= 1 || loading}
-            className={TEXT_BUTTON_CLASS}
-          >
-            上一页
-          </button>
-          <span className="tabular-nums text-slate-500">
-            {page} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => void fetchPage(page + 1, typeFilter, statusFilter)}
-            disabled={page >= totalPages || loading}
-            className={TEXT_BUTTON_CLASS}
-          >
-            下一页
-          </button>
+        <div className="mt-10 flex justify-center">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={(p) => void fetchPage(p, typeFilter, statusFilter)}
+          />
         </div>
       )}
     </>

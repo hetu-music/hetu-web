@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import Pagination from "@/components/shared/Pagination";
 import { cn } from "@/lib/utils/utils";
 import {
   AdminOptions,
@@ -357,26 +358,12 @@ export default function AuditLogsPanel() {
       )}
 
       {totalPages > 1 && (
-        <div className="mt-8 flex items-center justify-center gap-6 text-sm">
-          <button
-            type="button"
-            onClick={() => loadPage(page - 1)}
-            disabled={page <= 1 || loading}
-            className={TEXT_BUTTON_CLASS}
-          >
-            上一页
-          </button>
-          <span className="tabular-nums text-slate-500">
-            {page} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => loadPage(page + 1)}
-            disabled={page >= totalPages || loading}
-            className={TEXT_BUTTON_CLASS}
-          >
-            下一页
-          </button>
+        <div className="mt-10 flex justify-center">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={(p) => loadPage(p)}
+          />
         </div>
       )}
     </>

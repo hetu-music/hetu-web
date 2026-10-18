@@ -8,6 +8,11 @@ import { toCategoryPayload } from "@/lib/forms/imagery-form";
 import type { ImageryCategory } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import type { CategoryFormValues } from "@/lib/forms/imagery-form";
+import {
+  IMAGERY_KEYS,
+  useImageryCategoriesQuery,
+  useUpdateCache,
+} from "./queries";
 import type { ModalState } from "./types";
 import { buildTree, getCategoryPath } from "./utils";
 
@@ -16,8 +21,11 @@ export function useCategoriesTab(
   csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
-  const [categories, setCategories] =
-    useState<ImageryCategory[]>(initialCategories);
+  const categoriesQuery = useImageryCategoriesQuery(initialCategories);
+  const categories = categoriesQuery.data ?? initialCategories;
+  const setCategories = useUpdateCache<ImageryCategory>(
+    IMAGERY_KEYS.categories,
+  );
   const [modal, setModal] = useState<ModalState>({ type: "none" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 

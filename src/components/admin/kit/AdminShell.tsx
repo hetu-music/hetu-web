@@ -1,11 +1,11 @@
 "use client";
 
 import type React from "react";
+import { ToastViewport } from "@/components/ui/toast";
 import { useUserContext } from "@/context/UserContext";
 import { cn } from "@/lib/utils/utils";
 import AdminNavbar, { type AdminSection } from "./AdminNavbar";
 import { type Stat, StatLine } from "./parts";
-import { ToastHost } from "./toast";
 
 /**
  * 所有后台页共用的外壳：顶栏、题头（题名、说明、统计、主操作）、正文与提示条。
@@ -77,7 +77,7 @@ export default function AdminShell({
         {children}
       </main>
 
-      <ToastHost />
+      <ToastViewport />
     </div>
   );
 }

@@ -5,13 +5,13 @@ import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
 import type { ImageryCategory, ImageryItem, ImageryMeaning } from "@/lib/types";
 import { AlertCircle, Plus, Wand2, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SuggestionReview from "../imagery-suggest/SuggestionReview";
 import { useImagerySuggestions } from "../imagery-suggest/useImagerySuggestions";
 import { ConfirmButton } from "../kit/parts";
 import {
   INPUT_CLASS,
   LABEL_CLASS,
-  optionClass,
   PANEL_CLASS,
   SELECT_CLASS,
   SOLID_BUTTON_CLASS,
@@ -40,6 +40,8 @@ interface EditorState {
 }
 
 type Tone = "draft" | "hover" | "candidate" | "saved";
+
+type View = "relations" | "suggestions";
 
 // 歌词里的标记：正在编辑的用强调色，悬停定位用 amber，候选只画虚线，已存的铺浅灰
 const TONE_CLASS: Record<Tone, string> = {
@@ -193,7 +195,7 @@ export default function SongRelationWorkbench({
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const lineRefs = useRef(new Map<string, HTMLDivElement>());
-  const [view, setView] = useState<"relations" | "suggestions">("relations");
+  const [view, setView] = useState<View>("relations");
   const [hoverSuggestionId, setHoverSuggestionId] = useState<number | null>(
     null,
   );
@@ -511,32 +513,23 @@ export default function SongRelationWorkbench({
       </section>
 
       {/* ── 右：关系 ── */}
-      <section className="flex min-h-0 flex-col gap-3">
+      <Tabs
+        value={view}
+        onValueChange={(next: View) => setView(next)}
+        render={<section />}
+        className="flex min-h-0 flex-col gap-3"
+      >
         <div className="flex items-center gap-2">
-          <div role="tablist" className="flex items-baseline gap-4 text-sm">
-            {(
-              [
-                ["relations", `关系 ${occurrences.length}`],
-                [
-                  "suggestions",
-                  suggest.result
-                    ? `候选审核 ${suggest.selectedCount}/${suggest.result.suggestions.length}`
-                    : "候选审核",
-                ],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={view === key}
-                onClick={() => setView(key)}
-                className={optionClass(view === key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <TabsList variant="inline" aria-label="关系与候选">
+            <TabsTrigger value="relations" variant="inline">
+              关系 {occurrences.length}
+            </TabsTrigger>
+            <TabsTrigger value="suggestions" variant="inline">
+              {suggest.result
+                ? `候选审核 ${suggest.selectedCount}/${suggest.result.suggestions.length}`
+                : "候选审核"}
+            </TabsTrigger>
+          </TabsList>
           {view === "relations" && (
             <button
               type="button"
@@ -549,277 +542,277 @@ export default function SongRelationWorkbench({
           )}
         </div>
 
-        {view === "suggestions" ? (
-          <div className="max-h-[75vh] overflow-y-auto pr-1">
-            <SuggestionReview
-              imagery={suggest}
-              songId={song.id}
-              onHoverSuggestion={setHoverSuggestionId}
-            />
-          </div>
-        ) : (
-          <>
-            {notice && (
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                {notice}
+        <TabsContent
+          value="suggestions"
+          variant="inline"
+          className="max-h-[75vh] overflow-y-auto pr-1"
+        >
+          <SuggestionReview
+            imagery={suggest}
+            songId={song.id}
+            onHoverSuggestion={setHoverSuggestionId}
+          />
+        </TabsContent>
+        <TabsContent value="relations" variant="inline" className="space-y-3">
+          {notice && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              {notice}
+            </p>
+          )}
+
+          {editor && (
+            <div className="space-y-3 rounded-lg border border-(--tone)/40 p-4">
+              <p className="text-xs tracking-[0.2em] text-(--tone)">
+                {editor.occurrenceId === null
+                  ? "新增关系"
+                  : `编辑关系 #${editor.occurrenceId}`}
               </p>
-            )}
 
-            {editor && (
-              <div className="space-y-3 rounded-lg border border-(--tone)/40 p-4">
-                <p className="text-xs tracking-[0.2em] text-(--tone)">
-                  {editor.occurrenceId === null
-                    ? "新增关系"
-                    : `编辑关系 #${editor.occurrenceId}`}
-                </p>
+              <label className="block space-y-1">
+                <span className={LABEL_CLASS}>意象</span>
+                <input
+                  value={editor.imageryName}
+                  onChange={(e) => renameDraft(e.target.value)}
+                  list={datalistId}
+                  maxLength={50}
+                  placeholder="输入或选择意象"
+                  className={INPUT_CLASS}
+                />
+                <datalist id={datalistId}>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.name} />
+                  ))}
+                </datalist>
+                <span className="flex flex-wrap items-center gap-2 text-[11px]">
+                  {nameError ? (
+                    <span className="text-rose-500">{nameError}</span>
+                  ) : resolvedItem ? (
+                    <span className="text-slate-400">
+                      已有意象 · 用于 {resolvedItem.count} 首
+                    </span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      新意象，保存时创建
+                    </span>
+                  )}
+                  {duplicate && (
+                    <button
+                      type="button"
+                      onClick={() => openExisting(duplicate)}
+                      className="text-(--tone) hover:underline"
+                    >
+                      打开那一条
+                    </button>
+                  )}
+                </span>
+              </label>
 
+              <label className="block space-y-1">
+                <span className={LABEL_CLASS}>分类</span>
+                <select
+                  value={editor.categoryId ?? ""}
+                  onChange={(e) =>
+                    setEditor({
+                      ...editor,
+                      categoryId: e.target.value
+                        ? Number(e.target.value)
+                        : null,
+                    })
+                  }
+                  className={SELECT_CLASS}
+                >
+                  <option value="">— 选择分类 —</option>
+                  {categoryOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {meanings.length > 0 && (
                 <label className="block space-y-1">
-                  <span className={LABEL_CLASS}>意象</span>
-                  <input
-                    value={editor.imageryName}
-                    onChange={(e) => renameDraft(e.target.value)}
-                    list={datalistId}
-                    maxLength={50}
-                    placeholder="输入或选择意象"
-                    className={INPUT_CLASS}
-                  />
-                  <datalist id={datalistId}>
-                    {items.map((i) => (
-                      <option key={i.id} value={i.name} />
-                    ))}
-                  </datalist>
-                  <span className="flex flex-wrap items-center gap-2 text-[11px]">
-                    {nameError ? (
-                      <span className="text-rose-500">{nameError}</span>
-                    ) : resolvedItem ? (
-                      <span className="text-slate-400">
-                        已有意象 · 用于 {resolvedItem.count} 首
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 dark:text-amber-400">
-                        新意象，保存时创建
-                      </span>
-                    )}
-                    {duplicate && (
-                      <button
-                        type="button"
-                        onClick={() => openExisting(duplicate)}
-                        className="text-(--tone) hover:underline"
-                      >
-                        打开那一条
-                      </button>
-                    )}
-                  </span>
-                </label>
-
-                <label className="block space-y-1">
-                  <span className={LABEL_CLASS}>分类</span>
+                  <span className={LABEL_CLASS}>含义（可选）</span>
                   <select
-                    value={editor.categoryId ?? ""}
+                    value={editor.meaningId ?? ""}
                     onChange={(e) =>
                       setEditor({
                         ...editor,
-                        categoryId: e.target.value
+                        meaningId: e.target.value
                           ? Number(e.target.value)
                           : null,
                       })
                     }
                     className={SELECT_CLASS}
                   >
-                    <option value="">— 选择分类 —</option>
-                    {categoryOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
+                    <option value="">— 不设置 —</option>
+                    {meanings.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
                       </option>
                     ))}
                   </select>
                 </label>
-
-                {meanings.length > 0 && (
-                  <label className="block space-y-1">
-                    <span className={LABEL_CLASS}>含义（可选）</span>
-                    <select
-                      value={editor.meaningId ?? ""}
-                      onChange={(e) =>
-                        setEditor({
-                          ...editor,
-                          meaningId: e.target.value
-                            ? Number(e.target.value)
-                            : null,
-                        })
-                      }
-                      className={SELECT_CLASS}
-                    >
-                      <option value="">— 不设置 —</option>
-                      {meanings.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className={LABEL_CLASS}>
-                      出现位置 {editor.timetags.length}{" "}
-                      处（在左侧点击歌词行增删）
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditor({
-                          ...editor,
-                          timetags: sortTags([
-                            ...new Set([
-                              ...editor.timetags,
-                              ...linesContaining(editor.imageryName),
-                            ]),
-                          ]),
-                        })
-                      }
-                      disabled={!editor.imageryName.trim()}
-                      title="把歌词中所有含该意象名的行都加进来"
-                      className="flex items-center gap-1 text-[11px] text-(--tone) hover:opacity-75 disabled:opacity-40"
-                    >
-                      <Wand2 size={11} />
-                      匹配全部行
-                    </button>
-                  </div>
-                  {editor.timetags.length === 0 ? (
-                    <p className="text-xs text-slate-400">至少选择一行歌词</p>
-                  ) : (
-                    <ul className="max-h-48 space-y-1 overflow-y-auto">
-                      {editor.timetags.map((tag) => {
-                        const text = textByTag.get(tag);
-                        return (
-                          <li
-                            key={tag}
-                            className="flex items-center gap-2 border-b border-slate-200/70 py-1 text-xs last:border-0 dark:border-slate-800"
-                          >
-                            <span className="font-mono text-[10px] text-slate-400">
-                              {tag}
-                            </span>
-                            <span
-                              className={cn(
-                                "min-w-0 flex-1 truncate",
-                                text
-                                  ? "text-slate-600 dark:text-slate-300"
-                                  : "text-amber-600 dark:text-amber-400",
-                              )}
-                            >
-                              {text ?? "歌词中找不到这个时间"}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => toggleTag(tag)}
-                              className="text-slate-300 hover:text-rose-500 dark:text-slate-600"
-                              aria-label={`移除 ${tag}`}
-                            >
-                              <X size={12} />
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditor(null);
-                      setNotice(null);
-                    }}
-                    className={TEXT_BUTTON_CLASS}
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void save()}
-                    disabled={!canSave}
-                    className={SOLID_BUTTON_CLASS}
-                  >
-                    {submitting ? "保存中…" : "保存"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="max-h-[70vh] space-y-2 overflow-y-auto">
-              {loading ? (
-                <p className="py-6 text-center text-sm text-slate-400">
-                  加载关系中…
-                </p>
-              ) : sortedOccurrences.length === 0 ? (
-                <p className="py-8 text-center font-kaiti text-base text-slate-400">
-                  暂无关系。在左侧划选词语，或点「新增关系」开始。
-                </p>
-              ) : (
-                sortedOccurrences.map((o) => {
-                  const orphans = o.lyric_timetag.filter(
-                    (t) => !lyricTags.has(t),
-                  );
-                  const isEditing = editor?.occurrenceId === o.id;
-                  const onFocusLine =
-                    focusTag !== null && o.lyric_timetag.includes(focusTag);
-                  const label = o.imagery_name ?? `意象 #${o.imagery_id}`;
-                  return (
-                    <div
-                      key={o.id}
-                      onMouseEnter={() => setHoverId(o.id)}
-                      onMouseLeave={() => setHoverId(null)}
-                      onClick={() => openExisting(o)}
-                      className={cn(
-                        "group flex cursor-pointer items-start gap-3 border-l-2 px-3 py-2 transition-colors",
-                        isEditing
-                          ? "border-(--tone) bg-(--tone)/5"
-                          : onFocusLine
-                            ? "border-slate-400 bg-slate-100 dark:bg-slate-800/60"
-                            : "border-transparent hover:border-amber-400 hover:bg-slate-100/60 dark:hover:bg-slate-900/60",
-                      )}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-2">
-                          <span className="text-slate-900 dark:text-slate-100">
-                            {label}
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            {shortPath(getCategoryPath(o.category_id))}
-                          </span>
-                          {o.meaning_label && (
-                            <span className={TAG_CLASS}>{o.meaning_label}</span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">
-                          <span>{o.lyric_timetag.length} 处</span>
-                          {orphans.length > 0 && (
-                            <span
-                              className="flex items-center gap-1 text-amber-600 dark:text-amber-400"
-                              title={orphans.join("、")}
-                            >
-                              <AlertCircle size={11} />
-                              {orphans.length} 个时间在歌词中找不到
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <ConfirmButton
-                        onConfirm={() => onDelete(o.id, label)}
-                        disabled={submitting}
-                        className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
-                      />
-                    </div>
-                  );
-                })
               )}
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className={LABEL_CLASS}>
+                    出现位置 {editor.timetags.length} 处（在左侧点击歌词行增删）
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditor({
+                        ...editor,
+                        timetags: sortTags([
+                          ...new Set([
+                            ...editor.timetags,
+                            ...linesContaining(editor.imageryName),
+                          ]),
+                        ]),
+                      })
+                    }
+                    disabled={!editor.imageryName.trim()}
+                    title="把歌词中所有含该意象名的行都加进来"
+                    className="flex items-center gap-1 text-[11px] text-(--tone) hover:opacity-75 disabled:opacity-40"
+                  >
+                    <Wand2 size={11} />
+                    匹配全部行
+                  </button>
+                </div>
+                {editor.timetags.length === 0 ? (
+                  <p className="text-xs text-slate-400">至少选择一行歌词</p>
+                ) : (
+                  <ul className="max-h-48 space-y-1 overflow-y-auto">
+                    {editor.timetags.map((tag) => {
+                      const text = textByTag.get(tag);
+                      return (
+                        <li
+                          key={tag}
+                          className="flex items-center gap-2 border-b border-slate-200/70 py-1 text-xs last:border-0 dark:border-slate-800"
+                        >
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {tag}
+                          </span>
+                          <span
+                            className={cn(
+                              "min-w-0 flex-1 truncate",
+                              text
+                                ? "text-slate-600 dark:text-slate-300"
+                                : "text-amber-600 dark:text-amber-400",
+                            )}
+                          >
+                            {text ?? "歌词中找不到这个时间"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleTag(tag)}
+                            className="text-slate-300 hover:text-rose-500 dark:text-slate-600"
+                            aria-label={`移除 ${tag}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditor(null);
+                    setNotice(null);
+                  }}
+                  className={TEXT_BUTTON_CLASS}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void save()}
+                  disabled={!canSave}
+                  className={SOLID_BUTTON_CLASS}
+                >
+                  {submitting ? "保存中…" : "保存"}
+                </button>
+              </div>
             </div>
-          </>
-        )}
-      </section>
+          )}
+
+          <div className="max-h-[70vh] space-y-2 overflow-y-auto">
+            {loading ? (
+              <p className="py-6 text-center text-sm text-slate-400">
+                加载关系中…
+              </p>
+            ) : sortedOccurrences.length === 0 ? (
+              <p className="py-8 text-center font-kaiti text-base text-slate-400">
+                暂无关系。在左侧划选词语，或点「新增关系」开始。
+              </p>
+            ) : (
+              sortedOccurrences.map((o) => {
+                const orphans = o.lyric_timetag.filter(
+                  (t) => !lyricTags.has(t),
+                );
+                const isEditing = editor?.occurrenceId === o.id;
+                const onFocusLine =
+                  focusTag !== null && o.lyric_timetag.includes(focusTag);
+                const label = o.imagery_name ?? `意象 #${o.imagery_id}`;
+                return (
+                  <div
+                    key={o.id}
+                    onMouseEnter={() => setHoverId(o.id)}
+                    onMouseLeave={() => setHoverId(null)}
+                    onClick={() => openExisting(o)}
+                    className={cn(
+                      "group flex cursor-pointer items-start gap-3 border-l-2 px-3 py-2 transition-colors",
+                      isEditing
+                        ? "border-(--tone) bg-(--tone)/5"
+                        : onFocusLine
+                          ? "border-slate-400 bg-slate-100 dark:bg-slate-800/60"
+                          : "border-transparent hover:border-amber-400 hover:bg-slate-100/60 dark:hover:bg-slate-900/60",
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span className="text-slate-900 dark:text-slate-100">
+                          {label}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {shortPath(getCategoryPath(o.category_id))}
+                        </span>
+                        {o.meaning_label && (
+                          <span className={TAG_CLASS}>{o.meaning_label}</span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                        <span>{o.lyric_timetag.length} 处</span>
+                        {orphans.length > 0 && (
+                          <span
+                            className="flex items-center gap-1 text-amber-600 dark:text-amber-400"
+                            title={orphans.join("、")}
+                          >
+                            <AlertCircle size={11} />
+                            {orphans.length} 个时间在歌词中找不到
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ConfirmButton
+                      onConfirm={() => onDelete(o.id, label)}
+                      disabled={submitting}
+                      className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+                    />
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

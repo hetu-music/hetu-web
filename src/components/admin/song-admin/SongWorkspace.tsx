@@ -6,6 +6,7 @@ import Image from "next/image";
 import type React from "react";
 import { FormProvider, useWatch } from "react-hook-form";
 import SectionHeading from "@/components/detail/SectionHeading";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserContext } from "@/context/UserContext";
 import { Link } from "@/i18n/navigation";
 import type { MusicProviderType } from "@/lib/api/api-auto-complete";
@@ -16,7 +17,7 @@ import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
 import { PUBLISH_STATUS_LABEL } from "@/lib/utils/utils-song-diff";
 import { useTwoStepConfirm } from "@/hooks/ui";
 import AdminShell from "../kit/AdminShell";
-import { AdminToolbar, FilterOptions } from "../kit/parts";
+import { AdminToolbar } from "../kit/parts";
 import {
   OUTLINE_BUTTON_CLASS,
   SOLID_BUTTON_CLASS,
@@ -142,32 +143,46 @@ export default function SongWorkspace({
       pinned={<UsageNotesButton />}
     >
       <FormProvider {...ws.form}>
-        <AdminToolbar search={<SaveBar ws={ws} />}>
-          {tabs.length > 1 && (
-            <FilterOptions
-              options={tabs.map((t) => ({ key: t, label: TAB_LABEL[t] }))}
-              active={tab}
-              onSelect={(t) => void setTab(t === "info" ? null : t)}
-            />
-          )}
-        </AdminToolbar>
-
-        {/* 资料的表单一直挂着：切到别的栏再回来，没暂存的改动还在 */}
-        <form
-          id="song-form"
-          onSubmit={ws.save}
-          className={cn(tab !== "info" && tab !== "assets" && "hidden")}
+        <Tabs
+          value={tab}
+          onValueChange={(t: Tab) => void setTab(t === "info" ? null : t)}
         >
-          <div className={cn(tab !== "info" && "hidden")}>
-            <InfoTab ws={ws} onOpenAssets={() => void setTab("assets")} />
-          </div>
-          {song && tab === "assets" && <AssetsTab ws={ws} song={song} />}
-        </form>
+          <AdminToolbar search={<SaveBar ws={ws} />}>
+            {tabs.length > 1 && (
+              <TabsList variant="inline" aria-label="工作台栏目">
+                {tabs.map((t) => (
+                  <TabsTrigger key={t} value={t} variant="inline">
+                    {TAB_LABEL[t]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            )}
+          </AdminToolbar>
 
-        {song && tab === "imagery" && (
-          <SongImageryTab song={song} csrfToken={ws.csrfToken} />
-        )}
-        {song && tab === "audio" && <SongAudioTab songId={song.id} />}
+          {/* 封面、乐谱的选项也是资料表单的字段，两栏共用一个 form */}
+          <form id="song-form" onSubmit={ws.save}>
+            {/* 资料一直挂着：切到别的栏再回来，没暂存的改动还在 */}
+            <TabsContent value="info" variant="inline" keepMounted>
+              <InfoTab ws={ws} onOpenAssets={() => void setTab("assets")} />
+            </TabsContent>
+            {song && (
+              <TabsContent value="assets" variant="inline">
+                <AssetsTab ws={ws} song={song} />
+              </TabsContent>
+            )}
+          </form>
+
+          {song && (
+            <TabsContent value="imagery" variant="inline">
+              <SongImageryTab song={song} csrfToken={ws.csrfToken} />
+            </TabsContent>
+          )}
+          {song && user?.isSuper && (
+            <TabsContent value="audio" variant="inline">
+              <SongAudioTab songId={song.id} />
+            </TabsContent>
+          )}
+        </Tabs>
       </FormProvider>
 
       <SearchResultsDialog

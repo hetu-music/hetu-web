@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils/utils";
 import {
   ConfirmButton,
   EmptyState,
+  ErrorState,
   LoadingState,
   SearchInput,
 } from "../kit/parts";
@@ -132,7 +133,12 @@ export default function ImageryMeaningsClient() {
         />
       }
     >
-      {m.meaningsLoading ? (
+      {m.meaningsError ? (
+        <ErrorState
+          message={m.meaningsError}
+          onRetry={() => void m.refetchMeanings()}
+        />
+      ) : m.meaningsLoading ? (
         <LoadingState text="加载含义中…" />
       ) : (
         <>

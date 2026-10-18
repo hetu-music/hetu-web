@@ -6,25 +6,24 @@ import {
   apiCreateImagery,
   apiCreateOccurrence,
   apiDeleteOccurrence,
-  apiGetImageryCategories,
-  apiGetImageryItems,
-  apiGetMeanings,
   apiGetOccurrencesForSong,
   apiUpdateOccurrence,
 } from "@/lib/api/client-api";
 import { MIN_OCCURRENCES } from "@/lib/quiz/pool";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import type { ImageryCategory, ImageryItem, ImageryMeaning } from "@/lib/types";
 import SongRelationWorkbench, {
   type RelationDraft,
 } from "../imagery-admin/SongRelationWorkbench";
+import {
+  IMAGERY_KEYS,
+  useImageryCategoriesQuery,
+  useImageryItemsQuery,
+  useImageryMeaningsQuery,
+} from "../imagery-admin/queries";
 import { getCategoryPath } from "../imagery-admin/utils";
 import { EmptyState, ErrorState, LoadingState } from "../kit/parts";
 import { WARN_TEXT_CLASS } from "../kit/styles";
 import { notify, notifyError } from "../kit/toast";
-
-/** 意象词典、分类、含义：几首歌之间来回切换时不必重取 */
-const DICTIONARY_STALE_MS = 5 * 60 * 1000;
 
 export const songOccurrencesKey = (songId: number) =>
   ["admin", "occurrences", songId] as const;
@@ -48,21 +47,9 @@ export default function SongImageryTab({
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
 
-  const items = useQuery<ImageryItem[]>({
-    queryKey: ["admin", "imagery", "items"],
-    queryFn: apiGetImageryItems,
-    staleTime: DICTIONARY_STALE_MS,
-  });
-  const categories = useQuery<ImageryCategory[]>({
-    queryKey: ["admin", "imagery", "categories"],
-    queryFn: apiGetImageryCategories,
-    staleTime: DICTIONARY_STALE_MS,
-  });
-  const meanings = useQuery<ImageryMeaning[]>({
-    queryKey: ["admin", "imagery", "meanings"],
-    queryFn: apiGetMeanings,
-    staleTime: DICTIONARY_STALE_MS,
-  });
+  const items = useImageryItemsQuery();
+  const categories = useImageryCategoriesQuery();
+  const meanings = useImageryMeaningsQuery();
   const occurrences = useQuery<OccurrenceWithSong[]>({
     queryKey: songOccurrencesKey(song.id),
     queryFn: () => apiGetOccurrencesForSong(song.id),
@@ -85,9 +72,7 @@ export default function SongImageryTab({
         queryClient.invalidateQueries({
           queryKey: songOccurrencesKey(song.id),
         }),
-        queryClient.invalidateQueries({
-          queryKey: ["admin", "imagery", "items"],
-        }),
+        queryClient.invalidateQueries({ queryKey: IMAGERY_KEYS.items }),
       ]),
     [queryClient, song.id],
   );

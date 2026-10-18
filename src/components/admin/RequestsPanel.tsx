@@ -2,12 +2,12 @@
 
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { InlineOptions } from "@/components/shared/topbar/menu";
 import { Link } from "@/i18n/navigation";
 import { apiGetAdminRequests, apiReplyRequest } from "@/lib/api/client-api";
 import type { RequestStatus, RequestType, UserRequest } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import {
+  AdminOptions,
   AdminToolbar,
   EmptyState,
   ErrorState,
@@ -18,6 +18,7 @@ import {
   INPUT_CLASS,
   LABEL_CLASS,
   META_CLASS,
+  optionClass,
   SOLID_BUTTON_CLASS,
   TEXT_BUTTON_CLASS,
   TEXT_PRIMARY_CLASS,
@@ -189,7 +190,7 @@ export default function RequestsPanel({
         />
         {/* 普通管理员只看得到歌曲纠错 */}
         {isSuper && (
-          <InlineOptions
+          <AdminOptions
             items={TYPE_FILTERS}
             active={typeFilter}
             disabled={loading}
@@ -331,12 +332,11 @@ export default function RequestsPanel({
                               aria-pressed={replyState.status === s}
                               onClick={() => setReply({ status: s })}
                               className={cn(
-                                "text-sm tracking-wider transition-colors",
-                                replyState.status === s
-                                  ? s === "approved"
-                                    ? "text-(--tone)"
-                                    : "text-rose-600 dark:text-rose-400"
-                                  : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
+                                optionClass(replyState.status === s),
+                                // 选中「拒绝」时字与短线都换成 rose
+                                replyState.status === s &&
+                                  s === "rejected" &&
+                                  "text-rose-600 dark:text-rose-400",
                               )}
                             >
                               {s === "approved" ? "同意" : "拒绝"}

@@ -2,9 +2,9 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { InlineOptions } from "@/components/shared/topbar/menu";
 import { cn } from "@/lib/utils/utils";
 import {
+  AdminOptions,
   AdminToolbar,
   EmptyState,
   ErrorState,
@@ -282,7 +282,7 @@ export default function AuditLogsPanel() {
           </div>
         }
       >
-        <InlineOptions
+        <AdminOptions
           items={TABLE_FILTERS}
           active={tableFilter}
           disabled={loading}

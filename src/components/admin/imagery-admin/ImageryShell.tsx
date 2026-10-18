@@ -2,9 +2,9 @@
 
 import type React from "react";
 import { Link } from "@/i18n/navigation";
-import { cn } from "@/lib/utils/utils";
 import AdminShell from "../kit/AdminShell";
 import { AdminToolbar, type Stat } from "../kit/parts";
+import { optionClass } from "../kit/styles";
 
 export type ImagerySub = "items" | "categories" | "meanings";
 
@@ -66,12 +66,7 @@ export default function ImageryShell({
               <Link
                 href={s.href}
                 aria-current={s.key === sub ? "page" : undefined}
-                className={cn(
-                  "py-2 text-sm tracking-widest transition-colors",
-                  s.key === sub
-                    ? "text-(--tone)"
-                    : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
-                )}
+                className={optionClass(s.key === sub)}
               >
                 {s.label}
               </Link>

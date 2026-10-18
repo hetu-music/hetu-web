@@ -11,6 +11,7 @@ import { ConfirmButton } from "../kit/parts";
 import {
   INPUT_CLASS,
   LABEL_CLASS,
+  optionClass,
   PANEL_CLASS,
   SELECT_CLASS,
   SOLID_BUTTON_CLASS,
@@ -530,12 +531,7 @@ export default function SongRelationWorkbench({
                 role="tab"
                 aria-selected={view === key}
                 onClick={() => setView(key)}
-                className={cn(
-                  "py-1 tracking-wider transition-colors",
-                  view === key
-                    ? "text-(--tone)"
-                    : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
-                )}
+                className={optionClass(view === key)}
               >
                 {label}
               </button>

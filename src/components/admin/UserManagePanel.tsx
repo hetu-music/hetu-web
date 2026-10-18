@@ -2,11 +2,11 @@
 
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { InlineOptions } from "@/components/shared/topbar/menu";
 import { apiGetUsers, apiUpdateUser } from "@/lib/api/client-api";
 import type { UserRecord, UserUpdatePayload } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import {
+  AdminOptions,
   AdminToolbar,
   ConfirmButton,
   EmptyState,
@@ -70,7 +70,7 @@ function BoolField({
         {label}
         {locked && <span className="ml-2 tracking-normal">（{locked}）</span>}
       </span>
-      <InlineOptions
+      <AdminOptions
         items={YES_NO}
         active={value ? "yes" : "no"}
         disabled={Boolean(locked)}

@@ -11,6 +11,7 @@ import {
   INPUT_CLASS,
   INPUT_ERROR_CLASS,
   LABEL_CLASS,
+  optionClass,
   SELECT_CLASS,
   TEXT_BUTTON_CLASS,
 } from "../kit/styles";
@@ -73,7 +74,7 @@ function ToggleOptions({
   onChange: (next: string[]) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 py-1">
+    <div className="flex flex-wrap gap-x-4">
       {options.map((opt) => {
         const active = value.includes(opt);
         return (
@@ -86,12 +87,7 @@ function ToggleOptions({
                 active ? value.filter((x) => x !== opt) : [...value, opt],
               )
             }
-            className={cn(
-              "text-sm tracking-wider transition-colors",
-              active
-                ? "text-(--tone)"
-                : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
-            )}
+            className={optionClass(active)}
           >
             {opt}
           </button>

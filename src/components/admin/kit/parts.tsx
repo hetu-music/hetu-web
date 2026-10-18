@@ -1,11 +1,10 @@
 "use client";
 
 import { Loader2, Search, X } from "lucide-react";
-import type React from "react";
-import { InlineOptions } from "@/components/shared/topbar/menu";
+import React from "react";
 import { useTwoStepConfirm } from "@/hooks/ui/useTwoStepConfirm";
 import { cn } from "@/lib/utils/utils";
-import { DANGER_TEXT_CLASS, TEXT_BUTTON_CLASS } from "./styles";
+import { DANGER_TEXT_CLASS, optionClass, TEXT_BUTTON_CLASS } from "./styles";
 
 /** 吸顶工具栏：左边筛选，右边搜索。样式同 DESIGN.md 第四节的吸顶二级栏 */
 export function AdminToolbar({
@@ -38,7 +37,46 @@ export interface FilterOption<K extends string> {
   count?: number;
 }
 
-/** 筛选：「·」隔开的文字选项，当前项只变色 */
+/**
+ * 一行里用「·」隔开的文字选项，选中项变色并带短线（见 optionClass）。
+ * 公开页的 InlineOptions 只变色，后台选项多、来回切得勤，需要更醒目。
+ */
+export function AdminOptions<K extends string>({
+  items,
+  active,
+  onSelect,
+  disabled,
+}: {
+  items: readonly { id: K; label: string }[];
+  active: K | undefined;
+  onSelect: (id: K) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {items.map((item, i) => (
+        <React.Fragment key={item.id}>
+          {i > 0 && (
+            <span aria-hidden className="text-slate-300 dark:text-slate-600">
+              ·
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => onSelect(item.id)}
+            aria-pressed={item.id === active}
+            disabled={disabled}
+            className={optionClass(item.id === active)}
+          >
+            {item.label}
+          </button>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+/** 筛选：选项后面可带条数 */
 export function FilterOptions<K extends string>({
   options,
   active,
@@ -49,13 +87,13 @@ export function FilterOptions<K extends string>({
   onSelect: (key: K) => void;
 }) {
   return (
-    <InlineOptions
+    <AdminOptions
       items={options.map((o) => ({
         id: o.key,
         label: o.count === undefined ? o.label : `${o.label} ${o.count}`,
       }))}
       active={active}
-      onSelect={(id) => onSelect(id as K)}
+      onSelect={onSelect}
     />
   );
 }

@@ -55,3 +55,19 @@ export const ERROR_TEXT_CLASS = "text-rose-600 dark:text-rose-400";
 /** 两步确认进入待确认时的文字色 */
 export const DANGER_TEXT_CLASS =
   "text-rose-500 dark:text-rose-400 hover:text-rose-600";
+
+/**
+ * 文字选项（筛选、栏目、是否、类型）：选中除了换成强调色，底下再加一道 2px 短线。
+ * 墨蓝饱和度低，深色下与未选中的灰只有约 2:1 的亮度差，单靠字色分不清；
+ * 短线跟着字色（bg-current），选「拒绝」这类 rose 的选项时短线也是 rose。
+ * 宽字距会在末字后多留 0.1em，短线右端收回同样的距离，与字对齐。
+ */
+export function optionClass(active: boolean) {
+  return [
+    "relative py-2 text-sm tracking-widest transition-colors disabled:cursor-wait disabled:opacity-40",
+    "after:absolute after:left-0 after:right-[0.1em] after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-current after:transition-opacity",
+    active
+      ? "font-medium text-(--tone) after:opacity-100"
+      : "text-slate-400 after:opacity-0 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
+  ].join(" ");
+}

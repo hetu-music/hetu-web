@@ -9,8 +9,10 @@ import {
   MISSING_FIELD_LABEL_OVERRIDES,
   MISSING_GROUPS,
   NON_CRITICAL_FIELD_KEYS,
+  PLATFORM_LINKS,
   type CreatorFieldKey,
   type MissingGroup,
+  type PlatformLinkKey,
 } from "./types";
 
 export function getInputValue(value: string | number | null | undefined) {
@@ -72,6 +74,14 @@ export function getMissingGroups(song: SongDetail): MissingGroup[] {
       (field) => group.keys.includes(field.key) && isFieldEmpty(song, field),
     ),
   ).map((group) => group.key);
+}
+
+/** 没填的音乐平台链接，按 PLATFORM_LINKS 的顺序 */
+export function getMissingLinks(song: SongDetail): PlatformLinkKey[] {
+  return PLATFORM_LINKS.filter(({ key }) => {
+    const value = song[key];
+    return typeof value !== "string" || value.trim() === "";
+  }).map(({ key }) => key);
 }
 
 /** 还没有乐谱（只有 nmn_status 为 true 才算有） */

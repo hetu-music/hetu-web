@@ -22,19 +22,22 @@ import {
 } from "../kit/parts";
 import { META_CLASS, SOLID_BUTTON_CLASS, WARN_TEXT_CLASS } from "../kit/styles";
 import { AdminCoverArt } from "./shared";
-import { MISSING_GROUPS, type MissingGroup } from "./types";
+import { MISSING_GROUPS, PLATFORM_LINKS } from "./types";
 import UsageNotesButton from "./UsageNotes";
 import {
   getMissingFields,
   getMissingGroups,
+  getMissingLinks,
   lacksScore,
   summarizeMissing,
 } from "./utils";
 
 const ITEMS_PER_PAGE = 30;
 
-type Filter = "all" | "incomplete" | "unpublished" | "imagery" | "score";
-type Miss = "all" | MissingGroup;
+type Filter =
+  "all" | "incomplete" | "unpublished" | "imagery" | "score" | "links";
+
+const PLATFORM_LABEL = new Map(PLATFORM_LINKS.map((p) => [p.key, p.label]));
 
 /** 表头与每一行共用的列宽 */
 const GRID_COLS = "lg:grid-cols-[3rem_2.5rem_minmax(0,1fr)_9rem_5rem_14rem]";
@@ -73,7 +76,7 @@ export default function SongListClient({
     "f",
     parseAsString.withDefault("all").withOptions({ shallow: true }),
   );
-  // 待完善下再按缺哪组资料细分
+  // 待完善、缺链接下再细分：缺哪组资料、缺哪个平台
   const [miss, setMiss] = useSyncedQueryState<string>(
     "miss",
     parseAsString.withDefault("all").withOptions({ shallow: true }),
@@ -93,22 +96,37 @@ export default function SongListClient({
         (publishStatuses[s.id] ?? "unpublished") !== "published",
       imagery: (s) => lacksImagery(s, occurrenceCounts[s.id] ?? 0),
       score: lacksScore,
+      links: (s) => getMissingLinks(s).length > 0,
     }),
     [occurrenceCounts, publishStatuses],
   );
   const activeFilter: Filter =
     filter in predicates ? (filter as Filter) : "all";
-  const activeMiss: Miss = MISSING_GROUPS.some((g) => g.key === miss)
-    ? (miss as MissingGroup)
-    : "all";
-  const missGroupsById = useMemo(
-    () => new Map(songs.map((s) => [s.id, getMissingGroups(s)])),
-    [songs],
-  );
-  const matchesMiss = (s: SongDetail) =>
-    activeFilter !== "incomplete" ||
-    activeMiss === "all" ||
-    (missGroupsById.get(s.id) ?? []).includes(activeMiss);
+
+  /** 有细分的筛选：每一项的名字与判断 */
+  const subFilters = useMemo(() => {
+    const groupsById = new Map(songs.map((s) => [s.id, getMissingGroups(s)]));
+    const linksById = new Map(songs.map((s) => [s.id, getMissingLinks(s)]));
+    return {
+      incomplete: MISSING_GROUPS.map((g) => ({
+        id: g.key as string,
+        label: g.label,
+        test: (s: SongDetail) => !!groupsById.get(s.id)?.includes(g.key),
+      })),
+      links: PLATFORM_LINKS.map((l) => ({
+        id: l.key as string,
+        label: l.label,
+        test: (s: SongDetail) => !!linksById.get(s.id)?.includes(l.key),
+      })),
+    } as Partial<
+      Record<
+        Filter,
+        { id: string; label: string; test: (s: SongDetail) => boolean }[]
+      >
+    >;
+  }, [songs]);
+  const subs = subFilters[activeFilter];
+  const activeSub = subs?.find((o) => o.id === miss);
 
   const counts = useMemo(
     () =>
@@ -122,10 +140,8 @@ export default function SongListClient({
   );
 
   const visibleSongs = sortedSongs.filter(
-    (s) => predicates[activeFilter](s) && matchesMiss(s),
+    (s) => predicates[activeFilter](s) && (!activeSub || activeSub.test(s)),
   );
-  const missCount = (group: MissingGroup) =>
-    songs.filter((s) => missGroupsById.get(s.id)?.includes(group)).length;
 
   const totalPages = Math.max(
     1,
@@ -147,6 +163,7 @@ export default function SongListClient({
     { key: "unpublished", label: "待发布", count: counts.unpublished },
     { key: "imagery", label: "意象不足", count: counts.imagery },
     { key: "score", label: "缺乐谱", count: counts.score },
+    { key: "links", label: "缺链接", count: counts.links },
   ];
 
   return (
@@ -194,20 +211,20 @@ export default function SongListClient({
             setCurrentPage(1);
           }}
         />
-        {activeFilter === "incomplete" && (
+        {subs && (
           <div className="flex items-baseline gap-3">
             <span className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
               缺
             </span>
             <AdminOptions
               items={[
-                { id: "all" as Miss, label: "全部" },
-                ...MISSING_GROUPS.map((g) => ({
-                  id: g.key as Miss,
-                  label: `${g.label} ${missCount(g.key)}`,
+                { id: "all", label: "全部" },
+                ...subs.map((o) => ({
+                  id: o.id,
+                  label: `${o.label} ${songs.filter(o.test).length}`,
                 })),
               ]}
-              active={activeMiss}
+              active={activeSub?.id ?? "all"}
               onSelect={(id) => {
                 setMiss(id);
                 setCurrentPage(1);
@@ -244,6 +261,7 @@ export default function SongListClient({
                 song={song}
                 status={publishStatuses[song.id] ?? "unpublished"}
                 occurrences={occurrenceCounts[song.id] ?? 0}
+                showLinks={activeFilter === "links"}
               />
             ))}
           </ol>
@@ -264,12 +282,18 @@ function SongRow({
   song,
   status,
   occurrences,
+  showLinks,
 }: {
   song: SongDetail;
   status: PublishStatus;
   occurrences: number;
+  /** 筛「缺链接」时，在状态里写出缺哪几个平台 */
+  showLinks: boolean;
 }) {
   const missing = getMissingFields(song);
+  const missingLinks = showLinks
+    ? getMissingLinks(song).map((key) => PLATFORM_LABEL.get(key) ?? key)
+    : [];
   const fewImagery = lacksImagery(song, occurrences);
 
   return (
@@ -317,6 +341,11 @@ function SongRow({
           {missing.length > 0 && (
             <span className={WARN_TEXT_CLASS} title={missing.join("、")}>
               缺{summarizeMissing(missing)}
+            </span>
+          )}
+          {missingLinks.length > 0 && (
+            <span className="text-slate-500 dark:text-slate-400">
+              无{missingLinks.join("、")}链接
             </span>
           )}
           <span

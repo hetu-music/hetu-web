@@ -59,6 +59,21 @@ export const MISSING_GROUPS: readonly {
   },
 ];
 
+export type PlatformLinkKey = "nelink" | "kugolink" | "qmlink";
+
+/**
+ * 音乐平台链接：不算待完善（有的歌确实不在某个平台上），单独统计「链接不全」。
+ * 顺序即显示顺序，与资料表单里「链接」一段一致。
+ */
+export const PLATFORM_LINKS: readonly {
+  key: PlatformLinkKey;
+  label: string;
+}[] = [
+  { key: "nelink", label: "网易云" },
+  { key: "kugolink", label: "酷狗" },
+  { key: "qmlink", label: "QQ音乐" },
+];
+
 /** 待完善标签上与 songFields.label 不一致的显示名 */
 export const MISSING_FIELD_LABEL_OVERRIDES: Partial<
   Record<SongFormFieldKey, string>

@@ -9,7 +9,12 @@ import { useAudioAdmin } from "./audio-admin/useAudioAdmin";
 import AdminShell from "./kit/AdminShell";
 import { ADMIN_SECTIONS } from "./kit/AdminNavbar";
 import { SOLID_BUTTON_CLASS } from "./kit/styles";
-import { MISSING_GROUPS, type MissingGroup } from "./song-admin/types";
+import {
+  MISSING_GROUPS,
+  type MissingGroup,
+  PLATFORM_LINKS,
+  type PlatformLinkKey,
+} from "./song-admin/types";
 
 export interface OverviewCounts {
   songs: number;
@@ -18,6 +23,9 @@ export interface OverviewCounts {
   incomplete: number;
   /** 待完善里各组缺资料的歌数；一首歌可能同时缺几组 */
   missingByGroup: Record<MissingGroup, number>;
+  /** 至少缺一个音乐平台链接的歌数 */
+  lacksLinks: number;
+  missingByPlatform: Record<PlatformLinkKey, number>;
   lacksImagery: number;
   lacksScore: number;
 }
@@ -75,23 +83,26 @@ export default function AdminOverviewClient({
           label="意象标注不足"
           hint={`少于 ${MIN_OCCURRENCES} 个标注的歌不会进入寻曲测验`}
         />
+        {/* 乐谱、链接不算待完善：前者要另找来上传，后者有的歌确实不在某个平台 */}
+        <TodoItem
+          href="/admin/songs?f=score"
+          count={counts.lacksScore}
+          label="缺乐谱"
+          hint="找到简谱后，在歌曲的「封面与乐谱」里上传"
+        />
+        <TodoItem
+          href="/admin/songs?f=links"
+          count={counts.lacksLinks}
+          label="平台链接不全"
+          hint="详情页的收听入口，三个平台没有都填上"
+          breakdown={PLATFORM_LINKS.map((l) => ({
+            label: l.label,
+            count: counts.missingByPlatform[l.key],
+            href: `/admin/songs?f=links&miss=${l.key}`,
+          }))}
+        />
         {isSuper && <AudioTodo />}
       </ol>
-
-      {/* 乐谱要另找来上传，不是漏填的资料，也没有期限，不和上面的待办混在一起 */}
-      <section className="mt-16">
-        <h2 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
-          素材
-        </h2>
-        <ol className="mt-4 grid border-t border-slate-200/70 md:grid-cols-2 dark:border-slate-800">
-          <TodoItem
-            href="/admin/songs?f=score"
-            count={counts.lacksScore}
-            label="缺乐谱"
-            hint="找到简谱后，在歌曲的「封面与乐谱」里上传"
-          />
-        </ol>
-      </section>
 
       <nav className="mt-16">
         <h2 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">

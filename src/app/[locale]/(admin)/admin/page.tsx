@@ -10,9 +10,13 @@ import {
 } from "@/lib/server/service-admin";
 import { getSongs } from "@/lib/server/service-songs";
 import type { SongDetail } from "@/lib/types";
-import { MISSING_GROUPS } from "@/components/admin/song-admin/types";
+import {
+  MISSING_GROUPS,
+  PLATFORM_LINKS,
+} from "@/components/admin/song-admin/types";
 import {
   getMissingGroups,
+  getMissingLinks,
   lacksScore,
 } from "@/components/admin/song-admin/utils";
 
@@ -44,6 +48,7 @@ export default async function AdminOverviewPage({ params }: Props) {
   ]);
 
   const missingGroups = songs.map(getMissingGroups);
+  const missingLinks = songs.map(getMissingLinks);
 
   return (
     <AdminOverviewClient
@@ -61,6 +66,13 @@ export default async function AdminOverviewPage({ params }: Props) {
           ]),
         ) as Record<(typeof MISSING_GROUPS)[number]["key"], number>,
         lacksScore: songs.filter(lacksScore).length,
+        lacksLinks: missingLinks.filter((l) => l.length > 0).length,
+        missingByPlatform: Object.fromEntries(
+          PLATFORM_LINKS.map((platform) => [
+            platform.key,
+            missingLinks.filter((l) => l.includes(platform.key)).length,
+          ]),
+        ) as Record<(typeof PLATFORM_LINKS)[number]["key"], number>,
         lacksImagery: songs.filter(
           (s) =>
             isPoolEligible({ title: s.title, type: s.type ?? null }) &&

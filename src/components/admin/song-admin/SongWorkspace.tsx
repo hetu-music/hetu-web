@@ -30,8 +30,17 @@ import SongFormField from "./SongFormFields";
 import SongImageryTab from "./SongImageryTab";
 import UsageNotesButton from "./UsageNotes";
 import { type SongWorkspaceState, useSongWorkspace } from "./useSongWorkspace";
-import { MISSING_FIELD_LABEL_OVERRIDES, MISSING_GROUPS } from "./types";
-import { getMissingFields, isFieldEmpty, lacksScore } from "./utils";
+import {
+  MISSING_FIELD_LABEL_OVERRIDES,
+  MISSING_GROUPS,
+  PLATFORM_LINKS,
+} from "./types";
+import {
+  getMissingFields,
+  getMissingLinks,
+  isFieldEmpty,
+  lacksScore,
+} from "./utils";
 
 const TABS = ["info", "assets", "imagery", "audio"] as const;
 type Tab = (typeof TABS)[number];
@@ -331,7 +340,7 @@ function InfoTab({
 
 /**
  * 待完善按组列出（与歌曲列表的细分同一套分组），点组名滚到表单里那一段。
- * 乐谱不算待完善，单独一行，点了切到「封面与乐谱」。
+ * 乐谱、平台链接不算待完善，各单独一行：乐谱切到「封面与乐谱」，链接滚到表单的「链接」一段。
  * 按暂存版判断：刚填还没暂存的字段要暂存后才从这里消失。
  */
 function MissingList({
@@ -347,6 +356,9 @@ function MissingList({
     );
     return { ...group, fields };
   }).filter((g) => g.fields.length > 0);
+  const missingLinks = getMissingLinks(song).map(
+    (key) => PLATFORM_LINKS.find((l) => l.key === key)?.label ?? key,
+  );
 
   return (
     <div>
@@ -376,14 +388,27 @@ function MissingList({
           ))}
         </dl>
       )}
-      {lacksScore(song) && (
-        <button
-          type="button"
-          onClick={onOpenAssets}
-          className={cn(TEXT_BUTTON_CLASS, "mt-3 tracking-normal")}
-        >
-          还没有乐谱，去上传
-        </button>
+      {/* 乐谱、链接不算待完善，另起两行，只作提醒 */}
+      {(lacksScore(song) || missingLinks.length > 0) && (
+        <div className="mt-3 flex flex-col items-start gap-1">
+          {missingLinks.length > 0 && (
+            <a
+              href={`#${sectionIdOf("nelink")}`}
+              className={cn(TEXT_BUTTON_CLASS, "tracking-normal")}
+            >
+              没有{missingLinks.join("、")}链接
+            </a>
+          )}
+          {lacksScore(song) && (
+            <button
+              type="button"
+              onClick={onOpenAssets}
+              className={cn(TEXT_BUTTON_CLASS, "tracking-normal")}
+            >
+              还没有乐谱，去上传
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

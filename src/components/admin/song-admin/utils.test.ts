@@ -8,6 +8,7 @@ import type {
 import {
   getMissingFields,
   getMissingGroups,
+  getMissingLinks,
   lacksScore,
   summarizeMissing,
   isCreatorFieldKey,
@@ -201,6 +202,22 @@ describe("getMissingGroups", () => {
     for (const song of samples) {
       expect(getMissingGroups(song).length > 0).toBe(isSongIncomplete(song));
     }
+  });
+});
+
+describe("getMissingLinks", () => {
+  it("三个平台都有时为空", () => {
+    expect(getMissingLinks(makeCompleteSong())).toEqual([]);
+  });
+
+  it("按网易云、酷狗、QQ音乐的顺序列出没填的，空白也算没填", () => {
+    const song = makeCompleteSong({ qmlink: null, nelink: "  " });
+    expect(getMissingLinks(song)).toEqual(["nelink", "qmlink"]);
+  });
+
+  it("缺链接不算待完善", () => {
+    const song = makeCompleteSong({ kugolink: null });
+    expect(isSongIncomplete(song)).toBe(false);
   });
 });
 

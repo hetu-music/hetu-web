@@ -1,0 +1,284 @@
+"use client";
+
+import { parseAsInteger, parseAsString } from "nuqs";
+import { useEffect, useMemo } from "react";
+import Pagination from "@/components/shared/Pagination";
+import { useSongs } from "@/hooks/library/useSongs";
+import { useSyncedQueryState } from "@/hooks/utils/useSyncedQueryState";
+import { Link } from "@/i18n/navigation";
+import { isPoolEligible, MIN_OCCURRENCES } from "@/lib/quiz/pool";
+import type { SongDetail } from "@/lib/types";
+import { cn } from "@/lib/utils/utils";
+import type { PublishStatus } from "@/lib/utils/utils-song-diff";
+import AdminShell from "../kit/AdminShell";
+import {
+  AdminToolbar,
+  EmptyState,
+  ErrorState,
+  type FilterOption,
+  FilterOptions,
+  SearchInput,
+} from "../kit/parts";
+import { META_CLASS, SOLID_BUTTON_CLASS, WARN_TEXT_CLASS } from "../kit/styles";
+import { AdminCoverArt } from "./shared";
+import UsageNotesButton from "./UsageNotes";
+import { getMissingFields } from "./utils";
+
+const ITEMS_PER_PAGE = 30;
+
+type Filter = "all" | "incomplete" | "unpublished" | "imagery";
+
+/** 进不了寻曲测验的歌：类型允许入池，但意象标注不够 */
+function lacksImagery(song: SongDetail, count: number) {
+  return (
+    isPoolEligible({ title: song.title, type: song.type ?? null }) &&
+    count < MIN_OCCURRENCES
+  );
+}
+
+const join = (value: string[] | string | null | undefined) =>
+  Array.isArray(value) ? value.join("、") : value || "";
+
+export default function SongListClient({
+  initialSongs,
+  initialError,
+  publishStatuses,
+  occurrenceCounts,
+}: {
+  initialSongs: SongDetail[];
+  initialError: string | null;
+  publishStatuses: Record<number, PublishStatus>;
+  occurrenceCounts: Record<number, number>;
+}) {
+  const [searchTerm, setSearchTerm] = useSyncedQueryState<string>(
+    "q",
+    parseAsString.withDefault("").withOptions({ shallow: true }),
+  );
+  const [currentPage, setCurrentPage] = useSyncedQueryState<number>(
+    "page",
+    parseAsInteger.withDefault(1).withOptions({ shallow: true }),
+  );
+  const [filter, setFilter] = useSyncedQueryState<string>(
+    "f",
+    parseAsString.withDefault("all").withOptions({ shallow: true }),
+  );
+
+  const { songs, sortedSongs, error } = useSongs(
+    initialSongs,
+    initialError,
+    searchTerm,
+  );
+
+  const predicates = useMemo<Record<Filter, (s: SongDetail) => boolean>>(
+    () => ({
+      all: () => true,
+      incomplete: (s) => getMissingFields(s).length > 0,
+      unpublished: (s) =>
+        (publishStatuses[s.id] ?? "unpublished") !== "published",
+      imagery: (s) => lacksImagery(s, occurrenceCounts[s.id] ?? 0),
+    }),
+    [occurrenceCounts, publishStatuses],
+  );
+  const activeFilter: Filter =
+    filter in predicates ? (filter as Filter) : "all";
+
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        (Object.keys(predicates) as Filter[]).map((key) => [
+          key,
+          songs.filter(predicates[key]).length,
+        ]),
+      ) as Record<Filter, number>,
+    [predicates, songs],
+  );
+
+  const visibleSongs = useMemo(
+    () => sortedSongs.filter(predicates[activeFilter]),
+    [activeFilter, predicates, sortedSongs],
+  );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(visibleSongs.length / ITEMS_PER_PAGE),
+  );
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const pagedSongs = visibleSongs.slice(
+    (safePage - 1) * ITEMS_PER_PAGE,
+    safePage * ITEMS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    if (safePage !== currentPage) setCurrentPage(safePage);
+  }, [currentPage, safePage, setCurrentPage]);
+
+  const filters: FilterOption<Filter>[] = [
+    { key: "all", label: "全部", count: counts.all },
+    { key: "incomplete", label: "待完善", count: counts.incomplete },
+    { key: "unpublished", label: "待发布", count: counts.unpublished },
+    { key: "imagery", label: "意象不足", count: counts.imagery },
+  ];
+
+  return (
+    <AdminShell
+      section="songs"
+      title="歌曲"
+      stats={[
+        { label: "总计", value: songs.length },
+        {
+          label: "待完善",
+          value: counts.incomplete,
+          warn: counts.incomplete > 0,
+        },
+        {
+          label: "待发布",
+          value: counts.unpublished,
+          warn: counts.unpublished > 0,
+        },
+      ]}
+      actions={
+        <Link href="/admin/songs/new" className={SOLID_BUTTON_CLASS}>
+          新增歌曲
+        </Link>
+      }
+      pinned={<UsageNotesButton />}
+    >
+      <AdminToolbar
+        search={
+          <SearchInput
+            value={searchTerm}
+            onChange={(value) => {
+              setSearchTerm(value);
+              setCurrentPage(1);
+            }}
+            placeholder="搜索标题、专辑、作者"
+          />
+        }
+      >
+        <FilterOptions
+          options={filters}
+          active={activeFilter}
+          onSelect={(key) => {
+            setFilter(key);
+            setCurrentPage(1);
+          }}
+        />
+      </AdminToolbar>
+
+      {error && songs.length === 0 ? (
+        <ErrorState message={`加载失败：${error}`} />
+      ) : visibleSongs.length === 0 ? (
+        <EmptyState>没有符合条件的歌曲</EmptyState>
+      ) : (
+        <>
+          <div
+            className={cn(
+              META_CLASS,
+              "hidden border-b border-slate-200/70 pb-2 lg:grid lg:grid-cols-[3rem_2.5rem_minmax(0,1fr)_10rem_6rem_10rem] lg:gap-4 dark:border-slate-800",
+            )}
+          >
+            <span className="text-right">#</span>
+            <span />
+            <span>歌名</span>
+            <span>作曲</span>
+            <span>类型</span>
+            <span>状态</span>
+          </div>
+          <ol>
+            {pagedSongs.map((song) => (
+              <SongRow
+                key={song.id}
+                song={song}
+                status={publishStatuses[song.id] ?? "unpublished"}
+                occurrences={occurrenceCounts[song.id] ?? 0}
+              />
+            ))}
+          </ol>
+          <div className="mt-10 flex justify-center">
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              onPageChange={(page) => setCurrentPage(Math.max(1, page))}
+            />
+          </div>
+        </>
+      )}
+    </AdminShell>
+  );
+}
+
+function SongRow({
+  song,
+  status,
+  occurrences,
+}: {
+  song: SongDetail;
+  status: PublishStatus;
+  occurrences: number;
+}) {
+  const missing = getMissingFields(song);
+  const fewImagery = lacksImagery(song, occurrences);
+
+  return (
+    <li className="border-b border-slate-200/70 dark:border-slate-800">
+      <Link
+        href={`/admin/songs/${song.id}`}
+        className="group grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1 py-3 transition-colors hover:bg-slate-100/60 lg:grid-cols-[3rem_2.5rem_minmax(0,1fr)_10rem_6rem_10rem] lg:gap-4 dark:hover:bg-slate-900/60"
+      >
+        <span className="hidden text-right font-mono text-xs text-slate-400 tabular-nums lg:block">
+          {song.id}
+        </span>
+        <span className="row-span-2 size-10 overflow-hidden rounded ring-1 ring-slate-900/5 lg:row-span-1 dark:ring-white/10">
+          <AdminCoverArt song={song} />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-slate-900 transition-colors group-hover:text-(--tone) dark:text-slate-100">
+            {song.title}
+          </span>
+          <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+            {[song.album || "未归档", join(song.lyricist)]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        </span>
+        <span className="hidden truncate text-sm text-slate-500 lg:block dark:text-slate-400">
+          {join(song.composer) || "—"}
+        </span>
+        <span className="hidden truncate text-sm text-slate-500 lg:block dark:text-slate-400">
+          {song.type?.[0] ?? "—"}
+        </span>
+        {/* 窄屏排在歌名下面 */}
+        <span className="col-start-2 flex flex-wrap gap-x-3 text-xs lg:col-start-auto">
+          {status !== "published" && (
+            <span
+              className={
+                status === "unpublished" ? WARN_TEXT_CLASS : "text-(--tone)"
+              }
+            >
+              {status === "unpublished" ? "未发布" : "待发布"}
+            </span>
+          )}
+          {missing.length > 0 && (
+            <span className={WARN_TEXT_CLASS} title={missing.join("、")}>
+              缺 {missing.length} 项
+            </span>
+          )}
+          <span
+            className={
+              fewImagery
+                ? WARN_TEXT_CLASS
+                : "text-slate-400 dark:text-slate-500"
+            }
+            title={
+              fewImagery
+                ? `少于 ${MIN_OCCURRENCES} 个不会进入寻曲测验`
+                : undefined
+            }
+          >
+            意象 {occurrences}
+          </span>
+        </span>
+      </Link>
+    </li>
+  );
+}

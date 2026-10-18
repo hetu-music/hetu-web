@@ -192,9 +192,11 @@ describe("SongRelationWorkbench", () => {
     expect(screen.getByText("1 个时间在歌词中找不到")).toBeTruthy();
   });
 
-  it("删除按钮交给上层确认，不触发编辑", () => {
+  it("删除要点两次，不触发编辑", () => {
     renderWorkbench([occurrence({ id: 1, lyric_timetag: ["00:10.00"] })]);
-    fireEvent.click(screen.getByRole("button", { name: "删除「明月」" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
     expect(onDelete).toHaveBeenCalledWith(1, "明月");
     expect(screen.queryByText("编辑关系 #1")).toBeNull();
   });
@@ -238,7 +240,7 @@ describe("SongRelationWorkbench", () => {
     // 已有关系与勾选的候选在同一行里各自高亮
     const marks = [...line(container, "00:10.00").querySelectorAll("mark")];
     expect(marks.map((m) => m.textContent)).toEqual(["明月", "天涯"]);
-    expect(marks[1].className).toContain("emerald");
+    expect(marks[1].className).toContain("decoration-dashed");
 
     fireEvent.click(screen.getByRole("button", { name: "保存选中" }));
     await vi.waitFor(() => expect(onReload).toHaveBeenCalled());

@@ -1,15 +1,13 @@
-import { redirect } from "next/navigation";
-import { getAdminPageSession } from "@/lib/server/server-auth";
-import { loginPathFor } from "@/lib/utils/safe-next";
-import { getImageryCategories } from "@/lib/server/service-imagery";
-import ImageryAdminClient from "@/components/admin/ImageryAdminClient";
 import type { Metadata } from "next";
+import ImageryItemsClient from "@/components/admin/imagery-admin/ImageryItemsClient";
+import { requireAdminPage } from "@/lib/server/admin-page";
+import { getImageryCategories } from "@/lib/server/service-imagery";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "意象管理 - 河图作品勘鉴",
-  description: "管理意象库与分类",
+  title: "意象 - 河图作品勘鉴",
+  description: "管理意象词典",
 };
 
 type Props = {
@@ -18,13 +16,7 @@ type Props = {
 
 export default async function ImageryAdminPage({ params }: Props) {
   const { locale } = await params;
-
-  // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
-  const adminSession = await getAdminPageSession();
-  if (!adminSession) {
-    redirect(`/${locale}${loginPathFor("/admin/imagery")}`);
-  }
-
+  await requireAdminPage(locale, "/admin/imagery");
   const categories = await getImageryCategories().catch(() => []);
-  return <ImageryAdminClient initialCategories={categories} />;
+  return <ImageryItemsClient categories={categories} />;
 }

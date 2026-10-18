@@ -19,7 +19,6 @@ import { toMeaningPayload } from "@/lib/forms/imagery-form";
 import type { MeaningFormValues } from "@/lib/forms/imagery-form";
 import type { ImageryMeaning } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
-import type { ModalState } from "./types";
 
 const PAGE_SIZE = 20;
 
@@ -34,7 +33,6 @@ export function useMeaningsTab(
   const [addingMeaning, setAddingMeaning] = useState(false);
   const [editingMeaningId, setEditingMeaningId] = useState<number | null>(null);
   const [meaningSubmitting, setMeaningSubmitting] = useState(false);
-  const [modal, setModal] = useState<ModalState>({ type: "none" });
 
   useEffect(() => {
     void apiGetMeanings()
@@ -92,7 +90,6 @@ export function useMeaningsTab(
     setAddingMeaning(false);
     setEditingMeaningId(null);
   };
-  const closeModal = () => setModal({ type: "none" });
 
   const handleCreate = async (values: MeaningFormValues) => {
     if (meaningSubmitting) return;
@@ -145,15 +142,14 @@ export function useMeaningsTab(
     }
   };
 
-  const handleDelete = async () => {
-    if (modal.type !== "delete-meaning" || meaningSubmitting) return;
+  const handleDelete = async (meaning: ImageryMeaning) => {
+    if (meaningSubmitting) return;
     setMeaningSubmitting(true);
     try {
-      await apiDeleteGlobalMeaning(modal.meaningId, csrfToken);
-      setMeanings((current) => current.filter((m) => m.id !== modal.meaningId));
-      if (editingMeaningId === modal.meaningId) resetEditor();
-      closeModal();
-      showToast("success", "含义已删除");
+      await apiDeleteGlobalMeaning(meaning.id, csrfToken);
+      setMeanings((current) => current.filter((m) => m.id !== meaning.id));
+      if (editingMeaningId === meaning.id) resetEditor();
+      showToast("success", `已删除含义「${meaning.label}」`);
     } catch (error) {
       showToast(
         "error",
@@ -175,24 +171,14 @@ export function useMeaningsTab(
     editingMeaningId,
     editingMeaning,
     meaningSubmitting,
-    modal,
-    setModal,
     pagedMeanings,
     currentPage,
     totalPages,
     startAdd,
     startEdit,
     resetEditor,
-    closeModal,
     handleCreate,
     handleUpdate,
     handleDelete,
-    /** 触发删除确认 modal */
-    openDeleteModal: (meaning: ImageryMeaning) =>
-      setModal({
-        type: "delete-meaning",
-        meaningId: meaning.id,
-        label: meaning.label,
-      }),
   };
 }

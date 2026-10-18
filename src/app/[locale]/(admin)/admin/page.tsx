@@ -1,45 +1,59 @@
-import { redirect } from "next/navigation";
-import AdminClientComponent from "@/components/admin/AdminClient";
-import { getSongs } from "@/lib/server/service-songs";
+import type { Metadata } from "next";
+import AdminOverviewClient from "@/components/admin/AdminOverviewClient";
 import { TABLES } from "@/lib/db/supabase-server";
-import { getAdminPageSession } from "@/lib/server/server-auth";
-import { loginPathFor } from "@/lib/utils/safe-next";
-import type { Song } from "@/lib/types";
+import { isPoolEligible, MIN_OCCURRENCES } from "@/lib/quiz/pool";
+import { requireAdminPage } from "@/lib/server/admin-page";
+import {
+  getOccurrenceCountsBySong,
+  getPendingRequestCount,
+  getPublishStatuses,
+} from "@/lib/server/service-admin";
+import { getSongs } from "@/lib/server/service-songs";
+import type { SongDetail } from "@/lib/types";
+import { getMissingFields } from "@/components/admin/song-admin/utils";
 
-// 强制动态渲染，不在构建时预渲染
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "后台 - 河图作品勘鉴",
+};
 
 type Props = {
   params: Promise<{ locale: string }>;
 };
 
-export default async function AdminPage({ params }: Props) {
+export default async function AdminOverviewPage({ params }: Props) {
   const { locale } = await params;
+  const session = await requireAdminPage(locale, "/admin");
+  const isSuper = session.user.app_metadata?.is_super === true;
 
-  // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
-  const adminSession = await getAdminPageSession();
-  if (!adminSession) {
-    redirect(`/${locale}${loginPathFor("/admin")}`);
-  }
-
-  let songs: Song[] = [];
-  let error = null;
-  try {
-    songs = await getSongs(TABLES.ADMIN, adminSession.accessToken);
-  } catch (e: unknown) {
-    if (
-      e &&
-      typeof e === "object" &&
-      "message" in e &&
-      typeof (e as Error).message === "string"
-    ) {
-      error = (e as Error).message;
-      console.error("Fetch songs error:", (e as Error).message);
-    } else {
-      error = "Unknown error";
+  const songs = (await getSongs(TABLES.ADMIN, session.accessToken).catch(
+    (e) => {
       console.error("Fetch songs error:", e);
-    }
-  }
+      return [];
+    },
+  )) as SongDetail[];
+  const [statuses, occurrenceCounts, pendingRequests] = await Promise.all([
+    getPublishStatuses(songs),
+    getOccurrenceCountsBySong(),
+    getPendingRequestCount(isSuper),
+  ]);
 
-  return <AdminClientComponent initialSongs={songs} initialError={error} />;
+  return (
+    <AdminOverviewClient
+      counts={{
+        songs: songs.length,
+        pendingRequests,
+        unpublished: songs.filter(
+          (s) => (statuses[s.id] ?? "unpublished") !== "published",
+        ).length,
+        incomplete: songs.filter((s) => getMissingFields(s).length > 0).length,
+        lacksImagery: songs.filter(
+          (s) =>
+            isPoolEligible({ title: s.title, type: s.type ?? null }) &&
+            (occurrenceCounts[s.id] ?? 0) < MIN_OCCURRENCES,
+        ).length,
+      }}
+    />
+  );
 }

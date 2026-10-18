@@ -59,20 +59,10 @@ export const relationFormSchema = z.object({
   lyric_timetag: z.array(lyricTimetagItemSchema),
 });
 
-export const deleteConfirmationFormSchema = z.object({
-  confirmationText: z
-    .string()
-    .trim()
-    .refine((value) => value === "删除", "请输入“删除”以确认操作"),
-});
-
 export type ImageryFormValues = z.infer<typeof imageryFormSchema>;
 export type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 export type MeaningFormValues = z.infer<typeof meaningFormSchema>;
 export type RelationFormValues = z.infer<typeof relationFormSchema>;
-export type DeleteConfirmationFormValues = z.input<
-  typeof deleteConfirmationFormSchema
->;
 
 export function createImageryFormValues(
   item?: Pick<ImageryItem, "name">,
@@ -115,12 +105,6 @@ export function createRelationFormValues(
     lyric_timetag: occurrence?.lyric_timetag
       ? occurrence.lyric_timetag.map((item) => ({ value: item }))
       : [],
-  };
-}
-
-export function createDeleteConfirmationFormValues(): DeleteConfirmationFormValues {
-  return {
-    confirmationText: "",
   };
 }
 

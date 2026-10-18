@@ -31,10 +31,3 @@ export const MISSING_FIELD_LABEL_OVERRIDES: Partial<
 > = {
   lyrics: "歌词",
 };
-
-export type SongFormMode = "add" | "edit";
-
-export interface OperationMessage {
-  type: "success" | "error";
-  text: string;
-}

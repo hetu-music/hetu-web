@@ -3,13 +3,31 @@
 import { parseLrcLines, type LrcLine } from "@/lib/imagery/suggest";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
 import type { ImageryCategory, ImageryItem, ImageryMeaning } from "@/lib/types";
-import { AlertCircle, Plus, Trash2, Wand2, X } from "lucide-react";
+import { AlertCircle, Plus, Wand2, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import SuggestionReview from "../imagery-suggest/SuggestionReview";
 import { useImagerySuggestions } from "../imagery-suggest/useImagerySuggestions";
-import { cn, ghostButtonClassName, primaryButtonClassName } from "./shared";
+import { ConfirmButton } from "../kit/parts";
+import {
+  INPUT_CLASS,
+  LABEL_CLASS,
+  PANEL_CLASS,
+  SELECT_CLASS,
+  SOLID_BUTTON_CLASS,
+  TAG_CLASS,
+  TEXT_BUTTON_CLASS,
+} from "../kit/styles";
+import { cn } from "@/lib/utils/utils";
 import type { SongOption } from "./types";
-import type { RelationDraft } from "./useOccurrencesTab";
+
+/** 对照编辑提交的一条关系；imageryId 为 null 表示词典里还没有，保存时新建 */
+export interface RelationDraft {
+  imageryId: number | null;
+  imageryName: string;
+  categoryId: number;
+  meaningId: number | null;
+  timetags: string[];
+}
 
 /** 正在编辑的关系；occurrenceId 为 null 表示新建 */
 interface EditorState {
@@ -22,15 +40,15 @@ interface EditorState {
 
 type Tone = "draft" | "hover" | "candidate" | "saved";
 
+// 歌词里的标记：正在编辑的用强调色，悬停定位用 amber，候选只画虚线，已存的铺浅灰
 const TONE_CLASS: Record<Tone, string> = {
-  draft:
-    "bg-blue-200/80 text-blue-900 dark:bg-blue-500/30 dark:text-blue-100 rounded-sm",
+  draft: "bg-(--tone)/20 text-slate-900 dark:text-slate-50 rounded-sm",
   hover:
     "bg-amber-200/80 text-amber-900 dark:bg-amber-500/30 dark:text-amber-100 rounded-sm",
   candidate:
-    "bg-emerald-100 text-emerald-900 underline decoration-emerald-400 decoration-dashed underline-offset-4 dark:bg-emerald-500/20 dark:text-emerald-100 rounded-sm",
+    "bg-transparent text-inherit underline decoration-(--tone) decoration-dashed underline-offset-4",
   saved:
-    "bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-100 rounded-sm",
+    "bg-slate-200/80 text-slate-900 dark:bg-slate-700/60 dark:text-slate-100 rounded-sm",
 };
 const TONE_PRIORITY: Record<Tone, number> = {
   hover: 4,
@@ -389,14 +407,14 @@ export default function SongRelationWorkbench({
         className={cn(
           "group flex cursor-pointer items-baseline gap-3 border-l-2 px-3 py-1.5 transition-colors",
           inDraft
-            ? "border-blue-500 bg-blue-50/70 dark:bg-blue-900/20"
+            ? "border-(--tone) bg-(--tone)/5"
             : hoveredCandidate || hovered?.lyric_timetag.includes(line.tag)
               ? "border-amber-400 bg-amber-50/70 dark:bg-amber-900/10"
               : focusTag === line.tag
                 ? "border-slate-400 bg-slate-100 dark:bg-slate-800/60"
                 : candidates.length > 0
-                  ? "border-emerald-300 dark:border-emerald-700"
-                  : "border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/30",
+                  ? "border-(--tone)/40"
+                  : "border-transparent hover:bg-slate-100/60 dark:hover:bg-slate-900/60",
         )}
       >
         <span className="w-16 shrink-0 font-mono text-[11px] text-slate-400">
@@ -406,13 +424,13 @@ export default function SongRelationWorkbench({
           {highlight(line.text, marks)}
         </span>
         {hidden.length > 0 && (
-          <span className="shrink-0 text-[11px] text-violet-500">
+          <span className="shrink-0 text-[11px] text-slate-400">
             {hidden.map((o) => o.imagery_name).join("、")}
           </span>
         )}
         {onLine.length > 0 && (
           <span
-            className="shrink-0 rounded-full bg-violet-50 px-1.5 text-[10px] text-violet-600 dark:bg-violet-900/30 dark:text-violet-300"
+            className="shrink-0 text-[10px] tabular-nums text-slate-400"
             title={onLine.map((o) => o.imagery_name).join("、")}
           >
             {onLine.length}
@@ -425,24 +443,22 @@ export default function SongRelationWorkbench({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       {/* ── 左：歌词 ── */}
-      <section className="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
-        <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 text-xs text-slate-500 dark:border-slate-800">
-          <span className="font-semibold text-slate-700 dark:text-slate-200">
-            歌词
-          </span>
+      <section className={cn(PANEL_CLASS, "flex min-h-0 flex-col")}>
+        <header className="flex flex-wrap items-center gap-2 border-b border-slate-200/70 px-4 py-3 text-xs text-slate-500 dark:border-slate-800">
+          <span className="text-slate-700 dark:text-slate-200">歌词</span>
           <span>
             {lines.length} 行 · 已标注 {annotatedLineCount} 行
           </span>
           <span className="ml-auto text-slate-400">
             {view === "suggestions"
-              ? "绿色为已勾选的候选，悬停候选可定位"
+              ? "虚线为已勾选的候选，悬停候选可定位"
               : editor
                 ? "点击行加入 / 移出当前关系"
                 : "点击行查看该行意象，划选词语可新建关系"}
           </span>
         </header>
         {selection && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-blue-100 bg-blue-50/60 px-4 py-2 text-sm dark:border-blue-900/40 dark:bg-blue-900/10">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-200/70 bg-(--tone)/5 px-4 py-2 text-sm dark:border-slate-800">
             <span className="text-slate-600 dark:text-slate-300">
               已选「<strong>{selection.text}</strong>」
             </span>
@@ -453,7 +469,7 @@ export default function SongRelationWorkbench({
                 setSelection(null);
                 setView("relations");
               }}
-              className="rounded-full bg-blue-600 px-3 py-0.5 text-xs font-medium text-white hover:bg-blue-500"
+              className="text-xs tracking-wider text-(--tone) hover:opacity-75"
             >
               新建关系（匹配 {linesContaining(selection.text).length} 行）
             </button>
@@ -464,7 +480,7 @@ export default function SongRelationWorkbench({
                   renameDraft(selection.text);
                   setSelection(null);
                 }}
-                className="rounded-full border border-blue-200 px-3 py-0.5 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:text-blue-300"
+                className={TEXT_BUTTON_CLASS}
               >
                 用作当前意象名
               </button>
@@ -487,7 +503,7 @@ export default function SongRelationWorkbench({
             lines.map(renderLine)
           ) : (
             <p className="px-4 py-10 text-center text-sm text-slate-400">
-              这首歌没有带时间标签的歌词，先在歌曲管理中补全歌词。
+              这首歌没有带时间标签的歌词，先在「资料」里补全。
             </p>
           )}
         </div>
@@ -496,10 +512,7 @@ export default function SongRelationWorkbench({
       {/* ── 右：关系 ── */}
       <section className="flex min-h-0 flex-col gap-3">
         <div className="flex items-center gap-2">
-          <div
-            role="tablist"
-            className="flex rounded-full border border-slate-200 bg-white p-0.5 text-sm dark:border-slate-800 dark:bg-slate-900"
-          >
+          <div role="tablist" className="flex items-baseline gap-4 text-sm">
             {(
               [
                 ["relations", `关系 ${occurrences.length}`],
@@ -518,10 +531,10 @@ export default function SongRelationWorkbench({
                 aria-selected={view === key}
                 onClick={() => setView(key)}
                 className={cn(
-                  "rounded-full px-3 py-1 transition-colors",
+                  "py-1 tracking-wider transition-colors",
                   view === key
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
+                    ? "text-(--tone)"
+                    : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
                 )}
               >
                 {label}
@@ -532,7 +545,7 @@ export default function SongRelationWorkbench({
             <button
               type="button"
               onClick={() => startNew()}
-              className={cn(primaryButtonClassName(), "ml-auto")}
+              className={cn(SOLID_BUTTON_CLASS, "ml-auto")}
             >
               <Plus size={12} />
               新增关系
@@ -551,28 +564,28 @@ export default function SongRelationWorkbench({
         ) : (
           <>
             {notice && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
                 {notice}
               </p>
             )}
 
             {editor && (
-              <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900/50 dark:bg-blue-900/10">
-                <p className="text-xs font-semibold tracking-wide text-blue-700 dark:text-blue-300">
+              <div className="space-y-3 rounded-lg border border-(--tone)/40 p-4">
+                <p className="text-xs tracking-[0.2em] text-(--tone)">
                   {editor.occurrenceId === null
                     ? "新增关系"
                     : `编辑关系 #${editor.occurrenceId}`}
                 </p>
 
                 <label className="block space-y-1">
-                  <span className="text-xs text-slate-500">意象</span>
+                  <span className={LABEL_CLASS}>意象</span>
                   <input
                     value={editor.imageryName}
                     onChange={(e) => renameDraft(e.target.value)}
                     list={datalistId}
                     maxLength={50}
                     placeholder="输入或选择意象"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                    className={INPUT_CLASS}
                   />
                   <datalist id={datalistId}>
                     {items.map((i) => (
@@ -581,19 +594,21 @@ export default function SongRelationWorkbench({
                   </datalist>
                   <span className="flex flex-wrap items-center gap-2 text-[11px]">
                     {nameError ? (
-                      <span className="text-red-500">{nameError}</span>
+                      <span className="text-rose-500">{nameError}</span>
                     ) : resolvedItem ? (
                       <span className="text-slate-400">
                         已有意象 · 用于 {resolvedItem.count} 首
                       </span>
                     ) : (
-                      <span className="text-amber-600">新意象，保存时创建</span>
+                      <span className="text-amber-600 dark:text-amber-400">
+                        新意象，保存时创建
+                      </span>
                     )}
                     {duplicate && (
                       <button
                         type="button"
                         onClick={() => openExisting(duplicate)}
-                        className="text-blue-600 hover:underline"
+                        className="text-(--tone) hover:underline"
                       >
                         打开那一条
                       </button>
@@ -602,7 +617,7 @@ export default function SongRelationWorkbench({
                 </label>
 
                 <label className="block space-y-1">
-                  <span className="text-xs text-slate-500">分类</span>
+                  <span className={LABEL_CLASS}>分类</span>
                   <select
                     value={editor.categoryId ?? ""}
                     onChange={(e) =>
@@ -613,7 +628,7 @@ export default function SongRelationWorkbench({
                           : null,
                       })
                     }
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                    className={SELECT_CLASS}
                   >
                     <option value="">— 选择分类 —</option>
                     {categoryOptions.map((c) => (
@@ -626,7 +641,7 @@ export default function SongRelationWorkbench({
 
                 {meanings.length > 0 && (
                   <label className="block space-y-1">
-                    <span className="text-xs text-slate-500">含义（可选）</span>
+                    <span className={LABEL_CLASS}>含义（可选）</span>
                     <select
                       value={editor.meaningId ?? ""}
                       onChange={(e) =>
@@ -637,7 +652,7 @@ export default function SongRelationWorkbench({
                             : null,
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                      className={SELECT_CLASS}
                     >
                       <option value="">— 不设置 —</option>
                       {meanings.map((m) => (
@@ -651,7 +666,7 @@ export default function SongRelationWorkbench({
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
+                    <span className={LABEL_CLASS}>
                       出现位置 {editor.timetags.length}{" "}
                       处（在左侧点击歌词行增删）
                     </span>
@@ -670,7 +685,7 @@ export default function SongRelationWorkbench({
                       }
                       disabled={!editor.imageryName.trim()}
                       title="把歌词中所有含该意象名的行都加进来"
-                      className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-500 disabled:opacity-40"
+                      className="flex items-center gap-1 text-[11px] text-(--tone) hover:opacity-75 disabled:opacity-40"
                     >
                       <Wand2 size={11} />
                       匹配全部行
@@ -685,7 +700,7 @@ export default function SongRelationWorkbench({
                         return (
                           <li
                             key={tag}
-                            className="flex items-center gap-2 rounded-md bg-white px-2 py-1 text-xs dark:bg-slate-900"
+                            className="flex items-center gap-2 border-b border-slate-200/70 py-1 text-xs last:border-0 dark:border-slate-800"
                           >
                             <span className="font-mono text-[10px] text-slate-400">
                               {tag}
@@ -695,7 +710,7 @@ export default function SongRelationWorkbench({
                                 "min-w-0 flex-1 truncate",
                                 text
                                   ? "text-slate-600 dark:text-slate-300"
-                                  : "text-orange-600",
+                                  : "text-amber-600 dark:text-amber-400",
                               )}
                             >
                               {text ?? "歌词中找不到这个时间"}
@@ -703,7 +718,7 @@ export default function SongRelationWorkbench({
                             <button
                               type="button"
                               onClick={() => toggleTag(tag)}
-                              className="text-slate-300 hover:text-red-500"
+                              className="text-slate-300 hover:text-rose-500 dark:text-slate-600"
                               aria-label={`移除 ${tag}`}
                             >
                               <X size={12} />
@@ -722,7 +737,7 @@ export default function SongRelationWorkbench({
                       setEditor(null);
                       setNotice(null);
                     }}
-                    className={ghostButtonClassName()}
+                    className={TEXT_BUTTON_CLASS}
                   >
                     取消
                   </button>
@@ -730,7 +745,7 @@ export default function SongRelationWorkbench({
                     type="button"
                     onClick={() => void save()}
                     disabled={!canSave}
-                    className={primaryButtonClassName()}
+                    className={SOLID_BUTTON_CLASS}
                   >
                     {submitting ? "保存中…" : "保存"}
                   </button>
@@ -744,7 +759,7 @@ export default function SongRelationWorkbench({
                   加载关系中…
                 </p>
               ) : sortedOccurrences.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-400 dark:border-slate-800">
+                <p className="py-8 text-center font-kaiti text-base text-slate-400">
                   暂无关系。在左侧划选词语，或点「新增关系」开始。
                 </p>
               ) : (
@@ -763,33 +778,31 @@ export default function SongRelationWorkbench({
                       onMouseLeave={() => setHoverId(null)}
                       onClick={() => openExisting(o)}
                       className={cn(
-                        "group flex cursor-pointer items-start gap-3 rounded-xl border bg-white px-3 py-2.5 transition-colors dark:bg-slate-900/50",
+                        "group flex cursor-pointer items-start gap-3 border-l-2 px-3 py-2 transition-colors",
                         isEditing
-                          ? "border-blue-400 ring-1 ring-blue-400"
+                          ? "border-(--tone) bg-(--tone)/5"
                           : onFocusLine
-                            ? "border-slate-400"
-                            : "border-slate-200 hover:border-amber-300 dark:border-slate-800",
+                            ? "border-slate-400 bg-slate-100 dark:bg-slate-800/60"
+                            : "border-transparent hover:border-amber-400 hover:bg-slate-100/60 dark:hover:bg-slate-900/60",
                       )}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-2">
-                          <span className="font-semibold text-slate-900 dark:text-slate-100">
+                          <span className="text-slate-900 dark:text-slate-100">
                             {label}
                           </span>
                           <span className="text-[11px] text-slate-400">
                             {shortPath(getCategoryPath(o.category_id))}
                           </span>
                           {o.meaning_label && (
-                            <span className="rounded-full bg-emerald-50 px-2 text-[11px] text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-                              {o.meaning_label}
-                            </span>
+                            <span className={TAG_CLASS}>{o.meaning_label}</span>
                           )}
                         </div>
                         <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">
                           <span>{o.lyric_timetag.length} 处</span>
                           {orphans.length > 0 && (
                             <span
-                              className="flex items-center gap-1 text-orange-600"
+                              className="flex items-center gap-1 text-amber-600 dark:text-amber-400"
                               title={orphans.join("、")}
                             >
                               <AlertCircle size={11} />
@@ -798,17 +811,11 @@ export default function SongRelationWorkbench({
                           )}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(o.id, label);
-                        }}
-                        className="invisible rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-500 group-hover:visible dark:hover:bg-red-900/20"
-                        aria-label={`删除「${label}」`}
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <ConfirmButton
+                        onConfirm={() => onDelete(o.id, label)}
+                        disabled={submitting}
+                        className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+                      />
                     </div>
                   );
                 })

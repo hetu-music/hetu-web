@@ -1,15 +1,16 @@
 "use client";
 
-import {
-  CheckCircle2,
-  ChevronDown,
-  Loader2,
-  RefreshCw,
-  TriangleAlert,
-} from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import SectionHeading from "@/components/detail/SectionHeading";
+import { useTwoStepConfirm } from "@/hooks/ui";
 import type { DbSong, NavSong, SyncPlan } from "@/lib/navidrome/sync";
 import { cn } from "@/lib/utils/utils";
+import {
+  OUTLINE_BUTTON_CLASS,
+  SOLID_BUTTON_CLASS,
+  WARN_TEXT_CLASS,
+} from "../kit/styles";
 import { formatDuration } from "./utils";
 
 function songLabel(s: DbSong) {
@@ -36,7 +37,7 @@ function Section({
   const [open, setOpen] = useState(defaultOpen);
   if (count === 0) return null;
   return (
-    <div className="border-t border-slate-100 dark:border-slate-800">
+    <div className="border-t border-slate-200/70 dark:border-slate-800">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -44,9 +45,8 @@ function Section({
       >
         <span
           className={cn(
-            "font-medium",
             tone === "warn"
-              ? "text-amber-700 dark:text-amber-300"
+              ? WARN_TEXT_CLASS
               : "text-slate-700 dark:text-slate-200",
           )}
         >
@@ -84,7 +84,7 @@ export default function SyncPanel({
   onRefresh: () => void;
   onSync: () => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const confirm = useTwoStepConfirm();
   const loose = plan.upserts.filter((u) => u.loose);
   const exact = plan.upserts.filter((u) => !u.loose);
   const changeCount =
@@ -94,73 +94,45 @@ export default function SyncPanel({
     plan.hasAudioChanges.length;
 
   return (
-    <section className="mb-10 rounded-3xl border border-slate-200/70 bg-white/95 px-6 py-5 shadow-[0_16px_48px_-28px_rgba(15,23,42,0.35)] dark:border-slate-800/70 dark:bg-slate-900/75">
-      <div className="flex flex-col gap-4 pb-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-start gap-3">
-          {changeCount === 0 ? (
-            <CheckCircle2
-              size={22}
-              className="mt-0.5 shrink-0 text-emerald-500"
-            />
-          ) : (
-            <RefreshCw size={22} className="mt-0.5 shrink-0 text-amber-500" />
-          )}
-          <div>
-            <h2 className="font-semibold text-slate-900 dark:text-slate-50">
-              {changeCount === 0 ? "映射已是最新" : "自动同步"}
-            </h2>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-              {changeCount === 0
-                ? "曲库与歌曲的关联和元数据一致，无需同步。"
-                : `按标题与时长自动配对：新增/替换 ${plan.upserts.length} 条，删除失效 ${plan.deletes.length} 条，更新格式与时长 ${plan.mediaUpdates.length} 条，has_audio 变化 ${plan.hasAudioChanges.length} 首。已有且仍有效的关联只会更新格式与时长，不会改动指向。`}
-            </p>
-          </div>
+    <section className="mb-12">
+      <SectionHeading label="同步" />
+      <div className="mt-6 flex flex-col gap-4 pb-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-slate-900 dark:text-slate-50">
+            {changeCount === 0 ? "映射已是最新" : "可以自动同步"}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            {changeCount === 0
+              ? "曲库与歌曲的关联和元数据一致，无需同步。"
+              : `按标题与时长自动配对：新增/替换 ${plan.upserts.length} 条，删除失效 ${plan.deletes.length} 条，更新格式与时长 ${plan.mediaUpdates.length} 条，has_audio 变化 ${plan.hasAudioChanges.length} 首。已有且仍有效的关联只会更新格式与时长，不会改动指向。`}
+          </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"
             onClick={onRefresh}
             disabled={refreshing || syncing}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition-colors hover:border-emerald-300 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300"
+            className={OUTLINE_BUTTON_CLASS}
           >
-            <RefreshCw size={14} className={cn(refreshing && "animate-spin")} />
+            {refreshing && <Loader2 size={14} className="animate-spin" />}
             重新检查
           </button>
-          {changeCount > 0 &&
-            (confirming ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(false)}
-                  disabled={syncing}
-                  className="rounded-full px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirming(false);
-                    onSync();
-                  }}
-                  disabled={syncing}
-                  className="rounded-full bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
-                >
-                  确认写入 {changeCount} 项变更
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirming(true)}
-                disabled={syncing || refreshing}
-                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-medium text-white shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {syncing && <Loader2 size={14} className="animate-spin" />}
-                执行同步
-              </button>
-            ))}
+          {changeCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm.request()) onSync();
+              }}
+              disabled={syncing || refreshing}
+              className={SOLID_BUTTON_CLASS}
+            >
+              {syncing && <Loader2 size={14} className="animate-spin" />}
+              {confirm.confirming
+                ? `确认写入 ${changeCount} 项变更`
+                : "执行同步"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -205,7 +177,6 @@ export default function SyncPanel({
       >
         {plan.review.map((r) => (
           <li key={r.song.id}>
-            <TriangleAlert size={12} className="mr-1 inline text-amber-500" />
             {songLabel(r.song)} —— {r.reason}
             {r.candidates.map((c) => (
               <div key={c.id} className="ml-5 text-slate-400">

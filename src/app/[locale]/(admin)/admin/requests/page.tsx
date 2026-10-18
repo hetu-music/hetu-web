@@ -1,28 +1,30 @@
-import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import AdminPanelClient from "@/components/admin/AdminPanelClient";
-import { getAdminPageSession } from "@/lib/server/server-auth";
-import { loginPathFor } from "@/lib/utils/safe-next";
+import { requireAdminPage } from "@/lib/server/admin-page";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "反馈管理 - 河图作品勘鉴",
+  title: "反馈 - 河图作品勘鉴",
   description: "处理用户提交的纠错、申请等反馈",
 };
 
 type Props = {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ status?: string | string[] }>;
 };
 
-export default async function RequestsAdminPage({ params }: Props) {
+const STATUSES = ["pending", "replied", "approved", "rejected"];
+
+export default async function RequestsAdminPage({
+  params,
+  searchParams,
+}: Props) {
   const { locale } = await params;
-
-  // 页面自身校验（getUser 会验签），不依赖 middleware 的 matcher
-  const adminSession = await getAdminPageSession();
-  if (!adminSession) {
-    redirect(`/${locale}${loginPathFor("/admin/requests")}`);
-  }
-
-  return <AdminPanelClient section="requests" />;
+  await requireAdminPage(locale, "/admin/requests");
+  // 待办首页链过来时带 ?status=pending
+  const { status } = await searchParams;
+  const initialStatus =
+    typeof status === "string" && STATUSES.includes(status) ? status : "all";
+  return <AdminPanelClient section="requests" initialStatus={initialStatus} />;
 }

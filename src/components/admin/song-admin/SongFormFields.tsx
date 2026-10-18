@@ -164,9 +164,12 @@ function SongFormInput({ field }: { field: SongFieldConfig }) {
                 onChange={(e) => controllerField.onChange(e.target.value)}
                 className={inputClass(
                   hasError,
+                  // LRC 是原始数据用等宽；备注、争议是人写的话用楷体（DESIGN.md 第三节）
                   cn(
-                    "resize-y leading-relaxed",
-                    isLyrics && "font-mono text-xs leading-6",
+                    "resize-y",
+                    isLyrics
+                      ? "font-mono text-[15px] leading-7"
+                      : "font-kaiti text-[17px] leading-[1.85]",
                   ),
                 )}
                 rows={isLyrics ? 18 : 4}

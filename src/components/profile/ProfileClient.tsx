@@ -7,6 +7,7 @@ import FeedbackSection from "@/components/profile/FeedbackSection";
 import ProfileHero from "@/components/profile/ProfileHero";
 import { PROFILE_TABS, type ProfileTab } from "@/components/profile/profile-ui";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
+import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { cn } from "@/lib/utils/utils";
@@ -104,12 +105,13 @@ function Catalog({
   const t = useTranslations("profile");
 
   return (
-    <nav aria-label={t("title")} className={className}>
+    // 细线画在 nav 上而不是会横向滚动的 ol 上：画在 ol 里会跟着滚走，画成 ol 的 border 又会把当前项的短线裁掉
+    <nav
+      aria-label={t("title")}
+      className={cn(horizontal && TAB_HAIRLINE_CLASS, className)}
+    >
       <ol
-        className={cn(
-          horizontal &&
-            "flex gap-7 overflow-x-auto no-scrollbar border-b border-slate-200/70 dark:border-slate-800",
-        )}
+        className={cn(horizontal && "flex gap-7 overflow-x-auto no-scrollbar")}
       >
         {PROFILE_TABS.map((tab) => {
           const current = tab === active;
@@ -134,7 +136,7 @@ function Catalog({
                   className={cn(
                     "absolute rounded-full bg-(--tone) transition-opacity",
                     horizontal
-                      ? "left-0 right-0 -bottom-px h-0.5"
+                      ? "left-0 right-0 bottom-0 h-0.5"
                       : "left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5",
                     current ? "opacity-100" : "opacity-0",
                   )}

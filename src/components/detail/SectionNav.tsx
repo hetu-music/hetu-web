@@ -94,10 +94,11 @@ export function ReadingProgress() {
     };
   }, []);
 
+  // 2px 的进度条与顶栏 1px 的底边中线对齐：底边在盒子外 1px，进度条再往下多出半像素
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 -bottom-px h-0.5"
+      className="pointer-events-none absolute inset-x-0 -bottom-[1.5px] h-0.5"
     >
       <div
         ref={barRef}

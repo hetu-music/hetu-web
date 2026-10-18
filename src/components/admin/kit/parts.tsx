@@ -3,10 +3,17 @@
 import { Loader2, Search, X } from "lucide-react";
 import React from "react";
 import { useTwoStepConfirm } from "@/hooks/ui/useTwoStepConfirm";
+import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
 import { cn } from "@/lib/utils/utils";
 import { DANGER_TEXT_CLASS, optionClass, TEXT_BUTTON_CLASS } from "./styles";
 
-/** 吸顶工具栏：左边筛选，右边搜索。样式同 DESIGN.md 第四节的吸顶二级栏 */
+// 选项与搜索框在工具栏里要把强调色线压在工具栏的细线上，在表单、弹窗里则照常排
+const InToolbarContext = React.createContext(false);
+
+/**
+ * 吸顶工具栏：左边筛选，右边搜索。与首页曲目工具栏同一种排法：选项与搜索撑满行高，
+ * 当前项、聚焦的搜索框在细线上亮一段强调色。窄屏分两行，搜索在上、选项在下贴着细线
+ */
 export function AdminToolbar({
   children,
   search,
@@ -19,14 +26,31 @@ export function AdminToolbar({
   return (
     <div
       className={cn(
-        "sticky top-(--nav-h) z-40 -mx-4 mb-6 border-b border-slate-200/70 bg-[#FAFAFA]/95 px-4 py-2 backdrop-blur-sm sm:-mx-6 sm:px-6 dark:border-slate-800 dark:bg-[#0B0F19]/95",
+        "sticky top-(--nav-h) z-40 -mx-4 mb-6 bg-[#FAFAFA]/95 px-4 pt-2 backdrop-blur-sm sm:-mx-6 sm:px-6 dark:bg-[#0B0F19]/95",
         className,
       )}
     >
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">{children}</div>
-        {search}
-      </div>
+      <InToolbarContext.Provider value={true}>
+        <div
+          className={cn(
+            TAB_HAIRLINE_CLASS,
+            "flex flex-col-reverse md:min-h-12 md:flex-row md:justify-between md:gap-8",
+          )}
+        >
+          <div className="peer flex min-h-11 min-w-0 flex-wrap items-stretch gap-x-8 empty:hidden">
+            {children}
+          </div>
+          {/* 窄屏搜索单占一行，自己带一道细线；没有选项那一行时，它就是工具栏的底，不再画 */}
+          <div
+            className={cn(
+              TAB_HAIRLINE_CLASS,
+              "flex min-h-11 items-center empty:hidden peer-empty:before:hidden md:before:hidden",
+            )}
+          >
+            {search}
+          </div>
+        </div>
+      </InToolbarContext.Provider>
     </div>
   );
 }
@@ -52,12 +76,24 @@ export function AdminOptions<K extends string>({
   onSelect: (id: K) => void;
   disabled?: boolean;
 }) {
+  const onLine = React.useContext(InToolbarContext);
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <div
+      className={cn(
+        "flex flex-wrap gap-x-3 gap-y-1",
+        onLine ? "items-stretch" : "items-baseline",
+      )}
+    >
       {items.map((item, i) => (
         <React.Fragment key={item.id}>
           {i > 0 && (
-            <span aria-hidden className="text-slate-300 dark:text-slate-600">
+            <span
+              aria-hidden
+              className={cn(
+                "text-slate-300 dark:text-slate-600",
+                onLine && "self-center",
+              )}
+            >
               ·
             </span>
           )}
@@ -66,7 +102,7 @@ export function AdminOptions<K extends string>({
             onClick={() => onSelect(item.id)}
             aria-pressed={item.id === active}
             disabled={disabled}
-            className={optionClass(item.id === active)}
+            className={optionClass(item.id === active, onLine)}
           >
             {item.label}
           </button>
@@ -98,7 +134,10 @@ export function FilterOptions<K extends string>({
   );
 }
 
-/** 工具栏里的搜索：只有一道底线 */
+/**
+ * 搜索：只有一道底线。在工具栏里连这道线也不画，只靠放大镜与占位字辨认，
+ * 聚焦时在工具栏的细线上亮一段强调色（同首页曲目工具栏）
+ */
 export function SearchInput({
   value,
   onChange,
@@ -110,8 +149,15 @@ export function SearchInput({
   placeholder: string;
   className?: string;
 }) {
+  const onLine = React.useContext(InToolbarContext);
   return (
-    <div className={cn("relative w-full md:w-72", className)}>
+    <div
+      className={cn(
+        "group relative w-full md:w-72",
+        onLine && "flex items-center self-stretch",
+        className,
+      )}
+    >
       <Search
         size={14}
         className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400"
@@ -122,8 +168,19 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="block w-full border-0 border-b border-slate-300 bg-transparent py-1.5 pl-6 pr-6 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-(--tone) dark:border-slate-700 dark:text-slate-200 dark:placeholder:text-slate-600 [&::-webkit-search-cancel-button]:hidden"
+        className={cn(
+          "block w-full border-0 bg-transparent py-1.5 pl-6 pr-6 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-600 [&::-webkit-search-cancel-button]:hidden",
+          onLine
+            ? "py-2"
+            : "border-b border-slate-300 focus:border-(--tone) dark:border-slate-700",
+        )}
       />
+      {onLine && (
+        <span
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) opacity-0 transition-opacity group-focus-within:opacity-100"
+        />
+      )}
       {value && (
         <button
           type="button"

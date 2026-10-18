@@ -2,6 +2,7 @@
 
 import { Tabs as BaseTabs } from "@base-ui/react/tabs";
 import * as React from "react";
+import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
 import { cn } from "@/lib/utils/utils";
 
 const Tabs = BaseTabs.Root;
@@ -18,7 +19,8 @@ type WithClassName<T extends React.ElementType> = Omit<
 > & { className?: string; variant?: TabsVariant };
 
 const LIST_STYLES: Record<TabsVariant, string> = {
-  fill: "flex shrink-0 border-b border-slate-100 dark:border-slate-800",
+  // 细线画在里面，当前页签的短线才压得住它（见 TAB_HAIRLINE_CLASS）
+  fill: cn(TAB_HAIRLINE_CLASS, "flex shrink-0"),
   inline: "flex flex-wrap items-baseline gap-x-6",
 };
 

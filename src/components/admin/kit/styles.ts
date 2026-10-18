@@ -61,11 +61,13 @@ export const DANGER_TEXT_CLASS =
  * 墨蓝饱和度低，深色下与未选中的灰只有约 2:1 的亮度差，单靠字色分不清；
  * 短线跟着字色（bg-current），选「拒绝」这类 rose 的选项时短线也是 rose。
  * 宽字距会在末字后多留 0.1em，短线右端收回同样的距离，与字对齐。
+ * onLine：在吸顶工具栏里，选项撑满行高、字竖直居中，短线落到底边压住工具栏的细线。
  */
-export function optionClass(active: boolean) {
+export function optionClass(active: boolean, onLine = false) {
   return [
     "relative py-2 text-sm tracking-widest transition-colors disabled:cursor-wait disabled:opacity-40",
-    "after:absolute after:left-0 after:right-[0.1em] after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-current after:transition-opacity",
+    "after:absolute after:left-0 after:right-[0.1em] after:h-0.5 after:rounded-full after:bg-current after:transition-opacity",
+    onLine ? "flex items-center after:bottom-0" : "after:bottom-0.5",
     active
       ? "font-medium text-(--tone) after:opacity-100"
       : "text-slate-400 after:opacity-0 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",

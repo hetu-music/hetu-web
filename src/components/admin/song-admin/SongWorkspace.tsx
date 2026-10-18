@@ -149,9 +149,19 @@ export default function SongWorkspace({
         >
           <AdminToolbar search={<SaveBar ws={ws} />}>
             {tabs.length > 1 && (
-              <TabsList variant="inline" aria-label="工作台栏目">
+              // 页签撑满工具栏的行高，当前项的短线压在工具栏的细线上
+              <TabsList
+                variant="inline"
+                aria-label="工作台栏目"
+                className="items-stretch"
+              >
                 {tabs.map((t) => (
-                  <TabsTrigger key={t} value={t} variant="inline">
+                  <TabsTrigger
+                    key={t}
+                    value={t}
+                    variant="inline"
+                    className="flex items-center after:bottom-0"
+                  >
                     {TAB_LABEL[t]}
                   </TabsTrigger>
                 ))}

@@ -4,6 +4,7 @@ import TopBar from "@/components/shared/topbar/TopBar";
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import Pagination from "@/components/shared/Pagination";
+import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
 import { addToast } from "@/components/ui/toast";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useFilteredSongs } from "@/hooks/library/useFilteredSongs";
@@ -58,12 +59,6 @@ const VIEW_MODE_ICONS: Record<MusicLibraryViewMode, React.ReactNode> = {
 };
 
 /** 类型标签：文字切换，当前项下方一道强调色短线（同个人中心的目录） */
-// 工具栏的细线不用 border：border 在盒子外面，当前标签与搜索框的强调色线贴着盒子内沿，
-// 会浮在细线上面一点。也不能把强调色线挪出去，标签行横向滚动，会把挪出去的那截裁掉。
-// 所以细线画在盒子里面，用 ::before 让它先画，强调色线就压在它上面、下沿对齐
-const TOOLBAR_HAIRLINE_CLASS =
-  "relative before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-slate-200/70 dark:before:bg-slate-800";
-
 const TYPE_TAB_CLASS =
   "relative flex h-full shrink-0 items-center whitespace-nowrap font-serif text-[15px] tracking-wider transition-colors select-none";
 
@@ -381,7 +376,7 @@ export default function MusicLibraryClient({
         <section className="sticky top-(--nav-h) z-40 -mx-6 mb-10 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95">
           <div
             className={cn(
-              TOOLBAR_HAIRLINE_CLASS,
+              TAB_HAIRLINE_CLASS,
               "flex flex-col-reverse md:h-12 md:flex-row md:gap-8",
             )}
           >
@@ -439,7 +434,7 @@ export default function MusicLibraryClient({
 
             <div
               className={cn(
-                TOOLBAR_HAIRLINE_CLASS,
+                TAB_HAIRLINE_CLASS,
                 "flex h-11 items-center gap-1 md:ml-auto md:h-full md:before:hidden",
               )}
             >

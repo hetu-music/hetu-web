@@ -52,13 +52,13 @@ export default function ImageryShell({
       actions={actions}
     >
       <AdminToolbar search={search}>
-        <nav className="flex items-baseline gap-x-3">
+        <nav className="flex items-stretch gap-x-3">
           {SUBS.map((s, i) => (
-            <span key={s.key} className="flex items-baseline gap-x-3">
+            <span key={s.key} className="flex items-stretch gap-x-3">
               {i > 0 && (
                 <span
                   aria-hidden
-                  className="text-slate-300 dark:text-slate-600"
+                  className="self-center text-slate-300 dark:text-slate-600"
                 >
                   ·
                 </span>
@@ -66,7 +66,7 @@ export default function ImageryShell({
               <Link
                 href={s.href}
                 aria-current={s.key === sub ? "page" : undefined}
-                className={optionClass(s.key === sub)}
+                className={optionClass(s.key === sub, true)}
               >
                 {s.label}
               </Link>

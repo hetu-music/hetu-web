@@ -118,13 +118,12 @@ export default function ImageryItemsClient({
               );
             })}
           </ol>
-          <div className="mt-10 flex justify-center">
-            <Pagination
-              currentPage={imagery.currentPage}
-              totalPages={imagery.totalPages}
-              onPageChange={imagery.setPage}
-            />
-          </div>
+          <Pagination
+            className="mt-10"
+            currentPage={imagery.currentPage}
+            totalPages={imagery.totalPages}
+            onPageChange={imagery.setPage}
+          />
         </>
       )}
 

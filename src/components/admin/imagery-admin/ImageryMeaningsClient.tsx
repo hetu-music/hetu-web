@@ -201,15 +201,12 @@ export default function ImageryMeaningsClient() {
         </>
       )}
 
-      {m.totalPages > 1 && (
-        <div className="mt-10 flex justify-center">
-          <Pagination
-            currentPage={m.currentPage}
-            totalPages={m.totalPages}
-            onPageChange={m.setPage}
-          />
-        </div>
-      )}
+      <Pagination
+        className="mt-10"
+        currentPage={m.currentPage}
+        totalPages={m.totalPages}
+        onPageChange={m.setPage}
+      />
     </ImageryShell>
   );
 }

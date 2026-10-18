@@ -357,15 +357,12 @@ export default function AuditLogsPanel() {
         </ol>
       )}
 
-      {totalPages > 1 && (
-        <div className="mt-10 flex justify-center">
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={(p) => loadPage(p)}
-          />
-        </div>
-      )}
+      <Pagination
+        className="mt-10"
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={(p) => loadPage(p)}
+      />
     </>
   );
 }

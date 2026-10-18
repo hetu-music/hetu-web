@@ -375,15 +375,12 @@ export default function RequestsPanel({
         </ol>
       )}
 
-      {totalPages > 1 && (
-        <div className="mt-10 flex justify-center">
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={(p) => void fetchPage(p, typeFilter, statusFilter)}
-          />
-        </div>
-      )}
+      <Pagination
+        className="mt-10"
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={(p) => void fetchPage(p, typeFilter, statusFilter)}
+      />
     </>
   );
 }

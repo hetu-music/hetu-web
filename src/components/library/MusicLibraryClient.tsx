@@ -40,7 +40,13 @@ import {
   XCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import GridCard from "./GridCard";
 import HeroSection from "./HeroSection";
 import ListRow from "./ListRow";
@@ -111,6 +117,7 @@ export default function MusicLibraryClient({
   const [activeSongId, setActiveSongId] = useState<number | null>(null);
   const [mountKey, setMountKey] = useState(0);
   const { showScrollTop, scrollToTop } = useScrollTop();
+  const listStartRef = useRef<HTMLDivElement>(null);
   const { containerRef, hasDraggedRef, dragHandlers } =
     useMouseDragScroll<HTMLDivElement>();
 
@@ -357,6 +364,10 @@ export default function MusicLibraryClient({
           </div>
         </section>
 
+        {/* 翻页后停在这里：工具栏刚好吸顶，下一页的第一行露在它下面，
+            和读者自己滚过卷首时一样。不能直接滚工具栏，它吸顶后量出的位置不是原位 */}
+        <div ref={listStartRef} aria-hidden className="scroll-mt-(--nav-h)" />
+
         {/* 曲目工具栏：吸顶，底下只有一道细线。标签、搜索、按钮都放在等高的
             一行里竖直居中，当前标签与聚焦的搜索框在细线上亮一段强调色。
             窄屏分两行：上面搜索与按钮，下面类型标签，两行各有一道细线分开；
@@ -573,13 +584,13 @@ export default function MusicLibraryClient({
                 </div>
               )}
 
-              <div className="mt-12 flex justify-center">
-                <Pagination
-                  currentPage={safePage}
-                  totalPages={totalPages}
-                  onPageChange={setPaginationPage}
-                />
-              </div>
+              <Pagination
+                className="mt-12"
+                currentPage={safePage}
+                totalPages={totalPages}
+                onPageChange={setPaginationPage}
+                scrollTarget={listStartRef}
+              />
             </>
           ) : (
             <p className="py-20 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">

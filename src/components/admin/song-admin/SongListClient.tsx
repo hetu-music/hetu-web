@@ -265,13 +265,12 @@ export default function SongListClient({
               />
             ))}
           </ol>
-          <div className="mt-10 flex justify-center">
-            <Pagination
-              currentPage={safePage}
-              totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(Math.max(1, page))}
-            />
-          </div>
+          <Pagination
+            className="mt-10"
+            currentPage={safePage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(Math.max(1, page))}
+          />
         </>
       )}
     </AdminShell>

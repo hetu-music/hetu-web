@@ -8,6 +8,8 @@ interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  /** 翻页后滚到这个元素（按它的 scroll-margin 对齐）；不给就回到页面顶部 */
+  scrollTarget?: React.RefObject<HTMLElement | null>;
   className?: string;
 }
 
@@ -24,6 +26,7 @@ const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
   onPageChange,
+  scrollTarget,
   className,
 }) => {
   const t = useTranslations("common.pagination");
@@ -32,14 +35,16 @@ const Pagination: React.FC<PaginationProps> = ({
   const [preview, setPreview] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  // 即使只有一页也显示，让用户明确当前状态 (1 / 1)
-  if (totalPages < 1) return null;
+  // 只有一页就不标页码，书也是这样
+  if (totalPages <= 1) return null;
 
   const goTo = (page: number) => {
     const next = Math.min(Math.max(1, page), totalPages);
     if (next === currentPage) return;
     onPageChange(next);
-    window.scrollTo({ top: 0 });
+    const target = scrollTarget?.current;
+    if (target) target.scrollIntoView({ block: "start" });
+    else window.scrollTo({ top: 0 });
   };
 
   const pageAt = (clientX: number) => {

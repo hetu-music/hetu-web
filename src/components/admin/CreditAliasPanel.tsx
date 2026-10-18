@@ -8,7 +8,7 @@ import {
 import type { CreditAliasRow } from "@/lib/server/service-credit-aliases";
 import type { CreditField } from "@/lib/types";
 import type { CreditNameUsage } from "@/lib/utils/utils-credits";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SectionHeading from "@/components/detail/SectionHeading";
 import {
@@ -171,6 +171,30 @@ export default function CreditAliasPanel({ csrfToken }: { csrfToken: string }) {
         <div className="mt-6 space-y-3">
           <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto] md:items-start">
             <div className="space-y-1 min-w-0">
+              <label htmlFor="credit-name" className={LABEL_CLASS}>
+                主名（全站统一显示）
+              </label>
+              <input
+                id="credit-name"
+                list="credit-name-options"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="如 萧忆情"
+                autoComplete="off"
+                className={INPUT_CLASS}
+              />
+              <p className="text-[11px] text-slate-400 min-h-4">
+                {name && (describeUsage(nameUsage) ?? "曲库里还没有这个名字")}
+              </p>
+            </div>
+
+            <ArrowLeft
+              size={16}
+              className="hidden md:block mt-8 text-slate-300 dark:text-slate-600"
+              aria-hidden
+            />
+
+            <div className="space-y-1 min-w-0">
               <label htmlFor="credit-alias" className={LABEL_CLASS}>
                 别名（作品上的署名）
               </label>
@@ -190,30 +214,6 @@ export default function CreditAliasPanel({ csrfToken }: { csrfToken: string }) {
                       曲库里没有署这个名字的歌
                     </span>
                   ))}
-              </p>
-            </div>
-
-            <ArrowRight
-              size={16}
-              className="hidden md:block mt-8 text-slate-300 dark:text-slate-600"
-              aria-hidden
-            />
-
-            <div className="space-y-1 min-w-0">
-              <label htmlFor="credit-name" className={LABEL_CLASS}>
-                主名（全站统一显示）
-              </label>
-              <input
-                id="credit-name"
-                list="credit-name-options"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                placeholder="如 萧忆情"
-                autoComplete="off"
-                className={INPUT_CLASS}
-              />
-              <p className="text-[11px] text-slate-400 min-h-4">
-                {name && (describeUsage(nameUsage) ?? "曲库里还没有这个名字")}
               </p>
             </div>
 

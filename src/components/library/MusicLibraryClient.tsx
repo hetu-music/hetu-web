@@ -4,6 +4,7 @@ import TopBar from "@/components/shared/topbar/TopBar";
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import Pagination from "@/components/shared/Pagination";
+import { addToast } from "@/components/ui/toast";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useFilteredSongs } from "@/hooks/library/useFilteredSongs";
 import { extractLyricsSnippet } from "@/hooks/library/useLyricsIndex";
@@ -19,6 +20,7 @@ import {
   type MusicLibraryViewMode,
 } from "@/lib/constants";
 import type { MusicLibraryClientProps } from "@/lib/types";
+import { sharePage } from "@/lib/utils/share";
 import { cn } from "@/lib/utils/utils";
 import {
   calculateFilterOptions,
@@ -284,27 +286,11 @@ export default function MusicLibraryClient({
 
   const handleShare = useCallback(async () => {
     // 与卷首那句同一句话，卷首在句末接「……」，这里也一样
-    const shareData = {
+    const outcome = await sharePage({
       title: tCommon("site.name"),
       text: `${t("hero.defaultDesc")}……`,
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        // Share cancelled.
-      }
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      alert(t("linkCopied"));
-    } catch {
-      // Clipboard unavailable.
-    }
+    });
+    if (outcome === "copied") addToast("success", t("linkCopied"));
   }, [t, tCommon]);
 
   const handleTitleReset = useCallback(() => {

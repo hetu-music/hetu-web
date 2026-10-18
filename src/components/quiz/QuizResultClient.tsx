@@ -6,6 +6,7 @@ import EnqueueButton from "@/components/shared/EnqueueButton";
 import PlayButton from "@/components/shared/PlayButton";
 import { Link } from "@/i18n/navigation";
 import type { QuizResultView } from "@/lib/quiz/views";
+import { copyPageLink, sharePage, type ShareOutcome } from "@/lib/utils/share";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { motion } from "framer-motion";
 import { Check, Link2, RotateCcw, Share2 } from "lucide-react";
@@ -36,28 +37,20 @@ export default function QuizResultClient({ result }: Props) {
   const tNav = useTranslations("common.nav");
   const [copied, setCopied] = useState(false);
 
-  const copyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // 剪贴板不可用（如非安全上下文）时静默失败
-    }
+  // 复制成功在按钮上原地提示「已复制」；剪贴板不可用（如非安全上下文）时静默
+  const showCopied = useCallback((outcome: ShareOutcome) => {
+    if (outcome !== "copied") return;
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
   }, []);
-
-  // 能调起系统分享就用系统分享，否则退回复制链接
-  const share = useCallback(async () => {
-    if (!navigator.share) return copyLink();
-    try {
-      await navigator.share({
-        title: document.title,
-        url: window.location.href,
-      });
-    } catch {
-      // 用户取消分享
-    }
-  }, [copyLink]);
+  const copyLink = useCallback(
+    async () => showCopied(await copyPageLink()),
+    [showCopied],
+  );
+  const share = useCallback(
+    async () => showCopied(await sharePage({ title: document.title })),
+    [showCopied],
+  );
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">

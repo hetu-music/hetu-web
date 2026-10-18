@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { NAV_HEIGHT } from "@/components/shared/nav-button";
 
 export interface NavItem {
   id: string;
   label: string;
 }
 
-/** 顶栏高度（同 globals.css 的 --nav-h）：跳转后章节落在顶栏下方 */
-const NAV_HEIGHT = 80;
 /** 章节顶端越过视口这一比例处即算读到该节 */
 const READING_LINE = 0.3;
 

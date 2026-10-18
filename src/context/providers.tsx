@@ -6,6 +6,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import React from "react";
 import { ChunkErrorHandler } from "@/components/shared/ChunkErrorHandler";
 import { BrowserChromeColor } from "@/components/ui/browser-chrome";
+import { ToastViewport } from "@/components/ui/toast";
 import GlobalPlayer from "@/components/shared/GlobalPlayer";
 import { UserProvider } from "@/context/UserContext";
 import { FavoritesProvider } from "@/context/FavoritesContext";
@@ -45,6 +46,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
               {/* GlobalPlayer 在纯 Client 树内，zustand store 是模块级单例，
                   跨路由导航时音频状态完全不受影响 */}
               <GlobalPlayer />
+              {/* 操作结果提示，全站共用一个；用法见 components/ui/toast */}
+              <ToastViewport />
             </FavoritesProvider>
           </UserProvider>
         </QueryClientProvider>

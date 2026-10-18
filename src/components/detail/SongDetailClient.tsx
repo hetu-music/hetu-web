@@ -20,12 +20,16 @@ import SongHero from "@/components/detail/SongHero";
 import FavoriteButton from "@/components/shared/FavoriteButton";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import ImageModal from "@/components/shared/ImageModal";
+import { NAV_HEIGHT } from "@/components/shared/nav-button";
+import { addToast } from "@/components/ui/toast";
 import TopBar, { type TopBarAction } from "@/components/shared/topbar/TopBar";
 import { PlaceNav } from "@/components/shared/topbar/parts";
 import { useUserContext } from "@/context/UserContext";
+import { useIntersection } from "@/hooks/ui/useIntersection";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
 import { buildFolio, markLines, parseNotes } from "@/lib/utils/utils-folio";
+import { sharePage } from "@/lib/utils/share";
 import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
 import {
   type CoverTone,
@@ -34,13 +38,7 @@ import {
 } from "@/lib/utils/utils-tone";
 import { Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
 /** 题签最多展示的意象数 */
 const STRIP_LIMIT = 7;
@@ -140,42 +138,21 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     activeImagery !== null ? (markById.get(activeImagery) ?? null) : null;
 
   // ── 导航栏标题：卷首的大标题滚出视口后才出现 ─────────────────────────────
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const [titleOutOfView, setTitleOutOfView] = useState(false);
-  useEffect(() => {
-    const el = titleRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setTitleOutOfView(!entry.isIntersecting),
-      { rootMargin: "-80px 0px 0px 0px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const { ref: titleRef, entry: titleEntry } =
+    useIntersection<HTMLHeadingElement>({
+      rootMargin: `-${NAV_HEIGHT}px 0px 0px 0px`,
+    });
+  const titleOutOfView = titleEntry ? !titleEntry.isIntersecting : false;
 
   // ── 其他交互 ────────────────────────────────────────────────────────────
   const handleShare = useCallback(async () => {
     const artistText = song.artist ? ` - ${song.artist.join("、")}` : "";
-    const shareData = {
+    const outcome = await sharePage({
       title: t("shareTitle"),
       text: t("shareText", { title: song.title, artist: artistText }),
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        console.warn(t("shareCancel"));
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        alert(t("copySuccess"));
-      } catch {
-        console.warn(t("copyError"));
-      }
-    }
+    });
+    if (outcome === "copied") addToast("success", t("copySuccess"));
+    else if (outcome === "failed") addToast("error", t("copyError"));
   }, [song.title, song.artist, t]);
 
   const handleCoverLoad = useCallback((img: HTMLImageElement) => {

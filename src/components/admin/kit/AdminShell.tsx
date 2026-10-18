@@ -1,14 +1,13 @@
 "use client";
 
 import type React from "react";
-import { ToastViewport } from "@/components/ui/toast";
 import { useUserContext } from "@/context/UserContext";
 import { cn } from "@/lib/utils/utils";
 import AdminNavbar, { type AdminSection } from "./AdminNavbar";
 import { type Stat, StatLine } from "./parts";
 
 /**
- * 所有后台页共用的外壳：顶栏、题头（题名、说明、统计、主操作）、正文与提示条。
+ * 所有后台页共用的外壳：顶栏、题头（题名、说明、统计、主操作）与正文。提示条全站共用，挂在 Providers 里。
  * 强调色用全站默认的墨蓝 --tone（globals.css），不再每个板块各配一种颜色。
  */
 export default function AdminShell({
@@ -76,8 +75,6 @@ export default function AdminShell({
 
         {children}
       </main>
-
-      <ToastViewport />
     </div>
   );
 }

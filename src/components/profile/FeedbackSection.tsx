@@ -25,19 +25,21 @@ import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import { apiCreateRequest, apiGetMyRequests } from "@/lib/api/client-api";
 import type { RequestStatus, RequestType, UserRequest } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
+import { type FormEvent, useReducer, useRef, useState } from "react";
 
 const CONTENT_MAX = 2000;
+
+/** 按用户分开缓存：同一个标签页里换了账号，不会先闪出上一个人的记录 */
+const myRequestsKey = (userId: string | undefined) =>
+  ["profile", "requests", userId] as const;
+const NO_REQUESTS: UserRequest[] = [];
 /** 字数接近上限时才显示计数 */
 const SHOW_COUNT_FROM = CONTENT_MAX - 200;
 
@@ -52,25 +54,14 @@ const STATUS_CLASS: Record<RequestStatus, string> = {
 /** 建议反馈：提交纠错或申请，下方列出自己提交过的记录 */
 export default function FeedbackSection() {
   const t = useTranslations("profile");
-  const [requests, setRequests] = useState<UserRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchRequests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { requests: data } = await apiGetMyRequests();
-      setRequests(data);
-    } catch {
-      // 静默失败，保持空列表
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchRequests();
-  }, [fetchRequests]);
+  const queryClient = useQueryClient();
+  const { user } = useUserContext();
+  const history = useQuery({
+    queryKey: myRequestsKey(user?.id),
+    queryFn: async () => (await apiGetMyRequests()).requests,
+  });
+  const requests = history.data ?? NO_REQUESTS;
+  const refresh = () => void history.refetch();
 
   return (
     <section>
@@ -80,7 +71,13 @@ export default function FeedbackSection() {
         <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
           {t("feedback.submitTitle")}
         </h3>
-        <SubmitForm onSubmitted={fetchRequests} />
+        <SubmitForm
+          onSubmitted={() =>
+            void queryClient.invalidateQueries({
+              queryKey: myRequestsKey(user?.id),
+            })
+          }
+        />
       </div>
 
       <div className="mt-20">
@@ -88,7 +85,7 @@ export default function FeedbackSection() {
           <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
             {t("feedback.historyTitle")}
           </h3>
-          {!loading && (
+          {history.isSuccess && (
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {t("feedback.historyCount", { count: requests.length })}
             </span>
@@ -96,8 +93,10 @@ export default function FeedbackSection() {
         </div>
         <RequestList
           requests={requests}
-          loading={loading}
-          onRefresh={fetchRequests}
+          pending={history.isPending}
+          fetching={history.isFetching}
+          failed={history.isError}
+          onRefresh={refresh}
         />
       </div>
     </section>
@@ -450,17 +449,47 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
 
 function RequestList({
   requests,
-  loading,
+  pending,
+  fetching,
+  failed,
   onRefresh,
 }: {
   requests: UserRequest[];
-  loading: boolean;
+  /** 还没取到过 */
+  pending: boolean;
+  /** 正在取（含刷新） */
+  fetching: boolean;
+  failed: boolean;
   onRefresh: () => void;
 }) {
   const t = useTranslations("profile.feedback");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  if (loading && requests.length === 0) {
+  const refreshButton = (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={fetching}
+      className={cn(TEXT_BUTTON_CLASS, "mt-6 inline-flex items-center gap-1.5")}
+    >
+      {fetching && <Loader2 size={12} className="animate-spin" />}
+      {t("refresh")}
+    </button>
+  );
+
+  // 原先取失败时静默显示成「暂无提交记录」，分不清是真没有还是没取到
+  if (failed && requests.length === 0) {
+    return (
+      <div>
+        <p className="mt-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+          {t("historyError")}
+        </p>
+        {refreshButton}
+      </div>
+    );
+  }
+
+  if (pending) {
     return <Loader2 size={20} className="mt-8 animate-spin text-slate-400" />;
   }
 
@@ -486,18 +515,7 @@ function RequestList({
           />
         ))}
       </ul>
-      <button
-        type="button"
-        onClick={onRefresh}
-        disabled={loading}
-        className={cn(
-          TEXT_BUTTON_CLASS,
-          "mt-6 inline-flex items-center gap-1.5",
-        )}
-      >
-        {loading && <Loader2 size={12} className="animate-spin" />}
-        {t("refresh")}
-      </button>
+      {refreshButton}
     </>
   );
 }

@@ -9,7 +9,7 @@ export interface ToastMessage {
 
 /**
  * 后台的操作结果提示。原先每个板块各写一份 state + setTimeout，时长也不一；
- * 现在统一交给 ui/toast（Base UI Toast），任何 hook 里都能直接调用，由 AdminShell 渲染。
+ * 现在统一交给 ui/toast（Base UI Toast），任何 hook 里都能直接调用。
  */
 export function notify(message: ToastMessage) {
   addToast(message.type, message.text);

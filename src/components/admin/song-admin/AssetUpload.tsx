@@ -31,11 +31,17 @@ export default function AssetUpload({
   kind,
   songId,
   csrfToken,
+  preset,
   onUploaded,
 }: {
   kind: keyof typeof KINDS;
   songId: number;
   csrfToken: string;
+  /**
+   * 正在用的预设图名（白底狐狸、初号机）。预设图是站里共用的，始终存在；
+   * 这时不检查这首歌自己的文件，上传的是备用的定制图
+   */
+  preset?: string;
   onUploaded?: () => void;
 }) {
   const config = KINDS[kind];
@@ -44,6 +50,7 @@ export default function AssetUpload({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (preset) return;
     let active = true;
     void apiCheckFileExists(songId, kind, csrfToken)
       .then((result) => active && setExists(result?.exists ?? false))
@@ -54,7 +61,7 @@ export default function AssetUpload({
     return () => {
       active = false;
     };
-  }, [csrfToken, kind, songId]);
+  }, [csrfToken, kind, preset, songId]);
 
   const upload = async (file: File) => {
     if (!config.matches(file.type)) {
@@ -106,19 +113,27 @@ export default function AssetUpload({
         {uploading && <Loader2 size={14} className="animate-spin" />}
         {uploading
           ? "上传中…"
-          : exists
-            ? `替换${config.label}`
-            : `上传${config.label}`}
+          : preset
+            ? `上传定制${config.label}`
+            : exists
+              ? `替换${config.label}`
+              : `上传${config.label}`}
       </button>
       <span
         className={cn(
           "text-xs",
-          exists
+          preset || exists
             ? "text-slate-500 dark:text-slate-400"
             : "text-slate-400 dark:text-slate-500",
         )}
       >
-        {exists === null ? "检查中…" : exists ? "已上传" : "未上传"}
+        {preset
+          ? `使用预设「${preset}」，始终可用`
+          : exists === null
+            ? "检查中…"
+            : exists
+              ? "已上传"
+              : "未上传"}
         <span className="mx-2 text-slate-300 dark:text-slate-600">·</span>
         {config.format}，不超过 100MB
       </span>

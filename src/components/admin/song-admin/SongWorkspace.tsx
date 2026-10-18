@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import Image from "next/image";
 import type React from "react";
-import { FormProvider } from "react-hook-form";
+import { FormProvider, useWatch } from "react-hook-form";
 import SectionHeading from "@/components/detail/SectionHeading";
 import { useUserContext } from "@/context/UserContext";
 import { Link } from "@/i18n/navigation";
@@ -353,6 +353,10 @@ function SideList({
 function AssetsTab({ ws, song }: { ws: SongWorkspaceState; song: SongDetail }) {
   const cover = FIELD_BY_KEY.get("hascover");
   const score = FIELD_BY_KEY.get("nmn_status");
+  // 跟着表单里当前选的封面走，没暂存也算：选了预设就不提示「未上传」
+  const hascover = useWatch({ control: ws.form.control, name: "hascover" });
+  const coverPreset =
+    hascover === true ? undefined : hascover === false ? "初号机" : "白底狐狸";
 
   return (
     <div className="grid gap-16 md:grid-cols-2">
@@ -363,8 +367,17 @@ function AssetsTab({ ws, song }: { ws: SongWorkspaceState; song: SongDetail }) {
             changed={ws.changedFields.has("hascover")}
           />
         )}
-        <Preview src={getCoverUrl(song)} alt={`${song.title} 封面`} square />
-        <AssetUpload kind="cover" songId={song.id} csrfToken={ws.csrfToken} />
+        <Preview
+          src={getCoverUrl({ id: song.id, hascover })}
+          alt={`${song.title} 封面`}
+          square
+        />
+        <AssetUpload
+          kind="cover"
+          songId={song.id}
+          csrfToken={ws.csrfToken}
+          preset={coverPreset}
+        />
         <p className="text-xs text-slate-400">
           上传定制封面后，记得把封面设为「定制封面」并暂存
         </p>

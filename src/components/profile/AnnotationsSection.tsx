@@ -6,7 +6,7 @@ import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
 import { useUserContext } from "@/context/UserContext";
 import { useTwoStepConfirm } from "@/hooks/ui";
 import { Link, useRouter } from "@/i18n/navigation";
-import { getCsrfToken } from "@/lib/api/csrf";
+import { apiRequest } from "@/lib/api/request";
 import type { CommentAnchor, MyComment, MyCommentGroup } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
@@ -66,12 +66,10 @@ export default function AnnotationsSection() {
   };
 
   const remove = async (id: number) => {
-    const csrf = await getCsrfToken();
-    const res = await fetch(`/api/public/comments/${id}`, {
+    await apiRequest(`/api/public/comments/${id}`, {
       method: "DELETE",
-      headers: { "x-csrf-token": csrf },
+      fallback: "删除失败",
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     await queryClient.invalidateQueries({ queryKey: ["my-comments"] });
     // 详情页的批注缓存也作废，回到歌曲页时不显示已删的批注
     queryClient.invalidateQueries({ queryKey: ["song-comments"] });

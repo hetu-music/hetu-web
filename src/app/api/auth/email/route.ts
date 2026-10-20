@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { emailField, passwordField } from "@/lib/forms/account-rules";
 import { authErrorResponse } from "@/lib/server/auth-errors";
 import { checkCurrentPassword } from "@/lib/server/auth-route";
-import { parseJsonBody } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const SCOPE = "POST /api/auth/email";
 

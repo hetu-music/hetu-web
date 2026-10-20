@@ -7,28 +7,20 @@ import {
   createCommentSchema,
 } from "@/lib/server/service-comments";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 // POST /api/public/comments — 写批注或回复
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
-
-    const parsed = createCommentSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      createCommentSchema,
+    );
+    if (invalid) return invalid;
 
     try {
       const supabase = await createSupabaseServerClient();
-      const id = await createComment(supabase, user.id, parsed.data);
+      const id = await createComment(supabase, user.id, input);
       return NextResponse.json({ id }, { status: 201 });
     } catch (error) {
       if (error instanceof CommentError) {

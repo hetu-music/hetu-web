@@ -4,7 +4,8 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { TABLES } from "@/lib/db/supabase-server";
 import { displayNameField, introField } from "@/lib/forms/account-rules";
-import { parseJsonBody, serverErrorResponse } from "@/lib/server/server-utils";
+import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const schema = z.object({
   displayName: displayNameField,

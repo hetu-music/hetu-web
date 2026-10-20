@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
 import type { UserRecord } from "@/lib/types";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 // ─── 更新字段 Zod schema ──────────────────────────────────────────────────────
 
@@ -45,23 +46,13 @@ export const GET = withAuth(
 
 export const PUT = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      userUpdateSchema,
+    );
+    if (invalid) return invalid;
 
-    const parsed = userUpdateSchema.safeParse(body);
-    if (!parsed.success) {
-      const firstIssue = parsed.error.issues[0];
-      return NextResponse.json(
-        { error: firstIssue?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
-
-    const { id, ...fieldsToUpdate } = parsed.data;
+    const { id, ...fieldsToUpdate } = input;
 
     // 防止超级管理员被取消 is_admin 权限
     if (fieldsToUpdate.is_admin === false) {

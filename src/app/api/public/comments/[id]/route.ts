@@ -9,6 +9,7 @@ import {
   editCommentSchema,
 } from "@/lib/server/service-comments";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 function errorResponse(scope: string, error: unknown) {
   if (error instanceof CommentError) {
@@ -26,23 +27,15 @@ export const PATCH = withAuth(
     const id = commentIdFromUrl(request);
     if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
-    const parsed = editCommentSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      editCommentSchema,
+    );
+    if (invalid) return invalid;
 
     try {
       const supabase = await createSupabaseServerClient();
-      await editComment(supabase, id, parsed.data.body);
+      await editComment(supabase, id, input.body);
       return NextResponse.json({ success: true });
     } catch (error) {
       return errorResponse("PATCH /api/public/comments/[id]", error);

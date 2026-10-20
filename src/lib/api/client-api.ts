@@ -1,5 +1,13 @@
-// Admin 管理页面 API 封装
-import type { Song, UserRecord, UserUpdatePayload } from "@/lib/types";
+// Admin 管理页面 API 封装：一律走 lib/api/request 的 apiRequest，失败抛 ApiError
+import { apiRequest } from "@/lib/api/request";
+import type {
+  CreateRequestPayload,
+  ReplyRequestPayload,
+  Song,
+  UserRecord,
+  UserRequest,
+  UserUpdatePayload,
+} from "@/lib/types";
 import type { ReviewCandidate, ReviewResult } from "@/lib/imagery/review";
 import type { OccurrenceBatchItem } from "@/lib/server/service-imagery";
 import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
@@ -9,122 +17,100 @@ import type { NavSong } from "@/lib/navidrome/sync";
 import type { CreditAliasRow } from "@/lib/server/service-credit-aliases";
 import type { CreditNameUsage } from "@/lib/utils/utils-credits";
 
-// 新增歌曲
-export async function apiCreateSong(song: Partial<Song>, csrfToken: string) {
-  const res = await fetch("/api/admin/edit", {
+/**
+ * 没标返回类型的接口沿用原来 res.json() 的 any，调用方按各自的形状取用。
+ * 新接口请写明返回类型。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Untyped = any;
+
+// ─── Songs Admin API ───────────────────────────────────────────────────────────
+
+export function apiCreateSong(song: Partial<Song>, csrfToken: string) {
+  return apiRequest<Untyped>("/api/admin/edit", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify(song),
+    body: song,
+    csrfToken,
+    fallback: "新增失败",
   });
-  if (!res.ok) throw new Error("新增失败");
-  return res.json();
 }
 
-// 更新歌曲
-export async function apiUpdateSong(
+/** 409 是乐观锁冲突，服务端的提示（「数据已被他人修改…」）可以直接给用户看 */
+export function apiUpdateSong(
   id: number,
   song: Partial<Song>,
   csrfToken: string,
 ) {
-  const res = await fetch("/api/admin/edit", {
+  return apiRequest<Untyped>("/api/admin/edit", {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify({ id, ...song }),
+    body: { id, ...song },
+    csrfToken,
+    fallback: "更新失败",
+    serverMessage: [409],
   });
-  if (res.status === 409) {
-    throw new Error("数据已被他人修改，请刷新页面后重试");
-  }
-  if (!res.ok) throw new Error("更新失败");
-  return res.json();
 }
 
-// 检查文件是否存在
-export async function apiCheckFileExists(
+export function apiCheckFileExists(
   songId: number,
   fileType: "cover" | "score",
   csrfToken: string,
 ) {
-  const res = await fetch(
+  return apiRequest<Untyped>(
     `/api/admin/check-file?songId=${songId}&type=${fileType}`,
-    {
-      method: "GET",
-      headers: {
-        "x-csrf-token": csrfToken,
-      },
-    },
+    { csrfToken, fallback: "Failed to check file existence" },
   );
-  if (!res.ok) throw new Error("Failed to check file existence");
-  return res.json();
 }
 
-// Auto-complete logic has been moved to src/lib/api-auto-complete.ts
-
-// ─── Songs Admin API ───────────────────────────────────────────────────────────
-
-export async function apiGetSongs(): Promise<
-  {
-    id: number;
-    title: string;
-    album?: string | null;
-    lyrics?: string | null;
-  }[]
-> {
-  const res = await fetch("/api/admin/edit");
-  if (!res.ok) throw new Error("获取歌曲列表失败");
-  return res.json();
+export function apiGetSongs() {
+  return apiRequest<
+    {
+      id: number;
+      title: string;
+      album?: string | null;
+      lyrics?: string | null;
+    }[]
+  >("/api/admin/edit", { fallback: "获取歌曲列表失败" });
 }
 
 // ─── Imagery Admin API ─────────────────────────────────────────────────────────
 
-export async function apiGetImageryItems() {
-  const res = await fetch("/api/admin/imagery");
-  if (!res.ok) throw new Error("获取意象列表失败");
-  return res.json();
+export function apiGetImageryItems() {
+  return apiRequest<Untyped>("/api/admin/imagery", {
+    fallback: "获取意象列表失败",
+  });
 }
 
-export async function apiCreateImagery(name: string, csrfToken: string) {
-  const res = await fetch("/api/admin/imagery", {
+export function apiCreateImagery(name: string, csrfToken: string) {
+  return apiRequest<Untyped>("/api/admin/imagery", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify({ name }),
+    body: { name },
+    csrfToken,
+    fallback: "新增意象失败",
   });
-  if (!res.ok) throw new Error("新增意象失败");
-  return res.json();
 }
 
-export async function apiUpdateImagery(
-  id: number,
-  name: string,
-  csrfToken: string,
-) {
-  const res = await fetch(`/api/admin/imagery/${id}`, {
+export function apiUpdateImagery(id: number, name: string, csrfToken: string) {
+  return apiRequest<Untyped>(`/api/admin/imagery/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify({ name }),
+    body: { name },
+    csrfToken,
+    fallback: "更新意象失败",
   });
-  if (!res.ok) throw new Error("更新意象失败");
-  return res.json();
 }
 
-export async function apiGetImageryOccurrences(imageryId: number) {
-  const res = await fetch(`/api/admin/imagery/${imageryId}`);
-  if (!res.ok) throw new Error("获取出现记录失败");
-  return res.json();
+export function apiGetImageryOccurrences(imageryId: number) {
+  return apiRequest<Untyped>(`/api/admin/imagery/${imageryId}`, {
+    fallback: "获取出现记录失败",
+  });
 }
 
-export async function apiGetImageryCategories() {
-  const res = await fetch("/api/admin/imagery/categories");
-  if (!res.ok) throw new Error("获取分类失败");
-  return res.json();
+export function apiGetImageryCategories() {
+  return apiRequest<Untyped>("/api/admin/imagery/categories", {
+    fallback: "获取分类失败",
+  });
 }
 
-export async function apiCreateImageryCategory(
+export function apiCreateImageryCategory(
   data: {
     name: string;
     parent_id?: number | null;
@@ -133,16 +119,15 @@ export async function apiCreateImageryCategory(
   },
   csrfToken: string,
 ) {
-  const res = await fetch("/api/admin/imagery/categories", {
+  return apiRequest<Untyped>("/api/admin/imagery/categories", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify(data),
+    body: data,
+    csrfToken,
+    fallback: "新增分类失败",
   });
-  if (!res.ok) throw new Error("新增分类失败");
-  return res.json();
 }
 
-export async function apiUpdateImageryCategory(
+export function apiUpdateImageryCategory(
   id: number,
   data: {
     name?: string;
@@ -152,128 +137,105 @@ export async function apiUpdateImageryCategory(
   },
   csrfToken: string,
 ) {
-  const res = await fetch(`/api/admin/imagery/categories/${id}`, {
+  return apiRequest<Untyped>(`/api/admin/imagery/categories/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify(data),
+    body: data,
+    csrfToken,
+    fallback: "更新分类失败",
   });
-  if (!res.ok) throw new Error("更新分类失败");
-  return res.json();
 }
 
 // ─── Imagery meanings API ──────────────────────────────────────────────────────
 
-export async function apiGetMeanings() {
-  const res = await fetch("/api/admin/meanings");
-  if (!res.ok) throw new Error("获取含义列表失败");
-  return res.json();
-}
+type MeaningInput = { label: string; description?: string | null };
 
-export async function apiCreateMeaning(
-  imageryId: number,
-  data: { label: string; description?: string | null },
-  csrfToken: string,
-) {
-  const res = await fetch(`/api/admin/imagery/${imageryId}/meanings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify(data),
+export function apiGetMeanings() {
+  return apiRequest<Untyped>("/api/admin/meanings", {
+    fallback: "获取含义列表失败",
   });
-  if (!res.ok) throw new Error("新增含义失败");
-  return res.json();
 }
 
-export async function apiUpdateMeaning(
+export function apiCreateMeaning(
   imageryId: number,
-  meaningId: number,
-  data: { label: string; description?: string | null },
+  data: MeaningInput,
   csrfToken: string,
 ) {
-  const res = await fetch(
-    `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "x-csrf-token": csrfToken,
-      },
-      body: JSON.stringify(data),
-    },
-  );
-  if (!res.ok) throw new Error("更新含义失败");
-  return res.json();
-}
-
-export async function apiDeleteMeaning(
-  imageryId: number,
-  meaningId: number,
-  csrfToken: string,
-) {
-  const res = await fetch(
-    `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
-    {
-      method: "DELETE",
-      headers: { "x-csrf-token": csrfToken },
-    },
-  );
-  if (!res.ok) throw new Error("删除含义失败");
-  return res.json();
-}
-
-export async function apiCreateGlobalMeaning(
-  data: { label: string; description?: string | null },
-  csrfToken: string,
-) {
-  const res = await fetch("/api/admin/meanings", {
+  return apiRequest<Untyped>(`/api/admin/imagery/${imageryId}/meanings`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify(data),
+    body: data,
+    csrfToken,
+    fallback: "新增含义失败",
   });
-  if (!res.ok) throw new Error("新增含义失败");
-  return res.json();
 }
 
-export async function apiUpdateGlobalMeaning(
+export function apiUpdateMeaning(
+  imageryId: number,
   meaningId: number,
-  data: { label: string; description?: string | null },
+  data: MeaningInput,
   csrfToken: string,
 ) {
-  const res = await fetch(`/api/admin/meanings/${meaningId}`, {
+  return apiRequest<Untyped>(
+    `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
+    { method: "PUT", body: data, csrfToken, fallback: "更新含义失败" },
+  );
+}
+
+export function apiDeleteMeaning(
+  imageryId: number,
+  meaningId: number,
+  csrfToken: string,
+) {
+  return apiRequest<Untyped>(
+    `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
+    { method: "DELETE", csrfToken, fallback: "删除含义失败" },
+  );
+}
+
+export function apiCreateGlobalMeaning(data: MeaningInput, csrfToken: string) {
+  return apiRequest<Untyped>("/api/admin/meanings", {
+    method: "POST",
+    body: data,
+    csrfToken,
+    fallback: "新增含义失败",
+  });
+}
+
+export function apiUpdateGlobalMeaning(
+  meaningId: number,
+  data: MeaningInput,
+  csrfToken: string,
+) {
+  return apiRequest<Untyped>(`/api/admin/meanings/${meaningId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify(data),
+    body: data,
+    csrfToken,
+    fallback: "更新含义失败",
   });
-  if (!res.ok) throw new Error("更新含义失败");
-  return res.json();
 }
 
-export async function apiDeleteGlobalMeaning(
-  meaningId: number,
-  csrfToken: string,
-) {
-  const res = await fetch(`/api/admin/meanings/${meaningId}`, {
+export function apiDeleteGlobalMeaning(meaningId: number, csrfToken: string) {
+  return apiRequest<Untyped>(`/api/admin/meanings/${meaningId}`, {
     method: "DELETE",
-    headers: { "x-csrf-token": csrfToken },
+    csrfToken,
+    fallback: "删除含义失败",
   });
-  if (!res.ok) throw new Error("删除含义失败");
-  return res.json();
 }
 
 // ─── Occurrences API ───────────────────────────────────────────────────────────
 
-export async function apiGetOccurrencesForImagery(imageryId: number) {
-  const res = await fetch(`/api/admin/occurrences?imagery_id=${imageryId}`);
-  if (!res.ok) throw new Error("获取关系列表失败");
-  return res.json();
+export function apiGetOccurrencesForImagery(imageryId: number) {
+  return apiRequest<Untyped>(`/api/admin/occurrences?imagery_id=${imageryId}`, {
+    fallback: "获取关系列表失败",
+  });
 }
 
-export async function apiGetOccurrencesForSong(songId: number) {
-  const res = await fetch(`/api/admin/occurrences?song_id=${songId}`);
-  if (!res.ok) throw new Error("获取歌曲意象失败");
-  return res.json();
+export function apiGetOccurrencesForSong(songId: number) {
+  return apiRequest<Untyped>(`/api/admin/occurrences?song_id=${songId}`, {
+    fallback: "获取歌曲意象失败",
+  });
 }
 
-export async function apiCreateOccurrence(
+export function apiCreateOccurrence(
   data: {
     song_id: number;
     imagery_id: number;
@@ -283,70 +245,55 @@ export async function apiCreateOccurrence(
   },
   csrfToken: string,
 ) {
-  const res = await fetch("/api/admin/occurrences", {
+  return apiRequest<Untyped>("/api/admin/occurrences", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify(data),
+    body: data,
+    csrfToken,
+    fallback: "新增关系失败",
   });
-  if (!res.ok) throw new Error("新增关系失败");
-  return res.json();
 }
 
-export async function apiGetImagerySuggestions(
-  songId: number,
-): Promise<ImagerySuggestionsResult> {
-  const res = await fetch(
+export function apiGetImagerySuggestions(songId: number) {
+  return apiRequest<ImagerySuggestionsResult>(
     `/api/admin/occurrences/suggestions?song_id=${songId}`,
+    { fallback: "生成意象候选失败" },
   );
-  if (!res.ok) throw new Error("生成意象候选失败");
-  return res.json();
 }
 
-export async function apiReviewImagery(
+/** 502/503 是 LLM 侧的问题，服务端给的信息可以直接展示 */
+export function apiReviewImagery(
   songId: number,
   candidates: ReviewCandidate[],
   csrfToken: string,
-): Promise<ReviewResult> {
-  const res = await fetch("/api/admin/occurrences/review", {
+) {
+  return apiRequest<ReviewResult>("/api/admin/occurrences/review", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify({ song_id: songId, candidates }),
+    body: { song_id: songId, candidates },
+    csrfToken,
+    fallback: "AI 校验失败",
+    serverMessage: [502, 503],
   });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    // 502/503 是 LLM 侧的问题，服务端给的信息可以直接展示
-    throw new Error(
-      (res.status === 502 || res.status === 503) &&
-        typeof body?.error === "string"
-        ? body.error
-        : "AI 校验失败",
-    );
-  }
-  return res.json();
 }
 
-export async function apiCreateOccurrencesBatch(
+/** 400 带着可读的原因（歌曲未发布、校验不过等） */
+export function apiCreateOccurrencesBatch(
   songId: number,
   items: OccurrenceBatchItem[],
   csrfToken: string,
-): Promise<{ created: number; skipped: number; newImagery: number }> {
-  const res = await fetch("/api/admin/occurrences/batch", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify({ song_id: songId, items }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(
-      res.status === 400 && typeof body?.error === "string" && !body.details
-        ? body.error
-        : "保存意象标注失败",
-    );
-  }
-  return res.json();
+) {
+  return apiRequest<{ created: number; skipped: number; newImagery: number }>(
+    "/api/admin/occurrences/batch",
+    {
+      method: "POST",
+      body: { song_id: songId, items },
+      csrfToken,
+      fallback: "保存意象标注失败",
+      serverMessage: [400],
+    },
+  );
 }
 
-export async function apiUpdateOccurrence(
+export function apiUpdateOccurrence(
   id: number,
   data: {
     imagery_id?: number;
@@ -356,188 +303,157 @@ export async function apiUpdateOccurrence(
   },
   csrfToken: string,
 ) {
-  const res = await fetch(`/api/admin/occurrences/${id}`, {
+  return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify(data),
+    body: data,
+    csrfToken,
+    fallback: "更新关系失败",
   });
-  if (!res.ok) throw new Error("更新关系失败");
-  return res.json();
 }
 
-export async function apiDeleteOccurrence(id: number, csrfToken: string) {
-  const res = await fetch(`/api/admin/occurrences/${id}`, {
+export function apiDeleteOccurrence(id: number, csrfToken: string) {
+  return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "DELETE",
-    headers: { "x-csrf-token": csrfToken },
+    csrfToken,
+    fallback: "删除关系失败",
   });
-  if (!res.ok) throw new Error("删除关系失败");
-  return res.json();
 }
 
 // ─── Credit Aliases API ────────────────────────────────────────────────────────
 
-async function errorMessage(res: Response, fallback: string) {
-  const d = await res.json().catch(() => ({}));
-  return (d as { error?: string }).error || fallback;
+export function apiGetCreditAliases() {
+  return apiRequest<{ aliases: CreditAliasRow[]; names: CreditNameUsage[] }>(
+    "/api/admin/credit-aliases",
+    { fallback: "获取署名别名失败", serverMessage: true },
+  );
 }
 
-export async function apiGetCreditAliases(): Promise<{
-  aliases: CreditAliasRow[];
-  names: CreditNameUsage[];
-}> {
-  const res = await fetch("/api/admin/credit-aliases");
-  if (!res.ok) throw new Error(await errorMessage(res, "获取署名别名失败"));
-  return res.json();
-}
-
-export async function apiCreateCreditAlias(
+export function apiCreateCreditAlias(
   alias: string,
   name: string,
   csrfToken: string,
-): Promise<CreditAliasRow> {
-  const res = await fetch("/api/admin/credit-aliases", {
+) {
+  return apiRequest<CreditAliasRow>("/api/admin/credit-aliases", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-    body: JSON.stringify({ alias, name }),
+    body: { alias, name },
+    csrfToken,
+    fallback: "登记别名失败",
+    serverMessage: true,
   });
-  if (!res.ok) throw new Error(await errorMessage(res, "登记别名失败"));
-  return res.json();
 }
 
-export async function apiDeleteCreditAlias(alias: string, csrfToken: string) {
-  const res = await fetch(
+export function apiDeleteCreditAlias(alias: string, csrfToken: string) {
+  return apiRequest<Untyped>(
     `/api/admin/credit-aliases?alias=${encodeURIComponent(alias)}`,
-    { method: "DELETE", headers: { "x-csrf-token": csrfToken } },
+    {
+      method: "DELETE",
+      csrfToken,
+      fallback: "删除别名失败",
+      serverMessage: true,
+    },
   );
-  if (!res.ok) throw new Error(await errorMessage(res, "删除别名失败"));
-  return res.json();
 }
 
 // ─── Super Admin Users API ─────────────────────────────────────────────────────
 
-export async function apiGetUsers(): Promise<{ users: UserRecord[] }> {
-  const res = await fetch("/api/admin/users");
-  if (!res.ok) throw new Error("获取用户列表失败");
-  return res.json();
+export function apiGetUsers() {
+  return apiRequest<{ users: UserRecord[] }>("/api/admin/users", {
+    fallback: "获取用户列表失败",
+  });
 }
 
-export async function apiUpdateUser(
-  payload: UserUpdatePayload,
-  csrfToken: string,
-) {
-  const res = await fetch("/api/admin/users", {
+export function apiUpdateUser(payload: UserUpdatePayload, csrfToken: string) {
+  return apiRequest<Untyped>("/api/admin/users", {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify(payload),
+    body: payload,
+    csrfToken,
+    fallback: "更新用户失败",
+    serverMessage: true,
   });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error((d as { error?: string }).error || "更新用户失败");
-  }
-  return res.json();
 }
 
 // ─── User Requests API ─────────────────────────────────────────────────────────
 
-export async function apiGetMyRequests(): Promise<{
-  requests: import("../types").UserRequest[];
-}> {
-  const res = await fetch("/api/public/requests");
-  if (!res.ok) throw new Error("获取请求列表失败");
-  return res.json();
-}
-
-export async function apiCreateRequest(
-  payload: import("../types").CreateRequestPayload,
-  csrfToken: string,
-): Promise<{ request: import("../types").UserRequest }> {
-  const res = await fetch("/api/public/requests", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify(payload),
+export function apiGetMyRequests() {
+  return apiRequest<{ requests: UserRequest[] }>("/api/public/requests", {
+    fallback: "获取请求列表失败",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "提交失败");
-  return data;
 }
 
-export async function apiGetAdminRequests(params?: {
+export function apiCreateRequest(
+  payload: CreateRequestPayload,
+  csrfToken: string,
+) {
+  return apiRequest<{ request: UserRequest }>("/api/public/requests", {
+    method: "POST",
+    body: payload,
+    csrfToken,
+    fallback: "提交失败",
+    serverMessage: true,
+  });
+}
+
+export function apiGetAdminRequests(params?: {
   type?: string;
   status?: string;
   page?: number;
-}): Promise<{
-  requests: import("../types").UserRequest[];
-  total: number;
-  page: number;
-  pageSize: number;
-}> {
+}) {
   const sp = new URLSearchParams();
   if (params?.type) sp.set("type", params.type);
   if (params?.status) sp.set("status", params.status);
   if (params?.page) sp.set("page", String(params.page));
-  const res = await fetch(`/api/admin/requests?${sp.toString()}`);
-  if (!res.ok) throw new Error("获取请求列表失败");
-  return res.json();
+  return apiRequest<{
+    requests: UserRequest[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>(`/api/admin/requests?${sp.toString()}`, {
+    fallback: "获取请求列表失败",
+  });
 }
 
-export async function apiReplyRequest(
-  payload: import("../types").ReplyRequestPayload,
+export function apiReplyRequest(
+  payload: ReplyRequestPayload,
   csrfToken: string,
-): Promise<{ success: boolean }> {
-  const res = await fetch("/api/admin/requests", {
+) {
+  return apiRequest<{ success: boolean }>("/api/admin/requests", {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify(payload),
+    body: payload,
+    csrfToken,
+    fallback: "操作失败",
+    serverMessage: true,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "操作失败");
-  return data;
 }
 
 // ─── Audio (Navidrome) API ────────────────────────────────────────────────────
 
-async function readError(res: Response, fallback: string): Promise<Error> {
-  const d = await res.json().catch(() => ({}));
-  return new Error((d as { error?: string }).error || fallback);
-}
-
-export async function apiGetAudioOverview(): Promise<AudioOverview> {
-  const res = await fetch("/api/admin/audio", { cache: "no-store" });
-  if (!res.ok) throw await readError(res, "获取音频数据失败");
-  return res.json();
-}
-
-export async function apiRunAudioSync(csrfToken: string): Promise<ApplyResult> {
-  const res = await fetch("/api/admin/audio/sync", {
-    method: "POST",
-    headers: { "x-csrf-token": csrfToken },
+export function apiGetAudioOverview() {
+  return apiRequest<AudioOverview>("/api/admin/audio", {
+    cache: "no-store",
+    fallback: "获取音频数据失败",
+    serverMessage: true,
   });
-  if (!res.ok) throw await readError(res, "同步失败");
-  return res.json();
 }
 
-export async function apiUpdateAudioMapping(
+export function apiRunAudioSync(csrfToken: string) {
+  return apiRequest<ApplyResult>("/api/admin/audio/sync", {
+    method: "POST",
+    csrfToken,
+    fallback: "同步失败",
+    serverMessage: true,
+  });
+}
+
+export function apiUpdateAudioMapping(
   songId: number,
   navidId: string | null,
   csrfToken: string,
-): Promise<{ nav: NavSong | null }> {
-  const res = await fetch("/api/admin/audio/mapping", {
+) {
+  return apiRequest<{ nav: NavSong | null }>("/api/admin/audio/mapping", {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify({ songId, navidId }),
+    body: { songId, navidId },
+    csrfToken,
+    fallback: "更新关联失败",
+    serverMessage: true,
   });
-  if (!res.ok) throw await readError(res, "更新关联失败");
-  return res.json();
 }

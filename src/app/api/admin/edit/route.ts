@@ -4,6 +4,7 @@ import { TABLES } from "@/lib/db/supabase-server";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 //类型校验
 const SongSchema = z.object({
@@ -35,6 +36,16 @@ const SongSchema = z.object({
   qmlink: z.url().max(200).nullable().optional(),
   nelink: z.url().max(200).nullable().optional(),
   nmn_status: z.boolean().nullable().optional(),
+});
+
+/** 更新时多带 id 与乐观锁用的 updated_at */
+const SongUpdateSchema = SongSchema.extend({
+  id: z.number().int().min(1, "歌曲 ID 无效"),
+  // 库里可能为 null：当作没有，不做乐观锁比对（与 updateSong 的判断一致）
+  updated_at: z
+    .string()
+    .nullish()
+    .transform((v) => v ?? undefined),
 });
 
 export const GET = withAuth(
@@ -69,25 +80,17 @@ export const GET = withAuth(
 export const POST = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
-      const body = await request.json();
-      // 校验 body
-      const parseResult = SongSchema.safeParse(body);
-      if (!parseResult.success) {
-        return NextResponse.json(
-          { error: "Invalid input", details: parseResult.error.issues },
-          { status: 400 },
-        );
-      }
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        SongSchema,
+      );
+      if (invalid) return invalid;
 
       const supabase = await createSupabaseServerClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const song = await createSong(
-        parseResult.data,
-        TABLES.ADMIN,
-        session?.access_token,
-      );
+      const song = await createSong(input, TABLES.ADMIN, session?.access_token);
       return NextResponse.json(song);
     } catch (e: unknown) {
       if (
@@ -112,21 +115,12 @@ export const POST = withAuth(
 export const PUT = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
-      const body = await request.json();
-      const { id, updated_at, ...data } = body;
-      if (!id || typeof id !== "number" || id < 1 || !Number.isInteger(id))
-        return NextResponse.json(
-          { error: "Missing or invalid id" },
-          { status: 400 },
-        );
-      // 校验 data
-      const parseResult = SongSchema.safeParse(data);
-      if (!parseResult.success) {
-        return NextResponse.json(
-          { error: "Invalid input", details: parseResult.error.issues },
-          { status: 400 },
-        );
-      }
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        SongUpdateSchema,
+      );
+      if (invalid) return invalid;
+      const { id, updated_at, ...data } = input;
       const supabase = await createSupabaseServerClient();
       const {
         data: { session },
@@ -134,7 +128,7 @@ export const PUT = withAuth(
       // 传递 updated_at
       const song = await updateSong(
         id,
-        { ...parseResult.data, updated_at },
+        { ...data, updated_at },
         TABLES.ADMIN,
         session?.access_token,
       );

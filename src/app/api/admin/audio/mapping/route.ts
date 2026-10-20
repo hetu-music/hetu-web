@@ -5,6 +5,7 @@ import {
   audioErrorResponse,
   updateAudioMapping,
 } from "@/lib/server/service-navidrome";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const mappingSchema = z.object({
   songId: z.number().int().positive("歌曲 ID 无效"),
@@ -16,23 +17,14 @@ const mappingSchema = z.object({
 
 export const PUT = withAuth(
   async (request: NextRequest) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
-
-    const parsed = mappingSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      mappingSchema,
+    );
+    if (invalid) return invalid;
 
     try {
-      const { songId, navidId } = parsed.data;
+      const { songId, navidId } = input;
       return NextResponse.json(await updateAudioMapping(songId, navidId));
     } catch (error) {
       return audioErrorResponse("PUT /api/admin/audio/mapping", error);

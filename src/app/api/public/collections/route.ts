@@ -3,6 +3,12 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getSongsByIds } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
+import { parseJsonBody } from "@/lib/server/parse-body";
+import { z } from "zod";
+
+const SongIdSchema = z.object({
+  songId: z.coerce.number().int().min(1, "歌曲 ID 无效"),
+});
 
 // GET /api/public/collections — 获取当前用户的收藏，返回 songIds 和完整 songs 数据
 export const GET = withAuth(
@@ -52,11 +58,12 @@ export const GET = withAuth(
 // POST /api/public/collections — 添加收藏
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    const body = await request.json();
-    const songId = Number(body?.songId);
-    if (!Number.isInteger(songId) || songId < 1) {
-      return NextResponse.json({ error: "Invalid songId" }, { status: 400 });
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      SongIdSchema,
+    );
+    if (invalid) return invalid;
+    const { songId } = input;
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from(TABLES.COLLECTIONS).insert({
@@ -81,11 +88,12 @@ export const POST = withAuth(
 // DELETE /api/public/collections — 取消收藏
 export const DELETE = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    const body = await request.json();
-    const songId = Number(body?.songId);
-    if (!Number.isInteger(songId) || songId < 1) {
-      return NextResponse.json({ error: "Invalid songId" }, { status: 400 });
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      SongIdSchema,
+    );
+    if (invalid) return invalid;
+    const { songId } = input;
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase

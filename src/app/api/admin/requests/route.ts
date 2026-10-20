@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 // ─── 回复 schema ──────────────────────────────────────────────────────────────
 
@@ -117,23 +118,13 @@ export const GET = withAuth(
 
 export const PUT = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      replySchema,
+    );
+    if (invalid) return invalid;
 
-    const parsed = replySchema.safeParse(body);
-    if (!parsed.success) {
-      const firstIssue = parsed.error.issues[0];
-      return NextResponse.json(
-        { error: firstIssue?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
-
-    const { id, reply, status } = parsed.data;
+    const { id, reply, status } = input;
     const appMeta = user.app_metadata;
     const isSuper = appMeta?.is_super === true;
 

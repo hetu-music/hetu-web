@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/service-credit-aliases";
 import { refreshSongPages } from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const CreditNameSchema = z.string().trim().min(1, "名字不能为空").max(100);
 
@@ -63,19 +64,11 @@ export const GET = withAuth(
 
 export const POST = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
-    const parsed = CreateAliasSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      CreateAliasSchema,
+    );
+    if (invalid) return invalid;
 
     const token = await getAccessToken();
     if (!token) {
@@ -83,11 +76,7 @@ export const POST = withAuth(
     }
 
     try {
-      const created = await createCreditAlias(
-        parsed.data.alias,
-        parsed.data.name,
-        token,
-      );
+      const created = await createCreditAlias(input.alias, input.name, token);
       await refreshPagesCreditedAs(created.alias);
       return NextResponse.json(created);
     } catch (e) {

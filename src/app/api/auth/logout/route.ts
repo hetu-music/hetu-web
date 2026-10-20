@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { clearAuthCookies, parseJsonBody } from "@/lib/server/server-utils";
+import { clearAuthCookies } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 
 const schema = z.object({

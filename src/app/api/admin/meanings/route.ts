@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/service-imagery";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const CreateMeaningSchema = z.object({
   label: z.string().min(1).max(100),
@@ -37,14 +38,11 @@ export const GET = withAuth(
 export const POST = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
-      const body = await request.json();
-      const parsed = CreateMeaningSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: "Invalid input", details: parsed.error.issues },
-          { status: 400 },
-        );
-      }
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        CreateMeaningSchema,
+      );
+      if (invalid) return invalid;
 
       const supabase = await createSupabaseServerClient();
       const {
@@ -54,8 +52,8 @@ export const POST = withAuth(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
       const created = await createImageryMeaning(
-        parsed.data.label,
-        parsed.data.description ?? null,
+        input.label,
+        input.description ?? null,
         session.access_token,
       );
       return NextResponse.json(created);

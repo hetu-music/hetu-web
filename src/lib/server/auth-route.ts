@@ -4,11 +4,11 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { verifyPassword } from "@/lib/db/supabase-auth";
 import { authErrorResponse } from "@/lib/server/auth-errors";
 import {
-  parseJsonBody,
   serverErrorResponse,
   verifyCSRFToken,
   verifyTurnstileToken,
 } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 /**
  * 未登录也能调的认证接口（登录、注册、验证码、找回密码）的公共外壳：

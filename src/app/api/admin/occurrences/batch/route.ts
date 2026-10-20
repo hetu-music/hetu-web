@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createOccurrencesBatch } from "@/lib/server/service-imagery";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { lyricTimetagPattern } from "@/lib/forms/imagery-form";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const timetags = z.array(z.string().regex(lyricTimetagPattern)).max(50);
 
@@ -33,12 +34,11 @@ const BatchSchema = z.object({
 export const POST = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
-      const parsed = BatchSchema.safeParse(await request.json());
-      if (!parsed.success)
-        return NextResponse.json(
-          { error: "Invalid input", details: parsed.error.issues },
-          { status: 400 },
-        );
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        BatchSchema,
+      );
+      if (invalid) return invalid;
       const supabase = await createSupabaseServerClient();
       const {
         data: { session },
@@ -46,8 +46,8 @@ export const POST = withAuth(
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const result = await createOccurrencesBatch(
-        parsed.data.song_id,
-        parsed.data.items,
+        input.song_id,
+        input.items,
         session.access_token,
       );
       return NextResponse.json(result);

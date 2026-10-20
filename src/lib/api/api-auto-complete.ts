@@ -2,6 +2,8 @@
 // 自动补全相关类型和函数
 // ============================================
 
+import { apiRequest } from "@/lib/api/request";
+
 /** 支持的音乐提供者 */
 export type MusicProviderType = "netease" | "kugou";
 
@@ -78,19 +80,12 @@ export async function apiSearchSongs(
     limit: limit.toString(),
   });
 
-  const res = await fetch(`/api/admin/auto-complete?${params}`, {
-    method: "GET",
-    headers: {
-      "x-csrf-token": csrfToken,
-    },
+  // 这个 GET 也校验 CSRF：它会替服务端去请求第三方音乐平台
+  return apiRequest<SearchResponse>(`/api/admin/auto-complete?${params}`, {
+    csrfToken,
+    fallback: "搜索失败",
+    serverMessage: true,
   });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `搜索失败: ${res.status}`);
-  }
-
-  return res.json();
 }
 
 /**
@@ -126,18 +121,9 @@ export async function apiGetSongDetail(
     params.append("albumartist", song.albumartist);
   }
 
-  const res = await fetch(`/api/admin/auto-complete?${params}`, {
-    method: "GET",
-    headers: {
-      "x-csrf-token": csrfToken,
-    },
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `获取详情失败: ${res.status}`);
-  }
-
-  const response: DetailResponse = await res.json();
+  const response = await apiRequest<DetailResponse>(
+    `/api/admin/auto-complete?${params}`,
+    { csrfToken, fallback: "获取详情失败", serverMessage: true },
+  );
   return response.data;
 }

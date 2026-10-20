@@ -8,7 +8,7 @@ import {
   checkCurrentPassword,
   signOutOtherSessions,
 } from "@/lib/server/auth-route";
-import { parseJsonBody } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const SCOPE = "POST /api/auth/change-password";
 

@@ -4,7 +4,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { otpCodeField } from "@/lib/forms/account-rules";
 import { authErrorResponse } from "@/lib/server/auth-errors";
-import { parseJsonBody } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const schema = z.object({
   /** 这个验证码是发到哪个邮箱的：新邮箱，还是原邮箱 */

@@ -3,6 +3,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { updateImageryCategory } from "@/lib/server/service-imagery";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const UpdateCategorySchema = z.object({
   name: z.string().min(1).max(50).optional(),
@@ -24,14 +25,11 @@ export const PUT = withAuth(
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
     try {
-      const body = await request.json();
-      const parsed = UpdateCategorySchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: "Invalid input", details: parsed.error.issues },
-          { status: 400 },
-        );
-      }
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        UpdateCategorySchema,
+      );
+      if (invalid) return invalid;
 
       const supabase = await createSupabaseServerClient();
       const {
@@ -43,7 +41,7 @@ export const PUT = withAuth(
 
       const updated = await updateImageryCategory(
         categoryId,
-        parsed.data,
+        input,
         session.access_token,
       );
       return NextResponse.json(updated);

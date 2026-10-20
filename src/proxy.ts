@@ -28,7 +28,8 @@ export async function proxy(request: NextRequest) {
   const isStrictRoute =
     strippedPathname.startsWith("/admin") ||
     strippedPathname === "/login" ||
-    strippedPathname === "/register";
+    strippedPathname === "/register" ||
+    strippedPathname === "/forgot-password";
 
   // Only use Nonce in Production on Strict routes
   const useNonce = isStrictRoute && !isDev;

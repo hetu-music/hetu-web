@@ -20,6 +20,8 @@ export const GET = withAuth(
     return NextResponse.json({
       id: user.id,
       email: user.email,
+      // 改邮箱验证到一半（页面刷新、关掉又回来）时，个人中心据此接着验证
+      pendingEmail: (user.new_email as string | undefined) || null,
       name: data?.name ?? "未设置用户名",
       display: data?.display ?? false,
       intro: data?.intro ?? null,

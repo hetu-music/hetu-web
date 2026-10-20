@@ -61,18 +61,35 @@
     "emptyFiltered": "这一类下还没有批评"
   },
   "account": {
+    "profileTitle": "公开资料",
     "description": "管理您的公开资料与基本信息",
     "displayName": "用户名",
-    "email": "邮箱",
     "intro": "个人简介",
     "display": "公开展示",
     "displayHint": "开启后，你的用户名和个人简介将在站内 关于-维护团队 页面中展示。",
     "save": "保存更改",
     "saved": "已保存",
     "saveError": "保存失败",
+    "emailChange": {
+      "title": "登录邮箱",
+      "description": "用来登录、接收验证码与找回密码",
+      "current": "当前邮箱",
+      "pending": "正在改为 {email}，尚未验证",
+      "continue": "继续验证",
+      "change": "更改邮箱",
+      "new": "新邮箱",
+      "password": "当前密码",
+      "send": "发送验证码",
+      "cancel": "取消",
+      "sentNew": "验证码已发到新邮箱 {email}",
+      "sentCurrent": "新邮箱已验证。为确认是你本人，还要填写发到原邮箱 {email} 的验证码",
+      "verify": "验证",
+      "done": "邮箱已改为 {email}",
+      "error": "操作失败"
+    },
     "password": {
       "title": "修改密码",
-      "description": "设置一个更安全的新密码",
+      "description": "改好后，其他设备上的登录会一并退出",
       "current": "当前密码",
       "new": "新密码",
       "newPlaceholder": "至少8位，包含字母和数字",
@@ -81,6 +98,14 @@
       "submit": "确认修改",
       "success": "密码修改成功",
       "error": "修改失败"
+    },
+    "sessions": {
+      "title": "登录设备",
+      "description": "在别的设备上登录过又忘了退出，可以在这里一并退出。当前设备不受影响。",
+      "signOutOthers": "退出其他设备",
+      "confirm": "确认退出",
+      "done": "其他设备已退出",
+      "error": "操作失败"
     }
   },
   "feedback": {

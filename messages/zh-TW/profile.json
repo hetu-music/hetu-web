@@ -61,18 +61,35 @@
     "emptyFiltered": "這一類下還沒有批評"
   },
   "account": {
+    "profileTitle": "公開資料",
     "description": "管理您的公開資料與基本資訊",
     "displayName": "使用者名稱",
-    "email": "信箱",
     "intro": "個人簡介",
     "display": "公開展示",
     "displayHint": "開啟後，你的使用者名稱和個人簡介將在站內 關於-維護團隊 頁面中展示。",
     "save": "儲存變更",
     "saved": "已儲存",
     "saveError": "儲存失敗",
+    "emailChange": {
+      "title": "登入信箱",
+      "description": "用來登入、接收驗證碼與找回密碼",
+      "current": "目前信箱",
+      "pending": "正在改為 {email}，尚未驗證",
+      "continue": "繼續驗證",
+      "change": "變更信箱",
+      "new": "新信箱",
+      "password": "目前密碼",
+      "send": "發送驗證碼",
+      "cancel": "取消",
+      "sentNew": "驗證碼已發到新信箱 {email}",
+      "sentCurrent": "新信箱已驗證。為確認是你本人，還要填寫發到原信箱 {email} 的驗證碼",
+      "verify": "驗證",
+      "done": "信箱已改為 {email}",
+      "error": "操作失敗"
+    },
     "password": {
       "title": "修改密碼",
-      "description": "設定一個更安全的新密碼",
+      "description": "改好後，其他裝置上的登入會一併登出",
       "current": "目前密碼",
       "new": "新密碼",
       "newPlaceholder": "至少8位，包含字母和數字",
@@ -81,6 +98,14 @@
       "submit": "確認修改",
       "success": "密碼修改成功",
       "error": "修改失敗"
+    },
+    "sessions": {
+      "title": "登入裝置",
+      "description": "在別的裝置上登入過又忘了登出，可以在這裡一併登出。目前裝置不受影響。",
+      "signOutOthers": "登出其他裝置",
+      "confirm": "確認登出",
+      "done": "其他裝置已登出",
+      "error": "操作失敗"
     }
   },
   "feedback": {

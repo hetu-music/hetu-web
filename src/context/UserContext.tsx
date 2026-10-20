@@ -3,11 +3,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import React, { createContext, useCallback, useContext } from "react";
-import { getCsrfToken } from "@/lib/api/csrf";
+import { postAuth } from "@/lib/api/auth-api";
 
 export interface UserInfo {
   id: string;
   email?: string;
+  /** 改邮箱验证到一半时的新邮箱 */
+  pendingEmail?: string | null;
   name: string;
   display: boolean;
   intro: string | null;
@@ -53,18 +55,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const csrfToken = await getCsrfToken();
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": csrfToken,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("退出登录失败");
-      }
+      const result = await postAuth("/api/auth/logout");
+      if (!result.ok) throw new Error("退出登录失败");
     },
     onSuccess: () => {
       // 直接跳转到带当前语言前缀的登录页。由于是全页刷新跳转（window.location.href），整个 React 状态和内存缓存会自动清空。

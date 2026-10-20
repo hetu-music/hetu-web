@@ -44,54 +44,6 @@ export async function apiUpdateSong(
   return res.json();
 }
 
-// 修改密码
-export async function apiChangePassword(
-  oldPassword: string,
-  newPassword: string,
-  csrfToken: string,
-) {
-  const res = await fetch("/api/auth/change-password", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify({ oldPassword, newPassword }),
-  });
-  return res.json();
-}
-
-// 获取账号信息（含 displayName, display, intro）
-export async function apiGetAccountInfo() {
-  const res = await fetch("/api/auth/account");
-  return res.json();
-}
-
-// 更新账号信息（displayName, display, intro）
-export async function apiUpdateAccountInfo(
-  displayName: string,
-  csrfToken: string,
-  display?: boolean,
-  intro?: string | null,
-) {
-  const body: {
-    displayName: string;
-    display?: boolean;
-    intro?: string | null;
-  } = { displayName };
-  if (typeof display === "boolean") body.display = display;
-  if (typeof intro === "string" || intro === null) body.intro = intro;
-  const res = await fetch("/api/auth/account", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify(body),
-  });
-  return res.json();
-}
-
 // 检查文件是否存在
 export async function apiCheckFileExists(
   songId: number,

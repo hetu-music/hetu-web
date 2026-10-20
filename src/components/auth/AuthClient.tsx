@@ -1,23 +1,16 @@
 "use client";
 
-import {
-  CoverStrip,
-  CoverWall,
-  GalleryQuote,
-  useQuoteCycle,
-} from "@/components/auth/AuthGallery";
+import AuthShell, { AUTH_LINK_CLASS } from "@/components/auth/AuthShell";
+import CaptchaField from "@/components/auth/CaptchaField";
 import OtpStep from "@/components/auth/OtpStep";
+import FormField from "@/components/shared/FormField";
+import { FIELD_CLASS, FIELD_ERROR_CLASS } from "@/components/shared/form-field";
 import {
-  FIELD_CLASS,
-  FIELD_ERROR_CLASS,
-  FIELD_LABEL_CLASS,
-} from "@/components/shared/form-field";
-import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
-import SiteMark from "@/components/shared/SiteMark";
-import TopBar from "@/components/shared/topbar/TopBar";
-import { useMounted } from "@/hooks/ui";
+  PRIMARY_BUTTON_CLASS,
+  TEXT_BUTTON_CLASS,
+} from "@/components/shared/text-button";
 import { Link, useRouter } from "@/i18n/navigation";
-import { getCsrfToken } from "@/lib/api/csrf";
+import { postAuth } from "@/lib/api/auth-api";
 import type { GallerySong } from "@/lib/auth-gallery";
 import {
   createAuthFormSchema,
@@ -25,14 +18,11 @@ import {
   type AuthFormValues,
 } from "@/lib/forms/auth-form";
 import { cn } from "@/lib/utils/utils";
-import { INK_TONE } from "@/lib/utils/utils-tone";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Turnstile } from "@marsidev/react-turnstile";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useTheme } from "next-themes";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 
 type Step = "credentials" | "otp" | "verified";
@@ -42,14 +32,12 @@ interface AuthClientProps {
   mode: "login" | "register";
   /** 登录、注册后跳回的站内路径，已在服务端校验 */
   next: string;
-  /** 封面墙与轮换摘句；取不到时为空，页面只剩表单 */
   gallery: GallerySong[];
 }
 
 /**
- * 登录与注册：宽屏左半边是缓缓漂移的封面墙，墙下轮换一句歌词，
- * 轮到哪首，墙上那张封面就恢复原色；右半边是题名与表单。
- * 窄屏封面收成顶部两行相向滚动的小图。注册多一步邮箱验证码。
+ * 登录与注册。注册多一步邮箱验证码；注册后没填验证码就走了的账号，
+ * 登录时也转到这一步（服务端已顺手重发了一封）。
  */
 export default function AuthClient({
   nonce,
@@ -58,15 +46,12 @@ export default function AuthClient({
   gallery,
 }: AuthClientProps) {
   const t = useTranslations("auth");
-  const tSite = useTranslations("common.site");
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { resolvedTheme } = useTheme();
-  const mounted = useMounted();
-  const quote = useQuoteCycle(gallery);
-  const hasGallery = gallery.length > 0;
   const [step, setStep] = useState<Step>("credentials");
-  const [turnstileInstanceKey, setTurnstileInstanceKey] = useState(0);
+  /** 为什么要填验证码：刚注册，还是登录时发现邮箱没验证过 */
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   const isLogin = mode === "login";
   const authSchema = useMemo(() => createAuthFormSchema(mode), [mode]);
@@ -77,47 +62,11 @@ export default function AuthClient({
     reValidateMode: "onChange",
   });
   const { errors, isSubmitting } = form.formState;
+  // 填验证码时用的是第一步提交过的邮箱；第一步之后表单不再变
+  const email = form.getValues("email");
 
-  // 登录与注册互相切换时带上 next，登录后仍回到原来的页面
+  // 登录、注册、找回密码互相切换时带上 next，完事后仍回到原来的页面
   const nextQuery = next !== "/" ? `?next=${encodeURIComponent(next)}` : "";
-
-  const submit = form.handleSubmit(async (values) => {
-    form.clearErrors("root");
-    try {
-      const csrfToken = await getCsrfToken();
-      const res = await fetch(
-        isLogin ? "/api/auth/login" : "/api/auth/register",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-csrf-token": csrfToken,
-          },
-          body: JSON.stringify(values),
-          cache: "no-store",
-        },
-      );
-      const result = await res.json();
-      if (!res.ok) {
-        form.setError("root", {
-          message:
-            result.error || t(isLogin ? "login.failed" : "register.failed"),
-        });
-        return;
-      }
-
-      if (isLogin) {
-        await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-        router.replace(next);
-        return;
-      }
-      setStep("otp");
-    } catch (err: unknown) {
-      form.setError("root", {
-        message: err instanceof Error ? err.message : t("network"),
-      });
-    }
-  });
 
   const setTurnstileToken = (token: string) =>
     form.setValue("turnstileToken", token, {
@@ -126,15 +75,73 @@ export default function AuthClient({
       shouldValidate: true,
     });
 
-  // 回到第一步重填：人机验证的令牌只能用一次，要重新挂一个
-  const restart = () => {
-    setStep("credentials");
+  // 人机验证的令牌只能用一次：提交过就要重新挂一个
+  const resetCaptcha = () => {
     setTurnstileToken("");
-    form.clearErrors("root");
-    setTurnstileInstanceKey((k) => k + 1);
+    setCaptchaKey((k) => k + 1);
   };
 
-  const email = form.getValues("email");
+  const signedIn = async () => {
+    // 顶栏的用户状态缓存了「未登录」，不刷掉的话跳过去还显示访客
+    await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+  };
+
+  const submit = form.handleSubmit(async (values) => {
+    form.clearErrors("root");
+    const result = await postAuth(
+      isLogin ? "/api/auth/login" : "/api/auth/register",
+      values,
+    );
+
+    if (result.ok) {
+      if (isLogin) {
+        await signedIn();
+        router.replace(next);
+        return;
+      }
+      setUnconfirmed(false);
+      setStep("otp");
+      return;
+    }
+
+    resetCaptcha();
+    if (result.code === "email_not_confirmed") {
+      setUnconfirmed(true);
+      setStep("otp");
+      return;
+    }
+    form.setError("root", {
+      message:
+        result.error ??
+        (result.status === 0
+          ? t("network")
+          : t(isLogin ? "login.failed" : "register.failed")),
+    });
+  });
+
+  const verify = async (otp: string) => {
+    const result = await postAuth("/api/auth/verify-otp", { email, otp });
+    if (!result.ok) return result.error ?? t("otp.failed");
+    await signedIn();
+    setStep("verified");
+    setTimeout(() => router.replace(next), 1500);
+  };
+
+  const resend = async (turnstileToken?: string) => {
+    const result = await postAuth("/api/auth/resend", {
+      email,
+      turnstileToken,
+    });
+    return result.ok ? null : (result.error ?? t("network"));
+  };
+
+  // 回到第一步重填
+  const restart = () => {
+    setStep("credentials");
+    form.clearErrors("root");
+    resetCaptcha();
+  };
+
   const heading =
     step === "otp"
       ? t("otp.title")
@@ -143,217 +150,138 @@ export default function AuthClient({
         : t(isLogin ? "login.title" : "register.title");
   const subtitle =
     step === "otp"
-      ? t("otp.sent")
+      ? t(unconfirmed ? "otp.unconfirmed" : "otp.sent")
       : step === "verified"
         ? t("otp.redirecting")
         : t(isLogin ? "login.subtitle" : "register.subtitle");
   const formError = errors.root?.message ?? errors.turnstileToken?.message;
 
   return (
-    <div
-      className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19] transition-colors duration-500 [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)]"
-      style={
-        {
-          "--tone-light": INK_TONE.light,
-          "--tone-dark": INK_TONE.dark,
-        } as React.CSSProperties
-      }
+    <AuthShell
+      gallery={gallery}
+      heading={heading}
+      subtitle={subtitle}
+      email={step === "credentials" ? undefined : email}
     >
-      <TopBar exit={{ kind: "logo" }} user={false} />
+      {step === "credentials" && (
+        <form onSubmit={submit} noValidate className="space-y-8">
+          <FormField label={t("email")} error={errors.email?.message}>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder={t("emailPlaceholder")}
+              {...form.register("email")}
+              className={cn(FIELD_CLASS, errors.email && FIELD_ERROR_CLASS)}
+            />
+          </FormField>
 
-      <div
-        className={cn(
-          "lg:grid lg:min-h-screen",
-          hasGallery && "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]",
-        )}
-      >
-        {/* 宽屏左半边：封面墙，墙脚一句歌词；随页面固定，不跟着表单滚 */}
-        {hasGallery && (
-          <aside className="relative hidden lg:block lg:sticky lg:top-0 lg:h-screen">
-            <CoverWall songs={gallery} activeId={quote?.id ?? null} />
-            <div className="absolute inset-x-0 bottom-0 px-12 pb-16 xl:px-16">
-              <GalleryQuote song={quote} size="lg" />
-            </div>
-          </aside>
-        )}
+          <FormField
+            label={t("password")}
+            error={errors.password?.message}
+            aside={
+              isLogin && (
+                <Link
+                  href={`/forgot-password${nextQuery}`}
+                  className={TEXT_BUTTON_CLASS}
+                >
+                  {t("login.forgot")}
+                </Link>
+              )
+            }
+          >
+            <input
+              type="password"
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              placeholder={
+                isLogin ? undefined : t("register.passwordPlaceholder")
+              }
+              {...form.register("password")}
+              className={cn(FIELD_CLASS, errors.password && FIELD_ERROR_CLASS)}
+            />
+          </FormField>
 
-        <div className="flex min-h-screen flex-col">
-          {/* 窄屏：顶部两行封面，下面一句歌词 */}
-          {hasGallery && (
-            <div className="lg:hidden pt-24 animate-in fade-in duration-700">
-              <CoverStrip songs={gallery} activeId={quote?.id ?? null} />
-              <div className="px-6 pt-6">
-                <GalleryQuote song={quote} size="sm" />
-              </div>
-            </div>
+          <CaptchaField
+            key={captchaKey}
+            nonce={nonce}
+            onToken={setTurnstileToken}
+            onExpire={() => setTurnstileToken("")}
+            onError={() =>
+              form.setError("root", { message: t("captchaFailed") })
+            }
+          />
+
+          {formError && (
+            <p
+              role="alert"
+              className="text-sm text-rose-500 dark:text-rose-400"
+            >
+              {formError}
+            </p>
           )}
 
-          <main
-            className={cn(
-              "flex flex-1 items-start lg:items-center px-6 pb-16 sm:px-10 animate-in fade-in slide-in-from-bottom-4 duration-700",
-              hasGallery
-                ? "pt-10 lg:px-16 lg:pt-28 xl:px-24"
-                : "pt-32 md:pt-40 lg:justify-center",
-            )}
-          >
-            <div className="w-full max-w-104">
-              <header>
-                <p className="text-xs tracking-[0.35em] text-(--tone) mb-5">
-                  {tSite("name")}
-                </p>
-                <h1 className="font-serif text-5xl md:text-6xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50">
-                  {heading}
-                </h1>
-                <p className="mt-5 font-kaiti text-[15px] leading-[2.05] text-slate-600 dark:text-slate-400">
-                  {subtitle}
-                </p>
-                {step !== "credentials" && (
-                  <p className="mt-1 font-serif text-base text-slate-900 dark:text-slate-100 wrap-break-word">
-                    {email}
-                  </p>
-                )}
-              </header>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={cn(PRIMARY_BUTTON_CLASS, "text-sm")}
+            >
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              {t(isLogin ? "login.submit" : "register.submit")}
+            </button>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              {t(isLogin ? "login.switchPrompt" : "register.switchPrompt")}
+              <Link
+                href={(isLogin ? "/register" : "/login") + nextQuery}
+                className={AUTH_LINK_CLASS}
+              >
+                {t(isLogin ? "login.switchLink" : "register.switchLink")}
+              </Link>
+            </p>
+          </div>
+        </form>
+      )}
 
-              <div className="mt-12">
-                {step === "credentials" && (
-                  <form onSubmit={submit} noValidate className="space-y-8">
-                    <label className="block">
-                      <span className={FIELD_LABEL_CLASS}>{t("email")}</span>
-                      <input
-                        type="email"
-                        autoComplete="email"
-                        placeholder={t("emailPlaceholder")}
-                        {...form.register("email")}
-                        className={cn(
-                          FIELD_CLASS,
-                          "mt-2",
-                          errors.email && FIELD_ERROR_CLASS,
-                        )}
-                      />
-                      {errors.email && (
-                        <span className="mt-1.5 block text-xs text-rose-500">
-                          {errors.email.message}
-                        </span>
-                      )}
-                    </label>
-
-                    <label className="block">
-                      <span className={FIELD_LABEL_CLASS}>{t("password")}</span>
-                      <input
-                        type="password"
-                        autoComplete={
-                          isLogin ? "current-password" : "new-password"
-                        }
-                        placeholder={
-                          isLogin
-                            ? undefined
-                            : t("register.passwordPlaceholder")
-                        }
-                        {...form.register("password")}
-                        className={cn(
-                          FIELD_CLASS,
-                          "mt-2",
-                          errors.password && FIELD_ERROR_CLASS,
-                        )}
-                      />
-                      {errors.password && (
-                        <span className="mt-1.5 block text-xs text-rose-500">
-                          {errors.password.message}
-                        </span>
-                      )}
-                    </label>
-
-                    {/* 人机验证是第三方小窗，改不了样式；主题跟随站点而不是系统。
-                  站点主题只在浏览器里读得到，挂载后再渲染，否则水合不一致 */}
-                    <div className="min-h-16.25">
-                      {mounted && (
-                        <Turnstile
-                          key={turnstileInstanceKey}
-                          siteKey={
-                            process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""
-                          }
-                          onSuccess={setTurnstileToken}
-                          onError={() =>
-                            form.setError("root", {
-                              message: t("captchaFailed"),
-                            })
-                          }
-                          onExpire={() => setTurnstileToken("")}
-                          scriptOptions={{ nonce }}
-                          options={{
-                            theme: resolvedTheme === "dark" ? "dark" : "light",
-                            size: "flexible",
-                          }}
-                          className="w-full"
-                        />
-                      )}
-                    </div>
-
-                    {formError && (
-                      <p
-                        role="alert"
-                        className="text-sm text-rose-500 dark:text-rose-400"
-                      >
-                        {formError}
-                      </p>
-                    )}
-
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 pt-2">
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className={cn(PRIMARY_BUTTON_CLASS, "text-sm")}
-                      >
-                        {isSubmitting && (
-                          <Loader2 size={14} className="animate-spin" />
-                        )}
-                        {t(isLogin ? "login.submit" : "register.submit")}
-                      </button>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">
-                        {t(
-                          isLogin
-                            ? "login.switchPrompt"
-                            : "register.switchPrompt",
-                        )}
-                        <Link
-                          href={(isLogin ? "/register" : "/login") + nextQuery}
-                          className="ml-1.5 tracking-widest text-(--tone) hover:opacity-75 transition-opacity"
-                        >
-                          {t(
-                            isLogin
-                              ? "login.switchLink"
-                              : "register.switchLink",
-                          )}
-                        </Link>
-                      </p>
-                    </div>
-                  </form>
-                )}
-
-                {step === "otp" && (
-                  <OtpStep
-                    email={email}
-                    onVerified={() => {
-                      setStep("verified");
-                      setTimeout(() => router.replace(next), 1500);
-                    }}
-                    onRestart={restart}
-                  />
-                )}
-              </div>
-            </div>
-          </main>
-
-          <footer
-            className={cn(
-              "px-6 pb-10 sm:px-10",
-              hasGallery ? "lg:px-16 xl:px-24" : "lg:text-center",
-            )}
-          >
-            <SiteMark />
-          </footer>
-        </div>
-      </div>
-    </div>
+      {step === "otp" && (
+        <OtpStep
+          onSubmit={verify}
+          submitLabel={t("otp.submit")}
+          onResend={resend}
+          resendCaptcha
+          nonce={nonce}
+        >
+          <p>
+            {t("otp.wrongEmail")}
+            <button
+              type="button"
+              onClick={restart}
+              className={cn(
+                TEXT_BUTTON_CLASS,
+                "ml-1.5 text-slate-600 dark:text-slate-300",
+              )}
+            >
+              {t("otp.reset")}
+            </button>
+          </p>
+          {/* 已注册的邮箱再注册，GoTrue 不报错也不发信，只能在这里提醒一句 */}
+          {!unconfirmed && (
+            <p>
+              {t("otp.registered")}
+              <Link href={`/login${nextQuery}`} className={AUTH_LINK_CLASS}>
+                {t("otp.toLogin")}
+              </Link>
+              <span aria-hidden className="ml-1.5">
+                ·
+              </span>
+              <Link
+                href={`/forgot-password${nextQuery}`}
+                className={AUTH_LINK_CLASS}
+              >
+                {t("otp.toRecovery")}
+              </Link>
+            </p>
+          )}
+        </OtpStep>
+      )}
+    </AuthShell>
   );
 }

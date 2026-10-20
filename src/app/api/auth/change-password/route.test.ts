@@ -11,7 +11,9 @@ let mockCsrfValid = true;
 let mockVerifyError: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mockUpdateError: any = null;
+const verifyPasswordMock = vi.fn();
 const updateUserMock = vi.fn();
+const signOutMock = vi.fn();
 
 vi.mock("@/lib/db/supabase-auth", () => ({
   createSupabaseServerClient: vi.fn(async () => ({
@@ -20,13 +22,20 @@ vi.mock("@/lib/db/supabase-auth", () => ({
         data: { session: mockUser ? { access_token: "t" } : null },
       })),
       getUser: vi.fn(async () => ({ data: { user: mockUser } })),
-      signInWithPassword: vi.fn(async () => ({ error: mockVerifyError })),
       updateUser: (...args: unknown[]) => {
         updateUserMock(...args);
         return Promise.resolve({ error: mockUpdateError });
       },
+      signOut: (...args: unknown[]) => {
+        signOutMock(...args);
+        return Promise.resolve({ error: null });
+      },
     },
   })),
+  verifyPassword: (...args: unknown[]) => {
+    verifyPasswordMock(...args);
+    return Promise.resolve(mockVerifyError);
+  },
 }));
 
 vi.mock("@/lib/server/server-utils", async (importOriginal) => {
@@ -52,7 +61,10 @@ beforeEach(() => {
   mockCsrfValid = true;
   mockVerifyError = null;
   mockUpdateError = null;
+  verifyPasswordMock.mockClear();
   updateUserMock.mockClear();
+  signOutMock.mockClear();
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
 describe("POST /api/auth/change-password — 鉴权", () => {
@@ -98,32 +110,57 @@ describe("POST /api/auth/change-password — 新密码强度", () => {
 });
 
 describe("POST /api/auth/change-password — 旧密码校验", () => {
-  it("必须先用旧密码验证身份，验证失败则不改密码", async () => {
-    mockVerifyError = { message: "Invalid login credentials" };
+  it("用当前账号的邮箱核对旧密码", async () => {
+    await POST(makeRequest(VALID));
+    expect(verifyPasswordMock).toHaveBeenCalledWith(
+      "someone@example.com",
+      VALID.oldPassword,
+    );
+  });
+
+  it("旧密码不对则不改密码", async () => {
+    mockVerifyError = { code: "invalid_credentials", message: "Invalid" };
     const res = await POST(makeRequest(VALID));
 
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe("旧密码错误");
+    expect((await res.json()).error).toBe("当前密码错误");
     expect(updateUserMock).not.toHaveBeenCalled();
   });
 
-  it("旧密码正确时写入新密码", async () => {
+  it("核对时被限流，如实告知而不是报密码错误", async () => {
+    mockVerifyError = { code: "over_request_rate_limit", message: "limit" };
+    const res = await POST(makeRequest(VALID));
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toContain("频繁");
+    expect(updateUserMock).not.toHaveBeenCalled();
+  });
+
+  it("旧密码正确时写入新密码，并退出其他设备", async () => {
     const res = await POST(makeRequest(VALID));
     expect(res.status).toBe(200);
     expect(updateUserMock).toHaveBeenCalledWith({
       password: VALID.newPassword,
     });
+    expect(signOutMock).toHaveBeenCalledWith({ scope: "others" });
   });
 
-  it("账号没有邮箱时无法验证，返回 400", async () => {
+  it("账号没有邮箱时无法核对，返回 400", async () => {
     mockUser = { id: "user-1" };
     const res = await POST(makeRequest(VALID));
     expect(res.status).toBe(400);
     expect(updateUserMock).not.toHaveBeenCalled();
   });
 
-  it("写入失败时返回 400", async () => {
-    mockUpdateError = { message: "New password should be different" };
-    expect((await POST(makeRequest(VALID))).status).toBe(400);
+  it("写入失败时返回中文提示，不回 GoTrue 原文", async () => {
+    mockUpdateError = {
+      code: "same_password",
+      message: "New password should be different from the old password.",
+    };
+    const res = await POST(makeRequest(VALID));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("新密码不能与原密码相同");
+    expect(JSON.stringify(body)).not.toContain("should be different");
+    expect(signOutMock).not.toHaveBeenCalled();
   });
 });

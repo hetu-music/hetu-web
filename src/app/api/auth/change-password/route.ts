@@ -1,70 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import {
+  createSupabaseServerClient,
+  verifyPassword,
+} from "@/lib/db/supabase-auth";
+import { newPasswordField } from "@/lib/forms/account-rules";
+import { authErrorResponse } from "@/lib/server/auth-errors";
+import { parseJsonBody } from "@/lib/server/auth-route";
 
+const schema = z.object({
+  oldPassword: z.string().min(1, "请输入当前密码"),
+  newPassword: newPasswordField,
+});
+
+/** 改密码：先核对旧密码，改完退出其他设备上的登录（当前设备保留） */
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    const body = await request.json();
-    const oldPassword: string = body.oldPassword;
-    const newPassword: string = body.newPassword;
+    const { data, response } = await parseJsonBody(request, schema);
+    if (response) return response;
 
-    if (!oldPassword || !newPassword) {
-      return NextResponse.json({ error: "缺少参数" }, { status: 400 });
-    }
-
-    // 新密码格式校验
-    if (newPassword.length < 8) {
-      return NextResponse.json({ error: "新密码不能少于8位" }, { status: 400 });
-    }
-    if (!/[a-zA-Z]/.test(newPassword)) {
+    if (!user.email) {
       return NextResponse.json(
-        { error: "新密码需包含至少一个字母" },
-        { status: 400 },
-      );
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      return NextResponse.json(
-        { error: "新密码需包含至少一个数字" },
+        { error: "账号没有邮箱，无法核对密码" },
         { status: 400 },
       );
     }
 
-    try {
-      const supabase = await createSupabaseServerClient();
-
-      if (!user.email) {
-        return NextResponse.json(
-          { error: "用户不存在，无法验证密码" },
-          { status: 400 },
-        );
+    const verifyError = await verifyPassword(user.email, data.oldPassword);
+    if (verifyError) {
+      if (verifyError.code === "invalid_credentials") {
+        return NextResponse.json({ error: "当前密码错误" }, { status: 400 });
       }
-
-      // 验证旧密码
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: oldPassword,
-      });
-      if (verifyError) {
-        return NextResponse.json({ error: "旧密码错误" }, { status: 400 });
-      }
-
-      // 修改密码
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) {
-        return NextResponse.json(
-          { error: updateError.message || "修改失败" },
-          { status: 400 },
-        );
-      }
-      return NextResponse.json({ success: true });
-    } catch {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 },
+      return authErrorResponse(
+        "POST /api/auth/change-password",
+        verifyError,
+        "修改失败",
       );
     }
+
+    const supabase = await createSupabaseServerClient();
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: data.newPassword,
+    });
+    if (updateError) {
+      return authErrorResponse(
+        "POST /api/auth/change-password",
+        updateError,
+        "修改失败",
+      );
+    }
+
+    // 密码已经改好，这一步失败只记日志，不把整个操作报成失败
+    const { error: signOutError } = await supabase.auth.signOut({
+      scope: "others",
+    });
+    if (signOutError) {
+      console.error("[POST /api/auth/change-password] others", signOutError);
+    }
+
+    return NextResponse.json({ success: true });
   },
   { requireCSRF: true },
 );

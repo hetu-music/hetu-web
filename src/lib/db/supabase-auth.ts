@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient, type AuthError } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { NextRequest, NextResponse } from "next/server";
 
@@ -52,6 +53,41 @@ export async function createSupabaseServerClient() {
       },
     },
   });
+}
+
+/**
+ * 核对当前密码（改密码、改邮箱前确认是本人），不碰现有会话。
+ *
+ * 以前直接用 createSupabaseServerClient 的 signInWithPassword 核对：每核对一次
+ * 就新建一个会话并换掉 cookie，旧会话留在库里没人管。这里换一个只存在内存里的
+ * 临时客户端去登录，核对完立刻注销这次会话。
+ *
+ * 返回 GoTrue 的错误；密码不对是 code === "invalid_credentials"。
+ */
+export async function verifyPassword(
+  email: string,
+  password: string,
+): Promise<AuthError | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase environment variables");
+  }
+
+  const client = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  if (error) return error;
+
+  // 注销失败不影响核对结果：这次会话的 refresh token 没人拿得到，到期自然作废
+  await client.auth.signOut({ scope: "local" }).catch(() => undefined);
+  return null;
 }
 
 /**

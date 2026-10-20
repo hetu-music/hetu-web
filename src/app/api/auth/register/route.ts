@@ -1,64 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
-import {
-  verifyCSRFToken,
-  verifyTurnstileToken,
-} from "@/lib/server/server-utils";
+import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { emailField, newPasswordField } from "@/lib/forms/account-rules";
+import { authErrorResponse } from "@/lib/server/auth-errors";
+import { withPublicAuth } from "@/lib/server/auth-route";
 
-export async function POST(request: NextRequest) {
-  try {
-    if (!(await verifyCSRFToken(request))) {
-      return NextResponse.json(
-        { error: "Invalid CSRF token" },
-        { status: 403 },
-      );
-    }
+const schema = z.object({
+  email: emailField,
+  password: newPasswordField,
+  turnstileToken: z.string().optional(),
+});
 
-    const body = await request.json();
-    const { email, password, turnstileToken } = body;
-
-    const turnstileResult = await verifyTurnstileToken(turnstileToken);
-    if (!turnstileResult.success) {
-      return NextResponse.json(
-        { error: turnstileResult.error || "人机验证失败" },
-        { status: 403 },
-      );
-    }
-
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "邮箱不能为空" }, { status: 400 });
-    }
-
-    if (
-      !password ||
-      typeof password !== "string" ||
-      !/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password)
-    ) {
-      return NextResponse.json(
-        { error: "密码要求至少8位，并包含字母和数字" },
-        { status: 400 },
-      );
-    }
-
+export const POST = withPublicAuth(
+  "POST /api/auth/register",
+  schema,
+  async ({ email, password }) => {
     const supabase = await createSupabaseServerClient();
 
-    // 使用 OTP 验证码方式，不需要 emailRedirectTo，用户会在页面上输入邮件中的验证码
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
+    // 用验证码而不是确认链接：用户在页面上填邮件里的 6 位数字，不需要 emailRedirectTo。
+    // 邮箱已注册且已验证时 GoTrue 也回成功、只是不发信（防账号枚举），
+    // 前端在填码那一步提示「注册过的可以直接登录或找回密码」
+    const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
-      console.error("Register error:", error.message);
-      return NextResponse.json(
-        { error: error.message || "注册失败，请检查填写信息" },
-        { status: 400 },
+      return authErrorResponse(
+        "POST /api/auth/register",
+        error,
+        "注册失败，请检查填写信息",
       );
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Register API error:", error);
-    return NextResponse.json({ error: "服务器错误" }, { status: 500 });
-  }
-}
+  },
+  { captcha: true },
+);

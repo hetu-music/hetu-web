@@ -2,10 +2,9 @@
 
 import { OTPField } from "@base-ui/react/otp-field";
 import CaptchaField from "@/components/auth/CaptchaField";
-import {
-  PRIMARY_BUTTON_CLASS,
-  TEXT_BUTTON_CLASS,
-} from "@/components/shared/text-button";
+import { FormError, SubmitButton } from "@/components/shared/FormField";
+import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
+import { addToast } from "@/components/ui/toast";
 import {
   createOtpFormValues,
   otpFormSchema,
@@ -23,7 +22,13 @@ const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 60;
 
 /** 返回要显示的错误提示；成功时返回空 */
-type Action = () => Promise<string | null | undefined>;
+type ActionResult = Promise<string | null | undefined>;
+
+/** 提示行里的文字按钮：比一般的次要按钮深一档，免得淹没在同色的提示语里 */
+const HINT_BUTTON_CLASS = cn(
+  TEXT_BUTTON_CLASS,
+  "ml-1.5 text-slate-600 dark:text-slate-300",
+);
 
 /**
  * 填邮箱验证码的一步：注册、找回密码、改邮箱共用。
@@ -39,17 +44,20 @@ export default function OtpStep({
   onResend,
   resendCaptcha = false,
   nonce,
+  onRestart,
   initialError,
   children,
 }: {
-  onSubmit: (code: string) => ReturnType<Action>;
+  onSubmit: (code: string) => ActionResult;
   submitLabel: string;
-  onResend?: (captchaToken?: string) => ReturnType<Action>;
+  onResend?: (captchaToken?: string) => ActionResult;
   resendCaptcha?: boolean;
   nonce?: string;
+  /** 邮箱填错了：回到填邮箱那一步。给了就多一行「邮箱填错了？重新填写」 */
+  onRestart?: () => void;
   /** 进来时就要显示的错误，如找回密码时验证码在最后一步才被判错、退回这里 */
   initialError?: string;
-  /** 按钮下方的小字提示行，如「邮箱填错了？重新填写」 */
+  /** 再往下的小字提示行 */
   children?: ReactNode;
 }) {
   const t = useTranslations("auth.otp");
@@ -105,8 +113,6 @@ export default function OtpStep({
     void submit();
   };
 
-  const error = errors.root?.message ?? errors.otp?.message;
-
   return (
     <form onSubmit={submit} noValidate className="space-y-10">
       <OTPField.Root
@@ -127,22 +133,17 @@ export default function OtpStep({
         ))}
       </OTPField.Root>
 
-      {error && (
-        <p role="alert" className="text-sm text-rose-500 dark:text-rose-400">
-          {error}
-        </p>
-      )}
+      <FormError message={errors.root?.message ?? errors.otp?.message} />
 
-      <button
-        type="submit"
-        disabled={verifying || !complete}
-        className={cn(PRIMARY_BUTTON_CLASS, "text-sm")}
+      <SubmitButton
+        pending={verifying}
+        disabled={!complete}
+        className="text-sm"
       >
-        {verifying && <Loader2 size={14} className="animate-spin" />}
         {submitLabel}
-      </button>
+      </SubmitButton>
 
-      {(onResend || children) && (
+      {(onResend || onRestart || children) && (
         <div className="space-y-2 pt-6 text-xs text-slate-400 dark:text-slate-500">
           {onResend && (
             <ResendLine
@@ -150,6 +151,18 @@ export default function OtpStep({
               captcha={resendCaptcha}
               nonce={nonce}
             />
+          )}
+          {onRestart && (
+            <p>
+              {t("wrongEmail")}
+              <button
+                type="button"
+                onClick={onRestart}
+                className={HINT_BUTTON_CLASS}
+              >
+                {t("reset")}
+              </button>
+            </p>
           )}
           {children}
         </div>
@@ -165,16 +178,13 @@ function ResendLine({
   captcha,
   nonce,
 }: {
-  onResend: (captchaToken?: string) => ReturnType<Action>;
+  onResend: (captchaToken?: string) => ActionResult;
   captcha: boolean;
   nonce?: string;
 }) {
   const t = useTranslations("auth.otp");
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN);
   const [phase, setPhase] = useState<ResendPhase>("idle");
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(
-    null,
-  );
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -184,23 +194,13 @@ function ResendLine({
 
   const send = async (captchaToken?: string) => {
     setPhase("sending");
-    setResult(null);
     const error = await onResend(captchaToken);
     setPhase("idle");
     if (error) {
-      setResult({ ok: false, text: error });
+      addToast("error", error);
     } else {
-      setResult({ ok: true, text: t("resent") });
+      addToast("success", t("resent"));
       setCooldown(RESEND_COOLDOWN);
-    }
-  };
-
-  const start = () => {
-    if (captcha) {
-      setResult(null);
-      setPhase("captcha");
-    } else {
-      void send();
     }
   };
 
@@ -210,36 +210,22 @@ function ResendLine({
         {t("resendPrompt")}
         <button
           type="button"
-          onClick={start}
+          onClick={() => (captcha ? setPhase("captcha") : void send())}
           disabled={cooldown > 0 || phase !== "idle"}
-          className={cn(
-            TEXT_BUTTON_CLASS,
-            "ml-1.5 inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300",
-          )}
+          className={cn(HINT_BUTTON_CLASS, "inline-flex items-center gap-1.5")}
         >
           {phase !== "idle" && <Loader2 size={12} className="animate-spin" />}
           {cooldown > 0 ? t("resendIn", { s: cooldown }) : t("resend")}
         </button>
-        {result && (
-          <span
-            role="status"
-            className={cn(
-              "ml-3",
-              result.ok ? "text-(--tone)" : "text-rose-500 dark:text-rose-400",
-            )}
-          >
-            {result.text}
-          </span>
-        )}
       </p>
       {phase === "captcha" && (
         <CaptchaField
           nonce={nonce}
           appearance="interaction-only"
-          onToken={(token) => void send(token)}
+          onToken={(token) => token && void send(token)}
           onError={() => {
             setPhase("idle");
-            setResult({ ok: false, text: t("captchaFailed") });
+            addToast("error", t("captchaFailed"));
           }}
         />
       )}

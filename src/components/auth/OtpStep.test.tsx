@@ -12,6 +12,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import messages from "../../../messages/zh-CN";
 import OtpStep from "./OtpStep";
 
+const addToastMock = vi.fn();
+vi.mock("@/components/ui/toast", () => ({
+  addToast: (...args: unknown[]) => addToastMock(...args),
+}));
+
 type Submit = (code: string) => Promise<string | null | undefined>;
 type Resend = (token?: string) => Promise<string | null | undefined>;
 
@@ -36,10 +41,26 @@ function typeCode(inputs: HTMLElement[], code: string) {
 
 afterEach(() => {
   cleanup();
+  addToastMock.mockClear();
   vi.useRealTimers();
 });
 
 describe("OtpStep", () => {
+  it("给了 onRestart 才有「重新填写」，点了回调", () => {
+    const onRestart = vi.fn();
+    render(
+      <NextIntlClientProvider locale="zh-CN" messages={messages}>
+        <OtpStep
+          onSubmit={async () => null}
+          submitLabel="验证"
+          onRestart={onRestart}
+        />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "重新填写" }));
+    expect(onRestart).toHaveBeenCalledTimes(1);
+  });
+
   it("六位填满自动提交，把整串验证码交给 onSubmit", async () => {
     const { onSubmit, inputs } = renderOtp();
     expect(inputs).toHaveLength(6);
@@ -93,7 +114,7 @@ describe("OtpStep", () => {
       fireEvent.click(ready);
     });
     expect(onResend).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status").textContent).toBe("已重新发送");
+    expect(addToastMock).toHaveBeenCalledWith("success", "已重新发送");
     expect(
       screen.getByRole("button", { name: /秒后可重新发送/ }),
     ).toHaveProperty("disabled", true);
@@ -112,7 +133,8 @@ describe("OtpStep", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "重新发送" }));
     });
-    expect(screen.getByRole("status").textContent).toBe(
+    expect(addToastMock).toHaveBeenCalledWith(
+      "error",
       "邮件发送太频繁，请稍后再试",
     );
     expect(screen.getByRole("button", { name: "重新发送" })).toHaveProperty(

@@ -1,5 +1,7 @@
 import { FIELD_LABEL_CLASS } from "@/components/shared/form-field";
+import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
 import { cn } from "@/lib/utils/utils";
+import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
@@ -52,5 +54,39 @@ export default function FormField({
       <span className={FIELD_LABEL_CLASS}>{label}</span>
       {field}
     </label>
+  );
+}
+
+/** 整张表单的错误（服务端回的、人机验证失败等），不属于某一栏 */
+export function FormError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="text-sm text-rose-500 dark:text-rose-400">
+      {message}
+    </p>
+  );
+}
+
+/** 表单的主操作：强调色文字按钮，提交中转圈并禁用。转圈图标随字号缩放 */
+export function SubmitButton({
+  pending,
+  disabled,
+  className,
+  children,
+}: {
+  pending: boolean;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="submit"
+      disabled={pending || disabled}
+      className={cn(PRIMARY_BUTTON_CLASS, className)}
+    >
+      {pending && <Loader2 className="size-[1em] animate-spin" />}
+      {children}
+    </button>
   );
 }

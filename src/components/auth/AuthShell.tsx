@@ -120,7 +120,3 @@ export default function AuthShell({
     </div>
   );
 }
-
-/** 表单底部的小字提示行：一句话加一个强调色链接，如「还没有账号？立即注册」 */
-export const AUTH_LINK_CLASS =
-  "ml-1.5 tracking-widest text-(--tone) hover:opacity-75 transition-opacity";

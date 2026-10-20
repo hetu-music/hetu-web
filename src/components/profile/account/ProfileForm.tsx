@@ -3,7 +3,6 @@
 import {
   AccountBlock,
   SubmitRow,
-  useNotice,
 } from "@/components/profile/account/account-ui";
 import FormField from "@/components/shared/FormField";
 import {
@@ -11,6 +10,7 @@ import {
   FIELD_ERROR_CLASS,
   TEXTAREA_CLASS,
 } from "@/components/shared/form-field";
+import { addToast } from "@/components/ui/toast";
 import { useUserContext } from "@/context/UserContext";
 import { useAutoGrow } from "@/hooks/ui";
 import { postAuth } from "@/lib/api/auth-api";
@@ -28,7 +28,6 @@ import { useForm, useWatch } from "react-hook-form";
 export default function ProfileForm() {
   const t = useTranslations("profile.account");
   const { user, refetch } = useUserContext();
-  const [notice, setNotice] = useNotice(2500);
   const introRef = useRef<HTMLTextAreaElement | null>(null);
 
   const form = useForm<ProfileAccountFormValues>({
@@ -53,17 +52,16 @@ export default function ProfileForm() {
 
   const handleSave = form.handleSubmit(
     async ({ displayName, intro, display }) => {
-      setNotice(null);
       const result = await postAuth("/api/auth/account", {
         displayName,
         intro,
         ...(user?.isAdmin ? { display } : {}),
       });
       if (result.ok) {
-        setNotice({ ok: true, text: t("saved") });
+        addToast("success", t("saved"));
         await refetch();
       } else {
-        setNotice({ ok: false, text: result.error ?? t("saveError") });
+        addToast("error", result.error ?? t("saveError"));
       }
     },
   );
@@ -124,7 +122,7 @@ export default function ProfileForm() {
           )}
         </div>
 
-        <SubmitRow label={t("save")} pending={isSubmitting} notice={notice} />
+        <SubmitRow label={t("save")} pending={isSubmitting} />
       </form>
     </AccountBlock>
   );

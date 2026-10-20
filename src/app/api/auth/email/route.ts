@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import {
-  createSupabaseServerClient,
-  verifyPassword,
-} from "@/lib/db/supabase-auth";
+import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { emailField, passwordField } from "@/lib/forms/account-rules";
 import { authErrorResponse } from "@/lib/server/auth-errors";
-import { parseJsonBody } from "@/lib/server/auth-route";
+import { checkCurrentPassword } from "@/lib/server/auth-route";
+import { parseJsonBody } from "@/lib/server/server-utils";
+
+const SCOPE = "POST /api/auth/email";
 
 const schema = z.object({ email: emailField, password: passwordField });
 
@@ -23,32 +23,19 @@ export const POST = withAuth(
     const { data, response } = await parseJsonBody(request, schema);
     if (response) return response;
 
-    if (!user.email) {
-      return NextResponse.json(
-        { error: "账号没有邮箱，无法核对密码" },
-        { status: 400 },
-      );
-    }
-    if (data.email.toLowerCase() === user.email.toLowerCase()) {
+    if (data.email.toLowerCase() === user.email?.toLowerCase()) {
       return NextResponse.json(
         { error: "新邮箱与当前邮箱相同" },
         { status: 400 },
       );
     }
 
-    const verifyError = await verifyPassword(user.email, data.password);
-    if (verifyError) {
-      if (verifyError.code === "invalid_credentials") {
-        return NextResponse.json({ error: "当前密码错误" }, { status: 400 });
-      }
-      return authErrorResponse("POST /api/auth/email", verifyError, "发送失败");
-    }
+    const rejected = await checkCurrentPassword(user, data.password, SCOPE);
+    if (rejected) return rejected;
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.updateUser({ email: data.email });
-    if (error) {
-      return authErrorResponse("POST /api/auth/email", error, "发送失败");
-    }
+    if (error) return authErrorResponse(SCOPE, error, "发送失败");
 
     return NextResponse.json({ success: true });
   },

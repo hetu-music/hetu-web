@@ -3,10 +3,10 @@
 import {
   AccountBlock,
   SubmitRow,
-  useNotice,
 } from "@/components/profile/account/account-ui";
 import FormField from "@/components/shared/FormField";
 import { FIELD_CLASS, FIELD_ERROR_CLASS } from "@/components/shared/form-field";
+import { addToast } from "@/components/ui/toast";
 import { postAuth } from "@/lib/api/auth-api";
 import {
   profilePasswordFormSchema,
@@ -20,7 +20,6 @@ import { useForm } from "react-hook-form";
 /** 修改密码：核对当前密码；改好后服务端会退出其他设备上的登录 */
 export default function PasswordForm() {
   const t = useTranslations("profile.account.password");
-  const [notice, setNotice] = useNotice(3500);
 
   const form = useForm<ProfilePasswordFormValues>({
     resolver: zodResolver(profilePasswordFormSchema),
@@ -36,16 +35,15 @@ export default function PasswordForm() {
 
   const handleChange = form.handleSubmit(
     async ({ currentPassword, newPassword }) => {
-      setNotice(null);
       const result = await postAuth("/api/auth/change-password", {
         oldPassword: currentPassword,
         newPassword,
       });
       if (result.ok) {
-        setNotice({ ok: true, text: t("success") });
+        addToast("success", t("success"));
         form.reset();
       } else {
-        setNotice({ ok: false, text: result.error ?? t("error") });
+        addToast("error", result.error ?? t("error"));
       }
     },
   );
@@ -101,7 +99,7 @@ export default function PasswordForm() {
           </FormField>
         </div>
 
-        <SubmitRow label={t("submit")} pending={isSubmitting} notice={notice} />
+        <SubmitRow label={t("submit")} pending={isSubmitting} />
       </form>
     </AccountBlock>
   );

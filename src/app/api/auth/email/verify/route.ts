@@ -4,7 +4,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { otpCodeField } from "@/lib/forms/account-rules";
 import { authErrorResponse } from "@/lib/server/auth-errors";
-import { parseJsonBody } from "@/lib/server/auth-route";
+import { parseJsonBody } from "@/lib/server/server-utils";
 
 const schema = z.object({
   /** 这个验证码是发到哪个邮箱的：新邮箱，还是原邮箱 */
@@ -25,9 +25,8 @@ export const POST = withAuth(
     const { data, response } = await parseJsonBody(request, schema);
     if (response) return response;
 
-    const newEmail = user.new_email as string | undefined;
-    const email = data.target === "new" ? newEmail : user.email;
-    if (!newEmail || !email) {
+    const email = data.target === "new" ? user.new_email : user.email;
+    if (!user.new_email || !email) {
       return NextResponse.json(
         { error: "没有待验证的邮箱更改" },
         { status: 400 },

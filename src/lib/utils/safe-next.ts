@@ -16,12 +16,17 @@ export function safeNextPath(
 }
 
 /**
- * 登录页地址，登录后回到 next（不带语言前缀的站内路径）。
+ * 登录、注册、找回密码页的地址，完事后回到 next（不带语言前缀的站内路径）。
  * 返回值也不带语言前缀：服务端 redirect 时自行加上 /${locale}。
  */
-export function loginPathFor(next: string): string {
+export function authPathFor(
+  page: "/login" | "/register" | "/forgot-password",
+  next: string,
+): string {
   const target = safeNextPath(next);
-  return target === "/"
-    ? "/login"
-    : `/login?next=${encodeURIComponent(target)}`;
+  return target === "/" ? page : `${page}?next=${encodeURIComponent(target)}`;
+}
+
+export function loginPathFor(next: string): string {
+  return authPathFor("/login", next);
 }

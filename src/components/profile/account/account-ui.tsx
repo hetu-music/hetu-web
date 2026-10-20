@@ -1,37 +1,5 @@
-"use client";
-
-import { PRIMARY_BUTTON_CLASS } from "@/components/shared/text-button";
-import { cn } from "@/lib/utils/utils";
-import { Loader2 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
-
-export type Notice = { ok: boolean; text: string } | null;
-
-/** 提交结果的一行小字，几秒后消失 */
-export function useNotice(duration = 3000) {
-  const [notice, setNotice] = useState<Notice>(null);
-  useEffect(() => {
-    if (!notice) return;
-    const timer = setTimeout(() => setNotice(null), duration);
-    return () => clearTimeout(timer);
-  }, [notice, duration]);
-  return [notice, setNotice] as const;
-}
-
-export function NoticeText({ notice }: { notice: Notice }) {
-  if (!notice) return null;
-  return (
-    <span
-      role="status"
-      className={cn(
-        "text-xs",
-        notice.ok ? "text-(--tone)" : "text-rose-500 dark:text-rose-400",
-      )}
-    >
-      {notice.text}
-    </span>
-  );
-}
+import { SubmitButton } from "@/components/shared/FormField";
+import type { ReactNode } from "react";
 
 /** 账户设置里的一组：小字题名、一句说明，下面是表单或操作 */
 export function AccountBlock({
@@ -58,32 +26,23 @@ export function AccountBlock({
   );
 }
 
-/** 表单底部：主操作按钮，右边跟着结果提示或次要操作 */
+/**
+ * 表单底部：主操作按钮，右边可跟次要操作（如「取消」）。
+ * 提交结果走全站的提示条（addToast），不在这里另写一行定时消失的小字。
+ */
 export function SubmitRow({
   label,
   pending,
-  disabled,
-  notice,
   children,
 }: {
   label: string;
   pending: boolean;
-  disabled?: boolean;
-  notice?: Notice;
   children?: ReactNode;
 }) {
   return (
     <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3">
-      <button
-        type="submit"
-        disabled={pending || disabled}
-        className={PRIMARY_BUTTON_CLASS}
-      >
-        {pending && <Loader2 size={12} className="animate-spin" />}
-        {label}
-      </button>
+      <SubmitButton pending={pending}>{label}</SubmitButton>
       {children}
-      {notice !== undefined && <NoticeText notice={notice} />}
     </div>
   );
 }

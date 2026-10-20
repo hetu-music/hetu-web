@@ -3,9 +3,7 @@
 import OtpStep from "@/components/auth/OtpStep";
 import {
   AccountBlock,
-  NoticeText,
   SubmitRow,
-  useNotice,
 } from "@/components/profile/account/account-ui";
 import FormField from "@/components/shared/FormField";
 import {
@@ -13,7 +11,11 @@ import {
   FIELD_ERROR_CLASS,
   FIELD_LABEL_CLASS,
 } from "@/components/shared/form-field";
-import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
+import {
+  PRIMARY_BUTTON_CLASS,
+  TEXT_BUTTON_CLASS,
+} from "@/components/shared/text-button";
+import { addToast } from "@/components/ui/toast";
 import { useUserContext } from "@/context/UserContext";
 import { postAuth } from "@/lib/api/auth-api";
 import {
@@ -40,7 +42,6 @@ export default function EmailForm() {
   const [step, setStep] = useState<Step>("view");
   /** 每回到填新邮箱验证码这一步换一个 key：清空格子、重新倒数 */
   const [otpKey, setOtpKey] = useState(0);
-  const [notice, setNotice] = useNotice(4000);
 
   const email = user?.email ?? "";
   const pendingEmail = user?.pendingEmail ?? "";
@@ -63,7 +64,7 @@ export default function EmailForm() {
     const changedTo = pendingEmail;
     await refetch();
     setStep("view");
-    setNotice({ ok: true, text: t("done", { email: changedTo }) });
+    addToast("success", t("done", { email: changedTo }));
     return null;
   };
 
@@ -99,22 +100,19 @@ export default function EmailForm() {
               <button
                 type="button"
                 onClick={toNewCode}
-                className={cn(TEXT_BUTTON_CLASS, "ml-1.5 text-(--tone)")}
+                className={cn(PRIMARY_BUTTON_CLASS, "ml-1.5")}
               >
                 {t("continue")}
               </button>
             </p>
           )}
-          <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <button
-              type="button"
-              onClick={() => setStep("edit")}
-              className={cn(TEXT_BUTTON_CLASS, "text-(--tone)")}
-            >
-              {t("change")}
-            </button>
-            <NoticeText notice={notice} />
-          </div>
+          <button
+            type="button"
+            onClick={() => setStep("edit")}
+            className={cn(PRIMARY_BUTTON_CLASS, "mt-8")}
+          >
+            {t("change")}
+          </button>
         </div>
       )}
 
@@ -157,7 +155,6 @@ function RequestForm({
   cancel: ReactNode;
 }) {
   const t = useTranslations("profile.account.emailChange");
-  const [notice, setNotice] = useNotice(4000);
   const form = useForm<ProfileEmailFormValues>({
     resolver: zodResolver(profileEmailFormSchema),
     defaultValues: { email: "", currentPassword: "" },
@@ -167,16 +164,12 @@ function RequestForm({
   const { errors, isSubmitting } = form.formState;
 
   const submit = form.handleSubmit(async ({ email, currentPassword }) => {
-    setNotice(null);
     const result = await postAuth("/api/auth/email", {
       email,
       password: currentPassword,
     });
-    if (result.ok) {
-      await onSent();
-    } else {
-      setNotice({ ok: false, text: result.error ?? t("error") });
-    }
+    if (result.ok) await onSent();
+    else addToast("error", result.error ?? t("error"));
   });
 
   return (
@@ -206,7 +199,7 @@ function RequestForm({
         </FormField>
       </div>
 
-      <SubmitRow label={t("send")} pending={isSubmitting} notice={notice}>
+      <SubmitRow label={t("send")} pending={isSubmitting}>
         {cancel}
       </SubmitRow>
     </form>

@@ -1,9 +1,12 @@
 "use client";
 
-import AuthShell, { AUTH_LINK_CLASS } from "@/components/auth/AuthShell";
-import CaptchaField from "@/components/auth/CaptchaField";
+import AuthShell from "@/components/auth/AuthShell";
+import CaptchaField, { useFormCaptcha } from "@/components/auth/CaptchaField";
 import OtpStep from "@/components/auth/OtpStep";
-import FormField from "@/components/shared/FormField";
+import FormField, {
+  FormError,
+  SubmitButton,
+} from "@/components/shared/FormField";
 import { FIELD_CLASS, FIELD_ERROR_CLASS } from "@/components/shared/form-field";
 import {
   PRIMARY_BUTTON_CLASS,
@@ -18,10 +21,10 @@ import {
   type NewPasswordFormValues,
   type RecoveryEmailFormValues,
 } from "@/lib/forms/auth-form";
+import { authPathFor } from "@/lib/utils/safe-next";
 import { cn } from "@/lib/utils/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -53,8 +56,6 @@ export default function RecoveryClient({
   const [codeError, setCodeError] = useState<string>();
   /** 每进一次填码步骤换一个 key：清空格子，重新开始倒数 */
   const [otpKey, setOtpKey] = useState(0);
-
-  const nextQuery = next !== "/" ? `?next=${encodeURIComponent(next)}` : "";
 
   const sendCode = async (address: string, turnstileToken?: string) => {
     const result = await postAuth("/api/auth/recovery", {
@@ -116,7 +117,7 @@ export default function RecoveryClient({
             setOtpKey((k) => k + 1);
             setStep("otp");
           }}
-          loginHref={`/login${nextQuery}`}
+          loginHref={authPathFor("/login", next)}
         />
       )}
 
@@ -133,21 +134,8 @@ export default function RecoveryClient({
           resendCaptcha
           nonce={nonce}
           initialError={codeError}
-        >
-          <p>
-            {t("otp.wrongEmail")}
-            <button
-              type="button"
-              onClick={() => setStep("email")}
-              className={cn(
-                TEXT_BUTTON_CLASS,
-                "ml-1.5 text-slate-600 dark:text-slate-300",
-              )}
-            >
-              {t("otp.reset")}
-            </button>
-          </p>
-        </OtpStep>
+          onRestart={() => setStep("email")}
+        />
       )}
 
       {step === "password" && (
@@ -171,7 +159,6 @@ function EmailStep({
   loginHref: string;
 }) {
   const t = useTranslations("auth");
-  const [captchaKey, setCaptchaKey] = useState(0);
   const form = useForm<RecoveryEmailFormValues>({
     resolver: zodResolver(recoveryEmailFormSchema),
     defaultValues: { email: defaultEmail, turnstileToken: "" },
@@ -179,13 +166,7 @@ function EmailStep({
     reValidateMode: "onChange",
   });
   const { errors, isSubmitting } = form.formState;
-
-  const setTurnstileToken = (token: string) =>
-    form.setValue("turnstileToken", token, {
-      shouldDirty: true,
-      shouldTouch: true,
-      shouldValidate: true,
-    });
+  const captcha = useFormCaptcha(form);
 
   const submit = form.handleSubmit(async ({ email, turnstileToken }) => {
     form.clearErrors("root");
@@ -194,8 +175,7 @@ function EmailStep({
       onSent(email);
       return;
     }
-    setTurnstileToken("");
-    setCaptchaKey((k) => k + 1);
+    captcha.reset();
     form.setError("root", { message: error });
   });
 
@@ -214,31 +194,21 @@ function EmailStep({
       </FormField>
 
       <CaptchaField
-        key={captchaKey}
+        key={captcha.key}
         nonce={nonce}
-        onToken={setTurnstileToken}
-        onExpire={() => setTurnstileToken("")}
+        onToken={captcha.setToken}
         onError={() => form.setError("root", { message: t("captchaFailed") })}
       />
 
-      {formError && (
-        <p role="alert" className="text-sm text-rose-500 dark:text-rose-400">
-          {formError}
-        </p>
-      )}
+      <FormError message={formError} />
 
       <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 pt-2">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className={cn(PRIMARY_BUTTON_CLASS, "text-sm")}
-        >
-          {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+        <SubmitButton pending={isSubmitting} className="text-sm">
           {t("recovery.submit")}
-        </button>
+        </SubmitButton>
         <p className="text-xs text-slate-400 dark:text-slate-500">
           {t("recovery.rememberPrompt")}
-          <Link href={loginHref} className={AUTH_LINK_CLASS}>
+          <Link href={loginHref} className={cn(PRIMARY_BUTTON_CLASS, "ml-1.5")}>
             {t("register.switchLink")}
           </Link>
         </p>
@@ -299,21 +269,12 @@ function PasswordStep({
         />
       </FormField>
 
-      {errors.root?.message && (
-        <p role="alert" className="text-sm text-rose-500 dark:text-rose-400">
-          {errors.root.message}
-        </p>
-      )}
+      <FormError message={errors.root?.message} />
 
       <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 pt-2">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className={cn(PRIMARY_BUTTON_CLASS, "text-sm")}
-        >
-          {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+        <SubmitButton pending={isSubmitting} className="text-sm">
           {t("recovery.finish")}
-        </button>
+        </SubmitButton>
         <button type="button" onClick={onBack} className={TEXT_BUTTON_CLASS}>
           {t("recovery.back")}
         </button>

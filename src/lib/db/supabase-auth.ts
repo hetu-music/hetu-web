@@ -17,18 +17,30 @@ import type { NextRequest, NextResponse } from "next/server";
  *   - 仅在服务端使用，包含运行时检查
  */
 
-/**
- * 创建服务端 Supabase 客户端，用于处理认证和 cookies
- * 这个函数专门用于服务端组件和 API 路由中需要处理认证的场景
- */
-export async function createSupabaseServerClient() {
+function supabaseEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase environment variables");
   }
+  return { supabaseUrl, supabaseAnonKey };
+}
 
+/** 会话 cookie 一律 httpOnly，前端脚本读不到令牌 */
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/",
+} as const;
+
+/**
+ * 创建服务端 Supabase 客户端，用于处理认证和 cookies
+ * 这个函数专门用于服务端组件和 API 路由中需要处理认证的场景
+ */
+export async function createSupabaseServerClient() {
+  const { supabaseUrl, supabaseAnonKey } = supabaseEnv();
   const cookieStore = await cookies();
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -39,13 +51,7 @@ export async function createSupabaseServerClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, {
-              ...options,
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-              sameSite: "lax",
-              path: "/",
-            });
+            cookieStore.set(name, value, { ...options, ...COOKIE_OPTIONS });
           });
         } catch {
           // The `setAll` method was called from a Server Component or GET Route Handler.
@@ -68,13 +74,7 @@ export async function verifyPassword(
   email: string,
   password: string,
 ): Promise<AuthError | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables");
-  }
-
+  const { supabaseUrl, supabaseAnonKey } = supabaseEnv();
   const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
@@ -97,13 +97,7 @@ export function createSupabaseMiddlewareClient(
   request: NextRequest,
   response: NextResponse,
 ) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables");
-  }
-
+  const { supabaseUrl, supabaseAnonKey } = supabaseEnv();
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
@@ -111,13 +105,7 @@ export function createSupabaseMiddlewareClient(
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, {
-            ...options,
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            path: "/",
-          });
+          response.cookies.set(name, value, { ...options, ...COOKIE_OPTIONS });
         });
       },
     },

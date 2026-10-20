@@ -5,6 +5,8 @@ import { verifyCSRFToken } from "@/lib/server/server-utils";
 export interface AuthenticatedUser {
   id: string;
   email?: string;
+  /** 改邮箱验证到一半时的新邮箱 */
+  new_email?: string;
   app_metadata?: {
     is_admin?: boolean;
     is_super?: boolean;

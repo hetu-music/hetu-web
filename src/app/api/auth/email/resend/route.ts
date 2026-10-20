@@ -9,8 +9,7 @@ import { authErrorResponse } from "@/lib/server/auth-errors";
  */
 export const POST = withAuth(
   async (_request: NextRequest, user: AuthenticatedUser) => {
-    const newEmail = user.new_email as string | undefined;
-    if (!newEmail) {
+    if (!user.new_email) {
       return NextResponse.json(
         { error: "没有待验证的邮箱更改" },
         { status: 400 },
@@ -20,7 +19,7 @@ export const POST = withAuth(
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.resend({
       type: "email_change",
-      email: newEmail,
+      email: user.new_email,
     });
     if (error) {
       return authErrorResponse(

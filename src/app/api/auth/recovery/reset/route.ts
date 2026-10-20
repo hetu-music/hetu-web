@@ -7,7 +7,7 @@ import {
   otpCodeField,
 } from "@/lib/forms/account-rules";
 import { authErrorResponse } from "@/lib/server/auth-errors";
-import { withPublicAuth } from "@/lib/server/auth-route";
+import { signOutOtherSessions, withPublicAuth } from "@/lib/server/auth-route";
 import { clearAuthCookies } from "@/lib/server/server-utils";
 
 const schema = z.object({
@@ -59,12 +59,7 @@ export const POST = withPublicAuth(
       );
     }
 
-    const { error: signOutError } = await supabase.auth.signOut({
-      scope: "others",
-    });
-    if (signOutError) {
-      console.error("[POST /api/auth/recovery/reset] others", signOutError);
-    }
+    await signOutOtherSessions(supabase, "POST /api/auth/recovery/reset");
 
     return NextResponse.json({ success: true });
   },

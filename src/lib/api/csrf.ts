@@ -10,6 +10,7 @@
  *
  * 现在：服务端复用 cookie 中的现有 token，客户端也只保留这一份内存缓存，
  * 并发调用共享同一个 in-flight 请求。
+ * 业务代码不直接调这里，统一经 lib/api/request 发请求，由它取令牌。
  */
 
 let cachedToken = "";

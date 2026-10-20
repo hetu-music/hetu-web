@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import type { ImageryCategory } from "@/lib/types";
 import { EmptyState } from "../kit/parts";
 import { SOLID_BUTTON_CLASS, TEXT_BUTTON_CLASS } from "../kit/styles";
@@ -18,10 +17,9 @@ export default function ImageryCategoriesClient({
 }: {
   initialCategories: ImageryCategory[];
 }) {
-  const csrfToken = useCsrfToken();
-  const categories = useCategoriesTab(initialCategories, csrfToken, showToast);
+  const categories = useCategoriesTab(initialCategories, showToast);
   // 只用来数每个分类下有多少意象
-  const imagery = useImageryTab(csrfToken, showToast);
+  const imagery = useImageryTab(showToast);
   const list = categories.categories;
 
   const countByCategory = useMemo(() => {

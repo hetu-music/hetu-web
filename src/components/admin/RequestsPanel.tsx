@@ -80,11 +80,9 @@ const formatDateTime = (iso: string) =>
   });
 
 export default function RequestsPanel({
-  csrfToken,
   isSuper,
   initialStatus = "all",
 }: {
-  csrfToken: string;
   isSuper: boolean;
   initialStatus?: string;
 }) {
@@ -134,10 +132,11 @@ export default function RequestsPanel({
     if (!state.reply.trim()) return;
     setSavingId(id);
     try {
-      await apiReplyRequest(
-        { id, reply: state.reply.trim(), status: state.status },
-        csrfToken,
-      );
+      await apiReplyRequest({
+        id,
+        reply: state.reply.trim(),
+        status: state.status,
+      });
       notify({ type: "success", text: "回复已保存" });
       setRequests((prev) =>
         prev.map((r) =>

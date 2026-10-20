@@ -34,7 +34,6 @@ export const songOccurrencesKey = (songId: number) =>
  */
 export default function SongImageryTab({
   song,
-  csrfToken,
 }: {
   song: {
     id: number;
@@ -42,7 +41,6 @@ export default function SongImageryTab({
     album?: string | null;
     lyrics?: string | null;
   };
-  csrfToken: string;
 }) {
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
@@ -87,10 +85,9 @@ export default function SongImageryTab({
     try {
       let imageryId = draft.imageryId;
       if (imageryId === null) {
-        const created = (await apiCreateImagery(
-          draft.imageryName,
-          csrfToken,
-        )) as { id: number };
+        const created = (await apiCreateImagery(draft.imageryName)) as {
+          id: number;
+        };
         imageryId = created.id;
       }
       const payload = {
@@ -100,9 +97,9 @@ export default function SongImageryTab({
         lyric_timetag: draft.timetags,
       };
       if (occurrenceId === null) {
-        await apiCreateOccurrence({ song_id: song.id, ...payload }, csrfToken);
+        await apiCreateOccurrence({ song_id: song.id, ...payload });
       } else {
-        await apiUpdateOccurrence(occurrenceId, payload, csrfToken);
+        await apiUpdateOccurrence(occurrenceId, payload);
       }
       await reload();
       notify({
@@ -127,7 +124,7 @@ export default function SongImageryTab({
     if (submitting) return;
     setSubmitting(true);
     try {
-      await apiDeleteOccurrence(occurrenceId, csrfToken);
+      await apiDeleteOccurrence(occurrenceId);
       await reload();
       notify({ type: "success", text: `已删除「${label}」` });
     } catch (error) {
@@ -173,7 +170,6 @@ export default function SongImageryTab({
         meanings={meanings.data ?? []}
         submitting={submitting}
         getCategoryPath={pathOf}
-        csrfToken={csrfToken}
         onReload={reload}
         onSave={save}
         onDelete={(id, label) => void remove(id, label)}

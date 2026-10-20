@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import Pagination from "@/components/shared/Pagination";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import {
   createMeaningFormValues,
   meaningFormSchema,
@@ -106,8 +105,7 @@ function MeaningEditor({
 
 /** 全局含义库 */
 export default function ImageryMeaningsClient() {
-  const csrfToken = useCsrfToken();
-  const m = useMeaningsTab(csrfToken, showToast);
+  const m = useMeaningsTab(showToast);
 
   return (
     <ImageryShell

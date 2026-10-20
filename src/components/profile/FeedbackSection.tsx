@@ -21,7 +21,6 @@ import {
 import { useUserContext } from "@/context/UserContext";
 import { useAutoGrow } from "@/hooks/ui";
 import { useDebouncedValue } from "@/hooks/ui/useDebouncedValue";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import { apiCreateRequest, apiGetMyRequests } from "@/lib/api/client-api";
 import type { RequestStatus, RequestType, UserRequest } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
@@ -291,7 +290,6 @@ function submitFormReducer(
 function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
   const t = useTranslations("profile.feedback");
   const { user } = useUserContext();
-  const csrfToken = useCsrfToken();
   const [state, dispatch] = useReducer(
     submitFormReducer,
     initialSubmitFormState,
@@ -322,15 +320,12 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
 
     dispatch({ type: "SUBMIT_START" });
     try {
-      await apiCreateRequest(
-        {
-          type,
-          song_id: selectedSong?.id ?? null,
-          category: category.trim() || null,
-          content: content.trim(),
-        },
-        csrfToken,
-      );
+      await apiCreateRequest({
+        type,
+        song_id: selectedSong?.id ?? null,
+        category: category.trim() || null,
+        content: content.trim(),
+      });
       dispatch({ type: "SUBMIT_SUCCESS" });
       onSubmitted();
       setTimeout(() => dispatch({ type: "RESET" }), 1500);
@@ -420,7 +415,7 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
       <div className="flex items-center gap-5">
         <button
           type="submit"
-          disabled={submitting || success || !csrfToken}
+          disabled={submitting || success}
           className={PRIMARY_BUTTON_CLASS}
         >
           {submitting && <Loader2 size={12} className="animate-spin" />}

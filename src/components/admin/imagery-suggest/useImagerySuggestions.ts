@@ -54,7 +54,6 @@ const IMAGERY_NAME_MAX = 50;
  */
 export function useImagerySuggestions(
   songId: number,
-  csrfToken: string,
   options: {
     existing?: OccurrenceWithSong[];
     onSaved?: () => Promise<unknown>;
@@ -215,7 +214,6 @@ export function useImagerySuggestions(
           rate: s.rate,
           recommended: s.recommended,
         })),
-        csrfToken,
       );
 
       const notes: Record<number, AiNote> = {};
@@ -288,7 +286,7 @@ export function useImagerySuggestions(
     } finally {
       setReviewing(false);
     }
-  }, [csrfToken, resolveName, result, reviewing, songId]);
+  }, [resolveName, result, reviewing, songId]);
 
   const selected = (result?.suggestions ?? []).filter(
     (s) => drafts[s.imageryId]?.checked,
@@ -331,7 +329,6 @@ export function useImagerySuggestions(
       const { created, skipped, newImagery } = await apiCreateOccurrencesBatch(
         songId,
         items,
-        csrfToken,
       );
       const saved = new Set(selected.map((s) => s.imageryId));
       setResult({
@@ -355,16 +352,7 @@ export function useImagerySuggestions(
     } finally {
       setSaving(false);
     }
-  }, [
-    csrfToken,
-    drafts,
-    loadExisting,
-    resolveName,
-    result,
-    saving,
-    selected,
-    songId,
-  ]);
+  }, [drafts, loadExisting, resolveName, result, saving, selected, songId]);
 
   return {
     existing,

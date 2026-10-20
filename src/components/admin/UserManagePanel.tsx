@@ -89,7 +89,7 @@ function ReadField({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function UserManagePanel({ csrfToken }: { csrfToken: string }) {
+export default function UserManagePanel() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export default function UserManagePanel({ csrfToken }: { csrfToken: string }) {
   const handleClearBenefits = async (userId: string) => {
     setClearingId(userId);
     try {
-      await apiUpdateUser({ id: userId, can_stream: false }, csrfToken);
+      await apiUpdateUser({ id: userId, can_stream: false });
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, can_stream: false } : u)),
       );
@@ -192,7 +192,7 @@ export default function UserManagePanel({ csrfToken }: { csrfToken: string }) {
         is_admin: editState.is_admin,
         can_stream: editState.can_stream,
       };
-      await apiUpdateUser(payload, csrfToken);
+      await apiUpdateUser(payload);
       setUsers((prev) =>
         prev.map((u) =>
           u.id === userId

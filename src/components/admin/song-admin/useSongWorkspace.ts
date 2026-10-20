@@ -8,7 +8,6 @@ import {
   mergeAutoCompleteData,
   useAutoComplete,
 } from "@/hooks/admin/useAutoComplete";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import { useRouter } from "@/i18n/navigation";
 import type {
   MusicProviderType,
@@ -39,7 +38,6 @@ export function useSongWorkspace(
   initialSong: SongDetail | null,
   initialPublished: Published,
 ) {
-  const csrfToken = useCsrfToken();
   const router = useRouter();
   const [song, setSong] = useState(initialSong);
   const [published, setPublished] = useState(initialPublished);
@@ -55,7 +53,7 @@ export function useSongWorkspace(
   });
   const isDirty = form.formState.isDirty;
 
-  const autoComplete = useAutoComplete(csrfToken, (text) =>
+  const autoComplete = useAutoComplete((text) =>
     notify({ type: "error", text }),
   );
 
@@ -84,31 +82,23 @@ export function useSongWorkspace(
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty]);
 
-  const requireCsrfToken = useCallback((): boolean => {
-    if (csrfToken) return true;
-    notify({ type: "error", text: "缺少安全令牌，请刷新后重试" });
-    return false;
-  }, [csrfToken]);
-
   /** 把表单写进暂存表，返回存好的那一行；失败返回 null */
   const persist = useCallback(
     async (data: SongFormStateValues): Promise<SongDetail | null> => {
-      if (!requireCsrfToken()) return null;
       const payload = convertEmptyStringToNull(toSongFormPayload(data));
       try {
         if (!song) {
-          const created: SongDetail = await apiCreateSong(payload, csrfToken);
+          const created: SongDetail = await apiCreateSong(payload);
           // 表单已存，离开前不再提醒
           form.reset(toSongFormState(created));
           notify({ type: "success", text: "已创建" });
           router.replace(`/admin/songs/${created.id}`);
           return created;
         }
-        const updated: SongDetail = await apiUpdateSong(
-          song.id,
-          { ...payload, updated_at: song.updated_at },
-          csrfToken,
-        );
+        const updated: SongDetail = await apiUpdateSong(song.id, {
+          ...payload,
+          updated_at: song.updated_at,
+        });
         setSong(updated);
         form.reset(toSongFormState(updated));
         return updated;
@@ -117,7 +107,7 @@ export function useSongWorkspace(
         return null;
       }
     },
-    [csrfToken, form, requireCsrfToken, router, song],
+    [form, router, song],
   );
 
   const save = form.handleSubmit(async (data) => {
@@ -128,7 +118,7 @@ export function useSongWorkspace(
 
   /** 发布：先跑校验、把没暂存的改动存掉，再同步到正式表 */
   const publish = useCallback(async () => {
-    if (!song || !requireCsrfToken()) return;
+    if (!song) return;
     if (!(await form.trigger())) {
       notify({ type: "error", text: "有字段没填对，先改好再发布" });
       return;
@@ -152,7 +142,7 @@ export function useSongWorkspace(
     } finally {
       setIsPublishing(false);
     }
-  }, [form, persist, requireCsrfToken, song]);
+  }, [form, persist, song]);
 
   /** 放弃没暂存的改动 */
   const discard = useCallback(() => {
@@ -184,7 +174,6 @@ export function useSongWorkspace(
   );
 
   return {
-    csrfToken,
     song,
     form,
     isDirty,

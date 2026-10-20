@@ -12,7 +12,6 @@ const NO_ITEMS: ImageryItem[] = [];
 const PAGE_SIZE = 20;
 
 export function useImageryTab(
-  csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
   const itemsQuery = useImageryItemsQuery();
@@ -48,7 +47,7 @@ export function useImageryTab(
   const handleAdd = async ({ name }: ImageryFormValues) => {
     setIsSubmitting(true);
     try {
-      const created = await apiCreateImagery(name.trim(), csrfToken);
+      const created = await apiCreateImagery(name.trim());
       setItems((current) => [
         ...current,
         { ...created, count: 0, categoryIds: [], meaningCount: 0 },
@@ -69,7 +68,7 @@ export function useImageryTab(
     if (modal.type !== "edit-imagery") return;
     setIsSubmitting(true);
     try {
-      await apiUpdateImagery(modal.item.id, name.trim(), csrfToken);
+      await apiUpdateImagery(modal.item.id, name.trim());
       setItems((current) =>
         current.map((item) =>
           item.id === modal.item.id ? { ...item, name: name.trim() } : item,

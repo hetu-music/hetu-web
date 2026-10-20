@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import {
   apiGetAudioOverview,
   apiUpdateAudioMapping,
@@ -16,7 +15,6 @@ import { buildRows } from "./utils";
  * 曲库要整个从 Navidrome 读回来才能配对，两处共用同一份缓存。
  */
 export function useAudioAdmin() {
-  const csrfToken = useCsrfToken();
   const [pickerSong, setPickerSong] = useState<DbSong | null>(null);
 
   const overview = useQuery({
@@ -39,7 +37,7 @@ export function useAudioAdmin() {
 
   const mapping = useMutation({
     mutationFn: (vars: { song: DbSong; navidId: string | null }) =>
-      apiUpdateAudioMapping(vars.song.id, vars.navidId, csrfToken),
+      apiUpdateAudioMapping(vars.song.id, vars.navidId),
     onSuccess: (_result, vars) => {
       notify({
         type: "success",
@@ -54,7 +52,6 @@ export function useAudioAdmin() {
   });
 
   return {
-    csrfToken,
     overview,
     rows,
     owners,

@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import Pagination from "@/components/shared/Pagination";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import type { ImageryCategory } from "@/lib/types";
 import {
   EmptyState,
@@ -26,8 +25,7 @@ export default function ImageryItemsClient({
 }: {
   categories: ImageryCategory[];
 }) {
-  const csrfToken = useCsrfToken();
-  const imagery = useImageryTab(csrfToken, showToast);
+  const imagery = useImageryTab(showToast);
   const nameById = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
     [categories],

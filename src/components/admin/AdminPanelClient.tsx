@@ -5,7 +5,6 @@ import CreditAliasPanel from "@/components/admin/CreditAliasPanel";
 import RequestsPanel from "@/components/admin/RequestsPanel";
 import UserManagePanel from "@/components/admin/UserManagePanel";
 import { useUserContext } from "@/context/UserContext";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import AdminShell from "./kit/AdminShell";
 
 type PanelSection = "credits" | "requests" | "users" | "logs";
@@ -39,20 +38,18 @@ export default function AdminPanelClient({
   initialStatus?: string;
 }) {
   const { user } = useUserContext();
-  const csrfToken = useCsrfToken();
   const { title, description } = HEADERS[section];
 
   return (
     <AdminShell section={section} title={title} description={description}>
-      {section === "credits" && <CreditAliasPanel csrfToken={csrfToken} />}
+      {section === "credits" && <CreditAliasPanel />}
       {section === "requests" && (
         <RequestsPanel
-          csrfToken={csrfToken}
           isSuper={!!user?.isSuper}
           initialStatus={initialStatus}
         />
       )}
-      {section === "users" && <UserManagePanel csrfToken={csrfToken} />}
+      {section === "users" && <UserManagePanel />}
       {section === "logs" && <AuditLogsPanel />}
     </AdminShell>
   );

@@ -48,10 +48,19 @@ describe("sendRequest", () => {
     expect(fetchMock.mock.calls[0][1].body).toBe('{"a":1}');
   });
 
-  it("显式传入的令牌优先，GET 也带上", async () => {
+  it("csrf: true 时 GET 也带上令牌", async () => {
     respond(200, {});
-    await sendRequest("/x", { csrfToken: "given" });
-    expect(sentHeaders()).toEqual({ "x-csrf-token": "given" });
+    await sendRequest("/x", { csrf: true });
+    expect(sentHeaders()).toEqual({ "x-csrf-token": "cached-token" });
+  });
+
+  it("FormData 原样发出，不写 Content-Type（由浏览器带上 boundary）", async () => {
+    respond(200, {});
+    const form = new FormData();
+    form.append("file", "x");
+    await sendRequest("/upload", { method: "POST", body: form });
+    expect(sentHeaders()).toEqual({ "x-csrf-token": "cached-token" });
+    expect(fetchMock.mock.calls[0][1].body).toBe(form);
   });
 
   it("响应不是 JSON 时 data 为空对象，不抛错", async () => {

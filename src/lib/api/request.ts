@@ -7,15 +7,18 @@ import { getCsrfToken, resetCsrfToken } from "@/lib/api/csrf";
  * 以前 client-api、收藏、批注、登录注册各自手写一遍 fetch + 请求头 + 读错误，
  * 有的读错误前不判断响应是不是 JSON，有的 CSRF 失效后不丢缓存。
  *
- * CSRF：写操作（非 GET）不传 csrfToken 时自己从全站缓存取；
- * 少数要校验 CSRF 的 GET 接口（如 auto-complete）显式传入。
+ * CSRF 令牌由这里从全站缓存取（lib/api/csrf），调用方不用拿着令牌到处传。
  * 服务端判定令牌失效时丢掉缓存，下次重新取。
  */
 export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /** 会被 JSON.stringify；不传就不带请求体 */
+  /** FormData 原样发出（上传文件），其余会被 JSON.stringify；不传就不带请求体 */
   body?: unknown;
-  csrfToken?: string;
+  /**
+   * 带不带 CSRF 令牌。默认写操作带、GET 不带；
+   * 少数会替服务端去调外部服务的 GET（auto-complete、check-file）也校验，传 true
+   */
+  csrf?: boolean;
   cache?: RequestCache;
 }
 
@@ -28,18 +31,20 @@ export interface RawResponse {
 
 export async function sendRequest(
   path: string,
-  { method = "GET", body, csrfToken, cache }: RequestOptions = {},
+  { method = "GET", body, csrf = method !== "GET", cache }: RequestOptions = {},
 ): Promise<RawResponse> {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
-  const token =
-    csrfToken ?? (method === "GET" ? undefined : await getCsrfToken());
-  if (token) headers["x-csrf-token"] = token;
+  // FormData 的 Content-Type 要由浏览器带上 boundary，不能自己写
+  const isForm = body instanceof FormData;
+  if (body !== undefined && !isForm) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (csrf) headers["x-csrf-token"] = await getCsrfToken();
 
   const res = await fetch(path, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: isForm ? body : body === undefined ? undefined : JSON.stringify(body),
     cache,
   });
   const data = await res.json().catch(() => ({}));

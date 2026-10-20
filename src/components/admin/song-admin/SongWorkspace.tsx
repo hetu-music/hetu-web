@@ -184,7 +184,7 @@ export default function SongWorkspace({
 
           {song && (
             <TabsContent value="imagery" variant="inline">
-              <SongImageryTab song={song} csrfToken={ws.csrfToken} />
+              <SongImageryTab song={song} />
             </TabsContent>
           )}
           {song && user?.isSuper && (
@@ -486,12 +486,7 @@ function AssetsTab({ ws, song }: { ws: SongWorkspaceState; song: SongDetail }) {
           alt={`${song.title} 封面`}
           square
         />
-        <AssetUpload
-          kind="cover"
-          songId={song.id}
-          csrfToken={ws.csrfToken}
-          preset={coverPreset}
-        />
+        <AssetUpload kind="cover" songId={song.id} preset={coverPreset} />
         <p className="text-xs text-slate-400">
           上传定制封面后，记得把封面设为「定制封面」并暂存
         </p>
@@ -506,7 +501,7 @@ function AssetsTab({ ws, song }: { ws: SongWorkspaceState; song: SongDetail }) {
         {song.nmn_status && (
           <Preview src={getNmnUrl(song)} alt={`${song.title} 乐谱`} />
         )}
-        <AssetUpload kind="score" songId={song.id} csrfToken={ws.csrfToken} />
+        <AssetUpload kind="score" songId={song.id} />
       </AssetSection>
     </div>
   );

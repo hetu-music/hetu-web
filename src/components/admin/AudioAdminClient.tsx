@@ -53,7 +53,7 @@ export default function AudioAdminClient() {
   );
 
   const sync = useMutation({
-    mutationFn: () => apiRunAudioSync(audio.csrfToken),
+    mutationFn: () => apiRunAudioSync(),
     onSuccess: (result) => {
       notify({
         type: "success",

@@ -26,25 +26,19 @@ type Untyped = any;
 
 // ─── Songs Admin API ───────────────────────────────────────────────────────────
 
-export function apiCreateSong(song: Partial<Song>, csrfToken: string) {
+export function apiCreateSong(song: Partial<Song>) {
   return apiRequest<Untyped>("/api/admin/edit", {
     method: "POST",
     body: song,
-    csrfToken,
     fallback: "新增失败",
   });
 }
 
 /** 409 是乐观锁冲突，服务端的提示（「数据已被他人修改…」）可以直接给用户看 */
-export function apiUpdateSong(
-  id: number,
-  song: Partial<Song>,
-  csrfToken: string,
-) {
+export function apiUpdateSong(id: number, song: Partial<Song>) {
   return apiRequest<Untyped>("/api/admin/edit", {
     method: "PUT",
     body: { id, ...song },
-    csrfToken,
     fallback: "更新失败",
     serverMessage: [409],
   });
@@ -53,11 +47,10 @@ export function apiUpdateSong(
 export function apiCheckFileExists(
   songId: number,
   fileType: "cover" | "score",
-  csrfToken: string,
 ) {
   return apiRequest<Untyped>(
     `/api/admin/check-file?songId=${songId}&type=${fileType}`,
-    { csrfToken, fallback: "Failed to check file existence" },
+    { csrf: true, fallback: "Failed to check file existence" },
   );
 }
 
@@ -80,20 +73,18 @@ export function apiGetImageryItems() {
   });
 }
 
-export function apiCreateImagery(name: string, csrfToken: string) {
+export function apiCreateImagery(name: string) {
   return apiRequest<Untyped>("/api/admin/imagery", {
     method: "POST",
     body: { name },
-    csrfToken,
     fallback: "新增意象失败",
   });
 }
 
-export function apiUpdateImagery(id: number, name: string, csrfToken: string) {
+export function apiUpdateImagery(id: number, name: string) {
   return apiRequest<Untyped>(`/api/admin/imagery/${id}`, {
     method: "PUT",
     body: { name },
-    csrfToken,
     fallback: "更新意象失败",
   });
 }
@@ -110,19 +101,15 @@ export function apiGetImageryCategories() {
   });
 }
 
-export function apiCreateImageryCategory(
-  data: {
-    name: string;
-    parent_id?: number | null;
-    level?: number | null;
-    description?: string | null;
-  },
-  csrfToken: string,
-) {
+export function apiCreateImageryCategory(data: {
+  name: string;
+  parent_id?: number | null;
+  level?: number | null;
+  description?: string | null;
+}) {
   return apiRequest<Untyped>("/api/admin/imagery/categories", {
     method: "POST",
     body: data,
-    csrfToken,
     fallback: "新增分类失败",
   });
 }
@@ -135,12 +122,10 @@ export function apiUpdateImageryCategory(
     level?: number | null;
     description?: string | null;
   },
-  csrfToken: string,
 ) {
   return apiRequest<Untyped>(`/api/admin/imagery/categories/${id}`, {
     method: "PUT",
     body: data,
-    csrfToken,
     fallback: "更新分类失败",
   });
 }
@@ -155,15 +140,10 @@ export function apiGetMeanings() {
   });
 }
 
-export function apiCreateMeaning(
-  imageryId: number,
-  data: MeaningInput,
-  csrfToken: string,
-) {
+export function apiCreateMeaning(imageryId: number, data: MeaningInput) {
   return apiRequest<Untyped>(`/api/admin/imagery/${imageryId}/meanings`, {
     method: "POST",
     body: data,
-    csrfToken,
     fallback: "新增含义失败",
   });
 }
@@ -172,51 +152,39 @@ export function apiUpdateMeaning(
   imageryId: number,
   meaningId: number,
   data: MeaningInput,
-  csrfToken: string,
 ) {
   return apiRequest<Untyped>(
     `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
-    { method: "PUT", body: data, csrfToken, fallback: "更新含义失败" },
+    { method: "PUT", body: data, fallback: "更新含义失败" },
   );
 }
 
-export function apiDeleteMeaning(
-  imageryId: number,
-  meaningId: number,
-  csrfToken: string,
-) {
+export function apiDeleteMeaning(imageryId: number, meaningId: number) {
   return apiRequest<Untyped>(
     `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
-    { method: "DELETE", csrfToken, fallback: "删除含义失败" },
+    { method: "DELETE", fallback: "删除含义失败" },
   );
 }
 
-export function apiCreateGlobalMeaning(data: MeaningInput, csrfToken: string) {
+export function apiCreateGlobalMeaning(data: MeaningInput) {
   return apiRequest<Untyped>("/api/admin/meanings", {
     method: "POST",
     body: data,
-    csrfToken,
     fallback: "新增含义失败",
   });
 }
 
-export function apiUpdateGlobalMeaning(
-  meaningId: number,
-  data: MeaningInput,
-  csrfToken: string,
-) {
+export function apiUpdateGlobalMeaning(meaningId: number, data: MeaningInput) {
   return apiRequest<Untyped>(`/api/admin/meanings/${meaningId}`, {
     method: "PUT",
     body: data,
-    csrfToken,
     fallback: "更新含义失败",
   });
 }
 
-export function apiDeleteGlobalMeaning(meaningId: number, csrfToken: string) {
+export function apiDeleteGlobalMeaning(meaningId: number) {
   return apiRequest<Untyped>(`/api/admin/meanings/${meaningId}`, {
     method: "DELETE",
-    csrfToken,
     fallback: "删除含义失败",
   });
 }
@@ -235,20 +203,16 @@ export function apiGetOccurrencesForSong(songId: number) {
   });
 }
 
-export function apiCreateOccurrence(
-  data: {
-    song_id: number;
-    imagery_id: number;
-    category_id: number;
-    meaning_id?: number | null;
-    lyric_timetag: string[];
-  },
-  csrfToken: string,
-) {
+export function apiCreateOccurrence(data: {
+  song_id: number;
+  imagery_id: number;
+  category_id: number;
+  meaning_id?: number | null;
+  lyric_timetag: string[];
+}) {
   return apiRequest<Untyped>("/api/admin/occurrences", {
     method: "POST",
     body: data,
-    csrfToken,
     fallback: "新增关系失败",
   });
 }
@@ -264,12 +228,10 @@ export function apiGetImagerySuggestions(songId: number) {
 export function apiReviewImagery(
   songId: number,
   candidates: ReviewCandidate[],
-  csrfToken: string,
 ) {
   return apiRequest<ReviewResult>("/api/admin/occurrences/review", {
     method: "POST",
     body: { song_id: songId, candidates },
-    csrfToken,
     fallback: "AI 校验失败",
     serverMessage: [502, 503],
   });
@@ -279,14 +241,12 @@ export function apiReviewImagery(
 export function apiCreateOccurrencesBatch(
   songId: number,
   items: OccurrenceBatchItem[],
-  csrfToken: string,
 ) {
   return apiRequest<{ created: number; skipped: number; newImagery: number }>(
     "/api/admin/occurrences/batch",
     {
       method: "POST",
       body: { song_id: songId, items },
-      csrfToken,
       fallback: "保存意象标注失败",
       serverMessage: [400],
     },
@@ -301,20 +261,17 @@ export function apiUpdateOccurrence(
     meaning_id?: number | null;
     lyric_timetag?: string[];
   },
-  csrfToken: string,
 ) {
   return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "PUT",
     body: data,
-    csrfToken,
     fallback: "更新关系失败",
   });
 }
 
-export function apiDeleteOccurrence(id: number, csrfToken: string) {
+export function apiDeleteOccurrence(id: number) {
   return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "DELETE",
-    csrfToken,
     fallback: "删除关系失败",
   });
 }
@@ -328,26 +285,20 @@ export function apiGetCreditAliases() {
   );
 }
 
-export function apiCreateCreditAlias(
-  alias: string,
-  name: string,
-  csrfToken: string,
-) {
+export function apiCreateCreditAlias(alias: string, name: string) {
   return apiRequest<CreditAliasRow>("/api/admin/credit-aliases", {
     method: "POST",
     body: { alias, name },
-    csrfToken,
     fallback: "登记别名失败",
     serverMessage: true,
   });
 }
 
-export function apiDeleteCreditAlias(alias: string, csrfToken: string) {
+export function apiDeleteCreditAlias(alias: string) {
   return apiRequest<Untyped>(
     `/api/admin/credit-aliases?alias=${encodeURIComponent(alias)}`,
     {
       method: "DELETE",
-      csrfToken,
       fallback: "删除别名失败",
       serverMessage: true,
     },
@@ -362,11 +313,10 @@ export function apiGetUsers() {
   });
 }
 
-export function apiUpdateUser(payload: UserUpdatePayload, csrfToken: string) {
+export function apiUpdateUser(payload: UserUpdatePayload) {
   return apiRequest<Untyped>("/api/admin/users", {
     method: "PUT",
     body: payload,
-    csrfToken,
     fallback: "更新用户失败",
     serverMessage: true,
   });
@@ -380,14 +330,10 @@ export function apiGetMyRequests() {
   });
 }
 
-export function apiCreateRequest(
-  payload: CreateRequestPayload,
-  csrfToken: string,
-) {
+export function apiCreateRequest(payload: CreateRequestPayload) {
   return apiRequest<{ request: UserRequest }>("/api/public/requests", {
     method: "POST",
     body: payload,
-    csrfToken,
     fallback: "提交失败",
     serverMessage: true,
   });
@@ -412,14 +358,10 @@ export function apiGetAdminRequests(params?: {
   });
 }
 
-export function apiReplyRequest(
-  payload: ReplyRequestPayload,
-  csrfToken: string,
-) {
+export function apiReplyRequest(payload: ReplyRequestPayload) {
   return apiRequest<{ success: boolean }>("/api/admin/requests", {
     method: "PUT",
     body: payload,
-    csrfToken,
     fallback: "操作失败",
     serverMessage: true,
   });
@@ -435,24 +377,18 @@ export function apiGetAudioOverview() {
   });
 }
 
-export function apiRunAudioSync(csrfToken: string) {
+export function apiRunAudioSync() {
   return apiRequest<ApplyResult>("/api/admin/audio/sync", {
     method: "POST",
-    csrfToken,
     fallback: "同步失败",
     serverMessage: true,
   });
 }
 
-export function apiUpdateAudioMapping(
-  songId: number,
-  navidId: string | null,
-  csrfToken: string,
-) {
+export function apiUpdateAudioMapping(songId: number, navidId: string | null) {
   return apiRequest<{ nav: NavSong | null }>("/api/admin/audio/mapping", {
     method: "PUT",
     body: { songId, navidId },
-    csrfToken,
     fallback: "更新关联失败",
     serverMessage: true,
   });

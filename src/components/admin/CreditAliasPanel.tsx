@@ -40,7 +40,7 @@ function describeUsage(usage: CreditNameUsage | undefined) {
   return `${usage.songs} 首 · ${usage.roles.map((r) => ROLE_LABELS[r]).join(" / ")}`;
 }
 
-export default function CreditAliasPanel({ csrfToken }: { csrfToken: string }) {
+export default function CreditAliasPanel() {
   const [aliases, setAliases] = useState<CreditAliasRow[]>([]);
   const [names, setNames] = useState<CreditNameUsage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,7 +134,7 @@ export default function CreditAliasPanel({ csrfToken }: { csrfToken: string }) {
     if (!alias || !name || formError) return;
     setSubmitting(true);
     try {
-      const created = await apiCreateCreditAlias(alias, name, csrfToken);
+      const created = await apiCreateCreditAlias(alias, name);
       setAliases((prev) => [...prev, created]);
       setAliasInput("");
       flash(true, `已登记：${created.alias} → ${created.name}`);
@@ -148,7 +148,7 @@ export default function CreditAliasPanel({ csrfToken }: { csrfToken: string }) {
   const handleDelete = async (target: string) => {
     setDeleting(target);
     try {
-      await apiDeleteCreditAlias(target, csrfToken);
+      await apiDeleteCreditAlias(target);
       setAliases((prev) => prev.filter((a) => a.alias !== target));
       flash(true, `已删除别名：${target}`);
     } catch (err) {

@@ -132,7 +132,8 @@ export function UserButton() {
       aria-label={label}
       disabled={!loaded}
     >
-      <User size={20} className={user ? "text-(--tone)" : ""} />
+      {/* 已登录与站标竖线同色，固定 blue-600，不随 --tone 变 */}
+      <User size={20} className={user ? "text-blue-600" : ""} />
     </button>
   );
 }

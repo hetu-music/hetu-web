@@ -6,6 +6,7 @@ import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
 import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
 import {
   purgeCloudflareCache,
+  purgeCloudFrontCache,
   purgeEdgeOneCache,
 } from "@/lib/server/server-utils";
 
@@ -15,8 +16,10 @@ import {
  * 缓存只有两层，时长都由应用决定：
  * - Next：各页面 `revalidate` 的 ISR 条目，加上 unstable_cache 的数据。
  *   数据按标签失效，用到它的页面会跟着失效。
- * - CDN（Cloudflare、EdgeOne）：遵循源站 Cache-Control，不另设规则。
+ * - CDN（Cloudflare、EdgeOne、CloudFront）：遵循源站 Cache-Control，不另设规则。
  *   只能按 URL 清，所以受影响的页面和接口要逐个列出来。
+ *   站内跳转的 ?_rsc=… 变体只有 CloudFront 能按通配清；Cloudflare 上靠
+ *   Cache Rule 让这类请求不进缓存。
  *
  * 只能靠标签波及、列不出 URL 的页面（如改分类牵动全部详情页），
  * CDN 上的副本要等 s-maxage 到期，最多 2 小时。
@@ -53,13 +56,15 @@ async function invalidate({ pages = [], paths = [], tags = [] }: Targets) {
   for (let i = 0; i < cdnPaths.length; i += CDN_PURGE_BATCH) {
     batches.push(cdnPaths.slice(i, i + CDN_PURGE_BATCH));
   }
-  // 两家 CDN 互不依赖，并行刷新，缩短等待时间
-  await Promise.all(
-    batches.flatMap((batch) => [
+  // 各家 CDN 互不依赖，并行刷新，缩短等待时间。CloudFront 单次可提交上千条，
+  // 不用拆；页面另外连带清站内跳转的查询串变体
+  await Promise.all([
+    ...batches.flatMap((batch) => [
       purgeCloudflareCache(batch),
       purgeEdgeOneCache(batch),
     ]),
-  );
+    purgeCloudFrontCache(cdnPaths, localized),
+  ]);
 }
 
 /**

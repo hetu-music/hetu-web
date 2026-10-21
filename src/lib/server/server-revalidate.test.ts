@@ -8,11 +8,13 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/server/server-utils", () => ({
   purgeCloudflareCache: vi.fn(async () => undefined),
   purgeEdgeOneCache: vi.fn(async () => undefined),
+  purgeCloudFrontCache: vi.fn(async () => undefined),
 }));
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
   purgeCloudflareCache,
+  purgeCloudFrontCache,
   purgeEdgeOneCache,
 } from "@/lib/server/server-utils";
 import {
@@ -40,7 +42,21 @@ describe("refreshSongPages", () => {
     );
   });
 
-  it("两家 CDN 都按每批 30 条拆分", async () => {
+  it("CloudFront 一次提交全部路径，并连带清带语言前缀页面的查询串变体", async () => {
+    await refreshSongPages([1]);
+    expect(purgeCloudFrontCache).toHaveBeenCalledTimes(1);
+    const [paths, pagePaths] = vi.mocked(purgeCloudFrontCache).mock.calls[0];
+    expect(paths).toEqual(expect.arrayContaining(["/zh-CN/song/1", "/song/1"]));
+    // 无前缀的旧 URL 只是 301，没有站内跳转的变体
+    expect(pagePaths).toEqual([
+      "/zh-CN",
+      "/zh-CN/song/1",
+      "/zh-TW",
+      "/zh-TW/song/1",
+    ]);
+  });
+
+  it("Cloudflare 与 EdgeOne 按每批 30 条拆分", async () => {
     await refreshSongPages(Array.from({ length: 20 }, (_, i) => i + 1));
     for (const fn of [purgeCloudflareCache, purgeEdgeOneCache]) {
       const calls = vi.mocked(fn).mock.calls;

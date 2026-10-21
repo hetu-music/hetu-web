@@ -1,11 +1,17 @@
+import {
+  CloudFrontClient,
+  CreateInvalidationCommand,
+} from "@aws-sdk/client-cloudfront";
 import crypto from "crypto";
 import { cookies as nextCookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { fetchWithTimeout } from "@/lib/utils/utils-common";
 
-// 两家 CDN 的刷新接口串在发布流程的 Promise.all 上，卡住就卡住整个发布
+// 各家 CDN 的刷新接口串在发布流程的 Promise.all 上，卡住就卡住整个发布
 const PURGE_TIMEOUT_MS = 10000;
 const CLOUDFLARE_PURGE_BATCH = 30;
+// CloudFront 同一时间最多 15 条通配路径在处理中，留些余量给紧接着的下一次刷新
+const CLOUDFRONT_MAX_WILDCARDS = 10;
 
 const CSRF_COOKIE_NAME = "csrf-token";
 const CSRF_HEADER_NAME = "x-csrf-token";
@@ -371,4 +377,79 @@ export async function purgeEdgeOneCache(paths: string[]) {
   } catch (err) {
     console.error("[EdgeOne] 刷新 CDN 缓存出错:", err);
   }
+}
+
+let cloudFrontClient: CloudFrontClient | undefined;
+
+async function createCloudFrontInvalidation(
+  client: CloudFrontClient,
+  distributionId: string,
+  items: string[],
+) {
+  try {
+    const res = await client.send(
+      new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          // 每次提交都要唯一，重复的 CallerReference 会被当成同一个请求
+          CallerReference: `${Date.now()}-${crypto.randomUUID()}`,
+          Paths: { Quantity: items.length, Items: items },
+        },
+      }),
+      { abortSignal: AbortSignal.timeout(PURGE_TIMEOUT_MS) },
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      "[CloudFront] 成功提交刷新任务，任务 ID:",
+      res.Invalidation?.Id,
+      items,
+    );
+  } catch (err) {
+    console.error("[CloudFront] 刷新 CDN 缓存出错:", items, err);
+  }
+}
+
+/**
+ * 清除 Amazon CloudFront 的指定路径缓存
+ *
+ * 分两次提交：精确路径一次；页面带查询串的变体（站内跳转的 ?_rsc=…）
+ * 用 `路径?*` 通配另提交一次。通配路径同时处理中的数量有上限，超了只丢
+ * 这一次的变体，页面本身照常刷新；变体太多时改成整站 `/*`。
+ *
+ * 不用 `路径*`：首页 /zh-CN 加上 * 会匹配整个语言版本。
+ *
+ * @param paths     相对地址路径数组，如 [/, /song/123]
+ * @param pagePaths 其中要连带清查询串变体的页面路径
+ */
+export async function purgeCloudFrontCache(
+  paths: string[],
+  pagePaths: string[] = [],
+) {
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+
+  // 如果未配置环境变量，则静默跳过（如本地开发环境）
+  if (!distributionId) {
+    console.warn(
+      "[CloudFront] 未配置 CLOUDFRONT_DISTRIBUTION_ID，跳过 CDN 缓存刷新。",
+    );
+    return;
+  }
+
+  // 访问密钥走 SDK 默认凭证链（AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY）；
+  // CloudFront 是全局服务，API 固定在 us-east-1
+  cloudFrontClient ??= new CloudFrontClient({ region: "us-east-1" });
+  const client = cloudFrontClient;
+
+  const variants =
+    pagePaths.length > CLOUDFRONT_MAX_WILDCARDS
+      ? ["/*"]
+      : pagePaths.map((p) => `${p}?*`);
+
+  await Promise.all(
+    [paths, variants]
+      .filter((items) => items.length > 0)
+      .map((items) =>
+        createCloudFrontInvalidation(client, distributionId, items),
+      ),
+  );
 }

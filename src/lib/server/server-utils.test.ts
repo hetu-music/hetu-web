@@ -5,6 +5,7 @@ import {
   getCSRFCookie,
   purgeCloudflareCache,
   purgeEdgeOneCache,
+  purgeCloudFrontCache,
   safeCompareSecret,
   serverErrorResponse,
   setCSRFCookie,
@@ -38,6 +39,25 @@ function makeCookieJar() {
     },
   };
 }
+
+type InvalidationInput = {
+  DistributionId: string;
+  InvalidationBatch: { CallerReference: string; Paths: { Items: string[] } };
+};
+
+// ─── mock CloudFront SDK：只记录提交的命令 ────────────────────────────────────
+const cloudFrontSend = vi.hoisted(() =>
+  vi.fn<(command: { input: InvalidationInput }) => Promise<unknown>>(),
+);
+
+vi.mock("@aws-sdk/client-cloudfront", () => ({
+  CloudFrontClient: class {
+    send = cloudFrontSend;
+  },
+  CreateInvalidationCommand: class {
+    constructor(public input: unknown) {}
+  },
+}));
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => {
@@ -352,6 +372,67 @@ describe("purgeEdgeOneCache", () => {
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
     await expect(purgeEdgeOneCache(["/"])).resolves.toBeUndefined();
+  });
+});
+
+describe("purgeCloudFrontCache", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    cloudFrontSend.mockReset();
+  });
+
+  const submitted = () =>
+    cloudFrontSend.mock.calls.map(
+      ([command]) => command.input.InvalidationBatch.Paths.Items,
+    );
+
+  it("未配置分发 ID 时跳过，不发起请求", async () => {
+    vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "");
+    await purgeCloudFrontCache(["/"]);
+    expect(cloudFrontSend).not.toHaveBeenCalled();
+  });
+
+  it("精确路径与页面的查询串变体分两次提交", async () => {
+    vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
+    cloudFrontSend.mockResolvedValue({ Invalidation: { Id: "I1" } });
+
+    await purgeCloudFrontCache(["/zh-CN", "/", "/sitemap.xml"], ["/zh-CN"]);
+
+    const [command] = cloudFrontSend.mock.calls[0];
+    expect(command.input.DistributionId).toBe("E123");
+    expect(submitted()).toEqual([
+      ["/zh-CN", "/", "/sitemap.xml"],
+      ["/zh-CN?*"],
+    ]);
+  });
+
+  it("每次提交的 CallerReference 都不同", async () => {
+    vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
+    cloudFrontSend.mockResolvedValue({});
+    await purgeCloudFrontCache(["/a"], ["/a"]);
+    const refs = cloudFrontSend.mock.calls.map(
+      ([command]) => command.input.InvalidationBatch.CallerReference,
+    );
+    expect(new Set(refs).size).toBe(2);
+  });
+
+  it("变体超过 10 条时改成整站 /*，避免撞上通配路径的并发上限", async () => {
+    vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
+    cloudFrontSend.mockResolvedValue({});
+    const pages = Array.from({ length: 11 }, (_, i) => `/zh-CN/song/${i}`);
+    await purgeCloudFrontCache(pages, pages);
+    expect(submitted()[1]).toEqual(["/*"]);
+  });
+
+  it("SDK 抛异常时不向上抛出，另一批照常提交", async () => {
+    vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
+    cloudFrontSend
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("TooManyInvalidationsInProgress"));
+    await expect(
+      purgeCloudFrontCache(["/zh-CN"], ["/zh-CN"]),
+    ).resolves.toBeUndefined();
+    expect(cloudFrontSend).toHaveBeenCalledTimes(2);
   });
 });
 

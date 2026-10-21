@@ -23,6 +23,7 @@
     "navidrome:sync": "tsx --env-file=.env.local scripts/navidrome-sync.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudfront": "^3.1153.0",
     "@base-ui/react": "^1.9.0",
     "@gsap/react": "^2.1.2",
     "@hookform/resolvers": "6.0.0",

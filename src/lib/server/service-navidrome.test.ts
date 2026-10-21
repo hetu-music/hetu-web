@@ -12,6 +12,7 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/server/server-utils", () => ({
   purgeCloudflareCache: vi.fn(async () => undefined),
   purgeEdgeOneCache: vi.fn(async () => undefined),
+  purgeCloudFrontCache: vi.fn(async () => undefined),
   serverErrorResponse: vi.fn(
     (_scope: string, _error: unknown, message = "服务器错误", status = 500) =>
       Response.json({ error: message }, { status }),

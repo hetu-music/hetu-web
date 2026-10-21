@@ -15,6 +15,7 @@ vi.mock("@/lib/server/server-utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/server-utils")>()),
   purgeCloudflareCache: (paths: string[]) => purgeCloudflareMock(paths),
   purgeEdgeOneCache: vi.fn(async () => undefined),
+  purgeCloudFrontCache: vi.fn(async () => undefined),
 }));
 
 import { GET, POST } from "./route";

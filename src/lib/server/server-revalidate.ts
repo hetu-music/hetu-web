@@ -18,10 +18,12 @@ import {
  * 缓存只有两层，时长都由应用决定：
  * - Next：各页面 `revalidate` 的 ISR 条目，加上 unstable_cache 的数据。
  *   数据按标签失效，用到它的页面会跟着失效。
- * - CDN（Cloudflare、EdgeOne、CloudFront）：遵循源站 Cache-Control，不另设规则。
+ * - CDN（Cloudflare、EdgeOne、CloudFront）：缓存多久看源站 Cache-Control，
+ *   CDN 上不另设时长。但 Cloudflare 默认不缓存 HTML 和 JSON，要两条 Cache Rule：
+ *   一条让页面和公开接口按源站头进缓存（排除 /api/admin、/api/auth），
+ *   一条让站内跳转请求（?_rsc= 或 rsc: 1）绕过缓存。
  *   只能按 URL 清，所以受影响的页面和接口要逐个列出来。
- *   站内跳转的 ?_rsc=… 变体只有 CloudFront 能按通配清；Cloudflare 上靠
- *   Cache Rule 让这类请求不进缓存。
+ *   站内跳转的 ?_rsc=… 变体只有 CloudFront 能按通配清。
  *
  * 只能靠标签波及、列不出 URL 的页面（如改分类牵动全部详情页），
  * CDN 上的副本要等 s-maxage 到期，最多 2 小时。

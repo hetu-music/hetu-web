@@ -32,7 +32,7 @@ export async function handleApprove(id: number) {
     // 注：此处曾调用 revalidateTag("music")，但全站没有任何缓存条目打过
     // 这个标签，等于空操作。页面级失效由 revalidatePath 完成。
     // 播放器的歌词走单独的接口，在 CDN 上缓存 6 小时，要一起清
-    await refreshSongPages(
+    const purge = await refreshSongPages(
       [id],
       [
         "/sitemap.xml",
@@ -41,7 +41,8 @@ export async function handleApprove(id: number) {
       ],
     );
 
-    return { success: true };
+    // Server Action 拿不到响应头，没刷成功的 CDN 放进返回值，由调用方提示
+    return { success: true, cdnPurgeFailed: purge.failed };
   } catch (err: unknown) {
     console.error("handleApprove unexpected error:", err);
     return {

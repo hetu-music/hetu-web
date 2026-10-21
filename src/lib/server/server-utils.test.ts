@@ -238,8 +238,25 @@ describe("purgeCloudflareCache", () => {
   it("环境变量未配置时跳过，不发起请求", async () => {
     vi.stubEnv("CLOUDFLARE_ZONE_ID", "");
     vi.stubEnv("CLOUDFLARE_API_TOKEN", "");
-    await purgeCloudflareCache(["/"]);
+    await expect(purgeCloudflareCache(["/"])).resolves.toBe("skipped");
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  // 只配了凭证说明配置有误：按失败上报，并写明缺了哪个，不再笼统说没配凭证
+  it("凭证齐全但缺站点地址时按失败处理，并写明缺哪个变量", async () => {
+    vi.stubEnv("CLOUDFLARE_ZONE_ID", "zone123");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "token456");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    await expect(purgeCloudflareCache(["/"])).resolves.toBe("failed");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("NEXT_PUBLIC_SITE_URL"),
+    );
+    errorSpy.mockRestore();
   });
 
   it("环境变量齐全时按 zoneId 拼接 purge_cache 请求，携带 Bearer token", async () => {
@@ -251,7 +268,7 @@ describe("purgeCloudflareCache", () => {
       json: async () => ({}),
     } as Response);
 
-    await purgeCloudflareCache(["/song/1", "/"]);
+    await expect(purgeCloudflareCache(["/song/1", "/"])).resolves.toBe("ok");
 
     expect(fetch).toHaveBeenCalledWith(
       "https://api.cloudflare.com/client/v4/zones/zone123/purge_cache",
@@ -297,7 +314,7 @@ describe("purgeCloudflareCache", () => {
       text: async () => "invalid token",
     } as Response);
 
-    await expect(purgeCloudflareCache(["/"])).resolves.toBeUndefined();
+    await expect(purgeCloudflareCache(["/"])).resolves.toBe("failed");
   });
 
   it("fetch 本身抛异常（网络故障）时不向上抛出", async () => {
@@ -306,7 +323,7 @@ describe("purgeCloudflareCache", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.com");
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
-    await expect(purgeCloudflareCache(["/"])).resolves.toBeUndefined();
+    await expect(purgeCloudflareCache(["/"])).resolves.toBe("failed");
   });
 });
 
@@ -321,7 +338,9 @@ describe("purgeEdgeOneCache", () => {
 
   it("环境变量未配置时跳过，不发起请求", async () => {
     vi.stubEnv("EDGEONE_SECRET_ID", "");
-    await purgeEdgeOneCache(["/"]);
+    vi.stubEnv("EDGEONE_SECRET_KEY", "");
+    vi.stubEnv("EDGEONE_ZONE_ID", "");
+    await expect(purgeEdgeOneCache(["/"])).resolves.toBe("skipped");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -334,7 +353,7 @@ describe("purgeEdgeOneCache", () => {
       json: async () => ({ Response: { JobId: "job-1" } }),
     } as Response);
 
-    await purgeEdgeOneCache(["/song/1"]);
+    await expect(purgeEdgeOneCache(["/song/1"])).resolves.toBe("ok");
 
     expect(fetch).toHaveBeenCalledWith(
       "https://teo.intl.tencentcloudapi.com",
@@ -361,7 +380,7 @@ describe("purgeEdgeOneCache", () => {
       }),
     } as Response);
 
-    await expect(purgeEdgeOneCache(["/"])).resolves.toBeUndefined();
+    await expect(purgeEdgeOneCache(["/"])).resolves.toBe("failed");
   });
 
   it("fetch 本身抛异常时不向上抛出", async () => {
@@ -371,7 +390,7 @@ describe("purgeEdgeOneCache", () => {
     vi.stubEnv("EDGEONE_SITE_URL", "https://example.com");
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
-    await expect(purgeEdgeOneCache(["/"])).resolves.toBeUndefined();
+    await expect(purgeEdgeOneCache(["/"])).resolves.toBe("failed");
   });
 });
 
@@ -388,7 +407,7 @@ describe("purgeCloudFrontCache", () => {
 
   it("未配置分发 ID 时跳过，不发起请求", async () => {
     vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "");
-    await purgeCloudFrontCache(["/"]);
+    await expect(purgeCloudFrontCache(["/"])).resolves.toBe("skipped");
     expect(cloudFrontSend).not.toHaveBeenCalled();
   });
 
@@ -429,9 +448,9 @@ describe("purgeCloudFrontCache", () => {
     cloudFrontSend
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce(new Error("TooManyInvalidationsInProgress"));
-    await expect(
-      purgeCloudFrontCache(["/zh-CN"], ["/zh-CN"]),
-    ).resolves.toBeUndefined();
+    await expect(purgeCloudFrontCache(["/zh-CN"], ["/zh-CN"])).resolves.toBe(
+      "failed",
+    );
     expect(cloudFrontSend).toHaveBeenCalledTimes(2);
   });
 });

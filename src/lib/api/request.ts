@@ -1,6 +1,8 @@
 "use client";
 
+import { addToast } from "@/components/ui/toast";
 import { getCsrfToken, resetCsrfToken } from "@/lib/api/csrf";
+import { CDN_PURGE_FAILED_HEADER, cdnPurgeWarning } from "@/lib/cdn-purge";
 
 /**
  * 前端调站内接口的唯一底层：拼 JSON 请求体与 CSRF 请求头、读 JSON 响应。
@@ -51,6 +53,11 @@ export async function sendRequest(
 
   if (res.status === 403 && data?.error === "Invalid CSRF token") {
     resetCsrfToken();
+  }
+  // 后台写接口保存成功、但有 CDN 没刷新成功：在这里统一提示，调用方不用各自处理
+  const purgeFailed = res.headers.get(CDN_PURGE_FAILED_HEADER);
+  if (res.ok && purgeFailed) {
+    addToast("error", cdnPurgeWarning(purgeFailed.split(",")));
   }
   return { ok: res.ok, status: res.status, data: data ?? {} };
 }

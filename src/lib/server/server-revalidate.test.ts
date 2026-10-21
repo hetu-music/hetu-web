@@ -18,8 +18,10 @@ import {
   purgeEdgeOneCache,
 } from "@/lib/server/server-utils";
 import {
+  refreshAudioPages,
   refreshImagery,
   refreshSongPages,
+  withPurgeStatus,
 } from "@/lib/server/server-revalidate";
 
 const purged = () =>
@@ -63,6 +65,37 @@ describe("refreshSongPages", () => {
       expect(calls.length).toBeGreaterThan(1);
       expect(calls.every(([paths]) => paths.length <= 30)).toBe(true);
     }
+  });
+});
+
+describe("清 CDN 的结果", () => {
+  it("没启用的 CDN 不算失败；任一批失败就把那家记为失败", async () => {
+    vi.mocked(purgeCloudflareCache)
+      .mockResolvedValueOnce("ok")
+      .mockResolvedValueOnce("failed");
+    vi.mocked(purgeEdgeOneCache).mockResolvedValue("skipped");
+    vi.mocked(purgeCloudFrontCache).mockResolvedValue("ok");
+    // 20 首歌 × 2 种语言，超过 30 条，Cloudflare 分两批
+    const report = await refreshSongPages(
+      Array.from({ length: 20 }, (_, i) => i + 1),
+    );
+    expect(report).toEqual({ failed: ["Cloudflare"] });
+  });
+
+  it("没有歌曲变化时不刷新，也没有失败", async () => {
+    await expect(refreshAudioPages([])).resolves.toEqual({ failed: [] });
+    expect(purgeCloudflareCache).not.toHaveBeenCalled();
+  });
+
+  it("失败的 CDN 写进响应头，全部成功时不加", () => {
+    const failed = withPurgeStatus(new Response(null), {
+      failed: ["Cloudflare", "CloudFront"],
+    });
+    expect(failed.headers.get("x-cdn-purge-failed")).toBe(
+      "Cloudflare,CloudFront",
+    );
+    const ok = withPurgeStatus(new Response(null), { failed: [] });
+    expect(ok.headers.get("x-cdn-purge-failed")).toBeNull();
   });
 });
 

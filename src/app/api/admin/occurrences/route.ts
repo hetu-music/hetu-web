@@ -5,7 +5,10 @@ import {
   getOccurrencesForSong,
   createOccurrence,
 } from "@/lib/server/service-imagery";
-import { refreshImagery } from "@/lib/server/server-revalidate";
+import {
+  refreshImagery,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
@@ -74,11 +77,11 @@ export const POST = withAuth(
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const created = await createOccurrence(input, session.access_token);
-      await refreshImagery({
+      const purge = await refreshImagery({
         songIds: [created.song_id],
         imageryIds: [created.imagery_id],
       });
-      return NextResponse.json(created);
+      return withPurgeStatus(NextResponse.json(created), purge);
     } catch (e) {
       if (
         e instanceof Error &&

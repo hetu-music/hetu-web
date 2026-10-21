@@ -4,6 +4,7 @@ import {
   refreshAllSongPages,
   refreshPublicPages,
   refreshSongPages,
+  type PurgeReport,
 } from "@/lib/server/server-revalidate";
 
 const SECRET_HEADER = "x-revalidate-secret";
@@ -21,6 +22,20 @@ function isAuthorized(request: NextRequest): boolean {
   );
 }
 
+/**
+ * Next 已刷新但有 CDN 没刷成功：返回 502，让部署脚本与同步脚本看得出来，
+ * 不要报成功。哪几家失败写在响应体里，原因见服务日志。
+ */
+function purgeFailedResponse(report: PurgeReport, timestamp: string) {
+  return new NextResponse(
+    `PARTIAL: Next cache revalidated, CDN purge failed (${report.failed.join(", ")}) at ${timestamp}`,
+    {
+      status: 502,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    },
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!isAuthorized(request)) {
@@ -32,9 +47,10 @@ export async function POST(request: NextRequest) {
 
     // 首页、意象、故事、寻曲、sitemap，以及寻曲候选池与详情页意象索引；
     // 部署后由 start.sh 调用，Next 与 CDN 一起刷新
-    await refreshPublicPages();
+    const purge = await refreshPublicPages();
 
     const timestamp = new Date().toISOString();
+    if (purge.failed.length > 0) return purgeFailedResponse(purge, timestamp);
 
     const response = `SUCCESS: Home page, imagery, story, quiz, and sitemap revalidated at ${timestamp}`;
 
@@ -86,7 +102,8 @@ export async function GET(request: NextRequest) {
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         });
       }
-      await refreshSongPages([songId]);
+      const purge = await refreshSongPages([songId]);
+      if (purge.failed.length > 0) return purgeFailedResponse(purge, timestamp);
       response = `SUCCESS: Page /song/${songId} revalidated at ${timestamp}`;
     }
 

@@ -23,7 +23,10 @@ import {
   type NavSong,
   type SyncPlan,
 } from "@/lib/navidrome/sync";
-import { refreshAudioPages } from "@/lib/server/server-revalidate";
+import {
+  refreshAudioPages,
+  type PurgeReport,
+} from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 
 /** 缺少数据库或 Navidrome 配置，对应 503 */
@@ -90,8 +93,13 @@ export async function getAudioOverview(): Promise<AudioOverview> {
   };
 }
 
-/** 服务端重新计算同步计划并执行，不信任客户端预览时的计划 */
-export async function runAudioSync(): Promise<ApplyResult> {
+/**
+ * 服务端重新计算同步计划并执行，不信任客户端预览时的计划。
+ * purge 是清 CDN 的结果，由路由写进响应头，不放进响应体。
+ */
+export async function runAudioSync(): Promise<
+  ApplyResult & { purge: PurgeReport }
+> {
   const { supabase, config } = requireDeps();
   const [library, { songs, mappings }] = await Promise.all([
     loadLibrary(config),
@@ -101,15 +109,15 @@ export async function runAudioSync(): Promise<ApplyResult> {
     supabase,
     planSync(songs, library, mappings),
   );
-  await refreshAudioPages(result.hasAudioChanged);
-  return result;
+  const purge = await refreshAudioPages(result.hasAudioChanged);
+  return { ...result, purge };
 }
 
 /** 手动关联或解除关联（navidId 为 null）单首歌曲 */
 export async function updateAudioMapping(
   songId: number,
   navidId: string | null,
-): Promise<{ nav: NavSong | null }> {
+): Promise<{ nav: NavSong | null; purge: PurgeReport }> {
   const { supabase, config } = requireDeps();
 
   const { data: song, error } = await supabase
@@ -127,8 +135,9 @@ export async function updateAudioMapping(
   }
 
   await setSongMapping(supabase, songId, nav);
-  if (Boolean(song.has_audio) !== (navidId !== null)) {
-    await refreshAudioPages([songId]);
-  }
-  return { nav };
+  const purge =
+    Boolean(song.has_audio) !== (navidId !== null)
+      ? await refreshAudioPages([songId])
+      : { failed: [] };
+  return { nav, purge };
 }

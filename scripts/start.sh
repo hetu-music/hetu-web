@@ -24,7 +24,7 @@ if [ -n "${REVALIDATE_SECRET:-}" ]; then
           "${BASE}/api/public/revalidate"; then
           echo "[start] revalidate 成功（等待就绪 ${attempt}s）"
         else
-          echo "[start] revalidate 请求失败"
+          echo "[start] revalidate 失败（Next 或 CDN 刷新出错，原因见上方日志）"
         fi
         exit 0
       fi

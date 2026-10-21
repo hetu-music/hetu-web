@@ -2,12 +2,14 @@ import "server-only";
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { locales } from "@/i18n/config";
+import { CDN_PURGE_FAILED_HEADER } from "@/lib/cdn-purge";
 import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
 import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
 import {
   purgeCloudflareCache,
   purgeCloudFrontCache,
   purgeEdgeOneCache,
+  type PurgeOutcome,
 } from "@/lib/server/server-utils";
 
 /**
@@ -37,9 +39,29 @@ type Targets = {
   tags?: string[];
 };
 
+/** 这次没刷成功的 CDN；为空表示都刷成功了，或者没启用 */
+export type PurgeReport = { failed: string[] };
+
+const NOTHING_FAILED: PurgeReport = { failed: [] };
+
+/** 把没刷成功的 CDN 写进响应头，后台前端的 sendRequest 据此提示管理员 */
+export function withPurgeStatus<T extends Response>(
+  response: T,
+  report: PurgeReport,
+): T {
+  if (report.failed.length > 0) {
+    response.headers.set(CDN_PURGE_FAILED_HEADER, report.failed.join(","));
+  }
+  return response;
+}
+
 const songPage = (id: number) => `/song/${id}`;
 
-async function invalidate({ pages = [], paths = [], tags = [] }: Targets) {
+async function invalidate({
+  pages = [],
+  paths = [],
+  tags = [],
+}: Targets): Promise<PurgeReport> {
   // Next 侧：只有带 locale 前缀的路由真实存在。无前缀的 /、/song/:id
   // 在 next.config 的 redirects() 里是 301，Next 没有对应的缓存条目。
   const localized = locales.flatMap((locale) =>
@@ -58,13 +80,21 @@ async function invalidate({ pages = [], paths = [], tags = [] }: Targets) {
   }
   // 各家 CDN 互不依赖，并行刷新，缩短等待时间。CloudFront 单次可提交上千条，
   // 不用拆；页面另外连带清站内跳转的查询串变体
-  await Promise.all([
-    ...batches.flatMap((batch) => [
-      purgeCloudflareCache(batch),
-      purgeEdgeOneCache(batch),
-    ]),
+  const [cloudflare, edgeOne, cloudFront] = await Promise.all([
+    Promise.all(batches.map((batch) => purgeCloudflareCache(batch))),
+    Promise.all(batches.map((batch) => purgeEdgeOneCache(batch))),
     purgeCloudFrontCache(cdnPaths, localized),
   ]);
+  const outcomes: [string, PurgeOutcome[]][] = [
+    ["Cloudflare", cloudflare],
+    ["EdgeOne", edgeOne],
+    ["CloudFront", [cloudFront]],
+  ];
+  return {
+    failed: outcomes
+      .filter(([, results]) => results.includes("failed"))
+      .map(([cdn]) => cdn),
+  };
 }
 
 /**
@@ -76,8 +106,8 @@ async function invalidate({ pages = [], paths = [], tags = [] }: Targets) {
 export async function refreshSongPages(
   songIds: number[],
   extraPaths: string[] = [],
-) {
-  await invalidate({
+): Promise<PurgeReport> {
+  return invalidate({
     pages: ["", ...songIds.map(songPage)],
     paths: extraPaths,
   });
@@ -87,9 +117,11 @@ export async function refreshSongPages(
  * has_audio 变了：曲库列表、歌曲详情和寻曲测验的播放按钮。
  * navid_id 本身在播放时实时查询，替换映射不需要刷新缓存。
  */
-export async function refreshAudioPages(songIds: number[]) {
-  if (songIds.length === 0) return;
-  await invalidate({
+export async function refreshAudioPages(
+  songIds: number[],
+): Promise<PurgeReport> {
+  if (songIds.length === 0) return NOTHING_FAILED;
+  return invalidate({
     pages: ["", "/quiz", ...songIds.map(songPage)],
     tags: [QUIZ_POOL_TAG],
   });
@@ -104,8 +136,8 @@ export async function refreshAudioPages(songIds: number[]) {
 export async function refreshImagery({
   songIds = [],
   imageryIds = [],
-}: { songIds?: number[]; imageryIds?: number[] } = {}) {
-  await invalidate({
+}: { songIds?: number[]; imageryIds?: number[] } = {}): Promise<PurgeReport> {
+  return invalidate({
     pages: ["/imagery", "/quiz", ...songIds.map(songPage)],
     paths: imageryIds.map((id) => `/api/imagery/${id}/songs`),
     tags: [SONG_IMAGERY_TAG, QUIZ_POOL_TAG],
@@ -113,8 +145,8 @@ export async function refreshImagery({
 }
 
 /** 部署后预热与外部同步脚本用：列表类页面和各项聚合数据 */
-export async function refreshPublicPages() {
-  await invalidate({
+export async function refreshPublicPages(): Promise<PurgeReport> {
+  return invalidate({
     pages: ["", "/imagery", "/story/qjtx", "/quiz"],
     paths: ["/sitemap.xml", "/api/public/songs/lyrics-index"],
     tags: [QUIZ_POOL_TAG, SONG_IMAGERY_TAG],

@@ -5,7 +5,10 @@ import {
   deleteOccurrence,
   getOccurrenceRefs,
 } from "@/lib/server/service-imagery";
-import { refreshImagery } from "@/lib/server/server-revalidate";
+import {
+  refreshImagery,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
@@ -42,14 +45,14 @@ export const PUT = withAuth(
       // 换了意象的话，原意象的歌曲列表也要刷新
       const before = await getOccurrenceRefs(id);
       const updated = await updateOccurrence(id, input, session.access_token);
-      await refreshImagery({
+      const purge = await refreshImagery({
         songIds: [updated.song_id],
         imageryIds: [
           updated.imagery_id,
           ...(before ? [before.imagery_id] : []),
         ],
       });
-      return NextResponse.json(updated);
+      return withPurgeStatus(NextResponse.json(updated), purge);
     } catch (e) {
       if (
         e instanceof Error &&
@@ -80,13 +83,13 @@ export const DELETE = withAuth(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const before = await getOccurrenceRefs(id);
       await deleteOccurrence(id, session.access_token);
-      if (before) {
-        await refreshImagery({
-          songIds: [before.song_id],
-          imageryIds: [before.imagery_id],
-        });
-      }
-      return NextResponse.json({ success: true });
+      const purge = before
+        ? await refreshImagery({
+            songIds: [before.song_id],
+            imageryIds: [before.imagery_id],
+          })
+        : { failed: [] };
+      return withPurgeStatus(NextResponse.json({ success: true }), purge);
     } catch (e) {
       console.error("[DELETE /api/admin/occurrences/[id]]", e);
       return NextResponse.json(

@@ -245,6 +245,7 @@ describe("FavoritesProvider — 收藏与取消", () => {
     mockUser = makeUser("u1");
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => ({
       ok: true,
+      headers: new Headers(),
       json: async () =>
         init?.method
           ? {}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import type { PurgeOutcome } from "@/lib/server/server-utils";
 
 const revalidatePathMock = vi.fn();
 const revalidateTagMock = vi.fn();
@@ -9,7 +10,9 @@ vi.mock("next/cache", () => ({
   revalidateTag: (...args: unknown[]) => revalidateTagMock(...args),
 }));
 
-const purgeCloudflareMock = vi.fn(async (_paths: string[]) => undefined);
+const purgeCloudflareMock = vi.fn(
+  async (_paths: string[]): Promise<PurgeOutcome> => "ok",
+);
 
 vi.mock("@/lib/server/server-utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/server-utils")>()),
@@ -96,6 +99,14 @@ describe("POST /api/public/revalidate — 鉴权", () => {
     expect(purged).toEqual(
       expect.arrayContaining(["/zh-CN", "/", "/zh-CN/imagery", "/sitemap.xml"]),
     );
+  });
+
+  it("Next 刷新了但 CDN 失败时返回 502，让部署脚本看得出来", async () => {
+    purgeCloudflareMock.mockResolvedValueOnce("failed");
+    const res = await POST(makeRequest("POST", { secretHeader: SECRET }));
+    expect(res.status).toBe(502);
+    expect(await res.text()).toContain("Cloudflare");
+    expect(revalidatePathMock).toHaveBeenCalled();
   });
 
   it("服务端未配置密钥时一律拒绝", async () => {

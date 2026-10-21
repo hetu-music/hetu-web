@@ -33,8 +33,9 @@ vi.mock("@/lib/server/service-imagery", () => ({
   createImageryCategory: vi.fn(),
 }));
 
-vi.mock("@/lib/server/server-revalidate", () => ({
-  refreshImagery: vi.fn(async () => undefined),
+vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server/server-revalidate")>()),
+  refreshImagery: vi.fn(async () => ({ failed: [] })),
 }));
 
 import {

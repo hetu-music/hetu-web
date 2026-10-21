@@ -400,11 +400,27 @@ describe("POST /api/auth/account", () => {
     });
   });
 
-  it("更新失败返回 400，不回数据库原文", async () => {
-    mockUpdateError = { message: 'duplicate key "users_name_key"' };
+  it("用户名被占用返回 409，不回数据库原文", async () => {
+    mockUpdateError = {
+      code: "23505",
+      message:
+        'duplicate key value violates unique constraint "users_name_unique"',
+    };
+    const res = await updateAccount(makeRequest("account", VALID));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("这个用户名已经有人用了");
+    expect(JSON.stringify(body)).not.toContain("users_name_unique");
+  });
+
+  it("其他更新失败返回 400，不回数据库原文", async () => {
+    mockUpdateError = {
+      code: "42501",
+      message: 'permission denied for table "users"',
+    };
     const res = await updateAccount(makeRequest("account", VALID));
     expect(res.status).toBe(400);
-    expect(JSON.stringify(await res.json())).not.toContain("users_name_key");
+    expect(JSON.stringify(await res.json())).not.toContain("permission denied");
   });
 });
 

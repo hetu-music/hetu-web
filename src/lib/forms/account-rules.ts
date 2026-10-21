@@ -27,6 +27,12 @@ export const displayNameField = z
   .min(2, "用户名不少于2个字符")
   .max(30, "用户名不能超过30个字符");
 
+/**
+ * 用户名撞了 users 上的唯一索引（lower(btrim(name))）时回给前端的文案。
+ * 不另做「是否可用」的预查：先查再写挡不住两人同时提交，以约束为准
+ */
+export const DISPLAY_NAME_TAKEN = "这个用户名已经有人用了";
+
 export const introField = z
   .string()
   .trim()

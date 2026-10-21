@@ -3,7 +3,11 @@ import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { TABLES } from "@/lib/db/supabase-server";
-import { displayNameField, introField } from "@/lib/forms/account-rules";
+import {
+  DISPLAY_NAME_TAKEN,
+  displayNameField,
+  introField,
+} from "@/lib/forms/account-rules";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -36,6 +40,12 @@ export const POST = withAuth(
       .update(update)
       .eq("id", user.id);
     if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: DISPLAY_NAME_TAKEN },
+          { status: 409 },
+        );
+      }
       return serverErrorResponse(
         "POST /api/auth/account",
         error,

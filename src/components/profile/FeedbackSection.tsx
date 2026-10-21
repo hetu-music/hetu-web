@@ -1,8 +1,7 @@
 "use client";
 
 import ProfileSectionHeading, {
-  GROUP_TITLE_CLASS,
-  GroupRule,
+  GroupHeading,
 } from "@/components/profile/ProfileSectionHeading";
 import {
   FIELD_CLASS,
@@ -69,28 +68,28 @@ export default function FeedbackSection() {
     <section>
       <ProfileSectionHeading label={t("tabs.feedback")} />
 
-      <div className="mt-8 lg:mt-12 max-w-[40em]">
-        <h3 className={GROUP_TITLE_CLASS}>{t("feedback.submitTitle")}</h3>
-        <SubmitForm
-          onSubmitted={() =>
-            void queryClient.invalidateQueries({
-              queryKey: myRequestsKey(user?.id),
-            })
-          }
-        />
+      {/* 题头通栏，与下面通栏的反馈记录对齐；只有表单限宽 */}
+      <div className="mt-8 lg:mt-12">
+        <GroupHeading label={t("feedback.submitTitle")} />
+        <div className="max-w-[40em]">
+          <SubmitForm
+            onSubmitted={() =>
+              void queryClient.invalidateQueries({
+                queryKey: myRequestsKey(user?.id),
+              })
+            }
+          />
+        </div>
       </div>
 
-      <GroupRule />
-
-      <div>
-        <div className="flex items-baseline justify-between gap-4">
-          <h3 className={GROUP_TITLE_CLASS}>{t("feedback.historyTitle")}</h3>
+      <div className="mt-20">
+        <GroupHeading label={t("feedback.historyTitle")}>
           {history.isSuccess && (
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {t("feedback.historyCount", { count: requests.length })}
             </span>
           )}
-        </div>
+        </GroupHeading>
         <RequestList
           requests={requests}
           pending={history.isPending}

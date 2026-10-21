@@ -4,9 +4,7 @@ import EmailForm from "@/components/profile/account/EmailForm";
 import PasswordForm from "@/components/profile/account/PasswordForm";
 import ProfileForm from "@/components/profile/account/ProfileForm";
 import SessionsBlock from "@/components/profile/account/SessionsBlock";
-import ProfileSectionHeading, {
-  GroupRule,
-} from "@/components/profile/ProfileSectionHeading";
+import ProfileSectionHeading from "@/components/profile/ProfileSectionHeading";
 import { useUserContext } from "@/context/UserContext";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -22,13 +20,10 @@ export default function AccountSection() {
       {!loaded || !user ? (
         <Loader2 size={20} className="mt-12 animate-spin text-slate-400" />
       ) : (
-        <div className="mt-8 lg:mt-12 max-w-[40em]">
+        <div className="mt-8 lg:mt-12 max-w-[40em] space-y-20">
           <ProfileForm />
-          <GroupRule />
           <EmailForm />
-          <GroupRule />
           <PasswordForm />
-          <GroupRule />
           <SessionsBlock />
         </div>
       )}

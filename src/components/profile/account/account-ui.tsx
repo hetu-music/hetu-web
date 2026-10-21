@@ -1,8 +1,8 @@
-import { GROUP_TITLE_CLASS } from "@/components/profile/ProfileSectionHeading";
+import { GroupHeading } from "@/components/profile/ProfileSectionHeading";
 import { SubmitButton } from "@/components/shared/FormField";
 import type { ReactNode } from "react";
 
-/** 账户设置里的一组：小字题名、一句说明，下面是表单或操作 */
+/** 账户设置里的一组：题头、一句说明，下面是表单或操作 */
 export function AccountBlock({
   title,
   description,
@@ -14,7 +14,7 @@ export function AccountBlock({
 }) {
   return (
     <div>
-      <h3 className={GROUP_TITLE_CLASS}>{title}</h3>
+      <GroupHeading label={title} />
       {description && (
         <p className="mt-2 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
           {description}

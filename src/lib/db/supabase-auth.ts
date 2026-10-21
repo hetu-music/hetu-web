@@ -62,7 +62,7 @@ export async function createSupabaseServerClient() {
 }
 
 /**
- * 核对当前密码（改密码、改邮箱前确认是本人），不碰现有会话。
+ * 核对当前密码（改邮箱前确认是本人），不碰现有会话。
  *
  * 以前直接用 createSupabaseServerClient 的 signInWithPassword 核对：每核对一次
  * 就新建一个会话并换掉 cookie，旧会话留在库里没人管。这里换一个只存在内存里的

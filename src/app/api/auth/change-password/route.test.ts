@@ -8,10 +8,7 @@ let mockUser: {
 } | null = { id: "user-1", email: "someone@example.com" };
 let mockCsrfValid = true;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let mockVerifyError: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mockUpdateError: any = null;
-const verifyPasswordMock = vi.fn();
 const updateUserMock = vi.fn();
 const signOutMock = vi.fn();
 
@@ -32,10 +29,6 @@ vi.mock("@/lib/db/supabase-auth", () => ({
       },
     },
   })),
-  verifyPassword: (...args: unknown[]) => {
-    verifyPasswordMock(...args);
-    return Promise.resolve(mockVerifyError);
-  },
 }));
 
 vi.mock("@/lib/server/server-utils", async (importOriginal) => {
@@ -59,9 +52,7 @@ const VALID = { oldPassword: "oldpass123", newPassword: "newpass456" };
 beforeEach(() => {
   mockUser = { id: "user-1", email: "someone@example.com" };
   mockCsrfValid = true;
-  mockVerifyError = null;
   mockUpdateError = null;
-  verifyPasswordMock.mockClear();
   updateUserMock.mockClear();
   signOutMock.mockClear();
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -110,45 +101,38 @@ describe("POST /api/auth/change-password — 新密码强度", () => {
 });
 
 describe("POST /api/auth/change-password — 旧密码校验", () => {
-  it("用当前账号的邮箱核对旧密码", async () => {
-    await POST(makeRequest(VALID));
-    expect(verifyPasswordMock).toHaveBeenCalledWith(
-      "someone@example.com",
-      VALID.oldPassword,
-    );
-  });
-
-  it("旧密码不对则不改密码", async () => {
-    mockVerifyError = { code: "invalid_credentials", message: "Invalid" };
-    const res = await POST(makeRequest(VALID));
-
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe("当前密码错误");
-    expect(updateUserMock).not.toHaveBeenCalled();
-  });
-
-  it("核对时被限流，如实告知而不是报密码错误", async () => {
-    mockVerifyError = { code: "over_request_rate_limit", message: "limit" };
-    const res = await POST(makeRequest(VALID));
-    expect(res.status).toBe(429);
-    expect((await res.json()).error).toContain("频繁");
-    expect(updateUserMock).not.toHaveBeenCalled();
-  });
-
-  it("旧密码正确时写入新密码，并退出其他设备", async () => {
+  it("旧密码交给 GoTrue 核对，写入新密码并退出其他设备", async () => {
     const res = await POST(makeRequest(VALID));
     expect(res.status).toBe(200);
     expect(updateUserMock).toHaveBeenCalledWith({
       password: VALID.newPassword,
+      current_password: VALID.oldPassword,
     });
     expect(signOutMock).toHaveBeenCalledWith({ scope: "others" });
   });
 
-  it("账号没有邮箱时无法核对，返回 400", async () => {
-    mockUser = { id: "user-1" };
+  it("旧密码不对时提示「当前密码错误」，不退出其他设备", async () => {
+    mockUpdateError = {
+      code: "current_password_invalid",
+      message: "Current password required when setting new password.",
+    };
     const res = await POST(makeRequest(VALID));
     expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("当前密码错误");
+    expect(signOutMock).not.toHaveBeenCalled();
+  });
+
+  it("旧密码为空在本地就被拒绝，不调 GoTrue", async () => {
+    const res = await POST(makeRequest({ ...VALID, oldPassword: "" }));
+    expect(res.status).toBe(400);
     expect(updateUserMock).not.toHaveBeenCalled();
+  });
+
+  it("被限流时如实告知", async () => {
+    mockUpdateError = { code: "over_request_rate_limit", message: "limit" };
+    const res = await POST(makeRequest(VALID));
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toContain("频繁");
   });
 
   it("写入失败时返回中文提示，不回 GoTrue 原文", async () => {

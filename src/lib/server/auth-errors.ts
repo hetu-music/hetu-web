@@ -14,6 +14,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   email_exists: "该邮箱已被使用",
   weak_password: "密码强度不够，请换一个更复杂的密码",
   same_password: "新密码不能与原密码相同",
+  current_password_invalid: "当前密码错误",
+  current_password_required: "请输入当前密码",
   // GoTrue 对错码和过期码都回 otp_expired（Token has expired or is invalid）
   otp_expired: "验证码错误或已过期",
   over_email_send_rate_limit: "邮件发送太频繁，请稍后再试",

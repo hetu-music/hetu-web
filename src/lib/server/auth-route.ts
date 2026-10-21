@@ -56,7 +56,7 @@ export function withPublicAuth<S extends z.ZodType>(
 }
 
 /**
- * 改密码、改邮箱前核对当前密码。通过返回 null，否则返回要回给前端的响应。
+ * 改邮箱前核对当前密码（改密码由 GoTrue 核对，见 change-password）。通过返回 null，否则返回要回给前端的响应。
  * 密码不对单独说「当前密码错误」；被限流等别的原因如实转告，不冒充密码错误。
  */
 export async function checkCurrentPassword(

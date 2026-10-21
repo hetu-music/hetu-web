@@ -8,9 +8,18 @@ import React from "react";
 export const GROUP_TITLE_CLASS =
   "font-serif text-[15px] font-semibold tracking-[0.15em] text-slate-800 dark:text-slate-200";
 
-/** 组与组之间的细线：只靠留白分不开，按 DESIGN.md 的次序退到细线 */
-export const GROUP_DIVIDE_CLASS =
-  "divide-y divide-slate-200/70 dark:divide-slate-800";
+/**
+ * 组与组之间的分隔：一小段短粗线。只靠留白分不开组；
+ * 通栏细线又和输入框的底线是同一个形状，加深颜色也会混在一起
+ */
+export function GroupRule() {
+  return (
+    <span
+      aria-hidden
+      className="my-12 block h-0.5 w-10 rounded-full bg-slate-200 dark:bg-slate-800"
+    />
+  );
+}
 
 /**
  * 各节题头：宽屏同 SectionHeading（一行小字加细线，右侧放本节的操作）；

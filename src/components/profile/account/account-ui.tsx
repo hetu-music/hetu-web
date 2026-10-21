@@ -13,7 +13,7 @@ export function AccountBlock({
   children: ReactNode;
 }) {
   return (
-    <div className="py-12 first:pt-0 last:pb-0">
+    <div>
       <h3 className={GROUP_TITLE_CLASS}>{title}</h3>
       {description && (
         <p className="mt-2 text-xs leading-relaxed text-slate-400 dark:text-slate-500">

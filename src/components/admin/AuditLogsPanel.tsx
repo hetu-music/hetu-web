@@ -18,6 +18,8 @@ interface AuditLog {
   table_name: string;
   action_type: string;
   user_id: string | null;
+  /** 操作人的用户名；用户已删除、查不到时为 null */
+  user_name: string | null;
   old_data: Record<string, unknown> | null;
   new_data: Record<string, unknown> | null;
   changed_at: string | null;
@@ -66,9 +68,11 @@ function getDiffKeys(
   });
 }
 
-function shortId(id: string | null): string {
-  if (!id) return "—";
-  return id.slice(0, 8) + "…";
+/** 操作人：显示用户名，查不到（如用户已删除）才退回 UUID 前 8 位 */
+function operatorLabel(log: AuditLog): string {
+  if (log.user_name) return log.user_name;
+  if (!log.user_id) return "—";
+  return log.user_id.slice(0, 8) + "…";
 }
 
 function formatDate(ts: string | null): string {
@@ -341,10 +345,13 @@ export default function AuditLogsPanel() {
                     {identity}
                   </span>
                   <span
-                    className="hidden max-w-20 shrink-0 truncate font-mono text-slate-400 md:block"
+                    className={cn(
+                      "hidden max-w-32 shrink-0 truncate text-slate-400 md:block",
+                      !log.user_name && "font-mono",
+                    )}
                     title={log.user_id ?? undefined}
                   >
-                    {shortId(log.user_id)}
+                    {operatorLabel(log)}
                   </span>
                   <span className="shrink-0 tabular-nums text-slate-400">
                     {formatDate(log.changed_at)}

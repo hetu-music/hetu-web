@@ -1,8 +1,6 @@
 import "server-only";
 
-import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
-import { locales } from "@/i18n/config";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import {
   fetchNavidromeLibrary,
@@ -25,12 +23,8 @@ import {
   type NavSong,
   type SyncPlan,
 } from "@/lib/navidrome/sync";
-import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
-import {
-  purgeCloudflareCache,
-  purgeEdgeOneCache,
-  serverErrorResponse,
-} from "@/lib/server/server-utils";
+import { refreshAudioPages } from "@/lib/server/server-revalidate";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 /** 缺少数据库或 Navidrome 配置，对应 503 */
 export class AudioServiceUnavailableError extends Error {}
@@ -61,9 +55,6 @@ export type AudioOverview = {
   plan: SyncPlan;
 };
 
-/** Cloudflare 单次按 URL 清缓存的上限 */
-const CDN_PURGE_BATCH = 30;
-
 function requireDeps() {
   const supabase = getServiceClient();
   if (!supabase) throw new AudioServiceUnavailableError("数据库服务暂不可用");
@@ -83,35 +74,6 @@ async function loadLibrary(config: NavidromeConfig): Promise<NavSong[]> {
     throw new AudioServiceUnavailableError("Navidrome 返回的曲目为空");
   }
   return library;
-}
-
-/**
- * has_audio 只影响曲库列表、歌曲详情和寻曲测验的播放按钮；
- * navid_id 本身在播放时实时查询，替换映射不需要刷新缓存。
- */
-async function revalidateAudioPages(songIds: number[]) {
-  if (songIds.length === 0) return;
-
-  const nextPaths: string[] = [];
-  for (const locale of locales) {
-    nextPaths.push(`/${locale}`, `/${locale}/quiz`);
-    for (const id of songIds) nextPaths.push(`/${locale}/song/${id}`);
-  }
-  for (const path of nextPaths) revalidatePath(path);
-  revalidateTag(QUIZ_POOL_TAG, { expire: 0 });
-
-  // CDN 还缓存着无前缀的旧 URL（301 响应），一并清掉
-  const cdnPaths = [...nextPaths, "/", ...songIds.map((id) => `/song/${id}`)];
-  const batches: string[][] = [];
-  for (let i = 0; i < cdnPaths.length; i += CDN_PURGE_BATCH) {
-    batches.push(cdnPaths.slice(i, i + CDN_PURGE_BATCH));
-  }
-  await Promise.all(
-    batches.flatMap((batch) => [
-      purgeCloudflareCache(batch),
-      purgeEdgeOneCache(batch),
-    ]),
-  );
 }
 
 export async function getAudioOverview(): Promise<AudioOverview> {
@@ -139,7 +101,7 @@ export async function runAudioSync(): Promise<ApplyResult> {
     supabase,
     planSync(songs, library, mappings),
   );
-  await revalidateAudioPages(result.hasAudioChanged);
+  await refreshAudioPages(result.hasAudioChanged);
   return result;
 }
 
@@ -166,7 +128,7 @@ export async function updateAudioMapping(
 
   await setSongMapping(supabase, songId, nav);
   if (Boolean(song.has_audio) !== (navidId !== null)) {
-    await revalidateAudioPages([songId]);
+    await refreshAudioPages([songId]);
   }
   return { nav };
 }

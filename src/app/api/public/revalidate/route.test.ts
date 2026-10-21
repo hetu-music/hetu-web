@@ -9,6 +9,14 @@ vi.mock("next/cache", () => ({
   revalidateTag: (...args: unknown[]) => revalidateTagMock(...args),
 }));
 
+const purgeCloudflareMock = vi.fn(async (_paths: string[]) => undefined);
+
+vi.mock("@/lib/server/server-utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server/server-utils")>()),
+  purgeCloudflareCache: (paths: string[]) => purgeCloudflareMock(paths),
+  purgeEdgeOneCache: vi.fn(async () => undefined),
+}));
+
 import { GET, POST } from "./route";
 
 const SECRET = "correct-horse-battery-staple";
@@ -30,6 +38,7 @@ function makeRequest(
 beforeEach(() => {
   revalidatePathMock.mockClear();
   revalidateTagMock.mockClear();
+  purgeCloudflareMock.mockClear();
   process.env.REVALIDATE_SECRET = SECRET;
 });
 
@@ -79,6 +88,15 @@ describe("POST /api/public/revalidate — 鉴权", () => {
     });
   });
 
+  // 部署后预热也要清 CDN，否则边缘节点继续返回引用旧构建产物的 HTML
+  it("同时清 CDN 上的这些页面", async () => {
+    await POST(makeRequest("POST", { secretHeader: SECRET }));
+    const purged = purgeCloudflareMock.mock.calls.flatMap((c) => c[0]);
+    expect(purged).toEqual(
+      expect.arrayContaining(["/zh-CN", "/", "/zh-CN/imagery", "/sitemap.xml"]),
+    );
+  });
+
   it("服务端未配置密钥时一律拒绝", async () => {
     delete process.env.REVALIDATE_SECRET;
     const res = await POST(makeRequest("POST", { secretHeader: "anything" }));
@@ -109,6 +127,15 @@ describe("GET /api/public/revalidate — 单曲刷新", () => {
     expect(paths).toContain("/zh-TW/song/42");
   });
 
+  it("id 不是正整数时返回 400", async () => {
+    const res = await GET(
+      makeRequest("GET", { secretHeader: SECRET, query: "?id=abc" }),
+    );
+    expect(res.status).toBe(400);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  // 路由模板要带上路由组，写成 /zh-CN/song/[id] 匹配不到任何缓存条目
   it("id=all 时按路由模板整体刷新", async () => {
     const res = await GET(
       makeRequest("GET", { secretHeader: SECRET, query: "?id=all" }),
@@ -116,7 +143,7 @@ describe("GET /api/public/revalidate — 单曲刷新", () => {
     expect(res.status).toBe(200);
 
     const calls = revalidatePathMock.mock.calls;
-    expect(calls).toContainEqual(["/zh-CN/song/[id]", "page"]);
+    expect(calls).toContainEqual(["/[locale]/(public)/song/[id]", "page"]);
     expect(await res.text()).toContain("All song pages");
   });
 });

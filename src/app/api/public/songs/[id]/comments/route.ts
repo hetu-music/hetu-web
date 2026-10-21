@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PRIVATE_NO_STORE } from "@/lib/server/cache-headers";
 import { getUserFromRequest } from "@/lib/server/server-auth";
 import {
   listSongComments,
@@ -31,7 +32,7 @@ export const GET = async (
     return NextResponse.json(
       { comments },
       // 内容随登录身份而变，且新批注要立刻可见
-      { headers: { "Cache-Control": "private, no-store" } },
+      { headers: { "Cache-Control": PRIVATE_NO_STORE } },
     );
   } catch (error) {
     return serverErrorResponse("GET /api/public/songs/[id]/comments", error);

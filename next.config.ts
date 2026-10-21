@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
   },
   // 压缩配置
   compress: true,
+  // ISR 页面 Cache-Control 里 stale-while-revalidate 的上限（默认一年）。
+  // CDN 遵循源站缓存头；万一清 CDN 失败，旧页面最多再挂一天
+  expireTime: 86400,
   async headers() {
     return [
       {

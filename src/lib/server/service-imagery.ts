@@ -185,6 +185,21 @@ export async function getOccurrencesForSong(
   }
 }
 
+/** 标注属于哪首歌、哪个意象；改动或删除标注前查出来，好刷新对应缓存 */
+export async function getOccurrenceRefs(
+  id: number,
+): Promise<{ song_id: number; imagery_id: number } | null> {
+  const supabase = getServiceClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from(TABLES.IMAGERY_OCC)
+    .select("song_id,imagery_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as { song_id: number; imagery_id: number } | null;
+}
+
 // ─── write functions: imagery ─────────────────────────────────────────────────
 
 export async function createImagery(name: string, accessToken: string) {

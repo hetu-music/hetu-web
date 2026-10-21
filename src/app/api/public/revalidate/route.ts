@@ -1,9 +1,10 @@
-import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { locales } from "@/i18n/config";
-import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
 import { safeCompareSecret } from "@/lib/server/server-utils";
-import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
+import {
+  refreshAllSongPages,
+  refreshPublicPages,
+  refreshSongPages,
+} from "@/lib/server/server-revalidate";
 
 const SECRET_HEADER = "x-revalidate-secret";
 
@@ -29,26 +30,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 重新验证各语言版本的页面缓存
-    for (const locale of locales) {
-      revalidatePath(`/${locale}`);
-      revalidatePath(`/${locale}/imagery`);
-      revalidatePath(`/${locale}/story/qjtx`);
-      revalidatePath(`/${locale}/quiz`);
-    }
-
-    // 寻曲候选池由意象标注聚合并单独缓存；立即失效，让随后重新生成的
-    // /quiz 页面读到最新数据，而不是构建期（占位凭据）留下的空结果
-    revalidateTag(QUIZ_POOL_TAG, { expire: 0 });
-    // 详情页的意象标注与相关作品来自单独缓存的意象索引
-    revalidateTag(SONG_IMAGERY_TAG, { expire: 0 });
-
-    // 防范未命中重写路径的缓存，同时也刷新 sitemap
-    revalidatePath("/");
-    revalidatePath("/imagery");
-    revalidatePath("/story/qjtx");
-    revalidatePath("/quiz");
-    revalidatePath("/sitemap.xml");
+    // 首页、意象、故事、寻曲、sitemap，以及寻曲候选池与详情页意象索引；
+    // 部署后由 start.sh 调用，Next 与 CDN 一起刷新
+    await refreshPublicPages();
 
     const timestamp = new Date().toISOString();
 
@@ -68,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 新增: 刷新指定 /song/[id] 页面的 GET 路由
+// 刷新指定 /song/[id] 页面；id=all 刷新全部详情页（仅 Next）
 export async function GET(request: NextRequest) {
   try {
     const id = request.nextUrl.searchParams.get("id");
@@ -92,17 +76,18 @@ export async function GET(request: NextRequest) {
     let response: string;
 
     if (id === "all") {
-      for (const locale of locales) {
-        revalidatePath(`/${locale}/song/[id]`, "page");
-      }
-      revalidatePath("/song/[id]", "page");
+      refreshAllSongPages();
       response = `SUCCESS: All song pages revalidated at ${timestamp}`;
     } else {
-      for (const locale of locales) {
-        revalidatePath(`/${locale}/song/${id}`);
+      const songId = Number(id);
+      if (!Number.isInteger(songId) || songId < 1) {
+        return new NextResponse("ERROR: Invalid id parameter", {
+          status: 400,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
       }
-      revalidatePath(`/song/${id}`);
-      response = `SUCCESS: Page /song/${id} revalidated at ${timestamp}`;
+      await refreshSongPages([songId]);
+      response = `SUCCESS: Page /song/${songId} revalidated at ${timestamp}`;
     }
 
     return new NextResponse(response, {

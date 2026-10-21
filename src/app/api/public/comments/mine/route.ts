@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PRIVATE_NO_STORE } from "@/lib/server/cache-headers";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { listMyComments } from "@/lib/server/service-comments";
@@ -13,7 +14,7 @@ export const GET = withAuth(
       const groups = await listMyComments(supabase, user.id, locale);
       return NextResponse.json(
         { groups },
-        { headers: { "Cache-Control": "private, no-store" } },
+        { headers: { "Cache-Control": PRIVATE_NO_STORE } },
       );
     } catch (error) {
       return serverErrorResponse("GET /api/public/comments/mine", error);

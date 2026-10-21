@@ -4,6 +4,7 @@ import {
   getImageryCategories,
   createImageryCategory,
 } from "@/lib/server/service-imagery";
+import { refreshImagery } from "@/lib/server/server-revalidate";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
@@ -49,6 +50,7 @@ export const POST = withAuth(
       }
 
       const created = await createImageryCategory(input, session.access_token);
+      await refreshImagery();
       return NextResponse.json(created);
     } catch (e) {
       if (

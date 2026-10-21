@@ -33,6 +33,10 @@ vi.mock("@/lib/server/service-imagery", () => ({
   createImageryCategory: vi.fn(),
 }));
 
+vi.mock("@/lib/server/server-revalidate", () => ({
+  refreshImagery: vi.fn(async () => undefined),
+}));
+
 import {
   createImageryCategory,
   getImageryCategories,

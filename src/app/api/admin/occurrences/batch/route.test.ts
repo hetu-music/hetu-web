@@ -24,9 +24,18 @@ vi.mock("@/lib/server/server-utils", () => ({
 
 vi.mock("@/lib/server/service-imagery", () => ({
   createOccurrencesBatch: vi.fn(),
+  getOccurrencesForSong: vi.fn(async () => []),
 }));
 
-import { createOccurrencesBatch } from "@/lib/server/service-imagery";
+vi.mock("@/lib/server/server-revalidate", () => ({
+  refreshImagery: vi.fn(async () => undefined),
+}));
+
+import {
+  createOccurrencesBatch,
+  getOccurrencesForSong,
+} from "@/lib/server/service-imagery";
+import { refreshImagery } from "@/lib/server/server-revalidate";
 import { POST } from "./route";
 
 function post(body: unknown) {
@@ -47,6 +56,7 @@ beforeEach(() => {
   mockUser = { id: "admin-1", app_metadata: { is_admin: true } };
   mockCsrfValid = true;
   vi.mocked(createOccurrencesBatch).mockReset();
+  vi.mocked(refreshImagery).mockClear();
 });
 
 describe("POST /api/admin/occurrences/batch", () => {
@@ -61,6 +71,33 @@ describe("POST /api/admin/occurrences/batch", () => {
       [validItem],
       "test-token",
     );
+  });
+
+  it("写入后按这首歌现有的标注刷新缓存", async () => {
+    vi.mocked(createOccurrencesBatch).mockResolvedValue({
+      created: 1,
+      skipped: 0,
+      newImagery: 0,
+    });
+    vi.mocked(getOccurrencesForSong).mockResolvedValue([
+      { imagery_id: 1 },
+      { imagery_id: 7 },
+    ] as Awaited<ReturnType<typeof getOccurrencesForSong>>);
+    await POST(post({ song_id: 5, items: [validItem] }));
+    expect(refreshImagery).toHaveBeenCalledWith({
+      songIds: [5],
+      imageryIds: [1, 7],
+    });
+  });
+
+  it("全部跳过时不刷新缓存", async () => {
+    vi.mocked(createOccurrencesBatch).mockResolvedValue({
+      created: 0,
+      skipped: 1,
+      newImagery: 0,
+    });
+    await POST(post({ song_id: 5, items: [validItem] }));
+    expect(refreshImagery).not.toHaveBeenCalled();
   });
 
   it("接受新意象名并去掉首尾空白", async () => {

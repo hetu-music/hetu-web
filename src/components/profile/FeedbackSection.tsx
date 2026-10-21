@@ -1,6 +1,8 @@
 "use client";
 
-import ProfileSectionHeading from "@/components/profile/ProfileSectionHeading";
+import ProfileSectionHeading, {
+  GROUP_TITLE_CLASS,
+} from "@/components/profile/ProfileSectionHeading";
 import {
   FIELD_CLASS,
   FIELD_LABEL_CLASS,
@@ -66,10 +68,8 @@ export default function FeedbackSection() {
     <section>
       <ProfileSectionHeading label={t("tabs.feedback")} />
 
-      <div className="mt-8 lg:mt-12 max-w-[40em]">
-        <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-          {t("feedback.submitTitle")}
-        </h3>
+      <div className="mt-8 lg:mt-12 max-w-[40em] pb-12">
+        <h3 className={GROUP_TITLE_CLASS}>{t("feedback.submitTitle")}</h3>
         <SubmitForm
           onSubmitted={() =>
             void queryClient.invalidateQueries({
@@ -79,11 +79,10 @@ export default function FeedbackSection() {
         />
       </div>
 
-      <div className="mt-20">
+      {/* 与账户设置的组间细线同色（GROUP_DIVIDE_CLASS）；两组宽度不同，用不了 divide-y */}
+      <div className="border-t border-slate-200/70 pt-12 dark:border-slate-800">
         <div className="flex items-baseline justify-between gap-4">
-          <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-            {t("feedback.historyTitle")}
-          </h3>
+          <h3 className={GROUP_TITLE_CLASS}>{t("feedback.historyTitle")}</h3>
           {history.isSuccess && (
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {t("feedback.historyCount", { count: requests.length })}

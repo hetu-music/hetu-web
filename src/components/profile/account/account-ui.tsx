@@ -1,3 +1,4 @@
+import { GROUP_TITLE_CLASS } from "@/components/profile/ProfileSectionHeading";
 import { SubmitButton } from "@/components/shared/FormField";
 import type { ReactNode } from "react";
 
@@ -12,10 +13,8 @@ export function AccountBlock({
   children: ReactNode;
 }) {
   return (
-    <div>
-      <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-        {title}
-      </h3>
+    <div className="py-12 first:pt-0 last:pb-0">
+      <h3 className={GROUP_TITLE_CLASS}>{title}</h3>
       {description && (
         <p className="mt-2 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
           {description}

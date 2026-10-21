@@ -101,7 +101,7 @@
     },
     "sessions": {
       "title": "登入裝置",
-      "description": "在別的裝置上登入過又忘了登出，可以在這裡一併登出。目前裝置不受影響。",
+      "description": "一併登出其他裝置。目前裝置不受影響。",
       "signOutOthers": "登出其他裝置",
       "confirm": "確認登出",
       "done": "其他裝置已登出",

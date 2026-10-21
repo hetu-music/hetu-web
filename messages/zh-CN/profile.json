@@ -101,7 +101,7 @@
     },
     "sessions": {
       "title": "登录设备",
-      "description": "在别的设备上登录过又忘了退出，可以在这里一并退出。当前设备不受影响。",
+      "description": "一并退出其他设备。当前设备不受影响。",
       "signOutOthers": "退出其他设备",
       "confirm": "确认退出",
       "done": "其他设备已退出",

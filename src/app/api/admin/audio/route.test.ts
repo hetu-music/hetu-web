@@ -111,21 +111,36 @@ describe("GET /api/admin/audio", () => {
 });
 
 describe("POST /api/admin/audio/sync", () => {
-  it("执行同步并返回结果", async () => {
+  it("执行同步并返回结果，清 CDN 的结果不进响应体", async () => {
     vi.mocked(runAudioSync).mockResolvedValue({
       upserted: 2,
       deleted: 1,
       mediaUpdated: 0,
       hasAudioChanged: [3],
+      purge: { failed: [] },
     });
     const res = await POST(request("POST"));
     expect(res.status).toBe(200);
+    expect(res.headers.get("x-cdn-purge-failed")).toBeNull();
     expect(await res.json()).toEqual({
       upserted: 2,
       deleted: 1,
       mediaUpdated: 0,
       hasAudioChanged: [3],
     });
+  });
+
+  it("清 CDN 失败时写进响应头", async () => {
+    vi.mocked(runAudioSync).mockResolvedValue({
+      upserted: 0,
+      deleted: 0,
+      mediaUpdated: 0,
+      hasAudioChanged: [3],
+      purge: { failed: ["Cloudflare", "CloudFront"] },
+    });
+    const res = await POST(request("POST"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-cdn-purge-failed")).toBe("Cloudflare,CloudFront");
   });
 
   it("服务出错时交给 audioErrorResponse", async () => {
@@ -136,14 +151,20 @@ describe("POST /api/admin/audio/sync", () => {
 
 describe("PUT /api/admin/audio/mapping", () => {
   it("关联曲目", async () => {
-    vi.mocked(updateAudioMapping).mockResolvedValue({ nav: null });
+    vi.mocked(updateAudioMapping).mockResolvedValue({
+      nav: null,
+      purge: { failed: [] },
+    });
     const res = await PUT(request("PUT", { songId: 1, navidId: " a " }));
     expect(res.status).toBe(200);
     expect(updateAudioMapping).toHaveBeenCalledWith(1, "a");
   });
 
   it("navidId 为 null 表示解除关联", async () => {
-    vi.mocked(updateAudioMapping).mockResolvedValue({ nav: null });
+    vi.mocked(updateAudioMapping).mockResolvedValue({
+      nav: null,
+      purge: { failed: [] },
+    });
     await PUT(request("PUT", { songId: 1, navidId: null }));
     expect(updateAudioMapping).toHaveBeenCalledWith(1, null);
   });

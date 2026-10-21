@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PUBLIC_API_CACHE } from "@/lib/server/cache-headers";
 import { getSongsForImagery } from "@/lib/server/service-imagery";
 
 export async function GET(
@@ -16,12 +17,7 @@ export async function GET(
     return NextResponse.json(
       { songs: results },
       {
-        headers: {
-          // 公开只读数据，与 lyrics-index / songs/:id/lyrics 保持一致：
-          // CDN 缓存 6 小时，过期后 30 分钟内先返回旧值再后台刷新
-          "Cache-Control":
-            "public, s-maxage=21600, stale-while-revalidate=1800",
-        },
+        headers: { "Cache-Control": PUBLIC_API_CACHE },
       },
     );
   } catch (err) {

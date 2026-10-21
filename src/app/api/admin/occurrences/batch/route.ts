@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createOccurrencesBatch } from "@/lib/server/service-imagery";
+import {
+  createOccurrencesBatch,
+  getOccurrencesForSong,
+} from "@/lib/server/service-imagery";
+import {
+  refreshImagery,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { lyricTimetagPattern } from "@/lib/forms/imagery-form";
 import { parseJsonBody } from "@/lib/server/parse-body";
@@ -50,7 +57,14 @@ export const POST = withAuth(
         input.items,
         session.access_token,
       );
-      return NextResponse.json(result);
+      if (result.created === 0) return NextResponse.json(result);
+      // 新意象名可能落到已有意象上，按入库后的标注取意象
+      const occurrences = await getOccurrencesForSong(input.song_id);
+      const purge = await refreshImagery({
+        songIds: [input.song_id],
+        imageryIds: occurrences.map((o) => o.imagery_id),
+      });
+      return withPurgeStatus(NextResponse.json(result), purge);
     } catch (e) {
       const code = (e as { code?: string }).code;
       if (

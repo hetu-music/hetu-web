@@ -5,6 +5,7 @@ import {
   audioErrorResponse,
   updateAudioMapping,
 } from "@/lib/server/service-navidrome";
+import { withPurgeStatus } from "@/lib/server/server-revalidate";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
 const mappingSchema = z.object({
@@ -25,7 +26,8 @@ export const PUT = withAuth(
 
     try {
       const { songId, navidId } = input;
-      return NextResponse.json(await updateAudioMapping(songId, navidId));
+      const { purge, ...body } = await updateAudioMapping(songId, navidId);
+      return withPurgeStatus(NextResponse.json(body), purge);
     } catch (error) {
       return audioErrorResponse("PUT /api/admin/audio/mapping", error);
     }

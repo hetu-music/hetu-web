@@ -14,6 +14,7 @@ import type {
   SearchResultItem,
 } from "@/lib/api/api-auto-complete";
 import { apiCreateSong, apiUpdateSong } from "@/lib/api/client-api";
+import { cdnPurgeWarning } from "@/lib/cdn-purge";
 import {
   createEmptySongFormState,
   songFormStateSchema,
@@ -136,7 +137,11 @@ export function useSongWorkspace(
 
       // 正式表现在与暂存表一致
       setPublished({ ...saved });
-      notify({ type: "success", text: "已发布" });
+      if (res.cdnPurgeFailed?.length) {
+        notify({ type: "error", text: cdnPurgeWarning(res.cdnPurgeFailed) });
+      } else {
+        notify({ type: "success", text: "已发布" });
+      }
     } catch (err) {
       notifyError(err, "发布失败");
     } finally {

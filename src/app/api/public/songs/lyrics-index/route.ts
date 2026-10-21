@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PUBLIC_API_CACHE } from "@/lib/server/cache-headers";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
 import { processLyricsForSearch } from "@/lib/utils/utils-song";
 
@@ -31,10 +32,7 @@ export const GET = async () => {
     .filter((entry) => entry.l.length > 0);
 
   return NextResponse.json(index, {
-    headers: {
-      // CDN 缓存 6 小时，客户端缓存 30 分钟
-      "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=1800",
-    },
+    headers: { "Cache-Control": PUBLIC_API_CACHE },
   });
 };
 

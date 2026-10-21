@@ -4,6 +4,10 @@ import {
   updateImagery,
   getOccurrencesForImagery,
 } from "@/lib/server/service-imagery";
+import {
+  refreshImagery,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
@@ -64,7 +68,13 @@ export const PUT = withAuth(
         input.name,
         session.access_token,
       );
-      return NextResponse.json(updated);
+      // 改名牵动所有标了这个意象的歌
+      const occurrences = await getOccurrencesForImagery(imageryId);
+      const purge = await refreshImagery({
+        songIds: occurrences.map((o) => o.song_id),
+        imageryIds: [imageryId],
+      });
+      return withPurgeStatus(NextResponse.json(updated), purge);
     } catch (e) {
       console.error("[PUT /api/admin/imagery/[id]]", e);
       return NextResponse.json(

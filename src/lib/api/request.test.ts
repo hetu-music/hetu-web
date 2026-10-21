@@ -6,6 +6,11 @@ vi.mock("@/lib/api/csrf", () => ({
   resetCsrfToken: () => resetCsrfTokenMock(),
 }));
 
+const addToastMock = vi.fn();
+vi.mock("@/components/ui/toast", () => ({
+  addToast: (...args: unknown[]) => addToastMock(...args),
+}));
+
 import { ApiError, apiRequest, sendRequest } from "./request";
 
 const fetchMock = vi.fn();
@@ -23,6 +28,7 @@ function sentHeaders(): Record<string, string> {
 beforeEach(() => {
   fetchMock.mockReset();
   resetCsrfTokenMock.mockClear();
+  addToastMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -31,6 +37,26 @@ afterEach(() => {
 });
 
 describe("sendRequest", () => {
+  it("保存成功但有 CDN 没刷新时提示管理员", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("{}", {
+        status: 200,
+        headers: { "x-cdn-purge-failed": "Cloudflare,CloudFront" },
+      }),
+    );
+    await sendRequest("/x", { method: "POST", body: {} });
+    expect(addToastMock).toHaveBeenCalledWith(
+      "error",
+      expect.stringContaining("Cloudflare、CloudFront"),
+    );
+  });
+
+  it("没有这个响应头时不提示", async () => {
+    respond(200, {});
+    await sendRequest("/x", { method: "POST", body: {} });
+    expect(addToastMock).not.toHaveBeenCalled();
+  });
+
   it("GET 不带请求体，也不取 CSRF 令牌", async () => {
     respond(200, { a: 1 });
     const res = await sendRequest("/x");

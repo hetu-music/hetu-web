@@ -18,11 +18,22 @@ const nextConfig: NextConfig = {
   },
   // 压缩配置
   compress: true,
+  // ISR 页面过期上限（默认一年），同时决定两件事：
+  // - CDN 收到的 stale-while-revalidate：万一清 CDN 失败，旧页面最多再挂 7 天
+  // - Next 自己：超过 7 天没人访问的页面，下次访问当场重新生成，不先给旧页面
+  expireTime: 604800,
+  // 安全响应头只在这里设置（CSP 在 proxy.ts），nginx 不再重复添加
   async headers() {
     return [
       {
         source: "/:path*",
         headers: [
+          // 让 nginx 不缓冲响应，页面外壳与 loading 骨架屏能先发出去（流式渲染）。
+          // nginx 默认不把 X-Accel-* 头转给客户端
+          {
+            key: "X-Accel-Buffering",
+            value: "no",
+          },
           {
             key: "X-DNS-Prefetch-Control",
             value: "on",
@@ -101,7 +112,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-
 };
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");

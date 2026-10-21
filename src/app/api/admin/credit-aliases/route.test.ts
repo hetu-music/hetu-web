@@ -21,8 +21,9 @@ vi.mock("@/lib/server/server-utils", async (importOriginal) => {
   return { ...actual, verifyCSRFToken: vi.fn(async () => true) };
 });
 
-vi.mock("@/lib/server/server-revalidate", () => ({
-  refreshSongPages: vi.fn(async () => undefined),
+vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server/server-revalidate")>()),
+  refreshSongPages: vi.fn(async () => ({ failed: [] })),
 }));
 
 vi.mock("@/lib/server/service-credit-aliases", () => ({
@@ -98,6 +99,23 @@ describe("POST /api/admin/credit-aliases", () => {
       "test-token",
     );
     expect(refreshSongPages).toHaveBeenCalledWith([3, 7]);
+    expect(res.headers.get("x-cdn-purge-failed")).toBeNull();
+  });
+
+  it("写库成功但清 CDN 失败时，照常返回 200 并在响应头里写明", async () => {
+    vi.mocked(createCreditAlias).mockResolvedValue({
+      alias: "萧忆情Alex",
+      name: "萧忆情",
+      created_at: "",
+    });
+    vi.mocked(refreshSongPages).mockResolvedValueOnce({
+      failed: ["Cloudflare"],
+    });
+    const res = await POST(
+      request("POST", { alias: "萧忆情Alex", name: "萧忆情" }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-cdn-purge-failed")).toBe("Cloudflare");
   });
 
   it("别名与主名相同时 400，不写库", async () => {

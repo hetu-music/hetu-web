@@ -4,6 +4,10 @@ import {
   getImageryWithCounts,
   createImagery,
 } from "@/lib/server/service-imagery";
+import {
+  refreshImagery,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
@@ -46,7 +50,8 @@ export const POST = withAuth(
       }
 
       const created = await createImagery(input.name, session.access_token);
-      return NextResponse.json(created);
+      const purge = await refreshImagery();
+      return withPurgeStatus(NextResponse.json(created), purge);
     } catch (e) {
       console.error("[POST /api/admin/imagery]", e);
       return NextResponse.json(

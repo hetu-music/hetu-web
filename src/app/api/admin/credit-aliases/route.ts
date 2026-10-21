@@ -10,7 +10,10 @@ import {
   listCreditNames,
   type CreditAliasErrorCode,
 } from "@/lib/server/service-credit-aliases";
-import { refreshSongPages } from "@/lib/server/server-revalidate";
+import {
+  refreshSongPages,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -36,7 +39,7 @@ async function getAccessToken(): Promise<string | null> {
 /** 别名只影响署有它的歌；主名没署过的歌不用动 */
 async function refreshPagesCreditedAs(alias: string) {
   const ids = await getPublishedSongIdsCreditedAs(alias);
-  await refreshSongPages(ids);
+  return refreshSongPages(ids);
 }
 
 export const GET = withAuth(
@@ -77,8 +80,8 @@ export const POST = withAuth(
 
     try {
       const created = await createCreditAlias(input.alias, input.name, token);
-      await refreshPagesCreditedAs(created.alias);
-      return NextResponse.json(created);
+      const purge = await refreshPagesCreditedAs(created.alias);
+      return withPurgeStatus(NextResponse.json(created), purge);
     } catch (e) {
       const code = (e as { code?: string }).code as CreditAliasErrorCode;
       if (code in ERROR_STATUS) {
@@ -116,8 +119,8 @@ export const DELETE = withAuth(
       if (!deleted) {
         return NextResponse.json({ error: "别名不存在" }, { status: 404 });
       }
-      await refreshPagesCreditedAs(parsed.data);
-      return NextResponse.json({ success: true });
+      const purge = await refreshPagesCreditedAs(parsed.data);
+      return withPurgeStatus(NextResponse.json({ success: true }), purge);
     } catch (e) {
       return serverErrorResponse(
         "DELETE /api/admin/credit-aliases",

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import type { PurgeOutcome } from "@/lib/server/server-utils";
 
 const revalidatePathMock = vi.fn();
 const revalidateTagMock = vi.fn();
@@ -7,6 +8,17 @@ const revalidateTagMock = vi.fn();
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
   revalidateTag: (...args: unknown[]) => revalidateTagMock(...args),
+}));
+
+const purgeCloudflareMock = vi.fn(
+  async (_paths: string[]): Promise<PurgeOutcome> => "ok",
+);
+
+vi.mock("@/lib/server/server-utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server/server-utils")>()),
+  purgeCloudflareCache: (paths: string[]) => purgeCloudflareMock(paths),
+  purgeEdgeOneCache: vi.fn(async () => undefined),
+  purgeCloudFrontCache: vi.fn(async () => undefined),
 }));
 
 import { GET, POST } from "./route";
@@ -30,6 +42,7 @@ function makeRequest(
 beforeEach(() => {
   revalidatePathMock.mockClear();
   revalidateTagMock.mockClear();
+  purgeCloudflareMock.mockClear();
   process.env.REVALIDATE_SECRET = SECRET;
 });
 
@@ -79,6 +92,23 @@ describe("POST /api/public/revalidate — 鉴权", () => {
     });
   });
 
+  // 部署后预热也要清 CDN，否则边缘节点继续返回引用旧构建产物的 HTML
+  it("同时清 CDN 上的这些页面", async () => {
+    await POST(makeRequest("POST", { secretHeader: SECRET }));
+    const purged = purgeCloudflareMock.mock.calls.flatMap((c) => c[0]);
+    expect(purged).toEqual(
+      expect.arrayContaining(["/zh-CN", "/", "/zh-CN/imagery", "/sitemap.xml"]),
+    );
+  });
+
+  it("Next 刷新了但 CDN 失败时返回 502，让部署脚本看得出来", async () => {
+    purgeCloudflareMock.mockResolvedValueOnce("failed");
+    const res = await POST(makeRequest("POST", { secretHeader: SECRET }));
+    expect(res.status).toBe(502);
+    expect(await res.text()).toContain("Cloudflare");
+    expect(revalidatePathMock).toHaveBeenCalled();
+  });
+
   it("服务端未配置密钥时一律拒绝", async () => {
     delete process.env.REVALIDATE_SECRET;
     const res = await POST(makeRequest("POST", { secretHeader: "anything" }));
@@ -109,6 +139,15 @@ describe("GET /api/public/revalidate — 单曲刷新", () => {
     expect(paths).toContain("/zh-TW/song/42");
   });
 
+  it("id 不是正整数时返回 400", async () => {
+    const res = await GET(
+      makeRequest("GET", { secretHeader: SECRET, query: "?id=abc" }),
+    );
+    expect(res.status).toBe(400);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  // 路由模板要带上路由组，写成 /zh-CN/song/[id] 匹配不到任何缓存条目
   it("id=all 时按路由模板整体刷新", async () => {
     const res = await GET(
       makeRequest("GET", { secretHeader: SECRET, query: "?id=all" }),
@@ -116,7 +155,7 @@ describe("GET /api/public/revalidate — 单曲刷新", () => {
     expect(res.status).toBe(200);
 
     const calls = revalidatePathMock.mock.calls;
-    expect(calls).toContainEqual(["/zh-CN/song/[id]", "page"]);
+    expect(calls).toContainEqual(["/[locale]/(public)/song/[id]", "page"]);
     expect(await res.text()).toContain("All song pages");
   });
 });

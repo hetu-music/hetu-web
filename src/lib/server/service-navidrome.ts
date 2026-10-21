@@ -1,8 +1,6 @@
 import "server-only";
 
-import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
-import { locales } from "@/i18n/config";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import {
   fetchNavidromeLibrary,
@@ -25,12 +23,11 @@ import {
   type NavSong,
   type SyncPlan,
 } from "@/lib/navidrome/sync";
-import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
 import {
-  purgeCloudflareCache,
-  purgeEdgeOneCache,
-  serverErrorResponse,
-} from "@/lib/server/server-utils";
+  refreshAudioPages,
+  type PurgeReport,
+} from "@/lib/server/server-revalidate";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 
 /** 缺少数据库或 Navidrome 配置，对应 503 */
 export class AudioServiceUnavailableError extends Error {}
@@ -61,9 +58,6 @@ export type AudioOverview = {
   plan: SyncPlan;
 };
 
-/** Cloudflare 单次按 URL 清缓存的上限 */
-const CDN_PURGE_BATCH = 30;
-
 function requireDeps() {
   const supabase = getServiceClient();
   if (!supabase) throw new AudioServiceUnavailableError("数据库服务暂不可用");
@@ -85,35 +79,6 @@ async function loadLibrary(config: NavidromeConfig): Promise<NavSong[]> {
   return library;
 }
 
-/**
- * has_audio 只影响曲库列表、歌曲详情和寻曲测验的播放按钮；
- * navid_id 本身在播放时实时查询，替换映射不需要刷新缓存。
- */
-async function revalidateAudioPages(songIds: number[]) {
-  if (songIds.length === 0) return;
-
-  const nextPaths: string[] = [];
-  for (const locale of locales) {
-    nextPaths.push(`/${locale}`, `/${locale}/quiz`);
-    for (const id of songIds) nextPaths.push(`/${locale}/song/${id}`);
-  }
-  for (const path of nextPaths) revalidatePath(path);
-  revalidateTag(QUIZ_POOL_TAG, { expire: 0 });
-
-  // CDN 还缓存着无前缀的旧 URL（301 响应），一并清掉
-  const cdnPaths = [...nextPaths, "/", ...songIds.map((id) => `/song/${id}`)];
-  const batches: string[][] = [];
-  for (let i = 0; i < cdnPaths.length; i += CDN_PURGE_BATCH) {
-    batches.push(cdnPaths.slice(i, i + CDN_PURGE_BATCH));
-  }
-  await Promise.all(
-    batches.flatMap((batch) => [
-      purgeCloudflareCache(batch),
-      purgeEdgeOneCache(batch),
-    ]),
-  );
-}
-
 export async function getAudioOverview(): Promise<AudioOverview> {
   const { supabase, config } = requireDeps();
   const [library, { songs, mappings }] = await Promise.all([
@@ -128,8 +93,13 @@ export async function getAudioOverview(): Promise<AudioOverview> {
   };
 }
 
-/** 服务端重新计算同步计划并执行，不信任客户端预览时的计划 */
-export async function runAudioSync(): Promise<ApplyResult> {
+/**
+ * 服务端重新计算同步计划并执行，不信任客户端预览时的计划。
+ * purge 是清 CDN 的结果，由路由写进响应头，不放进响应体。
+ */
+export async function runAudioSync(): Promise<
+  ApplyResult & { purge: PurgeReport }
+> {
   const { supabase, config } = requireDeps();
   const [library, { songs, mappings }] = await Promise.all([
     loadLibrary(config),
@@ -139,15 +109,15 @@ export async function runAudioSync(): Promise<ApplyResult> {
     supabase,
     planSync(songs, library, mappings),
   );
-  await revalidateAudioPages(result.hasAudioChanged);
-  return result;
+  const purge = await refreshAudioPages(result.hasAudioChanged);
+  return { ...result, purge };
 }
 
 /** 手动关联或解除关联（navidId 为 null）单首歌曲 */
 export async function updateAudioMapping(
   songId: number,
   navidId: string | null,
-): Promise<{ nav: NavSong | null }> {
+): Promise<{ nav: NavSong | null; purge: PurgeReport }> {
   const { supabase, config } = requireDeps();
 
   const { data: song, error } = await supabase
@@ -165,8 +135,9 @@ export async function updateAudioMapping(
   }
 
   await setSongMapping(supabase, songId, nav);
-  if (Boolean(song.has_audio) !== (navidId !== null)) {
-    await revalidateAudioPages([songId]);
-  }
-  return { nav };
+  const purge =
+    Boolean(song.has_audio) !== (navidId !== null)
+      ? await refreshAudioPages([songId])
+      : { failed: [] };
+  return { nav, purge };
 }

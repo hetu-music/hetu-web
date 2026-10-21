@@ -72,7 +72,6 @@ function renderWorkbench(occurrences: OccurrenceWithSong[] = []) {
       meanings={[]}
       submitting={false}
       getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
-      csrfToken="csrf"
       onSave={onSave}
       onDelete={onDelete}
       onReload={onReload}
@@ -244,16 +243,12 @@ describe("SongRelationWorkbench", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "保存选中" }));
     await vi.waitFor(() => expect(onReload).toHaveBeenCalled());
-    expect(apiCreateOccurrencesBatch).toHaveBeenCalledWith(
-      7,
-      [
-        {
-          imagery_id: 2,
-          category_id: 200,
-          lyric_timetag: ["00:10.00", "01:10.00"],
-        },
-      ],
-      "csrf",
-    );
+    expect(apiCreateOccurrencesBatch).toHaveBeenCalledWith(7, [
+      {
+        imagery_id: 2,
+        category_id: 200,
+        lyric_timetag: ["00:10.00", "01:10.00"],
+      },
+    ]);
   });
 });

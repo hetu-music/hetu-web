@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/service-imagery";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const UpdateOccurrenceSchema = z.object({
   imagery_id: z.number().int().positive().optional(),
@@ -25,24 +26,18 @@ export const PUT = withAuth(
     const id = getIdFromUrl(request);
     if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     try {
-      const body = await request.json();
-      const parsed = UpdateOccurrenceSchema.safeParse(body);
-      if (!parsed.success)
-        return NextResponse.json(
-          { error: "Invalid input", details: parsed.error.issues },
-          { status: 400 },
-        );
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        UpdateOccurrenceSchema,
+      );
+      if (invalid) return invalid;
       const supabase = await createSupabaseServerClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      const updated = await updateOccurrence(
-        id,
-        parsed.data,
-        session.access_token,
-      );
+      const updated = await updateOccurrence(id, input, session.access_token);
       return NextResponse.json(updated);
     } catch (e) {
       if (

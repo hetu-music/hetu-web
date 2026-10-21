@@ -2,6 +2,8 @@
 // 自动补全相关类型和函数
 // ============================================
 
+import { apiRequest } from "@/lib/api/request";
+
 /** 支持的音乐提供者 */
 export type MusicProviderType = "netease" | "kugou";
 
@@ -60,14 +62,12 @@ export type DetailResponse = {
  * 搜索歌曲 - 根据关键词搜索
  *
  * @param keywords - 搜索关键词（歌曲标题）
- * @param csrfToken - CSRF token
  * @param provider - 音乐提供者，默认 netease
  * @param limit - 返回数量，默认 10
  * @returns 搜索结果列表
  */
 export async function apiSearchSongs(
   keywords: string,
-  csrfToken: string,
   provider: MusicProviderType = "netease",
   limit: number = 10,
 ): Promise<SearchResponse> {
@@ -78,32 +78,23 @@ export async function apiSearchSongs(
     limit: limit.toString(),
   });
 
-  const res = await fetch(`/api/admin/auto-complete?${params}`, {
-    method: "GET",
-    headers: {
-      "x-csrf-token": csrfToken,
-    },
+  // 这个 GET 也校验 CSRF：它会替服务端去请求第三方音乐平台
+  return apiRequest<SearchResponse>(`/api/admin/auto-complete?${params}`, {
+    csrf: true,
+    fallback: "搜索失败",
+    serverMessage: true,
   });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `搜索失败: ${res.status}`);
-  }
-
-  return res.json();
 }
 
 /**
  * 获取歌曲详情 - 根据用户选择的歌曲获取详细信息
  *
  * @param song - 用户选择的搜索结果项
- * @param csrfToken - CSRF token
  * @param provider - 音乐提供者，默认 netease
  * @returns 歌曲详情
  */
 export async function apiGetSongDetail(
   song: SearchResultItem,
-  csrfToken: string,
   provider: MusicProviderType = "netease",
 ): Promise<AutoCompleteResponse> {
   const params = new URLSearchParams({
@@ -126,18 +117,9 @@ export async function apiGetSongDetail(
     params.append("albumartist", song.albumartist);
   }
 
-  const res = await fetch(`/api/admin/auto-complete?${params}`, {
-    method: "GET",
-    headers: {
-      "x-csrf-token": csrfToken,
-    },
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `获取详情失败: ${res.status}`);
-  }
-
-  const response: DetailResponse = await res.json();
+  const response = await apiRequest<DetailResponse>(
+    `/api/admin/auto-complete?${params}`,
+    { csrf: true, fallback: "获取详情失败", serverMessage: true },
+  );
   return response.data;
 }

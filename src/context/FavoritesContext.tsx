@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUserContext } from "@/context/UserContext";
-import { getCsrfToken, resetCsrfToken } from "@/lib/api/csrf";
+import { sendRequest } from "@/lib/api/request";
 import type { Song } from "@/lib/types";
 
 interface FavoritesContextValue {
@@ -46,18 +46,10 @@ async function fetchFavorites(): Promise<FavoritesData> {
   };
 }
 
-function sendCollectionChange(
-  method: "POST" | "DELETE",
-  songId: number,
-  csrf: string,
-) {
-  return fetch("/api/public/collections", {
+function sendCollectionChange(method: "POST" | "DELETE", songId: number) {
+  return sendRequest("/api/public/collections", {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": csrf,
-    },
-    body: JSON.stringify({ songId }),
+    body: { songId },
   });
 }
 
@@ -121,16 +113,13 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         }));
 
       try {
-        const csrf = await getCsrfToken();
         const res = await sendCollectionChange(
           isCurrentlyFav ? "DELETE" : "POST",
           id,
-          csrf,
         );
 
         if (!res.ok) {
           rollback();
-          resetCsrfToken();
           void queryClient.invalidateQueries({ queryKey: key });
           return;
         }
@@ -158,9 +147,8 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     queryClient.setQueryData<FavoritesData>(key, EMPTY);
 
     try {
-      const csrf = await getCsrfToken();
       await Promise.all(
-        favorites.map((id) => sendCollectionChange("DELETE", id, csrf)),
+        favorites.map((id) => sendCollectionChange("DELETE", id)),
       );
     } catch {
       queryClient.setQueryData(key, previous);

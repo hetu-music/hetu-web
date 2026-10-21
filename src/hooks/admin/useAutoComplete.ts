@@ -97,12 +97,10 @@ export function mergeAutoCompleteData<T extends Partial<Song>>(
 /**
  * 自动补全 Hook
  *
- * @param csrfToken - CSRF token
  * @param onError - 错误回调
  * @returns 自动补全状态和操作方法
  */
 export function useAutoComplete(
-  csrfToken: string,
   onError?: (message: string) => void,
 ): UseAutoCompleteReturn {
   const [isAutoCompleting, setIsAutoCompleting] = useState(false);
@@ -136,12 +134,7 @@ export function useAutoComplete(
         }
         const keywords = keywordsParts.join(" ");
 
-        const response = await apiSearchSongs(
-          keywords,
-          csrfToken,
-          provider,
-          10,
-        );
+        const response = await apiSearchSongs(keywords, provider, 10);
 
         if (response.results.length === 0) {
           onError?.("未找到匹配的歌曲");
@@ -159,7 +152,7 @@ export function useAutoComplete(
         setIsAutoCompleting(false);
       }
     },
-    [csrfToken, onError],
+    [onError],
   );
 
   /**
@@ -171,7 +164,7 @@ export function useAutoComplete(
         setIsAutoCompleting(true);
         setShowSearchResults(false);
 
-        const data = await apiGetSongDetail(song, csrfToken, currentProvider);
+        const data = await apiGetSongDetail(song, currentProvider);
         return data;
       } catch (err) {
         onError?.(err instanceof Error ? err.message : "获取详情失败");
@@ -180,7 +173,7 @@ export function useAutoComplete(
         setIsAutoCompleting(false);
       }
     },
-    [csrfToken, currentProvider, onError],
+    [currentProvider, onError],
   );
 
   /**

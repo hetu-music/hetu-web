@@ -29,7 +29,6 @@ const NO_MEANINGS: ImageryMeaning[] = [];
 const PAGE_SIZE = 20;
 
 export function useMeaningsTab(
-  csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
   const meaningsQuery = useImageryMeaningsQuery();
@@ -90,10 +89,7 @@ export function useMeaningsTab(
     if (meaningSubmitting) return;
     setMeaningSubmitting(true);
     try {
-      const created = await apiCreateGlobalMeaning(
-        toMeaningPayload(values),
-        csrfToken,
-      );
+      const created = await apiCreateGlobalMeaning(toMeaningPayload(values));
       setMeanings((current) =>
         [...current, created].sort((a, b) =>
           a.label.localeCompare(b.label, "zh-CN"),
@@ -118,7 +114,6 @@ export function useMeaningsTab(
       const updated = await apiUpdateGlobalMeaning(
         editingMeaningId,
         toMeaningPayload(values),
-        csrfToken,
       );
       setMeanings((current) =>
         current
@@ -141,7 +136,7 @@ export function useMeaningsTab(
     if (meaningSubmitting) return;
     setMeaningSubmitting(true);
     try {
-      await apiDeleteGlobalMeaning(meaning.id, csrfToken);
+      await apiDeleteGlobalMeaning(meaning.id);
       setMeanings((current) => current.filter((m) => m.id !== meaning.id));
       if (editingMeaningId === meaning.id) resetEditor();
       showToast("success", `已删除含义「${meaning.label}」`);

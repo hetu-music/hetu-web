@@ -77,12 +77,22 @@ describe("POST /api/admin/edit", () => {
     expect(res.status).toBe(403);
   });
 
-  it("缺少必填 title 时返回 400 及校验详情", async () => {
+  it("缺少必填 title 时返回 400 及中文提示", async () => {
     const res = await POST(jsonRequest("POST", { album: "专辑" }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe("Invalid input");
-    expect(Array.isArray(body.details)).toBe(true);
+    expect(body.error).toMatch(/[一-鿿]/);
+  });
+
+  it("请求体不是合法 JSON 时返回 400", async () => {
+    const res = await POST(
+      new NextRequest("http://localhost/api/admin/edit", {
+        method: "POST",
+        body: "{oops",
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    expect(res.status).toBe(400);
   });
 
   it("非法 URL 字段时返回 400", async () => {

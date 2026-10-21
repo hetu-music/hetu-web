@@ -123,7 +123,6 @@ export default function SongRelationWorkbench({
   meanings,
   submitting,
   getCategoryPath,
-  csrfToken,
   onSave,
   onDelete,
   onReload,
@@ -141,7 +140,6 @@ export default function SongRelationWorkbench({
     draft: RelationDraft,
   ) => Promise<boolean>;
   onDelete: (occurrenceId: number, label: string) => void;
-  csrfToken: string;
   /** 候选批量保存后刷新该歌的关系与意象列表 */
   onReload: () => Promise<unknown>;
 }) {
@@ -199,7 +197,7 @@ export default function SongRelationWorkbench({
   const [hoverSuggestionId, setHoverSuggestionId] = useState<number | null>(
     null,
   );
-  const suggest = useImagerySuggestions(song.id, csrfToken, {
+  const suggest = useImagerySuggestions(song.id, {
     existing: occurrences,
     onSaved: onReload,
   });

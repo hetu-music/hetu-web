@@ -39,8 +39,36 @@ export const GET = withAuth(
       return serverErrorResponse("GET /api/admin/audit-logs", error);
     }
 
+    const rows = data ?? [];
+
+    // 批量查 public.users 获取操作人的用户名
+    const userIds = [
+      ...new Set(
+        rows
+          .map((r) => r.user_id as string | null)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    let userNameMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: usersData } = await supabase
+        .from(TABLES.USERS)
+        .select("id, name")
+        .in("id", userIds);
+      if (usersData) {
+        userNameMap = Object.fromEntries(
+          usersData.map((u: { id: string; name: string }) => [u.id, u.name]),
+        );
+      }
+    }
+
     return NextResponse.json({
-      logs: data ?? [],
+      logs: rows.map((row) => ({
+        ...row,
+        user_name: row.user_id
+          ? (userNameMap[row.user_id as string] ?? null)
+          : null,
+      })),
       total: count ?? 0,
       page,
       pageSize: PAGE_SIZE,

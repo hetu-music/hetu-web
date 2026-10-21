@@ -1,70 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import { z } from "zod";
+import { withAuth } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { newPasswordField } from "@/lib/forms/account-rules";
+import { authErrorResponse } from "@/lib/server/auth-errors";
+import { signOutOtherSessions } from "@/lib/server/auth-route";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
+const SCOPE = "POST /api/auth/change-password";
+
+const schema = z.object({
+  oldPassword: z.string().min(1, "请输入当前密码"),
+  newPassword: newPasswordField,
+});
+
+/**
+ * 改密码，改完退出其他设备上的登录（当前设备保留）。
+ *
+ * 旧密码由 GoTrue 核对：要开「Require current password when updating」，
+ * 否则 current_password 会被忽略，旧密码填什么都能改。开了之后直接调
+ * GoTrue 改密码同样要旧密码，拿到会话的人绕过本接口也改不了；
+ * 找回密码的会话 GoTrue 自动放行，不受影响。
+ */
 export const POST = withAuth(
-  async (request: NextRequest, user: AuthenticatedUser) => {
-    const body = await request.json();
-    const oldPassword: string = body.oldPassword;
-    const newPassword: string = body.newPassword;
+  async (request: NextRequest) => {
+    const { data, response } = await parseJsonBody(request, schema);
+    if (response) return response;
 
-    if (!oldPassword || !newPassword) {
-      return NextResponse.json({ error: "缺少参数" }, { status: 400 });
-    }
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.auth.updateUser({
+      password: data.newPassword,
+      current_password: data.oldPassword,
+    });
+    if (error) return authErrorResponse(SCOPE, error, "修改失败");
 
-    // 新密码格式校验
-    if (newPassword.length < 8) {
-      return NextResponse.json({ error: "新密码不能少于8位" }, { status: 400 });
-    }
-    if (!/[a-zA-Z]/.test(newPassword)) {
-      return NextResponse.json(
-        { error: "新密码需包含至少一个字母" },
-        { status: 400 },
-      );
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      return NextResponse.json(
-        { error: "新密码需包含至少一个数字" },
-        { status: 400 },
-      );
-    }
-
-    try {
-      const supabase = await createSupabaseServerClient();
-
-      if (!user.email) {
-        return NextResponse.json(
-          { error: "用户不存在，无法验证密码" },
-          { status: 400 },
-        );
-      }
-
-      // 验证旧密码
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: oldPassword,
-      });
-      if (verifyError) {
-        return NextResponse.json({ error: "旧密码错误" }, { status: 400 });
-      }
-
-      // 修改密码
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) {
-        return NextResponse.json(
-          { error: updateError.message || "修改失败" },
-          { status: 400 },
-        );
-      }
-      return NextResponse.json({ success: true });
-    } catch {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 },
-      );
-    }
+    await signOutOtherSessions(supabase, SCOPE);
+    return NextResponse.json({ success: true });
   },
   { requireCSRF: true },
 );

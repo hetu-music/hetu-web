@@ -135,6 +135,36 @@ describe("PUT /api/admin/users（防止超管权限被误撤销）", () => {
     expect(updateCall).toMatchObject({ name: "新名字" });
   });
 
+  it("用户名去首尾空格后再写入，超过 30 字被拒绝", async () => {
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: null, error: null }),
+    ]);
+    vi.mocked(getServiceClient).mockReturnValue(client);
+
+    await PUT(jsonRequest("PUT", { id: VALID_UUID, name: " 张三 " }));
+    const builder = client.from.mock.results[0].value;
+    expect(builder.update.mock.calls[0][0]).toEqual({ name: "张三" });
+
+    const res = await PUT(
+      jsonRequest("PUT", { id: VALID_UUID, name: "字".repeat(31) }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("用户名被占用返回 409", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: null,
+          error: { code: "23505", message: "duplicate key" },
+        }),
+      ]),
+    );
+    const res = await PUT(jsonRequest("PUT", { id: VALID_UUID, name: "张三" }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("这个用户名已经有人用了");
+  });
+
   it("收回权益：can_stream 写入 false，旧的账号字段被忽略", async () => {
     const client = createMockSupabaseClient([
       makeQueryBuilder({ data: null, error: null }),

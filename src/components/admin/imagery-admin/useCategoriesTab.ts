@@ -18,7 +18,6 @@ import { buildTree, getCategoryPath } from "./utils";
 
 export function useCategoriesTab(
   initialCategories: ImageryCategory[],
-  csrfToken: string,
   showToast: (type: "success" | "error", text: string) => void,
 ) {
   const categoriesQuery = useImageryCategoriesQuery(initialCategories);
@@ -42,7 +41,6 @@ export function useCategoriesTab(
     try {
       const created = await apiCreateImageryCategory(
         toCategoryPayload(values, categories),
-        csrfToken,
       );
       setCategories((current) => [...current, created]);
       showToast("success", `分类「${created.name}」已创建`);
@@ -64,7 +62,6 @@ export function useCategoriesTab(
       const updated = await apiUpdateImageryCategory(
         modal.category.id,
         toCategoryPayload(values, categories),
-        csrfToken,
       );
       setCategories((current) =>
         current.map((category) =>

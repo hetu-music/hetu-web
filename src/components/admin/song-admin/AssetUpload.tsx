@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiCheckFileExists } from "@/lib/api/client-api";
+import { apiRequest } from "@/lib/api/request";
 import { cn } from "@/lib/utils/utils";
 import { notify } from "../kit/toast";
 import { OUTLINE_BUTTON_CLASS } from "../kit/styles";
@@ -30,13 +31,11 @@ const KINDS = {
 export default function AssetUpload({
   kind,
   songId,
-  csrfToken,
   preset,
   onUploaded,
 }: {
   kind: keyof typeof KINDS;
   songId: number;
-  csrfToken: string;
   /**
    * 正在用的预设图名（白底狐狸、初号机）。预设图是站里共用的，始终存在；
    * 这时不检查这首歌自己的文件，上传的是备用的定制图
@@ -52,7 +51,7 @@ export default function AssetUpload({
   useEffect(() => {
     if (preset) return;
     let active = true;
-    void apiCheckFileExists(songId, kind, csrfToken)
+    void apiCheckFileExists(songId, kind)
       .then((result) => active && setExists(result?.exists ?? false))
       .catch((error) => {
         console.error(`Check ${kind} failed:`, error);
@@ -61,7 +60,7 @@ export default function AssetUpload({
     return () => {
       active = false;
     };
-  }, [csrfToken, kind, preset, songId]);
+  }, [kind, preset, songId]);
 
   const upload = async (file: File) => {
     if (!config.matches(file.type)) {
@@ -78,13 +77,12 @@ export default function AssetUpload({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("songId", String(songId));
-      const response = await fetch(config.endpoint, {
+      const result = await apiRequest<{ message?: string }>(config.endpoint, {
         method: "POST",
-        headers: { "X-CSRF-Token": csrfToken },
         body: formData,
+        fallback: "上传失败",
+        serverMessage: true,
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || "上传失败");
       setExists(true);
       notify({
         type: "success",

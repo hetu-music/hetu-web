@@ -3,6 +3,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { updateMeaning, deleteMeaning } from "@/lib/server/service-imagery";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const UpdateMeaningSchema = z.object({
   label: z.string().min(1).max(100),
@@ -22,14 +23,11 @@ export const PUT = withAuth(
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
     try {
-      const body = await request.json();
-      const parsed = UpdateMeaningSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: "Invalid input", details: parsed.error.issues },
-          { status: 400 },
-        );
-      }
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        UpdateMeaningSchema,
+      );
+      if (invalid) return invalid;
 
       const supabase = await createSupabaseServerClient();
       const {
@@ -40,8 +38,8 @@ export const PUT = withAuth(
 
       const updated = await updateMeaning(
         meaningId,
-        parsed.data.label,
-        parsed.data.description ?? null,
+        input.label,
+        input.description ?? null,
         session.access_token,
       );
       return NextResponse.json(updated);

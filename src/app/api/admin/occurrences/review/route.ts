@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { reviewImagerySuggestions } from "@/lib/server/service-imagery-suggest";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { LlmError } from "@/lib/server/llm";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 const ReviewSchema = z.object({
   song_id: z.number().int().positive(),
@@ -26,12 +27,11 @@ const ReviewSchema = z.object({
 export const POST = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
-      const parsed = ReviewSchema.safeParse(await request.json());
-      if (!parsed.success)
-        return NextResponse.json(
-          { error: "Invalid input", details: parsed.error.issues },
-          { status: 400 },
-        );
+      const { data: input, response: invalid } = await parseJsonBody(
+        request,
+        ReviewSchema,
+      );
+      if (invalid) return invalid;
       const supabase = await createSupabaseServerClient();
       const {
         data: { session },
@@ -39,8 +39,8 @@ export const POST = withAuth(
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const result = await reviewImagerySuggestions(
-        parsed.data.song_id,
-        parsed.data.candidates,
+        input.song_id,
+        input.candidates,
         session.access_token,
       );
       if (!result)

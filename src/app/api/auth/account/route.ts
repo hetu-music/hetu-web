@@ -1,91 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { TABLES } from "@/lib/db/supabase-server";
+import {
+  DISPLAY_NAME_TAKEN,
+  displayNameField,
+  introField,
+} from "@/lib/forms/account-rules";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
-export const GET = withAuth(
-  async (_request: NextRequest, user: AuthenticatedUser) => {
-    try {
-      const supabase = await createSupabaseServerClient();
+const schema = z.object({
+  displayName: displayNameField,
+  intro: introField.nullable().optional(),
+  display: z.boolean().optional(),
+});
 
-      // 查询 public.users 表的 name、display 和 intro 字段
-      const { data, error } = await supabase
-        .from(TABLES.USERS)
-        .select("name, display, intro")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        return serverErrorResponse("GET /api/auth/account", error);
-      }
-
-      return NextResponse.json({
-        displayName: data?.name || "",
-        display: data?.display ?? false,
-        intro: data?.intro ?? null,
-      });
-    } catch {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 },
-      );
-    }
-  },
-);
-
+/** 更新自己的公开资料：用户名、简介；管理员另可设「公开展示」 */
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    // 解析请求体
-    const { displayName, display, intro } = await request.json();
-    if (
-      !displayName ||
-      typeof displayName !== "string" ||
-      displayName.length < 2
-    ) {
-      return NextResponse.json(
-        { error: "用户名不能为空且不少于2个字符" },
-        { status: 400 },
+    const { data, response } = await parseJsonBody(request, schema);
+    if (response) return response;
+
+    const update: { name: string; intro?: string | null; display?: boolean } = {
+      name: data.displayName,
+    };
+    if (data.intro !== undefined) update.intro = data.intro || null;
+    // 「公开展示」会把名字挂到关于页的维护团队里，只有管理员能给自己开。
+    // 前端只对管理员显示这个开关，但接口不能只靠前端：普通用户直接调接口也得挡住。
+    // 带了就忽略，不报错——普通用户的请求里本不该有它
+    if (data.display !== undefined && user.app_metadata?.is_admin === true) {
+      update.display = data.display;
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+      .from(TABLES.USERS)
+      .update(update)
+      .eq("id", user.id);
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: DISPLAY_NAME_TAKEN },
+          { status: 409 },
+        );
+      }
+      return serverErrorResponse(
+        "POST /api/auth/account",
+        error,
+        "保存失败",
+        400,
       );
     }
 
-    try {
-      // 初始化 Supabase 客户端
-      const supabase = await createSupabaseServerClient();
-
-      if (!user.id) {
-        return NextResponse.json(
-          { error: "用户不存在，无法更新用户名" },
-          { status: 400 },
-        );
-      }
-
-      // 更新 public.users 表的 name、display 和 intro 字段
-      const updateObj: {
-        name: string;
-        display?: boolean;
-        intro?: string | null;
-      } = { name: displayName };
-      if (typeof display === "boolean") updateObj.display = display;
-      if (typeof intro === "string" || intro === null) updateObj.intro = intro;
-      const { error: updateError } = await supabase
-        .from(TABLES.USERS)
-        .update(updateObj)
-        .eq("id", user.id);
-      if (updateError) {
-        return NextResponse.json(
-          { error: updateError.message || "更新失败" },
-          { status: 400 },
-        );
-      }
-
-      return NextResponse.json({ success: true });
-    } catch {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 },
-      );
-    }
+    return NextResponse.json({ success: true });
   },
   { requireCSRF: true },
 );

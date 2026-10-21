@@ -1,6 +1,8 @@
 "use client";
 
-import ProfileSectionHeading from "@/components/profile/ProfileSectionHeading";
+import ProfileSectionHeading, {
+  GroupHeading,
+} from "@/components/profile/ProfileSectionHeading";
 import {
   FIELD_CLASS,
   FIELD_LABEL_CLASS,
@@ -21,7 +23,6 @@ import {
 import { useUserContext } from "@/context/UserContext";
 import { useAutoGrow } from "@/hooks/ui";
 import { useDebouncedValue } from "@/hooks/ui/useDebouncedValue";
-import { useCsrfToken } from "@/hooks/utils/useCsrfToken";
 import { apiCreateRequest, apiGetMyRequests } from "@/lib/api/client-api";
 import type { RequestStatus, RequestType, UserRequest } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
@@ -67,30 +68,28 @@ export default function FeedbackSection() {
     <section>
       <ProfileSectionHeading label={t("tabs.feedback")} />
 
-      <div className="mt-8 lg:mt-12 max-w-[40em]">
-        <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-          {t("feedback.submitTitle")}
-        </h3>
-        <SubmitForm
-          onSubmitted={() =>
-            void queryClient.invalidateQueries({
-              queryKey: myRequestsKey(user?.id),
-            })
-          }
-        />
+      {/* 题头通栏，与下面通栏的反馈记录对齐；只有表单限宽 */}
+      <div className="mt-8 lg:mt-12">
+        <GroupHeading label={t("feedback.submitTitle")} />
+        <div className="max-w-[40em]">
+          <SubmitForm
+            onSubmitted={() =>
+              void queryClient.invalidateQueries({
+                queryKey: myRequestsKey(user?.id),
+              })
+            }
+          />
+        </div>
       </div>
 
       <div className="mt-20">
-        <div className="flex items-baseline justify-between gap-4">
-          <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-            {t("feedback.historyTitle")}
-          </h3>
+        <GroupHeading label={t("feedback.historyTitle")}>
           {history.isSuccess && (
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {t("feedback.historyCount", { count: requests.length })}
             </span>
           )}
-        </div>
+        </GroupHeading>
         <RequestList
           requests={requests}
           pending={history.isPending}
@@ -291,7 +290,6 @@ function submitFormReducer(
 function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
   const t = useTranslations("profile.feedback");
   const { user } = useUserContext();
-  const csrfToken = useCsrfToken();
   const [state, dispatch] = useReducer(
     submitFormReducer,
     initialSubmitFormState,
@@ -322,15 +320,12 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
 
     dispatch({ type: "SUBMIT_START" });
     try {
-      await apiCreateRequest(
-        {
-          type,
-          song_id: selectedSong?.id ?? null,
-          category: category.trim() || null,
-          content: content.trim(),
-        },
-        csrfToken,
-      );
+      await apiCreateRequest({
+        type,
+        song_id: selectedSong?.id ?? null,
+        category: category.trim() || null,
+        content: content.trim(),
+      });
       dispatch({ type: "SUBMIT_SUCCESS" });
       onSubmitted();
       setTimeout(() => dispatch({ type: "RESET" }), 1500);
@@ -420,7 +415,7 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
       <div className="flex items-center gap-5">
         <button
           type="submit"
-          disabled={submitting || success || !csrfToken}
+          disabled={submitting || success}
           className={PRIMARY_BUTTON_CLASS}
         >
           {submitting && <Loader2 size={12} className="animate-spin" />}

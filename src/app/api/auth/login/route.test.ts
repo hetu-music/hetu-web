@@ -8,11 +8,17 @@ let mockTurnstileResult: { success: boolean; error?: string } = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mockSignInError: any = null;
 const signInMock = vi.fn();
+const resendMock = vi.fn();
 
-vi.mock("@/lib/server/server-utils", () => ({
-  verifyCSRFToken: vi.fn(async () => mockCsrfValid),
-  verifyTurnstileToken: vi.fn(async () => mockTurnstileResult),
-}));
+vi.mock("@/lib/server/server-utils", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/server/server-utils")>();
+  return {
+    ...actual,
+    verifyCSRFToken: vi.fn(async () => mockCsrfValid),
+    verifyTurnstileToken: vi.fn(async () => mockTurnstileResult),
+  };
+});
 
 vi.mock("@/lib/db/supabase-auth", () => ({
   createSupabaseServerClient: vi.fn(async () => ({
@@ -20,6 +26,10 @@ vi.mock("@/lib/db/supabase-auth", () => ({
       signInWithPassword: (...args: unknown[]) => {
         signInMock(...args);
         return Promise.resolve({ error: mockSignInError });
+      },
+      resend: (...args: unknown[]) => {
+        resendMock(...args);
+        return Promise.resolve({ error: null });
       },
     },
   })),
@@ -46,6 +56,7 @@ beforeEach(() => {
   mockTurnstileResult = { success: true };
   mockSignInError = null;
   signInMock.mockClear();
+  resendMock.mockClear();
 });
 
 describe("POST /api/auth/login — 前置校验顺序", () => {
@@ -93,7 +104,10 @@ describe("POST /api/auth/login — 登录结果", () => {
 
   // 不区分「邮箱不存在」与「密码错误」，避免账号枚举
   it("凭证错误时返回统一文案的 401", async () => {
-    mockSignInError = { message: "Invalid login credentials" };
+    mockSignInError = {
+      code: "invalid_credentials",
+      message: "Invalid login credentials",
+    };
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await POST(makeRequest(VALID));
@@ -105,7 +119,21 @@ describe("POST /api/auth/login — 登录结果", () => {
     spy.mockRestore();
   });
 
-  it("请求体不是合法 JSON 时返回 500 而非崩溃", async () => {
+  it("邮箱没验证过：重发验证码，并告诉前端转去填码", async () => {
+    mockSignInError = {
+      code: "email_not_confirmed",
+      message: "Email not confirmed",
+    };
+    const res = await POST(makeRequest(VALID));
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("email_not_confirmed");
+    expect(resendMock).toHaveBeenCalledWith({
+      type: "signup",
+      email: VALID.email,
+    });
+  });
+
+  it("请求体不是合法 JSON 时返回 400 而非崩溃", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const res = await POST(
       new NextRequest("http://localhost/api/auth/login", {
@@ -114,7 +142,7 @@ describe("POST /api/auth/login — 登录结果", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
     spy.mockRestore();
   });
 });

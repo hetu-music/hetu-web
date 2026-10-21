@@ -1,7 +1,7 @@
 "use client";
 
 import { useUserContext } from "@/context/UserContext";
-import { getCsrfToken } from "@/lib/api/csrf";
+import { apiRequest, type RequestOptions } from "@/lib/api/request";
 import type { SongComment } from "@/lib/types";
 import type { NewCommentAnchor } from "@/lib/utils/utils-comments";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,18 +12,18 @@ export type NewComment =
   | (NewCommentAnchor & { body: string; private: boolean })
   | { parentId: number; body: string };
 
-async function send(method: string, url: string, body?: unknown) {
-  const csrf = await getCsrfToken();
-  const res = await fetch(url, {
+/** 批注的写操作：服务端的提示（字数超限、被批原文已改等）都是给用户看的 */
+function send<T>(
+  method: RequestOptions["method"],
+  url: string,
+  body?: unknown,
+) {
+  return apiRequest<T>(url, {
     method,
-    headers: { "Content-Type": "application/json", "x-csrf-token": csrf },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body,
+    fallback: "操作失败，请稍后重试",
+    serverMessage: true,
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.error || `HTTP ${res.status}`);
-  }
-  return res.json();
 }
 
 /**

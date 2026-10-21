@@ -4,16 +4,18 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
 import type { UserRecord } from "@/lib/types";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
+import {
+  DISPLAY_NAME_TAKEN,
+  displayNameField,
+} from "@/lib/forms/account-rules";
 
 // ─── 更新字段 Zod schema ──────────────────────────────────────────────────────
 
 const userUpdateSchema = z.object({
   id: z.string().uuid("用户 ID 格式无效"),
-  name: z
-    .string()
-    .min(2, "用户名不能少于2个字符")
-    .max(50, "用户名不能超过50个字符")
-    .optional(),
+  // 与用户自己改名同一套规则：去首尾空格、2–30 字
+  name: displayNameField.optional(),
   display: z.boolean().optional(),
   intro: z.string().max(500, "简介不能超过500个字符").nullable().optional(),
   is_admin: z.boolean().optional(),
@@ -45,23 +47,13 @@ export const GET = withAuth(
 
 export const PUT = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      userUpdateSchema,
+    );
+    if (invalid) return invalid;
 
-    const parsed = userUpdateSchema.safeParse(body);
-    if (!parsed.success) {
-      const firstIssue = parsed.error.issues[0];
-      return NextResponse.json(
-        { error: firstIssue?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
-
-    const { id, ...fieldsToUpdate } = parsed.data;
+    const { id, ...fieldsToUpdate } = input;
 
     // 防止超级管理员被取消 is_admin 权限
     if (fieldsToUpdate.is_admin === false) {
@@ -106,6 +98,12 @@ export const PUT = withAuth(
       .eq("id", id);
 
     if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: DISPLAY_NAME_TAKEN },
+          { status: 409 },
+        );
+      }
       return serverErrorResponse("PUT /api/admin/users", error, "更新失败");
     }
 

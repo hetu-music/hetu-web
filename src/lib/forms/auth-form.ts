@@ -1,17 +1,35 @@
 import { z } from "zod";
+import {
+  emailField,
+  newPasswordField,
+  PASSWORD_MISMATCH,
+  passwordField,
+  passwordsMatch,
+} from "@/lib/forms/account-rules";
 
-const passwordRule = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+const turnstileField = z.string().min(1, "请完成人机验证");
 
 export function createAuthFormSchema(mode: "login" | "register") {
   return z.object({
-    email: z.email("请输入正确的邮箱地址"),
-    password:
-      mode === "login"
-        ? z.string().min(1, "请输入密码")
-        : z.string().regex(passwordRule, "密码要求至少8位，并包含字母和数字"),
-    turnstileToken: z.string().min(1, "请完成人机验证"),
+    email: emailField,
+    password: mode === "login" ? passwordField : newPasswordField,
+    turnstileToken: turnstileField,
   });
 }
+
+/** 找回密码第一步：邮箱与人机验证 */
+export const recoveryEmailFormSchema = z.object({
+  email: emailField,
+  turnstileToken: turnstileField,
+});
+
+/** 找回密码最后一步：设新密码 */
+export const newPasswordFormSchema = z
+  .object({
+    newPassword: newPasswordField,
+    confirmPassword: z.string().min(1, "请再次输入新密码"),
+  })
+  .refine(passwordsMatch, PASSWORD_MISMATCH);
 
 export const otpFormSchema = z
   .object({
@@ -28,6 +46,8 @@ export const otpFormSchema = z
   });
 
 export type AuthFormValues = z.infer<ReturnType<typeof createAuthFormSchema>>;
+export type RecoveryEmailFormValues = z.infer<typeof recoveryEmailFormSchema>;
+export type NewPasswordFormValues = z.infer<typeof newPasswordFormSchema>;
 export type OtpFormValues = z.infer<typeof otpFormSchema>;
 
 export function createAuthFormValues(): AuthFormValues {

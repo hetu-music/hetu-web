@@ -8,6 +8,7 @@ import { ArrowLeft, ChevronDown, Home, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ResponsivePanel } from "@/components/ui/responsive-panel";
 import { useCallback, useState } from "react";
+import { loginPathFor } from "@/lib/utils/safe-next";
 import { MenuList, type MenuItem } from "./menu";
 
 /** 站内导航深度：进入内页前递增，返回时据此判断有没有站内历史可退 */
@@ -111,8 +112,7 @@ export function UserButton() {
     // 登录状态尚未同步完成，忽略点击，避免误跳转到登录页
     if (!loaded) return;
     if (!user) {
-      const next = encodeURIComponent(pathname + window.location.search);
-      router.push(`/login?next=${next}`);
+      router.push(loginPathFor(pathname + window.location.search));
       return;
     }
     sessionStorage.setItem(NAV_DEPTH_KEY, String(readDepth() + 1));
@@ -132,7 +132,8 @@ export function UserButton() {
       aria-label={label}
       disabled={!loaded}
     >
-      <User size={20} className={user ? "text-(--tone)" : ""} />
+      {/* 已登录与站标竖线同色，固定 blue-600，不随 --tone 变 */}
+      <User size={20} className={user ? "text-blue-600" : ""} />
     </button>
   );
 }

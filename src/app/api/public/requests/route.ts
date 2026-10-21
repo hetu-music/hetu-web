@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { parseJsonBody } from "@/lib/server/parse-body";
 
 // ─── 创建请求 schema ──────────────────────────────────────────────────────────
 
@@ -77,23 +78,13 @@ export const GET = withAuth(
 
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "请求体格式无效" }, { status: 400 });
-    }
+    const { data: input, response: invalid } = await parseJsonBody(
+      request,
+      createRequestSchema,
+    );
+    if (invalid) return invalid;
 
-    const parsed = createRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      const firstIssue = parsed.error.issues[0];
-      return NextResponse.json(
-        { error: firstIssue?.message ?? "参数校验失败" },
-        { status: 400 },
-      );
-    }
-
-    const { type, song_id, category, content } = parsed.data;
+    const { type, song_id, category, content } = input;
 
     // song_feedback 必须提供 song_id
     if (type === "song_feedback" && !song_id) {

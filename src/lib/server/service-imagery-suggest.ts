@@ -77,25 +77,30 @@ export async function getImagerySuggestions(
   if (songError) throw songError;
   if (!song) return null;
 
-  const [dictionary, occurrences, songs, categories, motifs] = await Promise.all([
-    fetchAll<{ id: number; name: string }>(service, TABLES.IMAGERY, "id,name"),
-    fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
-      service,
-      TABLES.IMAGERY_OCC,
-      "song_id,imagery_id,category_id",
-    ),
-    fetchAll<{ id: number; lyrics: string | null }>(
-      service,
-      TABLES.MUSIC,
-      "id,lyrics",
-    ),
-    fetchAll<CategoryRow>(service, TABLES.IMAGERY_CAT, "id,name,parent_id"),
-    fetchAll<MotifEntry>(
-      service,
-      TABLES.IMAGERY_MOTIFS,
-      "imagery_id,category_id,role",
-    ),
-  ]);
+  const [dictionary, occurrences, songs, categories, motifs] =
+    await Promise.all([
+      fetchAll<{ id: number; name: string }>(
+        service,
+        TABLES.IMAGERY,
+        "id,name",
+      ),
+      fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
+        service,
+        TABLES.IMAGERY_OCC,
+        "song_id,imagery_id,category_id",
+      ),
+      fetchAll<{ id: number; lyrics: string | null }>(
+        service,
+        TABLES.MUSIC,
+        "id,lyrics",
+      ),
+      fetchAll<CategoryRow>(service, TABLES.IMAGERY_CAT, "id,name,parent_id"),
+      fetchAll<MotifEntry>(
+        service,
+        TABLES.IMAGERY_MOTIFS,
+        "imagery_id,category_id,role",
+      ),
+    ]);
   // fetchAll 出错时只记日志并返回部分数据；词典为空时生成的候选毫无意义
   if (dictionary.length === 0) throw new Error("意象词典为空");
 

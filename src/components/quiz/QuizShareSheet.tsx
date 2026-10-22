@@ -7,7 +7,6 @@ import {
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import { getPathname } from "@/i18n/navigation";
-import { DIMENSION_KEYS } from "@/lib/quiz/dimensions";
 import {
   renderShareCard,
   type ShareCardInput,
@@ -73,11 +72,7 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
       description: result.persona.description,
       imageryLabel: t("result.imagery"),
       profileLabel: t("result.profile"),
-      // 九宫格按维度的固定顺序排，每张图上同一维度都在同一格
-      dimensions: DIMENSION_KEYS.flatMap((key) => {
-        const p = result.profile.find((d) => d.key === key);
-        return p ? [{ label: p.label, z: p.z }] : [];
-      }),
+      dimensions: result.profile.map(({ label, z }) => ({ label, z })),
       imagery: result.imagery,
       matchesLabel: t("result.matches"),
       matchLabel: t("result.match"),

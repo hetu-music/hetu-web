@@ -16,7 +16,7 @@ export type ShareCardInput = {
   description: string;
   imageryLabel: string;
   profileLabel: string;
-  /** 九个维度，按固定顺序排成九宫格；z 为用户在该维度上的 z 分数 */
+  /** 各维度的名字与用户在该维度上的 z 分数，图上只画最偏爱的几项 */
   dimensions: Array<{ label: string; z: number }>;
   imagery: string[];
   matchesLabel: string;
@@ -93,10 +93,6 @@ const QR_SIZE = 140;
 /** 深色卡片上二维码浅底的留边 */
 const QR_TILE_PAD = 10;
 const COVER_SIZE = 148;
-const GRID_CELL_W = 220;
-const GRID_CELL_H = 88;
-/** 九宫格底色满格对应的 z 分数，与结果页倾向条一致 */
-const Z_RANGE = 2.5;
 
 /** 不宜出现在行首的标点 */
 const NO_LINE_START = "，。、；：！？）」』》〉,.;:!?)";
@@ -240,60 +236,106 @@ function wrapEven(ctx: CanvasRenderingContext2D, text: string, max: number) {
   return best;
 }
 
-/**
- * 意象倾向九宫格：底色是强调色，越偏爱越深；不偏爱的格子不着色、字也淡下去。
- * 最偏爱的两格题名加粗，一眼看出主次
- */
-function drawDimensionGrid(
+/** 只画最偏爱的几项：九项全铺开太杂，题字也已经点出了第一项 */
+const TOP_DIMENSIONS = 3;
+/** 细条满格对应的 z 分数，与结果页倾向条一致 */
+const Z_RANGE = 2.5;
+
+/** 偏爱的维度按 z 从高到低取前几项 */
+function topDimensions(dimensions: ShareCardInput["dimensions"]) {
+  return [...dimensions]
+    .filter((d) => d.z > 0)
+    .sort((a, b) => b.z - a.z)
+    .slice(0, TOP_DIMENSIONS);
+}
+
+/** 最偏爱的几项各一行：维度名后跟一根细条，长短表示偏爱程度 */
+function drawTopBars(
   ctx: CanvasRenderingContext2D,
-  dimensions: ShareCardInput["dimensions"],
+  dims: ShareCardInput["dimensions"],
   top: number,
   colors: Palette,
   fonts: Fonts,
 ): number {
-  const cols = 3;
-  const rows = Math.ceil(dimensions.length / cols);
-  const left = (WIDTH - GRID_CELL_W * cols) / 2;
-  const leading = new Set(
-    [...dimensions]
-      .filter((d) => d.z > 0)
-      .sort((a, b) => b.z - a.z)
-      .slice(0, 2)
-      .map((d) => d.label),
-  );
-
-  ctx.textAlign = "center";
-  dimensions.forEach((d, i) => {
-    const x = left + (i % cols) * GRID_CELL_W;
-    const y = top + Math.floor(i / cols) * GRID_CELL_H;
-    if (d.z > 0) {
-      ctx.globalAlpha = Math.min(d.z / Z_RANGE, 1) * 0.55;
-      ctx.fillStyle = colors.accent;
-      ctx.fillRect(x, y, GRID_CELL_W, GRID_CELL_H);
-      ctx.globalAlpha = 1;
-    }
-    const strong = leading.has(d.label);
-    ctx.font = `${strong ? 700 : 400} 32px ${fonts.serif}`;
-    ctx.fillStyle = d.z > 0 ? colors.title : colors.meta;
-    setSpacing(ctx, 6);
-    ctx.fillText(d.label, x + GRID_CELL_W / 2 + 3, y + GRID_CELL_H / 2 + 11);
+  const width = 640;
+  const left = (WIDTH - width) / 2;
+  const labelW = 110;
+  const trackW = width - labelW;
+  const rowH = 64;
+  dims.forEach((d, i) => {
+    const y = top + i * rowH;
+    ctx.textAlign = "left";
+    ctx.font = `400 32px ${fonts.serif}`;
+    ctx.fillStyle = colors.body;
+    setSpacing(ctx, 4);
+    ctx.fillText(d.label, left, y + 11);
     setSpacing(ctx, 0);
-  });
-
-  // 格线画在底色之上，深浅相邻的格子之间也有清楚的分界
-  ctx.fillStyle = colors.line;
-  for (let c = 0; c <= cols; c += 1) {
-    ctx.fillRect(left + c * GRID_CELL_W - 1, top, 2, rows * GRID_CELL_H);
-  }
-  for (let r = 0; r <= rows; r += 1) {
-    ctx.fillRect(
-      left - 1,
-      top + r * GRID_CELL_H - 1,
-      cols * GRID_CELL_W + 2,
-      2,
+    ctx.fillStyle = colors.line;
+    ctx.beginPath();
+    ctx.roundRect(left + labelW, y - 4, trackW, 8, 4);
+    ctx.fill();
+    const w = Math.max(Math.min(d.z / Z_RANGE, 1) * trackW, 8);
+    const grad = ctx.createLinearGradient(
+      left + labelW,
+      0,
+      left + labelW + w,
+      0,
     );
+    grad.addColorStop(0, `${colors.accent}59`);
+    grad.addColorStop(1, colors.accent);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(left + labelW, y - 4, w, 8, 4);
+    ctx.fill();
+  });
+  return top + (dims.length - 1) * rowH + 12;
+}
+
+/** 意象词一行居中，下面接意象倾向 */
+function drawImagerySection(
+  ctx: CanvasRenderingContext2D,
+  input: ShareCardInput,
+  top: number,
+  colors: Palette,
+  fonts: Fonts,
+  flex: Flex,
+): number {
+  let y = top;
+  if (input.imagery.length > 0) {
+    ctx.font = `400 26px ${fonts.serif}`;
+    ctx.fillStyle = colors.meta;
+    drawCentered(ctx, input.imageryLabel, y, 8);
+
+    ctx.font = `400 72px ${fonts.calligraphy}`;
+    ctx.fillStyle = colors.title;
+    const gap = 48;
+    const rows: string[][] = [[]];
+    let rowWidth = 0;
+    for (const word of input.imagery) {
+      const w = ctx.measureText(word).width;
+      const row = rows[rows.length - 1];
+      if (row.length > 0 && rowWidth + gap + w > INNER) {
+        rows.push([word]);
+        rowWidth = w;
+      } else {
+        rowWidth += (row.length > 0 ? gap : 0) + w;
+        row.push(word);
+      }
+    }
+    y += 24;
+    for (const row of rows) {
+      y += 92;
+      drawCentered(ctx, row.join("　"), y);
+    }
   }
-  return top + rows * GRID_CELL_H;
+
+  const dims = topDimensions(input.dimensions);
+  if (dims.length === 0) return y;
+  y += input.imagery.length > 0 ? flex(96, 1) : 0;
+  ctx.font = `400 26px ${fonts.serif}`;
+  ctx.fillStyle = colors.meta;
+  drawCentered(ctx, input.profileLabel, y, 8);
+  return drawTopBars(ctx, dims, y + 64, colors, fonts);
 }
 
 function hairline(ctx: CanvasRenderingContext2D, y: number, color: string) {
@@ -388,44 +430,7 @@ function drawCard(
   // ── 意象与倾向 ──
   y += flex(80, 1);
   hairline(ctx, y, colors.line);
-  // 没选中任何招牌意象时只画九宫格
-  if (input.imagery.length > 0) {
-    y += flex(88, 1);
-    ctx.font = `400 26px ${fonts.serif}`;
-    ctx.fillStyle = colors.meta;
-    drawCentered(ctx, input.imageryLabel, y, 8);
-
-    ctx.font = `400 72px ${fonts.calligraphy}`;
-    ctx.fillStyle = colors.title;
-    const gap = 48;
-    const rows: string[][] = [[]];
-    let rowWidth = 0;
-    for (const word of input.imagery) {
-      const w = ctx.measureText(word).width;
-      const row = rows[rows.length - 1];
-      if (row.length > 0 && rowWidth + gap + w > INNER) {
-        rows.push([word]);
-        rowWidth = w;
-      } else {
-        rowWidth += (row.length > 0 ? gap : 0) + w;
-        row.push(word);
-      }
-    }
-    y += 24;
-    for (const row of rows) {
-      y += 92;
-      drawCentered(ctx, row.join("　"), y);
-    }
-  }
-
-  if (input.dimensions.length > 0) {
-    // 意象词是大字，下沿离题头要多留一些，压缩时也不至于挤在一起
-    y += input.imagery.length > 0 ? flex(104, 1) : flex(88, 1);
-    ctx.font = `400 26px ${fonts.serif}`;
-    ctx.fillStyle = colors.meta;
-    drawCentered(ctx, input.profileLabel, y, 8);
-    y = drawDimensionGrid(ctx, input.dimensions, y + 36, colors, fonts);
-  }
+  y = drawImagerySection(ctx, input, y + flex(88, 1), colors, fonts, flex);
 
   // ── 契合歌曲 ──
   if (input.matches.length > 0) {

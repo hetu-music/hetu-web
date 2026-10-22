@@ -130,9 +130,6 @@ async function getLyricsByIds(ids: number[]): Promise<Map<number, string>> {
   );
 }
 
-/** 对唱歌词里标明演唱者的行，如「唐苏合：」「合：」 */
-const SINGER_LABEL = /^[^s，。]{1,8}[：:]$/;
-
 /** 按匹配理由的顺序，从歌词里找出含对应意象的句子 */
 function pickLines(
   song: PoolSong,
@@ -145,13 +142,7 @@ function pickLines(
   const lineAt = (tag: string | null) => {
     const t = tag ? timetagToSeconds(tag) : null;
     if (t === null) return null;
-    const i = lyricLines.findIndex((l) => Math.abs(l.time - t) < 0.05);
-    if (i < 0) return null;
-    // 时间标签有时落在演唱者那一行上，意象其实在紧接着的下一句
-    return (
-      lyricLines.slice(i).find((l) => !SINGER_LABEL.test(l.text.trim()))
-        ?.text ?? null
-    );
+    return lyricLines.find((l) => Math.abs(l.time - t) < 0.05)?.text ?? null;
   };
 
   const picked: string[] = [];

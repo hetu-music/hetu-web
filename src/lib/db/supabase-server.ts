@@ -37,7 +37,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   MUSIC_CATALOG / IMAGERY_OCC_CATALOG → getServiceClient (视图，只读)
 //   ADMIN              → getUserClient    (管理员读写)
 //   CREDIT_ALIASES     → getServiceClient (公开只读)
-//   IMAGERY / _CAT / _OCC → getServiceClient (公开只读)
+//   IMAGERY / _CAT / _OCC / _MOTIFS → getServiceClient (公开只读)
 //   USERS              → getUserClient    (用户本人读写，RLS 隔离)
 //   COLLECTIONS        → getUserClient    (用户本人读写，RLS 隔离)
 //   COMMENTS / _LIKES  → 读：getServiceClient（需连带作者名）；写：用户会话（RLS + RPC）
@@ -55,6 +55,7 @@ export const TABLES = {
   IMAGERY_SUMMARY: "imagery_summary",
   IMAGERY_CAT: "imagery_categories",
   IMAGERY_MEANINGS: "imagery_meanings",
+  IMAGERY_MOTIFS: "imagery_motifs", // 词 → 可取的母题（见 IMAGERY.md）
   IMAGERY_OCC: "imagery_occurrences",
   IMAGERY_OCC_CATALOG: "imagery_occurrences_catalog", // 视图：只含 MUSIC_CATALOG 歌曲的出处
 

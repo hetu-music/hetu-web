@@ -25,20 +25,21 @@ function CategorySelect({
   labelById,
   onChange,
 }: {
-  /** 该意象用过的分类 */
+  /** 该词可选的母题，第一个为默认 */
   categoryIds: number[];
   value: number | null;
   categories: CategoryOption[];
   labelById: Map<number, string>;
   onChange: (id: number | null) => void;
 }) {
-  // 全部叶子分类有数百项，逐行渲染会拖慢列表；默认只列该意象用过的分类和当前值
+  // 全部母题有数百项，逐行渲染会拖慢列表；默认只列该词登记的母题和当前值。
+  // 选了登记之外的母题，保存时会登记为该词的多义候选
   const [expanded, setExpanded] = useState(false);
   const showAll = expanded || (categoryIds.length === 0 && value === null);
   const options = showAll
     ? categories
     : [...new Set([...categoryIds, ...(value === null ? [] : [value])])].map(
-        (id) => ({ id, label: labelById.get(id) ?? `分类 #${id}` }),
+        (id) => ({ id, label: labelById.get(id) ?? `母题 #${id}` }),
       );
 
   return (
@@ -53,13 +54,13 @@ function CategorySelect({
       }}
       className="max-w-full rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-700 outline-none focus:border-(--tone) dark:border-slate-700 dark:text-slate-200 [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]"
     >
-      {value === null && <option value="">选择分类…</option>}
+      {value === null && <option value="">选择母题…</option>}
       {options.map((c) => (
         <option key={c.id} value={c.id}>
           {c.label}
         </option>
       ))}
-      {!showAll && <option value="__all">其他分类…</option>}
+      {!showAll && <option value="__all">其他母题…</option>}
     </select>
   );
 }

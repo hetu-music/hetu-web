@@ -3,12 +3,12 @@ import { checkCoverage, MIN_ALIAS_SONGS } from "./coverage";
 import { MIN_OCCURRENCES, type PoolRows } from "./pool";
 
 const categories: PoolRows["categories"] = [
-  { id: 1, name: "自然事物", parent_id: null, level: 1 },
+  { id: 1, name: "自然", parent_id: null, level: 1 },
   { id: 10, name: "天象", parent_id: 1, level: 2 },
-  { id: 11, name: "时间", parent_id: 1, level: 2 },
+  { id: 11, name: "光阴", parent_id: 1, level: 2 },
   { id: 12, name: "新分类", parent_id: 1, level: 2 },
-  { id: 100, name: "星相", parent_id: 10, level: 3 },
-  { id: 110, name: "度量", parent_id: 11, level: 3 },
+  { id: 100, name: "月", parent_id: 10, level: 3 },
+  { id: 110, name: "岁月", parent_id: 11, level: 3 },
   { id: 120, name: "其他", parent_id: 12, level: 3 },
 ];
 
@@ -98,7 +98,7 @@ describe("checkCoverage", () => {
   });
 
   it("报告映射引用但数据库已不存在的二级分类", () => {
-    expect(report.missingCategories).toContain("地理");
+    expect(report.missingCategories).toContain("山水");
     expect(report.missingCategories).not.toContain("天象");
   });
 

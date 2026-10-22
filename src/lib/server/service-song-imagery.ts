@@ -83,7 +83,7 @@ const loadImageryIndex = unstable_cache(
     }
     return { categories, imagery, occurrences, songs };
   },
-  ["song-imagery-index-v1"],
+  ["song-imagery-index-v2"],
   { revalidate: 7200, tags: [SONG_IMAGERY_TAG] },
 );
 
@@ -129,28 +129,33 @@ export async function getSongImagery(
     return path;
   };
 
-  // 每首歌的意象集合，以及每个意象覆盖的作品数
+  // 每首歌的母题集合，以及每个母题覆盖的作品数。按母题而非词聚合：
+  // 写「明月」与写「月光」的歌算作写了同一个东西（见 IMAGERY.md）
   const songIds = new Set(index.songs.map((s) => s.id));
   const imageryBySong = new Map<number, Set<number>>();
   for (const occ of index.occurrences) {
     if (!songIds.has(occ.song_id)) continue;
     let set = imageryBySong.get(occ.song_id);
     if (!set) imageryBySong.set(occ.song_id, (set = new Set()));
-    set.add(occ.imagery_id);
+    set.add(occ.category_id);
   }
   const df = new Map<number, number>();
   for (const set of imageryBySong.values()) {
     for (const id of set) df.set(id, (df.get(id) ?? 0) + 1);
   }
 
-  // ── 本曲意象 ──
+  // ── 本曲意象：一个词一处高亮。并列词（「风雨」）有几条标注，取第一条的母题作说明 ──
   const imageryName = new Map(index.imagery.map((i) => [i.id, i.name]));
   const byImagery = new Map<number, SongImageryMark>();
+  const own = new Set<number>();
   for (const occ of index.occurrences) {
     if (occ.song_id !== songId) continue;
+    own.add(occ.category_id);
     const existing = byImagery.get(occ.imagery_id);
     if (existing) {
-      existing.timetags.push(...(occ.lyric_timetag ?? []));
+      for (const tag of occ.lyric_timetag ?? []) {
+        if (!existing.timetags.includes(tag)) existing.timetags.push(tag);
+      }
       continue;
     }
     const path = pathOf(occ.category_id);
@@ -159,15 +164,14 @@ export async function getSongImagery(
       name: tr(imageryName.get(occ.imagery_id) ?? ""),
       path: path.map((c) => tr(c.name)),
       accent: (path[0] && l1Color.get(path[0].id)) ?? GRAY_PALETTE.accent,
-      timetags: [...(occ.lyric_timetag ?? [])],
-      songCount: df.get(occ.imagery_id) ?? 1,
+      timetags: [...new Set(occ.lyric_timetag ?? [])],
+      songCount: df.get(occ.category_id) ?? 1,
     });
   }
   const marks = [...byImagery.values()].filter((m) => m.name);
 
-  // ── 相关作品：以 IDF 加权的意象集合余弦相似度，少见的共同意象更能说明气质相近 ──
+  // ── 相关作品：以 IDF 加权的母题集合余弦相似度，少见的共同母题更能说明气质相近 ──
   // 不从 imageryBySong 取：存疑的歌不在曲库范围内，但它的详情页照样推荐相关作品
-  const own = new Set(byImagery.keys());
   const related: RelatedSong[] = [];
   if (own && own.size > 0) {
     const n = imageryBySong.size;
@@ -207,7 +211,7 @@ export async function getSongImagery(
         shared: shared
           .sort((a, b) => idf(b) - idf(a))
           .slice(0, SHARED_LIMIT)
-          .map((sid) => tr(imageryName.get(sid) ?? ""))
+          .map((sid) => tr(catById.get(sid)?.name ?? ""))
           .filter(Boolean),
       });
       if (related.length >= RELATED_LIMIT) break;

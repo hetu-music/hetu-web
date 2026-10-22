@@ -17,6 +17,7 @@ import {
 import {
   buildPriors,
   parseLrcLines,
+  type MotifEntry,
   suggestImagery,
   type ImagerySuggestion,
 } from "@/lib/imagery/suggest";
@@ -28,7 +29,7 @@ export type { ReviewCategory as CategoryOption } from "@/lib/imagery/review";
 export interface DictionaryOption {
   id: number;
   name: string;
-  /** 历史上使用过的分类，按使用次数从多到少 */
+  /** 可选母题，第一个为默认 */
   categoryIds: number[];
 }
 
@@ -37,7 +38,7 @@ export interface ImagerySuggestionsResult {
   published: boolean;
   hasLyrics: boolean;
   suggestions: ImagerySuggestion[];
-  /** 可挂载意象的叶子分类，用于候选改分类 */
+  /** 全部母题（叶子分类），用于把候选改挂到登记之外的母题 */
   categories: ReviewCategory[];
   dictionary: DictionaryOption[];
   /** 是否配置了 LLM，决定界面是否提供 AI 校验 */
@@ -76,7 +77,7 @@ export async function getImagerySuggestions(
   if (songError) throw songError;
   if (!song) return null;
 
-  const [dictionary, occurrences, songs, categories] = await Promise.all([
+  const [dictionary, occurrences, songs, categories, motifs] = await Promise.all([
     fetchAll<{ id: number; name: string }>(service, TABLES.IMAGERY, "id,name"),
     fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
       service,
@@ -89,6 +90,11 @@ export async function getImagerySuggestions(
       "id,lyrics",
     ),
     fetchAll<CategoryRow>(service, TABLES.IMAGERY_CAT, "id,name,parent_id"),
+    fetchAll<MotifEntry>(
+      service,
+      TABLES.IMAGERY_MOTIFS,
+      "imagery_id,category_id,role",
+    ),
   ]);
   // fetchAll 出错时只记日志并返回部分数据；词典为空时生成的候选毫无意义
   if (dictionary.length === 0) throw new Error("意象词典为空");
@@ -98,6 +104,7 @@ export async function getImagerySuggestions(
     dictionary,
     occurrences,
     songs,
+    motifs,
     excludeSongId: songId,
   });
   const existingImageryIds = new Set(

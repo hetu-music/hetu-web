@@ -22,23 +22,30 @@ import { GRAY_PALETTE, PALETTE_FULL } from "@/lib/imagery/palette";
 import { getSongImagery } from "./service-song-imagery";
 
 // ─── 测试数据 ────────────────────────────────────────────────────────────────
-// 明月（10）写得多、长剑（11）次之、江湖（14）少见；流云（15）的分类找不到一级分类
+// 母题「月」写得多（明月、月光都算）、「剑」次之、「江湖」少见；
+// 流云（15）的母题找不到一级分类；风雨（16）是并列词，有风、雨两条标注
 
 const categories = [
-  { id: 1, name: "自然事物", parent_id: null, level: 1 },
+  { id: 1, name: "自然", parent_id: null, level: 1 },
   { id: 2, name: "天象", parent_id: 1, level: 2 },
   { id: 3, name: "月", parent_id: 2, level: 3 },
-  { id: 4, name: "人文社会", parent_id: null, level: 1 },
+  { id: 20, name: "风", parent_id: 2, level: 3 },
+  { id: 21, name: "雨", parent_id: 2, level: 3 },
+  { id: 4, name: "人事", parent_id: null, level: 1 },
   { id: 5, name: "器物", parent_id: 4, level: 2 },
+  { id: 7, name: "剑", parent_id: 5, level: 3 },
+  { id: 8, name: "江湖", parent_id: 4, level: 3 },
   { id: 6, name: "飘零", parent_id: 99, level: 3 },
 ];
 
 const imagery = [
   { id: 10, name: "明月" },
   { id: 11, name: "长剑" },
+  { id: 12, name: "月光" },
   { id: 13, name: "" },
   { id: 14, name: "江湖" },
   { id: 15, name: "流云" },
+  { id: 16, name: "风雨" },
 ];
 
 const songs = [
@@ -66,27 +73,31 @@ const occurrences = [
   // 本曲：明月出现两次，时间标签合并
   occ(1, 10, 3, ["00:10.00"]),
   occ(1, 10, 3, ["00:40.00"]),
-  occ(1, 11, 5),
+  occ(1, 11, 7),
   occ(1, 13, 3),
   occ(1, 15, 6, ["00:20.00"]),
+  // 并列词：两条标注、同一处高亮，时间标签不重复
+  occ(1, 16, 20, ["00:30.00"]),
+  occ(1, 16, 21, ["00:30.00"]),
   // 纯歌版与原曲同源，不推荐
   occ(2, 10, 3),
-  occ(2, 11, 5),
-  // 与本曲共有两个意象
+  occ(2, 11, 7),
+  // 与本曲共有两个母题
   occ(3, 10, 3),
-  occ(3, 11, 5),
-  occ(4, 10, 3),
-  occ(5, 11, 5),
-  occ(5, 14, 5),
+  occ(3, 11, 7),
+  // 写的是「月光」，与本曲的「明月」同属母题「月」
+  occ(4, 12, 3),
+  occ(5, 11, 7),
+  occ(5, 14, 8),
   occ(6, 10, 3),
-  // 没有共同意象
-  occ(7, 14, 5),
+  // 没有共同母题
+  occ(7, 14, 8),
   occ(8, 10, 3),
   // 与 3 同源（DJ 版），同分时只留先出现的那首
   occ(9, 10, 3),
-  occ(9, 11, 5),
+  occ(9, 11, 7),
   // 不在曲库里的歌（如资料存疑）不计入作品数，也不被推荐
-  occ(500, 11, 5),
+  occ(500, 11, 7),
 ];
 
 type Tables = {
@@ -128,15 +139,16 @@ afterEach(() => {
 });
 
 describe("getSongImagery", () => {
-  it("本曲意象：带分类路径、一级分类配色、合并的时间标签与全库作品数", async () => {
+  it("本曲意象：带母题路径、一级分类配色、合并的时间标签与全库作品数", async () => {
     mockClient();
     const { marks } = await getSongImagery(1, "zh-CN");
 
     expect(marks).toEqual([
+      // 作品数按母题算：写月光的 4 也计入
       {
         id: 10,
         name: "明月",
-        path: ["自然事物", "天象", "月"],
+        path: ["自然", "天象", "月"],
         accent: PALETTE_FULL[0].accent,
         timetags: ["00:10.00", "00:40.00"],
         songCount: 7,
@@ -144,12 +156,12 @@ describe("getSongImagery", () => {
       {
         id: 11,
         name: "长剑",
-        path: ["人文社会", "器物"],
+        path: ["人事", "器物", "剑"],
         accent: PALETTE_FULL[1].accent,
         timetags: [],
         songCount: 5,
       },
-      // 无名意象（13）略去；流云的分类接不上一级分类，用灰色
+      // 无名意象（13）略去；流云的母题接不上一级分类，用灰色
       {
         id: 15,
         name: "流云",
@@ -158,23 +170,32 @@ describe("getSongImagery", () => {
         timetags: ["00:20.00"],
         songCount: 1,
       },
+      // 并列词只出一处高亮，说明取第一条标注的母题
+      {
+        id: 16,
+        name: "风雨",
+        path: ["自然", "天象", "风"],
+        accent: PALETTE_FULL[0].accent,
+        timetags: ["00:30.00"],
+        songCount: 1,
+      },
     ]);
   });
 
-  it("相关作品：少见的共同意象权重更高，同源版本不推荐，最多四首", async () => {
+  it("相关作品：少见的共同母题权重更高，同源版本不推荐，最多四首", async () => {
     mockClient();
     const { related } = await getSongImagery(1, "zh-CN");
 
-    // 3 共有两个意象排第一；9 与 3 同源、2 与本曲同源，都不出现；
-    // 只共有明月的 4、6、8 胜过只共有长剑、却另有少见意象江湖的 5，5 被上限挤掉
+    // 3 共有两个母题排第一；9 与 3 同源、2 与本曲同源，都不出现；
+    // 只共有「月」的 4（写的是月光）、6、8 胜过只共有「剑」、却另有少见母题江湖的 5，5 被上限挤掉
     expect(related.map((r) => r.id)).toEqual([3, 4, 6, 8]);
     expect(related[0]).toEqual({
       id: 3,
       title: "长剑甲",
       artist: ["河图"],
       hascover: false,
-      // 共有意象按少见程度排序
-      shared: ["长剑", "明月"],
+      // 共有母题按少见程度排序
+      shared: ["剑", "月"],
     });
   });
 
@@ -184,12 +205,12 @@ describe("getSongImagery", () => {
 
     expect(marks[1]).toMatchObject({
       name: "長劍",
-      path: ["人文社會", "器物"],
+      path: ["人事", "器物", "劍"],
     });
     expect(related[0]).toMatchObject({
       title: "長劍甲",
       artist: ["河圖"],
-      shared: ["長劍", "明月"],
+      shared: ["劍", "月"],
     });
   });
 

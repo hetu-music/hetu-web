@@ -266,6 +266,10 @@ describe("createOccurrence（叶子分类校验）", () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({ data: [], error: null }), // 无子分类，是叶子
+        makeQueryBuilder({
+          data: [{ imagery_id: 2, category_id: 3, role: "primary" }],
+          error: null,
+        }), // 该词已登记这个母题
         makeQueryBuilder({ data: { id: 7 }, error: null }), // 插入 occurrence
         makeQueryBuilder({
           data: {
@@ -300,6 +304,9 @@ describe("createOccurrencesBatch", () => {
   const leafOk = () => makeQueryBuilder({ data: [], error: null });
   const published = () => makeQueryBuilder({ data: { id: 5 }, error: null });
   const noExisting = () => makeQueryBuilder({ data: [], error: null });
+  const motifs = (
+    rows: Array<{ imagery_id: number; category_id: number; role: string }>,
+  ) => makeQueryBuilder({ data: rows, error: null });
 
   it("跳过该歌已标注的意象，只插入其余的", async () => {
     const insertBuilder = makeQueryBuilder({ data: null, error: null });
@@ -308,6 +315,7 @@ describe("createOccurrencesBatch", () => {
         leafOk(),
         published(),
         makeQueryBuilder({ data: [{ imagery_id: 1 }], error: null }), // 已有标注
+        motifs([{ imagery_id: 2, category_id: 10, role: "primary" }]),
         insertBuilder,
       ]),
     );
@@ -329,6 +337,7 @@ describe("createOccurrencesBatch", () => {
       data: [{ id: 31, name: "孤灯" }],
       error: null,
     });
+    const registerBuilder = makeQueryBuilder({ data: null, error: null });
     const insertBuilder = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
@@ -337,6 +346,8 @@ describe("createOccurrencesBatch", () => {
         makeQueryBuilder({ data: [{ id: 3, name: "月" }], error: null }), // 按名查找
         createBuilder,
         noExisting(),
+        motifs([{ imagery_id: 3, category_id: 10, role: "primary" }]),
+        registerBuilder,
         insertBuilder,
       ]),
     );
@@ -356,6 +367,11 @@ describe("createOccurrencesBatch", () => {
     );
     expect(result).toEqual({ created: 2, skipped: 0, newImagery: 1 });
     expect(createBuilder.insert).toHaveBeenCalledWith([{ name: "孤灯" }]);
+    // 新词以这次选的母题为默认母题
+    expect(registerBuilder.upsert).toHaveBeenCalledWith(
+      [{ imagery_id: 31, category_id: 12, role: "primary" }],
+      { onConflict: "imagery_id,category_id", ignoreDuplicates: true },
+    );
     expect(insertBuilder.insert).toHaveBeenCalledWith([
       {
         imagery_id: 3,
@@ -407,12 +423,52 @@ describe("createOccurrencesBatch", () => {
     expect(client.from).toHaveBeenCalledTimes(2);
   });
 
+  it("所选母题不在候选里时登记为多义候选；挂默认母题的并列词补写其余组成", async () => {
+    const registerBuilder = makeQueryBuilder({ data: null, error: null });
+    const insertBuilder = makeQueryBuilder({ data: null, error: null });
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        leafOk(),
+        published(),
+        noExisting(),
+        motifs([
+          // 1「风雨」：默认风（10），并列雨（11）
+          { imagery_id: 1, category_id: 10, role: "primary" },
+          { imagery_id: 1, category_id: 11, role: "part" },
+          // 2：默认母题是 20，这次选了 10
+          { imagery_id: 2, category_id: 20, role: "primary" },
+        ]),
+        registerBuilder,
+        insertBuilder,
+      ]),
+    );
+    const result = await createOccurrencesBatch(5, items, "token");
+    expect(result).toEqual({ created: 2, skipped: 0, newImagery: 0 });
+    expect(registerBuilder.upsert).toHaveBeenCalledWith(
+      [{ imagery_id: 2, category_id: 10, role: "alternative" }],
+      { onConflict: "imagery_id,category_id", ignoreDuplicates: true },
+    );
+    expect(insertBuilder.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ imagery_id: 1, category_id: 10 }),
+      expect.objectContaining({
+        imagery_id: 1,
+        category_id: 11,
+        lyric_timetag: ["00:01.00"],
+      }),
+      expect.objectContaining({ imagery_id: 2, category_id: 10 }),
+    ]);
+  });
+
   it("插入时 song_id 外键失败也提示先发布歌曲", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         leafOk(),
         published(),
         noExisting(),
+        motifs([
+          { imagery_id: 1, category_id: 10, role: "primary" },
+          { imagery_id: 2, category_id: 10, role: "primary" },
+        ]),
         makeQueryBuilder({
           data: null,
           error: {

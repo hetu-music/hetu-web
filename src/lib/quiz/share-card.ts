@@ -15,6 +15,9 @@ export type ShareCardInput = {
   secondary: string | null;
   description: string;
   imageryLabel: string;
+  profileLabel: string;
+  /** 九个维度，按固定顺序排成九宫格；z 为用户在该维度上的 z 分数 */
+  dimensions: Array<{ label: string; z: number }>;
   imagery: string[];
   matchesLabel: string;
   matchLabel: string;
@@ -90,6 +93,10 @@ const QR_SIZE = 140;
 /** 深色卡片上二维码浅底的留边 */
 const QR_TILE_PAD = 10;
 const COVER_SIZE = 148;
+const GRID_CELL_W = 220;
+const GRID_CELL_H = 88;
+/** 九宫格底色满格对应的 z 分数，与结果页倾向条一致 */
+const Z_RANGE = 2.5;
 
 /** 不宜出现在行首的标点 */
 const NO_LINE_START = "，。、；：！？）」』》〉,.;:!?)";
@@ -123,6 +130,8 @@ async function loadFonts(fonts: Fonts, input: ShareCardInput) {
     input.eyebrow,
     input.secondary ?? "",
     input.imageryLabel,
+    input.profileLabel,
+    ...input.dimensions.map((d) => d.label),
     input.matchesLabel,
     input.siteName,
     ...input.matches.map((m) => m.title + m.percent),
@@ -231,6 +240,62 @@ function wrapEven(ctx: CanvasRenderingContext2D, text: string, max: number) {
   return best;
 }
 
+/**
+ * 意象倾向九宫格：底色是强调色，越偏爱越深；不偏爱的格子不着色、字也淡下去。
+ * 最偏爱的两格题名加粗，一眼看出主次
+ */
+function drawDimensionGrid(
+  ctx: CanvasRenderingContext2D,
+  dimensions: ShareCardInput["dimensions"],
+  top: number,
+  colors: Palette,
+  fonts: Fonts,
+): number {
+  const cols = 3;
+  const rows = Math.ceil(dimensions.length / cols);
+  const left = (WIDTH - GRID_CELL_W * cols) / 2;
+  const leading = new Set(
+    [...dimensions]
+      .filter((d) => d.z > 0)
+      .sort((a, b) => b.z - a.z)
+      .slice(0, 2)
+      .map((d) => d.label),
+  );
+
+  ctx.textAlign = "center";
+  dimensions.forEach((d, i) => {
+    const x = left + (i % cols) * GRID_CELL_W;
+    const y = top + Math.floor(i / cols) * GRID_CELL_H;
+    if (d.z > 0) {
+      ctx.globalAlpha = Math.min(d.z / Z_RANGE, 1) * 0.55;
+      ctx.fillStyle = colors.accent;
+      ctx.fillRect(x, y, GRID_CELL_W, GRID_CELL_H);
+      ctx.globalAlpha = 1;
+    }
+    const strong = leading.has(d.label);
+    ctx.font = `${strong ? 700 : 400} 32px ${fonts.serif}`;
+    ctx.fillStyle = d.z > 0 ? colors.title : colors.meta;
+    setSpacing(ctx, 6);
+    ctx.fillText(d.label, x + GRID_CELL_W / 2 + 3, y + GRID_CELL_H / 2 + 11);
+    setSpacing(ctx, 0);
+  });
+
+  // 格线画在底色之上，深浅相邻的格子之间也有清楚的分界
+  ctx.fillStyle = colors.line;
+  for (let c = 0; c <= cols; c += 1) {
+    ctx.fillRect(left + c * GRID_CELL_W - 1, top, 2, rows * GRID_CELL_H);
+  }
+  for (let r = 0; r <= rows; r += 1) {
+    ctx.fillRect(
+      left - 1,
+      top + r * GRID_CELL_H - 1,
+      cols * GRID_CELL_W + 2,
+      2,
+    );
+  }
+  return top + rows * GRID_CELL_H;
+}
+
 function hairline(ctx: CanvasRenderingContext2D, y: number, color: string) {
   ctx.fillStyle = color;
   ctx.fillRect(PAD, y, INNER, 2);
@@ -320,10 +385,11 @@ function drawCard(
     drawCentered(ctx, line, y);
   }
 
-  // ── 意象 ──
+  // ── 意象与倾向 ──
+  y += flex(80, 1);
+  hairline(ctx, y, colors.line);
+  // 没选中任何招牌意象时只画九宫格
   if (input.imagery.length > 0) {
-    y += flex(80, 1);
-    hairline(ctx, y, colors.line);
     y += flex(88, 1);
     ctx.font = `400 26px ${fonts.serif}`;
     ctx.fillStyle = colors.meta;
@@ -350,6 +416,15 @@ function drawCard(
       y += 92;
       drawCentered(ctx, row.join("　"), y);
     }
+  }
+
+  if (input.dimensions.length > 0) {
+    // 意象词是大字，下沿离题头要多留一些，压缩时也不至于挤在一起
+    y += input.imagery.length > 0 ? flex(104, 1) : flex(88, 1);
+    ctx.font = `400 26px ${fonts.serif}`;
+    ctx.fillStyle = colors.meta;
+    drawCentered(ctx, input.profileLabel, y, 8);
+    y = drawDimensionGrid(ctx, input.dimensions, y + 36, colors, fonts);
   }
 
   // ── 契合歌曲 ──

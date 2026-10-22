@@ -81,6 +81,7 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
           .join(" · "),
         percent: m.percent,
         coverUrl: getCoverUrl(m.song),
+        lyric: m.lines[0] ?? null,
       })),
       siteName: tSite("name"),
       scanHint: t("card.scan"),

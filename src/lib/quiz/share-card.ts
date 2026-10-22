@@ -23,6 +23,8 @@ export type ShareCardInput = {
     meta: string;
     percent: number;
     coverUrl: string;
+    /** 印证契合的一句歌词，没有时退回显示 meta */
+    lyric: string | null;
   }>;
   siteName: string;
   scanHint: string;
@@ -39,6 +41,7 @@ const PALETTE: Record<
     bg: string;
     title: string;
     body: string;
+    lyric: string;
     meta: string;
     accent: string;
     line: string;
@@ -51,6 +54,7 @@ const PALETTE: Record<
     bg: "#FAFAFA",
     title: "#0f172a",
     body: "#475569",
+    lyric: "#475569",
     meta: "#94a3b8",
     accent: "#9A6B2F",
     line: "#e2e8f0",
@@ -62,6 +66,7 @@ const PALETTE: Record<
     bg: "#0B0F19",
     title: "#ffffff",
     body: "#94a3b8",
+    lyric: "#cbd5e1",
     meta: "#64748b",
     accent: "#D4A259",
     line: "#1e293b",
@@ -77,9 +82,9 @@ const PAD = 96;
 const INNER = WIDTH - PAD * 2;
 /** 先画在足够高的画布上，最后按实际内容高度裁下来 */
 const MAX_HEIGHT = 3200;
-const QR_SIZE = 200;
+const QR_SIZE = 140;
 /** 深色卡片上二维码浅底的留边 */
-const QR_TILE_PAD = 16;
+const QR_TILE_PAD = 10;
 const COVER_SIZE = 136;
 
 /** 不宜出现在行首的标点 */
@@ -127,7 +132,9 @@ async function loadFonts(fonts: Fonts, input: ShareCardInput) {
     document.fonts.load(`48px ${fonts.serif}`, serifText),
     document.fonts.load(
       `48px ${fonts.kaiti}`,
-      input.description + input.scanHint,
+      input.description +
+        input.scanHint +
+        input.matches.map((m) => m.lyric ?? "").join(""),
     ),
     document.fonts.load(
       `48px ${fonts.calligraphy}`,
@@ -201,22 +208,23 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, max: number) {
   return lines;
 }
 
-/** 行数不变的前提下把行宽收到最窄，各行长短接近，末行不会只剩一两个字 */
-function wrapBalanced(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  max: number,
-) {
+/**
+ * 按整栏宽折行；末行太短时逐字收窄行宽，把前面的字匀下来一些，
+ * 不改变行数，也不像整段均分那样把整块收得太窄
+ */
+function wrapEven(ctx: CanvasRenderingContext2D, text: string, max: number) {
   const lines = wrap(ctx, text, max);
   if (lines.length < 2) return lines;
-  let lo = 0;
-  let hi = max;
-  while (hi - lo > 4) {
-    const mid = (lo + hi) / 2;
-    if (wrap(ctx, text, mid).length > lines.length) lo = mid;
-    else hi = mid;
+  const step = ctx.measureText("字").width;
+  let best = lines;
+  let width = max;
+  while (ctx.measureText(best[best.length - 1]).width < max * 0.35) {
+    width -= step;
+    const next = wrap(ctx, text, width);
+    if (next.length > lines.length) break;
+    best = next;
   }
-  return wrap(ctx, text, hi);
+  return best;
 }
 
 function hairline(ctx: CanvasRenderingContext2D, y: number, color: string) {
@@ -302,11 +310,10 @@ export async function renderShareCard(
     drawCentered(ctx, input.secondary, y, 9);
   }
 
-  ctx.font = `400 34px ${fonts.kaiti}`;
+  ctx.font = `400 36px ${fonts.kaiti}`;
   ctx.fillStyle = colors.body;
-  const descLines = wrapBalanced(ctx, input.description, 780);
   y += 40;
-  for (const line of descLines) {
+  for (const line of wrapEven(ctx, input.description, INNER)) {
     y += 64;
     drawCentered(ctx, line, y);
   }
@@ -345,7 +352,7 @@ export async function renderShareCard(
 
   // ── 契合歌曲 ──
   if (input.matches.length > 0) {
-    y += 72;
+    y += 80;
     hairline(ctx, y, colors.line);
     y += 88;
     ctx.font = `400 24px ${fonts.serif}`;
@@ -365,28 +372,41 @@ export async function renderShareCard(
       if (cover) ctx.drawImage(cover, PAD, top, COVER_SIZE, COVER_SIZE);
       ctx.restore();
 
-      const percentRight = WIDTH - PAD;
+      const right = WIDTH - PAD;
       ctx.textAlign = "right";
       ctx.font = `400 56px ${fonts.serif}`;
       ctx.fillStyle = colors.accent;
       const percentText = String(match.percent);
-      ctx.fillText(percentText, percentRight - 30, top + 76);
+      ctx.fillText(percentText, right - 30, top + 76);
       const percentWidth = ctx.measureText(percentText).width + 30;
       ctx.font = `400 24px ${fonts.sans}`;
       ctx.fillStyle = colors.meta;
-      ctx.fillText("%", percentRight, top + 76);
+      ctx.fillText("%", right, top + 76);
       setSpacing(ctx, 4);
       // 右对齐时末尾的字距也算进宽度，补回去才和上面的「%」对齐
-      ctx.fillText(input.matchLabel, percentRight + 4, top + 114);
+      ctx.fillText(input.matchLabel, right + 4, top + 114);
       setSpacing(ctx, 0);
 
       const textLeft = PAD + COVER_SIZE + 36;
-      const textMax = percentRight - percentWidth - 40 - textLeft;
+      const textMax = right - percentWidth - 40 - textLeft;
       ctx.textAlign = "left";
       ctx.font = `400 40px ${fonts.serif}`;
       ctx.fillStyle = colors.title;
-      ctx.fillText(truncate(ctx, match.title, textMax), textLeft, top + 64);
-      if (match.meta) {
+      ctx.fillText(truncate(ctx, match.title, textMax), textLeft, top + 58);
+      if (match.lyric) {
+        // 与结果页一样，歌词前一道淡金色竖线
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = colors.accent;
+        ctx.fillRect(textLeft, top + 82, 3, 40);
+        ctx.globalAlpha = 1;
+        ctx.font = `400 30px ${fonts.kaiti}`;
+        ctx.fillStyle = colors.lyric;
+        ctx.fillText(
+          truncate(ctx, match.lyric, textMax - 20),
+          textLeft + 20,
+          top + 113,
+        );
+      } else if (match.meta) {
         ctx.font = `400 24px ${fonts.sans}`;
         ctx.fillStyle = colors.meta;
         ctx.fillText(truncate(ctx, match.meta, textMax), textLeft, top + 108);
@@ -396,28 +416,28 @@ export async function renderShareCard(
   }
 
   // ── 落款与二维码 ──
-  y += 80;
+  y += 56;
   hairline(ctx, y, colors.line);
-  y += 64;
+  y += 36 + (colors.qrTile ? QR_TILE_PAD : 0);
   // 有浅底时让底块而不是码本身贴齐右边距
   const qrX = WIDTH - PAD - QR_SIZE - (colors.qrTile ? QR_TILE_PAD : 0);
   drawQr(ctx, input.qrUrl, qrX, y, colors);
 
   ctx.textAlign = "left";
-  ctx.font = `600 36px ${fonts.serif}`;
+  ctx.font = `600 30px ${fonts.serif}`;
   ctx.fillStyle = colors.title;
   setSpacing(ctx, 6);
-  ctx.fillText(input.siteName, PAD, y + 62);
+  ctx.fillText(input.siteName, PAD, y + 38);
   setSpacing(ctx, 0);
-  ctx.font = `400 30px ${fonts.kaiti}`;
+  ctx.font = `400 26px ${fonts.kaiti}`;
   ctx.fillStyle = colors.body;
-  ctx.fillText(input.scanHint, PAD, y + 124);
-  ctx.font = `400 22px ${fonts.sans}`;
+  ctx.fillText(input.scanHint, PAD, y + 84);
+  ctx.font = `400 20px ${fonts.sans}`;
   ctx.fillStyle = colors.meta;
   setSpacing(ctx, 2);
-  ctx.fillText(input.displayUrl, PAD, y + 178);
+  ctx.fillText(input.displayUrl, PAD, y + 124);
   setSpacing(ctx, 0);
-  y += QR_SIZE + PAD;
+  y += QR_SIZE + (colors.qrTile ? QR_TILE_PAD : 0) + 56;
 
   const out = document.createElement("canvas");
   out.width = WIDTH;

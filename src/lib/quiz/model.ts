@@ -19,12 +19,20 @@ import type {
  * - 歌曲：维度取占比（消除歌词长短的影响），招牌意象取 log(1+次数)，
  *   再在候选池内逐特征标准化。
  * - 匹配：加权余弦相似度。比较方向而非距离，避免靠近均值的「中庸」歌曲包揽第一。
+ *   多人合唱的歌再减去一个固定值，见 ENSEMBLE_PENALTY。
  */
 
 /** 招牌意象特征相对维度特征的权重 */
 const IMAGERY_GROUP_WEIGHT = 0.6;
 /** 结果中同一专辑最多出现几首 */
 const MAX_PER_ALBUM = 2;
+/** 演唱者达到几人算多人合唱 */
+const ENSEMBLE_SIZE = 5;
+/**
+ * 多人合唱的歌从相似度里减去的值（契合度约少 PENALTY × 50 个百分点）。
+ * 这类歌多是群像、拼盘，意象堆得密，容易靠特征「撞」进前列，但作为推荐价值不高
+ */
+export const ENSEMBLE_PENALTY = 0.1;
 
 type FeatureKey =
   { kind: "dimension"; key: DimensionKey } | { kind: "imagery"; name: string };
@@ -42,6 +50,8 @@ export interface QuizModel {
   songVectors: Float64Array[];
   /** 与 songs 对齐的加权范数 */
   songNorms: Float64Array;
+  /** 与 songs 对齐，从相似度里扣掉的值 */
+  songPenalties: Float64Array;
 }
 
 function buildFeatures(): FeatureKey[] {
@@ -75,6 +85,8 @@ function weightedNorm(v: Float64Array, w: Float64Array): number {
 export function buildModel(
   pool: readonly PoolSong[],
   questions: readonly QuizQuestion[],
+  /** 只给诊断脚本比较不同取值用 */
+  ensemblePenalty = ENSEMBLE_PENALTY,
 ): QuizModel {
   const features = buildFeatures();
   const F = features.length;
@@ -147,6 +159,11 @@ export function buildModel(
   const songNorms = new Float64Array(
     songVectors.map((v) => weightedNorm(v, weights)),
   );
+  const songPenalties = new Float64Array(
+    pool.map((song) =>
+      (song.artist?.length ?? 0) >= ENSEMBLE_SIZE ? ensemblePenalty : 0,
+    ),
+  );
 
   return {
     questions,
@@ -158,6 +175,7 @@ export function buildModel(
     songs: [...pool],
     songVectors,
     songNorms,
+    songPenalties,
   };
 }
 
@@ -184,16 +202,17 @@ export function userVector(
   return { raw, z };
 }
 
-/** 所有歌曲的余弦相似度，与 model.songs 对齐 */
+/** 所有歌曲的余弦相似度（已扣除多人合唱的降权），与 model.songs 对齐 */
 export function scoreSongs(model: QuizModel, z: Float64Array): Float64Array {
-  const { weights, songVectors, songNorms } = model;
+  const { weights, songVectors, songNorms, songPenalties } = model;
   const userNorm = weightedNorm(z, weights);
   const scores = new Float64Array(songVectors.length);
   if (userNorm === 0) return scores;
   songVectors.forEach((s, j) => {
     let dot = 0;
     for (let f = 0; f < z.length; f += 1) dot += weights[f] * z[f] * s[f];
-    scores[j] = songNorms[j] > 0 ? dot / (userNorm * songNorms[j]) : 0;
+    const cosine = songNorms[j] > 0 ? dot / (userNorm * songNorms[j]) : 0;
+    scores[j] = cosine - songPenalties[j];
   });
   return scores;
 }

@@ -31,7 +31,7 @@ const categories = [
   { id: 3, name: "月", parent_id: 2, level: 3 },
   { id: 20, name: "风", parent_id: 2, level: 3 },
   { id: 21, name: "雨", parent_id: 2, level: 3 },
-  { id: 4, name: "人事", parent_id: null, level: 1 },
+  { id: 4, name: "人文", parent_id: null, level: 1 },
   { id: 5, name: "器物", parent_id: 4, level: 2 },
   { id: 7, name: "剑", parent_id: 5, level: 3 },
   { id: 8, name: "江湖", parent_id: 4, level: 3 },
@@ -156,7 +156,7 @@ describe("getSongImagery", () => {
       {
         id: 11,
         name: "长剑",
-        path: ["人事", "器物", "剑"],
+        path: ["人文", "器物", "剑"],
         accent: PALETTE_FULL[1].accent,
         timetags: [],
         songCount: 5,
@@ -205,7 +205,7 @@ describe("getSongImagery", () => {
 
     expect(marks[1]).toMatchObject({
       name: "長劍",
-      path: ["人事", "器物", "劍"],
+      path: ["人文", "器物", "劍"],
     });
     expect(related[0]).toMatchObject({
       title: "長劍甲",

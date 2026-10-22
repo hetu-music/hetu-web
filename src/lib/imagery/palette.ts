@@ -89,7 +89,7 @@ export const GRAY_PALETTE: PaletteEntry = {
   accent: "#94a3b8",
 };
 
-const IMAGERY_L1_ORDER = ["自然", "人事", "情志"];
+const IMAGERY_L1_ORDER = ["自然", "人文", "情志"];
 
 /** 一级分类按固定顺序排列，决定各自的配色下标 */
 export function sortLevel1Categories<

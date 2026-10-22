@@ -77,15 +77,19 @@ const PALETTE: Record<
   },
 };
 
+type Palette = (typeof PALETTE)[ShareCardTheme];
+
 const WIDTH = 1080;
+/** iPhone 13–16 全面屏的 19.5:9（如 1179×2556），存进相册点开正好铺满一屏 */
+const HEIGHT = 2340;
 const PAD = 96;
 const INNER = WIDTH - PAD * 2;
-/** 先画在足够高的画布上，最后按实际内容高度裁下来 */
+/** 先画在足够高的画布上再裁下来；内容实在太多时图片可以比全屏长，但不超过这个高度 */
 const MAX_HEIGHT = 3200;
 const QR_SIZE = 140;
 /** 深色卡片上二维码浅底的留边 */
 const QR_TILE_PAD = 10;
-const COVER_SIZE = 136;
+const COVER_SIZE = 148;
 
 /** 不宜出现在行首的标点 */
 const NO_LINE_START = "，。、；：！？）」』》〉,.;:!?)";
@@ -237,7 +241,7 @@ function drawQr(
   url: string,
   x: number,
   y: number,
-  colors: (typeof PALETTE)[ShareCardTheme],
+  colors: Palette,
 ) {
   const qr = encode(url, { ecc: "M", border: 0 });
   // 按整数像素对齐每个模块，扫码时边缘才干净
@@ -266,28 +270,26 @@ function drawQr(
   );
 }
 
-export async function renderShareCard(
-  input: ShareCardInput,
-  theme: ShareCardTheme,
-): Promise<HTMLCanvasElement> {
-  const fonts = resolveFonts();
-  const colors = PALETTE[theme];
-  const [covers] = await Promise.all([
-    Promise.all(input.matches.map((m) => loadCover(m.coverUrl))),
-    loadFonts(fonts, input),
-  ]);
+/**
+ * 可伸缩的间距：base 是内容自然排下时的间距，weight 决定多出（或不够）的高度分给它多少
+ */
+type Flex = (base: number, weight: number) => number;
 
-  const canvas = document.createElement("canvas");
-  canvas.width = WIDTH;
-  canvas.height = MAX_HEIGHT;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2D 不可用");
+/** 把整张卡画到 ctx 上，返回内容底边的 y */
+function drawCard(
+  ctx: CanvasRenderingContext2D,
+  input: ShareCardInput,
+  colors: Palette,
+  fonts: Fonts,
+  covers: (HTMLImageElement | null)[],
+  flex: Flex,
+): number {
   ctx.fillStyle = colors.bg;
-  ctx.fillRect(0, 0, WIDTH, MAX_HEIGHT);
+  ctx.fillRect(0, 0, WIDTH, ctx.canvas.height);
   ctx.textBaseline = "alphabetic";
 
   // ── 气韵 ──
-  let y = PAD + 40;
+  let y = flex(PAD, 1.5) + 40;
   ctx.font = `400 28px ${fonts.serif}`;
   ctx.fillStyle = colors.meta;
   drawCentered(ctx, input.eyebrow, y, 14);
@@ -299,7 +301,7 @@ export async function renderShareCard(
     mottoSize -= 8;
     ctx.font = `400 ${mottoSize}px ${fonts.calligraphy}`;
   }
-  y += 56 + mottoSize;
+  y += flex(56, 1) + mottoSize;
   ctx.fillStyle = colors.title;
   drawCentered(ctx, input.motto, y);
 
@@ -312,7 +314,7 @@ export async function renderShareCard(
 
   ctx.font = `400 36px ${fonts.kaiti}`;
   ctx.fillStyle = colors.body;
-  y += 40;
+  y += flex(40, 0.5);
   for (const line of wrapEven(ctx, input.description, INNER)) {
     y += 64;
     drawCentered(ctx, line, y);
@@ -320,14 +322,14 @@ export async function renderShareCard(
 
   // ── 意象 ──
   if (input.imagery.length > 0) {
-    y += 80;
+    y += flex(80, 1);
     hairline(ctx, y, colors.line);
-    y += 88;
-    ctx.font = `400 24px ${fonts.serif}`;
+    y += flex(88, 1);
+    ctx.font = `400 26px ${fonts.serif}`;
     ctx.fillStyle = colors.meta;
     drawCentered(ctx, input.imageryLabel, y, 8);
 
-    ctx.font = `400 64px ${fonts.calligraphy}`;
+    ctx.font = `400 72px ${fonts.calligraphy}`;
     ctx.fillStyle = colors.title;
     const gap = 48;
     const rows: string[][] = [[]];
@@ -345,23 +347,25 @@ export async function renderShareCard(
     }
     y += 24;
     for (const row of rows) {
-      y += 84;
+      y += 92;
       drawCentered(ctx, row.join("　"), y);
     }
   }
 
   // ── 契合歌曲 ──
   if (input.matches.length > 0) {
-    y += 80;
+    y += flex(80, 1);
     hairline(ctx, y, colors.line);
-    y += 88;
-    ctx.font = `400 24px ${fonts.serif}`;
+    y += flex(88, 1);
+    ctx.font = `400 26px ${fonts.serif}`;
     ctx.fillStyle = colors.meta;
     drawCentered(ctx, input.matchesLabel, y, 8);
-    y += 48;
+    y += flex(48, 0.5);
 
+    // 行距每处单独取，量高度时每一处的权重才都算得上
+    let top = y;
     input.matches.forEach((match, i) => {
-      const top = y + i * (COVER_SIZE + 36);
+      if (i > 0) top += COVER_SIZE + flex(36, 0.5);
       const cover = covers[i];
       ctx.save();
       ctx.beginPath();
@@ -374,49 +378,49 @@ export async function renderShareCard(
 
       const right = WIDTH - PAD;
       ctx.textAlign = "right";
-      ctx.font = `400 56px ${fonts.serif}`;
+      ctx.font = `400 60px ${fonts.serif}`;
       ctx.fillStyle = colors.accent;
       const percentText = String(match.percent);
-      ctx.fillText(percentText, right - 30, top + 76);
+      ctx.fillText(percentText, right - 30, top + 84);
       const percentWidth = ctx.measureText(percentText).width + 30;
       ctx.font = `400 24px ${fonts.sans}`;
       ctx.fillStyle = colors.meta;
-      ctx.fillText("%", right, top + 76);
+      ctx.fillText("%", right, top + 84);
       setSpacing(ctx, 4);
       // 右对齐时末尾的字距也算进宽度，补回去才和上面的「%」对齐
-      ctx.fillText(input.matchLabel, right + 4, top + 114);
+      ctx.fillText(input.matchLabel, right + 4, top + 124);
       setSpacing(ctx, 0);
 
       const textLeft = PAD + COVER_SIZE + 36;
       const textMax = right - percentWidth - 40 - textLeft;
       ctx.textAlign = "left";
-      ctx.font = `400 40px ${fonts.serif}`;
+      ctx.font = `400 44px ${fonts.serif}`;
       ctx.fillStyle = colors.title;
-      ctx.fillText(truncate(ctx, match.title, textMax), textLeft, top + 58);
+      ctx.fillText(truncate(ctx, match.title, textMax), textLeft, top + 62);
       if (match.lyric) {
         // 与结果页一样，歌词前一道淡金色竖线
         ctx.globalAlpha = 0.3;
         ctx.fillStyle = colors.accent;
-        ctx.fillRect(textLeft, top + 82, 3, 40);
+        ctx.fillRect(textLeft, top + 90, 3, 44);
         ctx.globalAlpha = 1;
-        ctx.font = `400 30px ${fonts.kaiti}`;
+        ctx.font = `400 34px ${fonts.kaiti}`;
         ctx.fillStyle = colors.lyric;
         ctx.fillText(
           truncate(ctx, match.lyric, textMax - 20),
           textLeft + 20,
-          top + 113,
+          top + 125,
         );
       } else if (match.meta) {
         ctx.font = `400 24px ${fonts.sans}`;
         ctx.fillStyle = colors.meta;
-        ctx.fillText(truncate(ctx, match.meta, textMax), textLeft, top + 108);
+        ctx.fillText(truncate(ctx, match.meta, textMax), textLeft, top + 118);
       }
     });
-    y += input.matches.length * (COVER_SIZE + 36) - 36;
+    y = top + COVER_SIZE;
   }
 
   // ── 落款与二维码 ──
-  y += 56;
+  y += flex(56, 1);
   hairline(ctx, y, colors.line);
   y += 36 + (colors.qrTile ? QR_TILE_PAD : 0);
   // 有浅底时让底块而不是码本身贴齐右边距
@@ -437,11 +441,45 @@ export async function renderShareCard(
   setSpacing(ctx, 2);
   ctx.fillText(input.displayUrl, PAD, y + 124);
   setSpacing(ctx, 0);
-  y += QR_SIZE + (colors.qrTile ? QR_TILE_PAD : 0) + 56;
+  return y + QR_SIZE + (colors.qrTile ? QR_TILE_PAD : 0) + flex(56, 0.5);
+}
+
+export async function renderShareCard(
+  input: ShareCardInput,
+  theme: ShareCardTheme,
+): Promise<HTMLCanvasElement> {
+  const fonts = resolveFonts();
+  const colors = PALETTE[theme];
+  const [covers] = await Promise.all([
+    Promise.all(input.matches.map((m) => loadCover(m.coverUrl))),
+    loadFonts(fonts, input),
+  ]);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH;
+  canvas.height = MAX_HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D 不可用");
+
+  // 先按自然间距排一遍量出高度，再把与目标高度的差额按权重摊进各处留白，重排一遍。
+  // 内容偏多时间距最多收到六成；还放不下就让图片变长，不压字
+  let weights = 0;
+  const natural = drawCard(ctx, input, colors, fonts, covers, (base, w) => {
+    weights += w;
+    return base;
+  });
+  const slack = (HEIGHT - natural) / weights;
+  const bottom = drawCard(ctx, input, colors, fonts, covers, (base, w) =>
+    Math.max(base * 0.6, base + slack * w),
+  );
 
   const out = document.createElement("canvas");
   out.width = WIDTH;
-  out.height = Math.min(Math.ceil(y), MAX_HEIGHT);
-  out.getContext("2d")?.drawImage(canvas, 0, 0);
+  out.height = Math.min(Math.max(HEIGHT, Math.ceil(bottom)), MAX_HEIGHT);
+  const outCtx = out.getContext("2d");
+  if (!outCtx) throw new Error("Canvas 2D 不可用");
+  outCtx.fillStyle = colors.bg;
+  outCtx.fillRect(0, 0, out.width, out.height);
+  outCtx.drawImage(canvas, 0, 0);
   return out;
 }

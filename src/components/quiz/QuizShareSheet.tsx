@@ -74,7 +74,7 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
       imagery: result.imagery,
       matchesLabel: t("result.matches"),
       matchLabel: t("result.match"),
-      matches: result.matches.slice(0, 3).map((m) => ({
+      matches: result.matches.slice(0, 4).map((m) => ({
         title: m.song.title,
         meta: [m.song.artist?.join(" / "), m.song.album]
           .filter(Boolean)

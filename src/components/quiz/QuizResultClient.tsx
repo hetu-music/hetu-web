@@ -1,9 +1,9 @@
 "use client";
 
 import CoverArt from "@/components/library/CoverArt";
-import TopBar from "@/components/shared/topbar/TopBar";
 import EnqueueButton from "@/components/shared/EnqueueButton";
 import PlayButton from "@/components/shared/PlayButton";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { Link } from "@/i18n/navigation";
 import type { QuizResultView } from "@/lib/quiz/views";
 import { getCoverUrl } from "@/lib/utils/utils-song";
@@ -102,7 +102,7 @@ export default function QuizResultClient({ result }: Props) {
                       {p.label}
                     </span>
                     <div className="relative h-1.5 flex-1 rounded-full bg-slate-100 dark:bg-slate-800/70">
-                      <span className="absolute inset-y-[-3px] left-1/2 w-px bg-slate-300 dark:bg-slate-700" />
+                      <span className="absolute -inset-y-0.75 left-1/2 w-px bg-slate-300 dark:bg-slate-700" />
                       <motion.span
                         className={
                           positive

@@ -26,9 +26,10 @@ function makeRows(): PoolRows {
       parent_id: null,
       level: 2,
     });
+    // 天象的母题取名「月」，让「明月」计入招牌意象「月」
     categories.push({
       id: id++,
-      name: `${dim.label}-子类`,
+      name: dim.key === "tianxiang" ? "月" : `${dim.label}-子类`,
       parent_id: l2,
       level: 3,
     });
@@ -185,7 +186,7 @@ describe("buildPool", () => {
     expect(ids).not.toContain(915);
   });
 
-  it("三级分类归入维度，别名归入招牌意象", () => {
+  it("母题向上归入维度，并按母题计入招牌意象", () => {
     const song = buildPool(makeRows())[0];
     expect(song.dimCounts.tianxiang).toBe(10);
     expect(song.dimCounts.shanhe).toBe(1);
@@ -193,8 +194,13 @@ describe("buildPool", () => {
     expect(song.occurrences[0]).toMatchObject({
       dim: "tianxiang",
       imagery: "明月",
+      signature: "月",
       timetag: "00:10.00",
     });
+    // 不是招牌意象母题的标注不计入
+    expect(song.occurrences.find((o) => o.dim === "shanhe")?.signature).toBe(
+      null,
+    );
   });
 });
 

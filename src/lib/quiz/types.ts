@@ -33,8 +33,8 @@ export interface Dimension {
 export interface SignatureImagery {
   /** 展示名，也是特征 key */
   name: string;
-  /** 数据库中计入该招牌意象的意象名（如「月」含「明月」「月光」） */
-  aliases: readonly string[];
+  /** 计入该招牌意象的母题（三级分类）名：挂在这个母题上的词都算，如「月」含明月、月光、皓月 */
+  motif: string;
 }
 
 export interface QuizOption {
@@ -74,6 +74,8 @@ export interface PoolSong {
 export interface PoolOccurrence {
   dim: DimensionKey | null;
   imagery: string;
+  /** 这条标注计入的招牌意象，不计入时为 null */
+  signature: string | null;
   timetag: string | null;
 }
 

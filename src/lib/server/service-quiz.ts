@@ -8,7 +8,6 @@ import {
   encodeAnswers,
   evaluate,
   getDimension,
-  IMAGERY_ALIAS,
   POOL_VERSION,
   QUIZ_POOL_TAG,
   QUESTIONS,
@@ -151,7 +150,7 @@ function pickLines(
       if (!o.timetag) return false;
       return reason.kind === "dimension"
         ? o.dim === reason.key
-        : IMAGERY_ALIAS.get(o.imagery) === reason.name;
+        : o.signature === reason.name;
     });
     const text = lineAt(occ?.timetag ?? null);
     if (text && !picked.includes(text)) picked.push(text);

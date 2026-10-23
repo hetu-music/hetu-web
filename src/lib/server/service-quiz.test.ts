@@ -53,7 +53,8 @@ function makeRows(): Rows {
     const leaf = catId++;
     categories.push({
       id: leaf,
-      name: `${dim.label}子类`,
+      // 天象的母题取名「月」，让「明月」计入招牌意象「月」
+      name: dim.key === "tianxiang" ? "月" : `${dim.label}子类`,
       parent_id: l2,
       level: 3,
     });

@@ -1,7 +1,7 @@
 import {
   CATEGORY_TO_DIMENSION,
   DIMENSION_KEYS,
-  IMAGERY_ALIAS,
+  MOTIF_TO_SIGNATURE,
 } from "./dimensions";
 import type { DimensionKey, PoolSong } from "./types";
 
@@ -36,8 +36,8 @@ export interface PoolRows {
  * 其余类型（原创、合作、文宣、商业、墨宝）以及未标类型的作品都参与匹配。
  */
 export const EXCLUDED_TYPES: readonly string[] = ["翻唱", "参与"];
-/** 入池规则版本：修改排除类型、标注门槛等规则时递增，使服务端缓存失效 */
-export const POOL_VERSION = 3;
+/** 入池规则版本：修改排除类型、标注门槛、招牌意象计法等规则时递增，使服务端缓存失效 */
+export const POOL_VERSION = 4;
 /** 候选池服务端缓存的标签，revalidate 接口据此刷新 */
 export const QUIZ_POOL_TAG = "quiz-pool";
 /** 意象标注少于此数的歌曲不进入候选池，画像不可靠 */
@@ -83,10 +83,17 @@ function emptyDimCounts(): Record<DimensionKey, number> {
 }
 
 /**
- * 把意象标注聚合为候选池。意象挂在三级分类上，向上找到二级分类后映射到维度。
+ * 把意象标注聚合为候选池。意象挂在三级分类（母题）上：向上找到二级分类后映射到维度，
+ * 母题本身决定是否计入招牌意象。
  */
 export function buildPool(rows: PoolRows): PoolSong[] {
   const level2Of = createLevel2Resolver(rows.categories);
+  const signatureOf = new Map(
+    rows.categories.flatMap((c) => {
+      const signature = MOTIF_TO_SIGNATURE.get(c.name);
+      return c.level === 3 && signature ? [[c.id, signature] as const] : [];
+    }),
+  );
   const resolveDim = (categoryId: number): DimensionKey | null => {
     const name = level2Of(categoryId);
     return name === null ? null : (CATEGORY_TO_DIMENSION.get(name) ?? null);
@@ -112,14 +119,14 @@ export function buildPool(rows: PoolRows): PoolSong[] {
     for (const occ of occs) {
       const dim = resolveDim(occ.category_id);
       if (dim) dimCounts[dim] += 1;
-      const name = imageryName.get(occ.imagery_id) ?? "";
-      const signature = IMAGERY_ALIAS.get(name);
+      const signature = signatureOf.get(occ.category_id) ?? null;
       if (signature) {
         imageryCounts[signature] = (imageryCounts[signature] ?? 0) + 1;
       }
       occurrences.push({
         dim,
-        imagery: name,
+        imagery: imageryName.get(occ.imagery_id) ?? "",
+        signature,
         timetag: occ.lyric_timetag?.[0] ?? null,
       });
     }

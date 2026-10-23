@@ -203,17 +203,18 @@ export function apiGetOccurrencesForSong(songId: number) {
   });
 }
 
+/** 时间标签由服务端按歌词算出；400 带着可读的原因（词不在歌词里等） */
 export function apiCreateOccurrence(data: {
   song_id: number;
   imagery_id: number;
   category_id: number;
   meaning_id?: number | null;
-  lyric_timetag: string[];
 }) {
   return apiRequest<Untyped>("/api/admin/occurrences", {
     method: "POST",
     body: data,
     fallback: "新增关系失败",
+    serverMessage: [400],
   });
 }
 
@@ -259,13 +260,13 @@ export function apiUpdateOccurrence(
     imagery_id?: number;
     category_id?: number;
     meaning_id?: number | null;
-    lyric_timetag?: string[];
   },
 ) {
   return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "PUT",
     body: data,
     fallback: "更新关系失败",
+    serverMessage: [400],
   });
 }
 

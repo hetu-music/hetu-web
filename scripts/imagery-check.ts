@@ -3,8 +3,8 @@
  * 意象标注一致性检查（规则见 IMAGERY.md）。默认只读。
  *
  * 用法：pnpm imagery:check [--fix] [--strict]
- *   --fix     修复时间标签：补上词字面出现但漏标的行，去掉歌词里已不存在的标签。
- *             标在没有出现该词的行上的、歌词里找不到该词的，只报告不改
+ *   --fix     修复时间标签：改成词在歌词里字面出现的行（补漏标的、去掉多出的）。
+ *             歌词里找不到该词的标注只报告不改，要人决定删掉还是改标实际写的词
  *   --strict  有需要处理的问题时以退出码 1 结束，供定时任务或 CI 使用
  *
  * 需要 .env.local 中的 SUPABASE_URL / SUPABASE_SECRET_API。
@@ -88,25 +88,20 @@ async function main() {
       `《${title.get(p.songId)}》意象 #${p.imageryId} 缺母题 #${p.categoryId}`,
   );
 
-  const fixable = report.timetags.filter(
-    (t) => (t.missing.length > 0 || t.stale.length > 0) && t.fixed.length > 0,
-  );
+  const fixable = report.timetags.filter((t) => !t.notFound);
   const notFound = report.timetags.filter((t) => t.notFound);
-  const offLine = report.timetags.filter((t) => t.offLine.length > 0);
 
   console.log(
-    `\n时间标签可修复：${fixable.length} 条（补漏标的行、去掉歌词里已不存在的标签）`,
+    `\n时间标签可修复：${fixable.length} 条（改成词在歌词里字面出现的行）`,
   );
   list(
     fixable,
     (t) => `${where(t)}：[${t.current.join(" ")}] → [${t.fixed.join(" ")}]`,
   );
-  console.log(`\n歌词里找不到该词：${notFound.length} 条（需人工处理）`);
-  list(notFound, where);
   console.log(
-    `\n标在没有出现该词的行上：${offLine.length} 条（可能是有意的引申，也可能标错，不自动改）`,
+    `\n歌词里找不到该词：${notFound.length} 条（删掉，或改标歌词里实际写的词）`,
   );
-  list(offLine, (t) => `${where(t)}：${t.offLine.join(" ")}`);
+  list(notFound, where);
 
   if (fix && fixable.length > 0) {
     for (const t of fixable) {

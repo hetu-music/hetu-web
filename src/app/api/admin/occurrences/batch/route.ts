@@ -10,10 +10,7 @@ import {
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { lyricTimetagPattern } from "@/lib/forms/imagery-form";
 import { parseJsonBody } from "@/lib/server/parse-body";
-
-const timetags = z.array(z.string().regex(lyricTimetagPattern)).max(50);
 
 const BatchSchema = z.object({
   song_id: z.number().int().positive(),
@@ -23,13 +20,11 @@ const BatchSchema = z.object({
         z.object({
           imagery_id: z.number().int().positive(),
           category_id: z.number().int().positive(),
-          lyric_timetag: timetags,
         }),
         // 审核时改成了词典里没有的意象，保存时创建
         z.object({
           imagery_name: z.string().trim().min(1).max(50),
           category_id: z.number().int().positive(),
-          lyric_timetag: timetags,
         }),
       ]),
     )
@@ -69,7 +64,9 @@ export const POST = withAuth(
       const code = (e as { code?: string }).code;
       if (
         e instanceof Error &&
-        (code === "NOT_LEAF_CATEGORY" || code === "SONG_NOT_PUBLISHED")
+        (code === "NOT_LEAF_CATEGORY" ||
+          code === "SONG_NOT_PUBLISHED" ||
+          code === "IMAGERY_NOT_IN_LYRICS")
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

@@ -94,7 +94,6 @@ export default function SongImageryTab({
         imagery_id: imageryId,
         category_id: draft.categoryId,
         meaning_id: draft.meaningId,
-        lyric_timetag: draft.timetags,
       };
       if (occurrenceId === null) {
         await apiCreateOccurrence({ song_id: song.id, ...payload });

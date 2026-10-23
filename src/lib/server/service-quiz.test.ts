@@ -110,6 +110,7 @@ function mockClient(rows: Rows, lyricsResult?: MockResult) {
     [TABLES.IMAGERY]: () => makeQueryBuilder(ok(rows.imagery)),
     [TABLES.IMAGERY_OCC_CATALOG]: () => makeQueryBuilder(ok(rows.occurrences)),
     [TABLES.MUSIC_CATALOG]: () => makeQueryBuilder(ok(rows.songs)),
+    [TABLES.SONG_EMOTIONS]: () => makeQueryBuilder(ok([])),
     [TABLES.MUSIC]: () => makeQueryBuilder(lyricsResult ?? ok(rows.lyrics)),
   };
   const from = vi.fn((table: string) => byTable[table]());

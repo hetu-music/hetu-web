@@ -37,12 +37,23 @@ export interface SignatureImagery {
   motif: string;
 }
 
+/**
+ * 情绪坐标：两条轴，取值 -1 到 1。只参与匹配，不在结果中展示。
+ * tone 明（+1）↔ 暗（-1），energy 扬（+1）↔ 抑（-1），对应 emotions 表的 tone、energy。
+ */
+export interface Mood {
+  tone: number;
+  energy: number;
+}
+
 export interface QuizOption {
   text: string;
   /** 维度权重，通常主维度 2、副维度 1 */
   dims: Partial<Record<DimensionKey, number>>;
   /** 选中后表示偏爱的招牌意象 */
   imagery?: readonly string[];
+  /** 这个选项流露的情绪；说不清的轴记 0 */
+  mood: Mood;
 }
 
 export interface QuizQuestion {
@@ -67,6 +78,8 @@ export interface PoolSong {
   dimCounts: Record<DimensionKey, number>;
   /** 招牌意象出现次数，只记录出现过的 */
   imageryCounts: Record<string, number>;
+  /** 由歌曲基调算出的情绪坐标；还没标基调时为 null */
+  mood: Mood | null;
   /** 用于生成匹配理由的意象出现记录（只保留第一个时间标签） */
   occurrences: PoolOccurrence[];
 }

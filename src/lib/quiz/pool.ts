@@ -3,7 +3,7 @@ import {
   DIMENSION_KEYS,
   MOTIF_TO_SIGNATURE,
 } from "./dimensions";
-import type { DimensionKey, PoolSong } from "./types";
+import type { DimensionKey, Mood, PoolSong } from "./types";
 
 /** 候选池的原始数据行，字段与数据库表一致 */
 export interface PoolRows {
@@ -29,6 +29,12 @@ export interface PoolRows {
     has_audio: boolean | null;
     type: string[] | null;
   }>;
+  /** 歌曲基调（song_emotions 连 emotions），用于算情绪坐标；省略时所有歌都没有坐标 */
+  songEmotions?: Array<{
+    song_id: number;
+    rank: number;
+    emotions: { tone: string; energy: string } | null;
+  }>;
 }
 
 /**
@@ -36,10 +42,31 @@ export interface PoolRows {
  * 其余类型（原创、合作、文宣、商业、墨宝）以及未标类型的作品都参与匹配。
  */
 export const EXCLUDED_TYPES: readonly string[] = ["翻唱", "参与"];
-/** 入池规则版本：修改排除类型、标注门槛、招牌意象计法等规则时递增，使服务端缓存失效 */
-export const POOL_VERSION = 4;
+/** 入池规则版本：修改排除类型、标注门槛、招牌意象计法、情绪坐标等规则时递增，使服务端缓存失效 */
+export const POOL_VERSION = 5;
 /** 候选池服务端缓存的标签，revalidate 接口据此刷新 */
 export const QUIZ_POOL_TAG = "quiz-pool";
+/** 主基调在情绪坐标里的权重，副基调为 1 */
+const MAIN_EMOTION_WEIGHT = 2;
+
+/**
+ * 歌曲的情绪坐标：主、副基调按权重平均，明 / 扬记 +1，暗 / 抑记 -1。
+ * 《倾尽天下》（悲怆、执守、苍凉）= 暗、略扬。
+ */
+function moodOf(rows: NonNullable<PoolRows["songEmotions"]>): Mood | null {
+  let tone = 0;
+  let energy = 0;
+  let total = 0;
+  for (const row of rows) {
+    if (!row.emotions) continue;
+    const w = row.rank === 1 ? MAIN_EMOTION_WEIGHT : 1;
+    tone += w * (row.emotions.tone === "明" ? 1 : -1);
+    energy += w * (row.emotions.energy === "扬" ? 1 : -1);
+    total += w;
+  }
+  return total > 0 ? { tone: tone / total, energy: energy / total } : null;
+}
+
 /** 意象标注少于此数的歌曲不进入候选池，画像不可靠 */
 export const MIN_OCCURRENCES = 10;
 /** 「（纯歌版）」「(DJ版)」等衍生版本与原曲意象相同，不重复入池 */
@@ -106,6 +133,15 @@ export function buildPool(rows: PoolRows): PoolSong[] {
     if (list) list.push(occ);
     else occBySong.set(occ.song_id, [occ]);
   }
+  const emotionsBySong = new Map<
+    number,
+    NonNullable<PoolRows["songEmotions"]>
+  >();
+  for (const row of rows.songEmotions ?? []) {
+    const list = emotionsBySong.get(row.song_id);
+    if (list) list.push(row);
+    else emotionsBySong.set(row.song_id, [row]);
+  }
 
   const pool: PoolSong[] = [];
   for (const song of rows.songs) {
@@ -141,6 +177,7 @@ export function buildPool(rows: PoolRows): PoolSong[] {
       total: occs.length,
       dimCounts,
       imageryCounts,
+      mood: moodOf(emotionsBySong.get(song.id) ?? []),
       occurrences,
     });
   }

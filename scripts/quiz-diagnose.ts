@@ -46,6 +46,10 @@ async function main() {
       "music",
       "id,title,artist,album,hascover,has_audio,type",
     ),
+    songEmotions: await fetchAll(
+      "song_emotions",
+      "song_id,rank,emotions(tone,energy)",
+    ),
   };
 
   const pool = buildPool(rows);

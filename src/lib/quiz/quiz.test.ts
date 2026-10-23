@@ -212,17 +212,26 @@ describe("userVector", () => {
         title: "甲",
         stem: "",
         options: [
-          { text: "", dims: { tianxiang: 2 } },
-          { text: "", dims: { shanhe: 1 } },
-          { text: "", dims: { tianxiang: 1, qingsi: 2 } },
+          { text: "", dims: { tianxiang: 2 }, mood: { tone: 1, energy: 0 } },
+          { text: "", dims: { shanhe: 1 }, mood: { tone: -1, energy: 1 } },
+          {
+            text: "",
+            dims: { tianxiang: 1, qingsi: 2 },
+            mood: { tone: 0, energy: -1 },
+          },
         ],
       },
       {
         title: "乙",
         stem: "",
         options: [
-          { text: "", dims: { tianxiang: 1 } },
-          { text: "", dims: { qingsi: 2 }, imagery: ["月"] },
+          { text: "", dims: { tianxiang: 1 }, mood: { tone: 1, energy: 1 } },
+          {
+            text: "",
+            dims: { qingsi: 2 },
+            imagery: ["月"],
+            mood: { tone: -1, energy: -1 },
+          },
         ],
       },
     ];
@@ -312,6 +321,73 @@ describe("evaluate", () => {
         song.id === rows.songs[1].id ? before[j] - ENSEMBLE_PENALTY : before[j];
       expect(after[j]).toBeCloseTo(expected, 12);
     });
+  });
+});
+
+describe("情绪坐标", () => {
+  const emotion = (
+    song_id: number,
+    rank: number,
+    tone: string,
+    energy: string,
+  ) => ({
+    song_id,
+    rank,
+    emotions: { tone, energy },
+  });
+
+  it("主基调权重 2、副基调 1，明 / 扬为正；没有基调的歌为 null", () => {
+    const rows = makeRows();
+    rows.songEmotions = [
+      // 悲怆（暗扬）为主，执守（暗扬）、苍凉（暗抑）为副
+      emotion(100, 1, "暗", "扬"),
+      emotion(100, 2, "暗", "扬"),
+      emotion(100, 3, "暗", "抑"),
+    ];
+    const pool = buildPool(rows);
+    expect(pool.find((s) => s.id === 100)?.mood).toEqual({
+      tone: -1,
+      energy: 0.5,
+    });
+    expect(pool.find((s) => s.id === 101)?.mood).toBeNull();
+  });
+
+  it("意象相同时，情绪相近的歌排在前面；情绪不出现在匹配理由里", () => {
+    const rows = makeRows();
+    // 两首意象完全相同的歌：复制 100 号为 200 号，只有基调不同
+    rows.songs.push({ ...rows.songs[0], id: 200, album: "另一张专辑" });
+    rows.occurrences.push(
+      ...rows.occurrences
+        .filter((o) => o.song_id === 100)
+        .map((o) => ({ ...o, song_id: 200 })),
+    );
+    rows.songEmotions = [
+      emotion(100, 1, "暗", "抑"),
+      emotion(200, 1, "明", "扬"),
+    ];
+    const questions: QuizQuestion[] = [
+      {
+        title: "情绪",
+        stem: "",
+        options: [
+          { text: "", dims: { tianxiang: 1 }, mood: { tone: -1, energy: -1 } },
+          { text: "", dims: { tianxiang: 1 }, mood: { tone: 1, energy: 1 } },
+        ],
+      },
+    ];
+    const model = buildModel(buildPool(rows), questions);
+    const rank = (answer: number) => {
+      const result = evaluate(model, [answer], model.songs.length);
+      const order = result.matches.map((m) => m.songId);
+      expect(
+        result.matches
+          .flatMap((m) => m.reasons)
+          .every((r) => ["dimension", "imagery"].includes(r.kind)),
+      ).toBe(true);
+      return order.indexOf(100) - order.indexOf(200);
+    };
+    expect(rank(0)).toBeLessThan(0); // 选「暗·抑」：100 号在前
+    expect(rank(1)).toBeGreaterThan(0); // 选「明·扬」：200 号在前
   });
 });
 

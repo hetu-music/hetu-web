@@ -12,18 +12,22 @@ import type {
 /**
  * 匹配模型。
  *
- * 特征 = 9 个意象维度 + 若干招牌意象。用户与歌曲各自标准化后比较「偏向」：
+ * 特征 = 9 个意象维度 + 若干招牌意象 + 情绪坐标（明暗、扬抑两条轴）。
+ * 情绪只参与匹配，不出现在匹配理由与结果画像里。用户与歌曲各自标准化后比较「偏向」：
  *
  * - 用户：假设每题独立、选项等概率，特征加总的均值与方差可由选项权重直接解析算出，
  *   据此把原始分转为 z 分数。无需模拟，也无需手调中心值。
  * - 歌曲：维度取占比（消除歌词长短的影响），招牌意象取 log(1+次数)，
- *   再在候选池内逐特征标准化。
+ *   情绪取由基调算出的坐标（没有基调的歌取池内均值），再在候选池内逐特征标准化。
  * - 匹配：加权余弦相似度。比较方向而非距离，避免靠近均值的「中庸」歌曲包揽第一。
  *   多人合唱的歌再减去一个固定值，见 ENSEMBLE_PENALTY。
  */
 
 /** 招牌意象特征相对维度特征的权重 */
 const IMAGERY_GROUP_WEIGHT = 0.6;
+/** 情绪坐标每条轴相对维度特征的权重 */
+export const MOOD_WEIGHT = 1;
+const MOOD_AXES = ["tone", "energy"] as const;
 /** 结果中同一专辑最多出现几首 */
 const MAX_PER_ALBUM = 2;
 /** 演唱者达到几人算多人合唱 */
@@ -35,7 +39,9 @@ const ENSEMBLE_SIZE = 5;
 export const ENSEMBLE_PENALTY = 0.1;
 
 type FeatureKey =
-  { kind: "dimension"; key: DimensionKey } | { kind: "imagery"; name: string };
+  | { kind: "dimension"; key: DimensionKey }
+  | { kind: "imagery"; name: string }
+  | { kind: "mood"; axis: (typeof MOOD_AXES)[number] };
 
 export interface QuizModel {
   questions: readonly QuizQuestion[];
@@ -61,6 +67,7 @@ function buildFeatures(): FeatureKey[] {
       kind: "imagery" as const,
       name: s.name,
     })),
+    ...MOOD_AXES.map((axis) => ({ kind: "mood" as const, axis })),
   ];
 }
 
@@ -87,6 +94,7 @@ export function buildModel(
   questions: readonly QuizQuestion[],
   /** 只给诊断脚本比较不同取值用 */
   ensemblePenalty = ENSEMBLE_PENALTY,
+  moodWeight = MOOD_WEIGHT,
 ): QuizModel {
   const features = buildFeatures();
   const F = features.length;
@@ -94,12 +102,21 @@ export function buildModel(
   const imageryIndex = new Map<string, number>();
   features.forEach((feat, i) => {
     if (feat.kind === "dimension") dimIndex.set(feat.key, i);
-    else imageryIndex.set(feat.name, i);
+    else if (feat.kind === "imagery") imageryIndex.set(feat.name, i);
   });
 
   const weights = new Float64Array(
     features.map((feat) =>
-      feat.kind === "dimension" ? 1 : IMAGERY_GROUP_WEIGHT,
+      feat.kind === "dimension"
+        ? 1
+        : feat.kind === "imagery"
+          ? IMAGERY_GROUP_WEIGHT
+          : moodWeight,
+    ),
+  );
+  const moodIndex = new Map(
+    features.flatMap((feat, i) =>
+      feat.kind === "mood" ? [[feat.axis, i] as const] : [],
     ),
   );
 
@@ -120,6 +137,10 @@ export function buildModel(
           throw new Error(`题目「${question.title}」含未知意象 ${name}`);
         }
         vec[i] += 1;
+      }
+      for (const axis of MOOD_AXES) {
+        const i = moodIndex.get(axis);
+        if (i !== undefined) vec[i] += option.mood[axis];
       }
       return vec;
     }),
@@ -145,13 +166,25 @@ export function buildModel(
   const userSd = userVar.map(Math.sqrt);
 
   // ── 歌曲侧：原始特征 → 池内标准化 ──
+  // 没有基调的歌取有基调歌曲的均值，标准化后为 0，即情绪上不偏不倚
+  const moodMean = Object.fromEntries(
+    MOOD_AXES.map((axis) => {
+      const values = pool.flatMap((s) => (s.mood ? [s.mood[axis]] : []));
+      return [
+        axis,
+        values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0,
+      ];
+    }),
+  ) as Record<(typeof MOOD_AXES)[number], number>;
   const songVectors = pool.map((song) => {
     const vec = new Float64Array(F);
     features.forEach((feat, i) => {
       vec[i] =
         feat.kind === "dimension"
           ? song.dimCounts[feat.key] / Math.max(song.total, 1)
-          : Math.log1p(song.imageryCounts[feat.name] ?? 0);
+          : feat.kind === "imagery"
+            ? Math.log1p(song.imageryCounts[feat.name] ?? 0)
+            : (song.mood?.[feat.axis] ?? moodMean[feat.axis]);
     });
     return vec;
   });
@@ -258,21 +291,26 @@ function explain(
   limit: number,
 ): MatchReason[] {
   const s = model.songVectors[songIndex];
-  return model.features
-    .map((feat, f) => ({
-      feat,
-      c: model.weights[f] * z[f] * s[f],
-      u: z[f],
-      v: s[f],
-    }))
-    .filter((x) => x.u > 0 && x.v > 0)
-    .sort((a, b) => b.c - a.c)
-    .slice(0, limit)
-    .map(({ feat }): MatchReason =>
-      feat.kind === "dimension"
-        ? { kind: "dimension", key: feat.key }
-        : { kind: "imagery", name: feat.name },
-    );
+  return (
+    model.features
+      .map((feat, f) => ({
+        feat,
+        c: model.weights[f] * z[f] * s[f],
+        u: z[f],
+        v: s[f],
+      }))
+      // 情绪只参与匹配，不作为理由展示
+      .filter((x) => x.feat.kind !== "mood" && x.u > 0 && x.v > 0)
+      .sort((a, b) => b.c - a.c)
+      .slice(0, limit)
+      .flatMap(({ feat }): MatchReason[] =>
+        feat.kind === "dimension"
+          ? [{ kind: "dimension", key: feat.key }]
+          : feat.kind === "imagery"
+            ? [{ kind: "imagery", name: feat.name }]
+            : [],
+      )
+  );
 }
 
 export function evaluate(
@@ -293,7 +331,7 @@ export function evaluate(
   const imagery: string[] = [];
   model.features.forEach((feat, f) => {
     if (feat.kind === "dimension") profile.push({ key: feat.key, z: z[f] });
-    else if (raw[f] > 0) imagery.push(feat.name);
+    else if (feat.kind === "imagery" && raw[f] > 0) imagery.push(feat.name);
   });
   profile.sort((a, b) => b.z - a.z);
 

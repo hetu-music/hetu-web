@@ -220,9 +220,27 @@ export function apiDeleteOccurrence(id: number) {
 // ─── Song Emotions API ─────────────────────────────────────────────────────────
 
 export function apiGetSongEmotions(songId: number) {
-  return apiRequest<{ emotions: Emotion[]; selected: number[] }>(
-    `/api/admin/song-emotions?song_id=${songId}`,
-    { fallback: "获取基调失败" },
+  return apiRequest<{
+    emotions: Emotion[];
+    selected: number[];
+    /** ai：批量预标、尚未确认；human：人工标注或确认过；null：还没标 */
+    source: "human" | "ai" | null;
+    llmEnabled: boolean;
+  }>(`/api/admin/song-emotions?song_id=${songId}`, {
+    fallback: "获取基调失败",
+  });
+}
+
+/** 每次调用都产生模型费用；502/503 是 LLM 侧的问题，服务端给的信息可以直接展示 */
+export function apiSuggestSongEmotions(songId: number) {
+  return apiRequest<{ emotionIds: number[]; reason: string }>(
+    "/api/admin/song-emotions/suggest",
+    {
+      method: "POST",
+      body: { song_id: songId },
+      fallback: "AI 建议失败",
+      serverMessage: [404, 502, 503],
+    },
   );
 }
 

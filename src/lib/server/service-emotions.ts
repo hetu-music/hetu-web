@@ -4,6 +4,14 @@ import {
   getUserClient,
   TABLES,
 } from "@/lib/db/supabase-server";
+import {
+  buildEmotionPrompt,
+  buildEmotionSystemPrompt,
+  emotionOutputSchema,
+  parseEmotionOutput,
+  type EmotionSuggestion,
+} from "@/lib/imagery/emotion-suggest";
+import { chatJson } from "@/lib/server/llm";
 import type { Emotion } from "@/lib/types";
 
 /** 每首歌最多 1 个主基调 + 2 个副基调 */
@@ -26,20 +34,63 @@ export const getEmotions = cache(async function getEmotions(): Promise<
   return (data ?? []) as Emotion[];
 });
 
-/** 一首歌的基调 id，主基调在前 */
-export async function getSongEmotionIds(songId: number): Promise<number[]> {
+export type SongEmotions = {
+  /** 主基调在前 */
+  ids: number[];
+  /** ai：批量预标、尚未经人确认；human：人工标注或确认过；null：还没标 */
+  source: "human" | "ai" | null;
+};
+
+/** 一首歌的基调 */
+export async function getSongEmotions(songId: number): Promise<SongEmotions> {
   const supabase = getServiceClient();
-  if (!supabase) return [];
+  if (!supabase) return { ids: [], source: null };
   const { data, error } = await supabase
     .from(TABLES.SONG_EMOTIONS)
-    .select("emotion_id")
+    .select("emotion_id,source")
     .eq("song_id", songId)
     .order("rank");
   if (error) {
-    console.error("[getSongEmotionIds]", error);
-    return [];
+    console.error("[getSongEmotions]", error);
+    return { ids: [], source: null };
   }
-  return ((data ?? []) as { emotion_id: number }[]).map((r) => r.emotion_id);
+  const rows = (data ?? []) as { emotion_id: number; source: string }[];
+  return {
+    ids: rows.map((r) => r.emotion_id),
+    source:
+      rows.length === 0
+        ? null
+        : rows.some((r) => r.source === "ai")
+          ? "ai"
+          : "human",
+  };
+}
+
+/**
+ * 请模型为一首歌标基调，只返回建议、不写库。
+ * 歌不在正式曲库或没有歌词时返回 null。
+ */
+export async function suggestSongEmotions(
+  songId: number,
+): Promise<EmotionSuggestion | null> {
+  const supabase = getServiceClient();
+  if (!supabase) throw new Error("Supabase client unavailable");
+  const { data: song, error } = await supabase
+    .from(TABLES.MUSIC)
+    .select("title,lyrics")
+    .eq("id", songId)
+    .maybeSingle();
+  if (error) throw error;
+  const row = song as { title: string; lyrics: string | null } | null;
+  if (!row?.lyrics?.trim()) return null;
+  const emotions = await getEmotions();
+  const raw = await chatJson({
+    system: buildEmotionSystemPrompt(emotions),
+    user: buildEmotionPrompt(row),
+    schemaName: "song_emotions",
+    schema: emotionOutputSchema(emotions),
+  });
+  return parseEmotionOutput(raw, emotions);
 }
 
 export type SongEmotionErrorCode = "INVALID_EMOTIONS" | "SONG_NOT_PUBLISHED";
@@ -50,6 +101,7 @@ function emotionError(code: SongEmotionErrorCode, message: string) {
 
 /**
  * 整首替换一首歌的基调：emotionIds 按主、副顺序排列，空数组表示清空。
+ * 后台保存即视为人已确认，来源记为 human（原样保存 AI 预标也是确认）。
  * 基调挂在正式曲库的歌上，未发布的歌不能标。
  */
 export async function setSongEmotions(
@@ -90,6 +142,7 @@ export async function setSongEmotions(
         song_id: songId,
         emotion_id,
         rank: i + 1,
+        source: "human",
       })),
     );
     // 外键失败：词表里没有这个基调

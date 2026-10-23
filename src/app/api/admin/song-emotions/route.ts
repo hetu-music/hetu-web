@@ -4,11 +4,12 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import {
   getEmotions,
-  getSongEmotionIds,
+  getSongEmotions,
   MAX_SONG_EMOTIONS,
   setSongEmotions,
   type SongEmotionErrorCode,
 } from "@/lib/server/service-emotions";
+import { isLlmConfigured } from "@/lib/server/llm";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -26,7 +27,7 @@ const ERROR_STATUS: Record<SongEmotionErrorCode, number> = {
   SONG_NOT_PUBLISHED: 400,
 };
 
-/** 词表与一首歌已标的基调：GET /api/admin/song-emotions?song_id= */
+/** 词表、一首歌已标的基调及其来源：GET /api/admin/song-emotions?song_id= */
 export const GET = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     const songId = Number(request.nextUrl.searchParams.get("song_id"));
@@ -34,11 +35,16 @@ export const GET = withAuth(
       return NextResponse.json({ error: "Invalid song_id" }, { status: 400 });
     }
     try {
-      const [emotions, selected] = await Promise.all([
+      const [emotions, current] = await Promise.all([
         getEmotions(),
-        getSongEmotionIds(songId),
+        getSongEmotions(songId),
       ]);
-      return NextResponse.json({ emotions, selected });
+      return NextResponse.json({
+        emotions,
+        selected: current.ids,
+        source: current.source,
+        llmEnabled: isLlmConfigured(),
+      });
     } catch (e) {
       return serverErrorResponse("GET /api/admin/song-emotions", e, "加载失败");
     }

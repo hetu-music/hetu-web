@@ -2,7 +2,11 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { apiGetSongEmotions, apiSetSongEmotions } from "@/lib/api/client-api";
+import {
+  apiGetSongEmotions,
+  apiSetSongEmotions,
+  apiSuggestSongEmotions,
+} from "@/lib/api/client-api";
 import { parseLrcLines } from "@/lib/imagery/suggest";
 import type { Emotion } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
@@ -12,6 +16,8 @@ import {
   OUTLINE_BUTTON_CLASS,
   PANEL_CLASS,
   SOLID_BUTTON_CLASS,
+  TEXT_BUTTON_CLASS,
+  WARN_TEXT_CLASS,
 } from "../kit/styles";
 import { notify, notifyError } from "../kit/toast";
 
@@ -31,6 +37,7 @@ const songEmotionsKey = (songId: number) =>
 /**
  * 一首歌的基调（见 IMAGERY.md）：左边整首歌词，右边词表。
  * 依次点选，第一个是主基调，其后最多两个副基调；再点一次取消。
+ * 批量预标（来源 ai）的歌要人看过：改了就保存，没问题就点「确认」，两者都把来源记为 human。
  */
 export default function SongEmotionTab({
   song,
@@ -45,6 +52,11 @@ export default function SongEmotionTab({
   // null：还没动过，跟着已保存的走
   const [draft, setDraft] = useState<number[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const [suggestion, setSuggestion] = useState<{
+    emotionIds: number[];
+    reason: string;
+  } | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const lines = useMemo(() => parseLrcLines(song.lyrics), [song.lyrics]);
 
   if (query.isError) {
@@ -57,9 +69,12 @@ export default function SongEmotionTab({
   }
   if (query.isPending) return <LoadingState text="加载基调…" />;
 
-  const { emotions, selected: saved } = query.data;
+  const { emotions, selected: saved, source, llmEnabled } = query.data;
   const selected = draft ?? saved;
   const dirty = selected.join() !== saved.join();
+  // AI 预标未确认时，原样保存也算确认
+  const pending = source === "ai";
+  const canSave = (dirty || pending) && !saving;
   const byId = new Map(emotions.map((e) => [e.id, e]));
 
   const toggle = (id: number) => {
@@ -72,6 +87,17 @@ export default function SongEmotionTab({
     );
   };
 
+  const suggest = async () => {
+    setSuggesting(true);
+    try {
+      setSuggestion(await apiSuggestSongEmotions(song.id));
+    } catch (error) {
+      notifyError(error, "AI 建议失败");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -80,7 +106,7 @@ export default function SongEmotionTab({
         queryKey: songEmotionsKey(song.id),
       });
       setDraft(null);
-      notify({ type: "success", text: "基调已保存" });
+      notify({ type: "success", text: dirty ? "基调已保存" : "基调已确认" });
     } catch (error) {
       notifyError(error, "保存基调失败");
     } finally {
@@ -118,7 +144,43 @@ export default function SongEmotionTab({
                   )
                   .join(" · ")}
           </p>
+          {pending && !dirty && (
+            <span className={`text-xs ${WARN_TEXT_CLASS}`}>
+              AI 预标，待确认
+            </span>
+          )}
         </div>
+
+        {llmEnabled && (
+          <div className="space-y-1 text-xs">
+            <button
+              type="button"
+              onClick={() => void suggest()}
+              disabled={suggesting}
+              className={TEXT_BUTTON_CLASS}
+              title="请模型读整首歌词给出基调，每次调用都有费用"
+            >
+              {suggesting ? "AI 正在读歌词…" : "AI 建议"}
+            </button>
+            {suggestion && (
+              <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                <span className="text-slate-700 dark:text-slate-200">
+                  {suggestion.emotionIds
+                    .map((id) => byId.get(id)?.name ?? `#${id}`)
+                    .join(" · ")}
+                </span>
+                ：{suggestion.reason}
+                <button
+                  type="button"
+                  onClick={() => setDraft(suggestion.emotionIds)}
+                  className={cn(TEXT_BUTTON_CLASS, "ml-2")}
+                >
+                  采用
+                </button>
+              </p>
+            )}
+          </div>
+        )}
 
         {QUADRANTS.map(({ tone, energy }) => {
           const group = emotions.filter(
@@ -186,10 +248,10 @@ export default function SongEmotionTab({
           <button
             type="button"
             onClick={() => void save()}
-            disabled={!dirty || saving}
+            disabled={!canSave}
             className={SOLID_BUTTON_CLASS}
           >
-            {saving ? "保存中…" : "保存"}
+            {saving ? "保存中…" : pending && !dirty ? "确认" : "保存"}
           </button>
         </div>
       </section>

@@ -21,6 +21,8 @@
     "quiz:check": "tsx --env-file=.env.local scripts/quiz-check.ts",
     "imagery:llm-check": "tsx --env-file=.env.local scripts/imagery-llm-check.ts",
     "imagery:check": "tsx --env-file=.env.local scripts/imagery-check.ts",
+    "emotion:eval": "tsx --env-file=.env.local scripts/emotion-eval.ts",
+    "emotion:label": "tsx --env-file=.env.local scripts/emotion-label.ts",
     "navidrome:sync": "tsx --env-file=.env.local scripts/navidrome-sync.ts"
   },
   "dependencies": {

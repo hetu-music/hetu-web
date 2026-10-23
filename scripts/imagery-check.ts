@@ -19,6 +19,7 @@ import type { MotifEntry } from "../src/lib/imagery/suggest";
 
 const PAGE_SIZE = 1000;
 const SAMPLE = 15;
+const FIX_CONCURRENCY = 20;
 
 async function main() {
   const url = process.env.SUPABASE_URL;
@@ -104,12 +105,17 @@ async function main() {
   list(notFound, where);
 
   if (fix && fixable.length > 0) {
-    for (const t of fixable) {
-      const { error } = await supabase
-        .from("imagery_occurrences")
-        .update({ lyric_timetag: t.fixed })
-        .eq("id", t.occurrenceId);
-      if (error) throw error;
+    // 每条一次请求；整批重标后有上万条，串行要十几分钟，分组并发
+    for (let i = 0; i < fixable.length; i += FIX_CONCURRENCY) {
+      await Promise.all(
+        fixable.slice(i, i + FIX_CONCURRENCY).map(async (t) => {
+          const { error } = await supabase
+            .from("imagery_occurrences")
+            .update({ lyric_timetag: t.fixed })
+            .eq("id", t.occurrenceId);
+          if (error) throw error;
+        }),
+      );
     }
     console.log(`\n已修复 ${fixable.length} 条时间标签`);
   } else if (fixable.length > 0) {

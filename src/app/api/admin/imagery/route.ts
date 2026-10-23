@@ -19,7 +19,8 @@ const CreateImagerySchema = z.object({
 export const GET = withAuth(
   async (_request: NextRequest, _user: AuthenticatedUser) => {
     try {
-      const items = await getImageryWithCounts();
+      // 后台要看到全部词，包括只在争议歌曲里出现、或已没有标注的
+      const items = await getImageryWithCounts("all");
       return NextResponse.json(items);
     } catch (e) {
       console.error("[GET /api/admin/imagery]", e);

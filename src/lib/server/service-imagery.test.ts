@@ -52,6 +52,20 @@ describe("getImageryWithCounts", () => {
     expect(result[0].categoryIds).toEqual([1, 2]);
   });
 
+  it("公开口径读曲库视图，后台口径读含争议歌曲、含 0 次的全量视图", async () => {
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: [], error: null }),
+      makeQueryBuilder({ data: [], error: null }),
+    ]);
+    vi.mocked(getServiceClient).mockReturnValue(client);
+    await getImageryWithCounts();
+    await getImageryWithCounts("all");
+    expect(client.from.mock.calls.map((c: unknown[]) => c[0])).toEqual([
+      "imagery_summary",
+      "imagery_summary_all",
+    ]);
+  });
+
   it("categoryIds 里的 null 会被 Number(null) 转成 0 而不是被过滤（现有行为，非本次改动范围）", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([

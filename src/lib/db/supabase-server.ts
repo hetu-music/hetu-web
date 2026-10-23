@@ -52,7 +52,8 @@ export const TABLES = {
 
   // 意象系统表
   IMAGERY: "imagery",
-  IMAGERY_SUMMARY: "imagery_summary",
+  IMAGERY_SUMMARY: "imagery_summary", // 视图：曲库歌曲里出现过的词及次数（公开意象页）
+  IMAGERY_SUMMARY_ALL: "imagery_summary_all", // 视图：全部词，次数含争议歌曲（后台）
   IMAGERY_CAT: "imagery_categories",
   IMAGERY_MOTIFS: "imagery_motifs", // 词 → 可取的母题（见 IMAGERY.md）
   IMAGERY_OCC: "imagery_occurrences",

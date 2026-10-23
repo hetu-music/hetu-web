@@ -301,9 +301,9 @@ describe("evaluate", () => {
       model,
       QUESTIONS.map(() => 0),
     );
-    expect(result.imagery).toContain("月");
-    expect(result.imagery).toContain("雨");
-    expect(result.imagery).not.toContain("酒");
+    expect(result.imagery).toContain("酒");
+    expect(result.imagery).toContain("江河");
+    expect(result.imagery).not.toContain("月");
   });
 
   it("五人及以上演唱的歌扣除固定分值，其余不受影响", () => {

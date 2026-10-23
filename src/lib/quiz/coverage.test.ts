@@ -109,8 +109,8 @@ describe("checkCoverage", () => {
       motif: "风",
     });
     expect(report.missingMotifs).toContainEqual({
-      signature: "星辰",
-      motif: "星",
+      signature: "江河",
+      motif: "江河",
     });
     expect(report.missingMotifs.map((m) => m.motif)).not.toContain("月");
   });

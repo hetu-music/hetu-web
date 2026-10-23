@@ -90,26 +90,34 @@ export const CATEGORY_TO_DIMENSION: ReadonlyMap<string, DimensionKey> = new Map(
 );
 
 /**
- * 招牌意象：原创歌曲中出现最多的意象，题目选项可直接指向它们。
+ * 招牌意象：原创歌曲中出现最多的具体意象，题目选项可直接指向它们。
  * 按母题计数：挂在该母题上的词都算（清风、长风都是「风」）。
  * 「花」只算母题「花」；桃、梅、梨等品种花是单列的母题，不并入，以免与「草木」维度重叠。
+ * 每个招牌意象都是独立的匹配特征，同一维度不宜挑太多，否则该维度在匹配里分量过重；
+ * 岁月、人间等高频母题太抽象，不适合作为「你偏爱的意象」展示，故不入选。
  * 母题改名时需同步这里（pnpm quiz:check 会报出找不到的母题）。
  */
 export const SIGNATURE_IMAGERY: readonly SignatureImagery[] = [
+  // 天象
   { name: "风", motif: "风" },
-  { name: "花", motif: "花" },
   { name: "月", motif: "月" },
   { name: "雪", motif: "雪" },
   { name: "雨", motif: "雨" },
-  { name: "云", motif: "云" },
-  { name: "酒", motif: "酒" },
-  { name: "梦", motif: "梦" },
+  // 山河
   { name: "山", motif: "山" },
-  { name: "灯", motif: "灯" },
+  { name: "江河", motif: "江河" },
+  // 草木
+  { name: "花", motif: "花" },
   { name: "柳", motif: "柳" },
   { name: "马", motif: "马" },
-  { name: "星辰", motif: "星" },
-  { name: "窗", motif: "窗" },
+  // 器用
+  { name: "酒", motif: "酒" },
+  { name: "灯", motif: "灯" },
+  { name: "剑", motif: "剑" },
+  // 情思
+  { name: "梦", motif: "梦" },
+  // 楼台
+  { name: "楼", motif: "楼" },
 ];
 
 /** 母题名 → 招牌意象名 */

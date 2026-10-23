@@ -160,7 +160,7 @@ describe("getQuizQuestions", () => {
   it("繁体转换题目文本", () => {
     const [first] = getQuizQuestions("zh-TW");
     expect(first.title).toBe("臨行");
-    expect(first.options[1]).toContain("溫");
+    expect(first.options[0]).toContain("溫");
   });
 });
 
@@ -242,7 +242,7 @@ describe("getQuizResult", () => {
 
   it("次要维度为正时给出「兼有」", async () => {
     mockClient(makeRows());
-    // 全选第一项：天象最高，楼台次之
+    // 全选第一项：楼台最高，其次是天象
     const result = await getQuizResult("A".repeat(QUESTIONS.length), "zh-CN");
     expect(result?.secondary).not.toBeNull();
     expect(result?.secondary?.label).not.toBe(result?.persona.label);

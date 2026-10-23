@@ -72,41 +72,73 @@ grant select, insert, update, delete on public.song_emotions to authenticated;
 
 -- 3. 删除含义子系统 ─────────────────────────────────────────────────────────
 
--- imagery_occurrences_catalog 是 select * 建的视图，展开后带着 meaning_id，
--- 删列前要先删视图。这里按线上的定义去掉那一列后重建，并恢复原有的选项与授权。
+-- imagery_occurrences_catalog 是 select * 建的视图，展开后带着 meaning_id；
+-- 其上还有 imagery_summary 等视图。删列前要把这一串视图都删掉：
+-- 先记下每个视图的定义、选项与授权，从最上层删起，删列后从最底层按原定义重建
+--（catalog 去掉 meaning_id 那一列），再恢复授权。
+create temp table saved_views (
+  name text,
+  depth int,
+  def text,
+  opts text[],
+  acl aclitem[],
+  owner oid
+) on commit drop;
+
+insert into saved_views
+with recursive deps (oid, depth) as (
+  select 'public.imagery_occurrences_catalog'::regclass::oid, 0
+  union all
+  select r.ev_class, d.depth + 1
+    from deps d
+    join pg_depend dep
+      on dep.refobjid = d.oid and dep.classid = 'pg_rewrite'::regclass
+    join pg_rewrite r on r.oid = dep.objid
+   where r.ev_class <> d.oid
+)
+select c.oid::regclass::text, max(d.depth), pg_get_viewdef(c.oid, true),
+       c.reloptions, c.relacl, c.relowner
+  from deps d
+  join pg_class c on c.oid = d.oid
+ group by c.oid;
+
 do $$
 declare
-  def text;
-  opts text[];
-  acl aclitem[];
+  v record;
   g record;
+  def text;
 begin
-  select pg_get_viewdef(c.oid, true), c.reloptions, c.relacl
-    into def, opts, acl
-    from pg_class c
-   where c.oid = 'public.imagery_occurrences_catalog'::regclass;
-
-  def := regexp_replace(def, ',\s*(\w+\.)?meaning_id\M', '', 'g');
-  if def ~ 'meaning_id' then
-    raise exception '没能从视图定义里去掉 meaning_id，请手动处理：%', def;
+  if exists (select 1 from saved_views sv join pg_class c on c.oid = sv.name::regclass
+              where c.relkind <> 'v') then
+    raise exception '依赖链里有非普通视图（如物化视图），请手动处理：%',
+      (select string_agg(name, ', ') from saved_views);
   end if;
 
-  drop view public.imagery_occurrences_catalog;
+  for v in select * from saved_views order by depth desc loop
+    execute format('drop view %s', v.name);
+  end loop;
+
   alter table public.imagery_occurrences drop column meaning_id;
-  execute format(
-    'create view public.imagery_occurrences_catalog %s as %s',
-    case when opts is null then '' else 'with (' || array_to_string(opts, ', ') || ')' end,
-    def
-  );
-  for g in
-    select a.grantee::regrole::text as grantee, a.privilege_type
-      from aclexplode(acl) a
-     where a.grantee <> 0
-       and a.grantee <> (select relowner from pg_class
-                          where oid = 'public.imagery_occurrences_catalog'::regclass)
-  loop
-    execute format('grant %s on public.imagery_occurrences_catalog to %s',
-                   g.privilege_type, g.grantee);
+
+  for v in select * from saved_views order by depth loop
+    def := regexp_replace(v.def, ',\s*(\w+\.)?meaning_id\M', '', 'g');
+    if def ~ 'meaning_id' then
+      raise exception '没能从视图 % 的定义里去掉 meaning_id，请手动处理：%', v.name, def;
+    end if;
+    execute format(
+      'create view %s %s as %s',
+      v.name,
+      case when v.opts is null then '' else 'with (' || array_to_string(v.opts, ', ') || ')' end,
+      def
+    );
+    for g in
+      select case when a.grantee = 0 then 'public' else a.grantee::regrole::text end as grantee,
+             a.privilege_type
+        from aclexplode(v.acl) a
+       where a.grantee <> v.owner
+    loop
+      execute format('grant %s on %s to %s', g.privilege_type, v.name, g.grantee);
+    end loop;
   end loop;
 end $$;
 

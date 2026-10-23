@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { decodeAnswers, encodeAnswers } from "./codec";
 import { DIMENSIONS, DIMENSION_KEYS } from "./dimensions";
-import { buildModel, evaluate, userVector } from "./model";
+import {
+  ENSEMBLE_PENALTY,
+  buildModel,
+  evaluate,
+  scoreSongs,
+  userVector,
+} from "./model";
 import { buildPool, type PoolRows } from "./pool";
 import { QUESTIONS } from "./questions";
 import { createRng, gini, simulate } from "./simulate";
@@ -283,6 +289,23 @@ describe("evaluate", () => {
     expect(result.imagery).toContain("月");
     expect(result.imagery).toContain("雨");
     expect(result.imagery).not.toContain("酒");
+  });
+
+  it("五人及以上演唱的歌扣除固定分值，其余不受影响", () => {
+    const rows = makeRows();
+    rows.songs[0].artist = ["甲", "乙", "丙", "丁"];
+    rows.songs[1].artist = ["甲", "乙", "丙", "丁", "戊"];
+    const pool = buildPool(rows);
+    const plain = buildModel(pool, QUESTIONS, 0);
+    const penalized = buildModel(pool, QUESTIONS);
+    const { z } = userVector(plain, answersFavoring(DIMENSION_KEYS[1]));
+    const before = scoreSongs(plain, z);
+    const after = scoreSongs(penalized, z);
+    plain.songs.forEach((song, j) => {
+      const expected =
+        song.id === rows.songs[1].id ? before[j] - ENSEMBLE_PENALTY : before[j];
+      expect(after[j]).toBeCloseTo(expected, 12);
+    });
   });
 });
 

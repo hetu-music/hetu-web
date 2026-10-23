@@ -307,7 +307,7 @@ export function useImagerySuggestions(
         return;
       }
       if (draft.categoryId === null) {
-        setMessage({ type: "error", text: `「${name}」还没有选择分类` });
+        setMessage({ type: "error", text: `「${name}」还没有选择母题` });
         return;
       }
       if (tags.length === 0) {

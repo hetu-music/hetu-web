@@ -606,7 +606,7 @@ export default function SongRelationWorkbench({
               </label>
 
               <label className="block space-y-1">
-                <span className={LABEL_CLASS}>分类</span>
+                <span className={LABEL_CLASS}>母题</span>
                 <select
                   value={editor.categoryId ?? ""}
                   onChange={(e) =>
@@ -619,7 +619,7 @@ export default function SongRelationWorkbench({
                   }
                   className={SELECT_CLASS}
                 >
-                  <option value="">— 选择分类 —</option>
+                  <option value="">— 选择母题 —</option>
                   {categoryOptions.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.label}

@@ -155,7 +155,7 @@ describe("SongRelationWorkbench", () => {
     const saveButton = screen.getByRole("button", { name: "保存" });
     expect((saveButton as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.change(screen.getByDisplayValue("— 选择分类 —"), {
+    fireEvent.change(screen.getByDisplayValue("— 选择母题 —"), {
       target: { value: "200" },
     });
     fireEvent.click(saveButton);

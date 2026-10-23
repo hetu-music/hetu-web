@@ -20,13 +20,38 @@ export interface DictionaryEntry {
   name: string;
 }
 
+/** imagery_motifs 的一行：词可取的母题（见 IMAGERY.md） */
+export interface MotifEntry {
+  imagery_id: number;
+  category_id: number;
+  role: "primary" | "alternative" | "part";
+}
+
 export interface ImageryPrior {
   /** 已标注歌曲中，歌词字面出现该意象的歌曲数 */
   seen: number;
   /** 其中确实标注了该意象的歌曲数 */
   annotated: number;
-  /** 历史上使用过的分类，按使用次数从多到少 */
+  /**
+   * 可选的母题，第一个为默认：登记过母题的词取默认母题与多义候选；
+   * 未登记的词（新词）退回历史上用过的分类，按使用次数从多到少
+   */
   categoryIds: number[];
+}
+
+/** 每个词的候选母题：默认母题在前，其后是多义候选。并列词的其余组成不在其中，保存时由服务端补写 */
+export function motifCandidates(
+  motifs: readonly MotifEntry[],
+): Map<number, number[]> {
+  const byImagery = new Map<number, number[]>();
+  for (const m of motifs) {
+    if (m.role === "part") continue;
+    let list = byImagery.get(m.imagery_id);
+    if (!list) byImagery.set(m.imagery_id, (list = []));
+    if (m.role === "primary") list.unshift(m.category_id);
+    else list.push(m.category_id);
+  }
+  return byImagery;
 }
 
 export interface ImagerySuggestion {
@@ -36,7 +61,7 @@ export interface ImagerySuggestion {
   timetags: string[];
   /** 时间标签对应的歌词文本，与 timetags 一一对应 */
   lines: string[];
-  /** 可选分类，第一个为默认值；为空表示该意象从未被标注过，需要人工选择 */
+  /** 可选母题，第一个为默认值；为空表示该意象既未登记母题也从未被标注过，需要人工选择 */
   categoryIds: number[];
   seen: number;
   annotated: number;
@@ -168,8 +193,11 @@ export function buildPriors(input: {
     category_id: number;
   }>;
   songs: ReadonlyArray<{ id: number; lyrics: string | null }>;
+  /** 词的候选母题；省略时只用历史分类 */
+  motifs?: readonly MotifEntry[];
   excludeSongId?: number;
 }): Map<number, ImageryPrior> {
+  const candidates = motifCandidates(input.motifs ?? []);
   const annotatedBySong = new Map<number, Set<number>>();
   const categoryCounts = new Map<number, Map<number, number>>();
   for (const occ of input.occurrences) {
@@ -201,9 +229,11 @@ export function buildPriors(input: {
     priors.set(entry.id, {
       seen: seen.get(entry.id) ?? 0,
       annotated: annotated.get(entry.id) ?? 0,
-      categoryIds: counts
-        ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)
-        : [],
+      categoryIds:
+        candidates.get(entry.id) ??
+        (counts
+          ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)
+          : []),
     });
   }
   return priors;

@@ -101,6 +101,23 @@ describe("buildPriors", () => {
     expect(priors.get(2)).toEqual({ seen: 2, annotated: 0, categoryIds: [] });
   });
 
+  it("登记了母题的词用登记的候选：默认在前、多义候选在后，并列组成不列入", () => {
+    const priors = buildPriors({
+      dictionary,
+      songs: [{ id: 10, lyrics: "[00:01.00]风里的人" }],
+      occurrences: [{ song_id: 10, imagery_id: 1, category_id: 100 }],
+      motifs: [
+        { imagery_id: 1, category_id: 300, role: "alternative" },
+        { imagery_id: 1, category_id: 200, role: "primary" },
+        { imagery_id: 1, category_id: 400, role: "part" },
+      ],
+    });
+    // 历史上用过的 100 不再出现：分类以登记为准
+    expect(priors.get(1)?.categoryIds).toEqual([200, 300]);
+    // 未登记的词退回历史分类（这里没有）
+    expect(priors.get(2)?.categoryIds).toEqual([]);
+  });
+
   it("excludeSongId 排除当前歌曲", () => {
     const priors = buildPriors({
       dictionary,

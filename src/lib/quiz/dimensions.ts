@@ -3,8 +3,8 @@ import type { Dimension, DimensionKey, SignatureImagery } from "./types";
 /**
  * 意象维度定义。
  *
- * 由数据库中的 15 个意象二级分类合并而来：过于稀疏的分类（传说、习俗、饮食等）
- * 并入相近维度，避免单独成维带来噪声。分类改名时需同步这里。
+ * 由数据库中的 17 个意象二级分类合并而来（分类体系见 IMAGERY.md）：过于稀疏的分类
+ *（世事、饮食等）并入相近维度，避免单独成维带来噪声。分类改名时需同步这里。
  */
 export const DIMENSIONS: readonly Dimension[] = [
   {
@@ -17,14 +17,14 @@ export const DIMENSIONS: readonly Dimension[] = [
   {
     key: "shanhe",
     label: "山河",
-    categories: ["地理", "地点"],
+    categories: ["山水", "地域"],
     motto: "行遍山河",
     description: "你的心在路上。江流、关山与远方，才是你想去的地方。",
   },
   {
     key: "caomu",
     label: "草木",
-    categories: ["植物", "动物"],
+    categories: ["草木", "鸟兽"],
     motto: "草木知心",
     description: "你留意一花一木的开落，万物有情，你都看在眼里。",
   },
@@ -45,28 +45,28 @@ export const DIMENSIONS: readonly Dimension[] = [
   {
     key: "guangyin",
     label: "光阴",
-    categories: ["时间"],
+    categories: ["时令", "光阴"],
     motto: "惜取光阴",
     description: "你对时间格外敏感，朝暮与春秋，总让你想起逝去的事。",
   },
   {
     key: "renjian",
     label: "人间",
-    categories: ["身体", "身份"],
+    categories: ["身体", "人物"],
     motto: "人间行走",
     description: "你关心人胜过风景，侠客、故人与眉眼，都是你想写的故事。",
   },
   {
     key: "qingsi",
     label: "情思",
-    categories: ["情感"],
+    categories: ["情感", "心象"],
     motto: "情之所钟",
     description: "你不绕弯子，爱与恨、离与别，都要写到最深处。",
   },
   {
     key: "diangu",
     label: "典故",
-    categories: ["传说", "习俗", "文体"],
+    categories: ["神异", "艺文", "世事"],
     motto: "旧典新声",
     description: "你喜欢有来历的句子，一个典故、一段传说，就是一整个世界。",
   },

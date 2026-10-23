@@ -208,7 +208,7 @@ export default function QuizClient({ questions, poolSize }: Props) {
                             className={cn(
                               "group flex w-full items-baseline gap-4 rounded-sm border px-5 py-4 text-left font-serif text-base leading-relaxed transition-all duration-300 md:text-lg",
                               selected
-                                ? "border-[#9A6B2F] bg-[#9A6B2F]/[0.06] text-[#7A5222] dark:border-[#D4A259] dark:bg-[#D4A259]/10 dark:text-[#E8C48A]"
+                                ? "border-[#9A6B2F] bg-[#9A6B2F]/6 text-[#7A5222] dark:border-[#D4A259] dark:bg-[#D4A259]/10 dark:text-[#E8C48A]"
                                 : "border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-white dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-900/60",
                             )}
                           >

@@ -1,17 +1,17 @@
 "use client";
 
 import CoverArt from "@/components/library/CoverArt";
-import TopBar from "@/components/shared/topbar/TopBar";
 import EnqueueButton from "@/components/shared/EnqueueButton";
 import PlayButton from "@/components/shared/PlayButton";
+import TopBar from "@/components/shared/topbar/TopBar";
 import { Link } from "@/i18n/navigation";
 import type { QuizResultView } from "@/lib/quiz/views";
-import { copyPageLink, sharePage, type ShareOutcome } from "@/lib/utils/share";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { motion } from "framer-motion";
-import { Check, Link2, RotateCcw, Share2 } from "lucide-react";
+import { ImageIcon, RotateCcw, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useState } from "react";
+import { useState } from "react";
+import QuizShareSheet from "./QuizShareSheet";
 
 interface Props {
   result: QuizResultView;
@@ -35,22 +35,9 @@ function fadeUp(delay: number) {
 export default function QuizResultClient({ result }: Props) {
   const t = useTranslations("quiz");
   const tNav = useTranslations("common.nav");
-  const [copied, setCopied] = useState(false);
-
-  // 复制成功在按钮上原地提示「已复制」；剪贴板不可用（如非安全上下文）时静默
-  const showCopied = useCallback((outcome: ShareOutcome) => {
-    if (outcome !== "copied") return;
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  }, []);
-  const copyLink = useCallback(
-    async () => showCopied(await copyPageLink()),
-    [showCopied],
-  );
-  const share = useCallback(
-    async () => showCopied(await sharePage({ title: document.title })),
-    [showCopied],
-  );
+  // 顶栏的分享和页尾的按钮都打开分享图面板，链接复制也收在面板里
+  const [sharing, setSharing] = useState(false);
+  const share = () => setSharing(true);
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
@@ -115,7 +102,7 @@ export default function QuizResultClient({ result }: Props) {
                       {p.label}
                     </span>
                     <div className="relative h-1.5 flex-1 rounded-full bg-slate-100 dark:bg-slate-800/70">
-                      <span className="absolute inset-y-[-3px] left-1/2 w-px bg-slate-300 dark:bg-slate-700" />
+                      <span className="absolute -inset-y-0.75 left-1/2 w-px bg-slate-300 dark:bg-slate-700" />
                       <motion.span
                         className={
                           positive
@@ -243,11 +230,11 @@ export default function QuizResultClient({ result }: Props) {
             {t("result.retry")}
           </Link>
           <button
-            onClick={copyLink}
+            onClick={share}
             className="flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
           >
-            {copied ? <Check size={14} /> : <Link2 size={14} />}
-            {copied ? t("result.copied") : t("result.share")}
+            <ImageIcon size={14} />
+            {t("result.share")}
           </button>
         </motion.div>
 
@@ -255,6 +242,12 @@ export default function QuizResultClient({ result }: Props) {
           {t("result.method")}
         </p>
       </main>
+
+      <QuizShareSheet
+        open={sharing}
+        onOpenChange={setSharing}
+        result={result}
+      />
     </div>
   );
 }

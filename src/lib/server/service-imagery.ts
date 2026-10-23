@@ -433,6 +433,78 @@ async function assertLeafCategory(
 
 // ─── write functions: occurrences ─────────────────────────────────────────────
 
+type UserClient = NonNullable<ReturnType<typeof getUserClient>>;
+type MotifInfo = { primary: number | null; parts: number[] };
+
+/**
+ * 保证标注挂的母题登记在该词的候选里（见 IMAGERY.md）：
+ * 从未登记母题的新词，以这次选的母题为默认；已登记的词选了候选之外的母题，登记为多义候选。
+ *
+ * 返回各词的默认母题与并列组成，供 withParts 为挂默认母题的标注补写并列组成。
+ */
+async function registerMotifs(
+  supabase: UserClient,
+  pairs: ReadonlyArray<{ imagery_id: number; category_id: number }>,
+): Promise<Map<number, MotifInfo>> {
+  const ids = [...new Set(pairs.map((p) => p.imagery_id))];
+  const { data, error } = await supabase
+    .from(TABLES.IMAGERY_MOTIFS)
+    .select("imagery_id,category_id,role")
+    .in("imagery_id", ids);
+  if (error) throw error;
+
+  const known = new Map<number, MotifInfo & { all: Set<number> }>(
+    ids.map((id) => [id, { primary: null, parts: [], all: new Set() }]),
+  );
+  for (const row of (data ?? []) as Array<{
+    imagery_id: number;
+    category_id: number;
+    role: string;
+  }>) {
+    const entry = known.get(row.imagery_id);
+    if (!entry) continue;
+    entry.all.add(row.category_id);
+    if (row.role === "primary") entry.primary = row.category_id;
+    if (row.role === "part") entry.parts.push(row.category_id);
+  }
+
+  const additions: Array<{
+    imagery_id: number;
+    category_id: number;
+    role: "primary" | "alternative";
+  }> = [];
+  for (const { imagery_id, category_id } of pairs) {
+    const entry = known.get(imagery_id);
+    if (!entry || entry.all.has(category_id)) continue;
+    const role = entry.primary === null ? "primary" : "alternative";
+    if (role === "primary") entry.primary = category_id;
+    entry.all.add(category_id);
+    additions.push({ imagery_id, category_id, role });
+  }
+  if (additions.length > 0) {
+    const { error: insertError } = await supabase
+      .from(TABLES.IMAGERY_MOTIFS)
+      .upsert(additions, {
+        onConflict: "imagery_id,category_id",
+        ignoreDuplicates: true,
+      });
+    if (insertError) throw insertError;
+  }
+  return known;
+}
+
+/** 挂默认母题的标注，补上并列词其余组成的行（「风雨」标了风，再写一条雨） */
+function withParts<T extends { imagery_id: number; category_id: number }>(
+  rows: T[],
+  motifs: ReadonlyMap<number, MotifInfo>,
+): T[] {
+  return rows.flatMap((row) => {
+    const entry = motifs.get(row.imagery_id);
+    if (!entry || entry.primary !== row.category_id) return [row];
+    return [row, ...entry.parts.map((id) => ({ ...row, category_id: id }))];
+  });
+}
+
 export async function createOccurrence(
   data: {
     song_id: number;
@@ -446,12 +518,23 @@ export async function createOccurrence(
   await assertLeafCategory(data.category_id, accessToken);
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
+  const motifs = await registerMotifs(supabase, [data]);
+  const [main, ...parts] = withParts([data], motifs);
   const { data: created, error } = await supabase
     .from(TABLES.IMAGERY_OCC)
-    .insert(data)
+    .insert(main)
     .select()
     .single();
   if (error) throw error;
+  if (parts.length > 0) {
+    const { error: partsError } = await supabase
+      .from(TABLES.IMAGERY_OCC)
+      .upsert(parts, {
+        onConflict: "song_id,imagery_id,category_id",
+        ignoreDuplicates: true,
+      });
+    if (partsError) throw partsError;
+  }
   return getOccurrenceWithRelationsById(
     (created as { id: number }).id,
     accessToken,
@@ -474,7 +557,8 @@ function songNotPublished() {
  * 为一首歌批量新增意象标注（预标注审核后一次提交）。
  *
  * - 新意象名若已存在同名意象则直接复用，否则创建；创建前先确认歌曲已发布，避免留下孤立意象
- * - 解析后指向同一意象的多项合并为一条（时间标签取并集、分类取第一项）
+ * - 解析后指向同一意象的多项合并为一条（时间标签取并集、母题取第一项）
+ * - 所选母题不在该词的候选里时登记为候选；挂默认母题的并列词补写其余组成
  * - 该歌已标注过的意象会被跳过，避免重复提交或并发编辑产生重复行
  */
 export async function createOccurrencesBatch(
@@ -560,11 +644,17 @@ export async function createOccurrencesBatch(
   const taken = new Set(
     ((existing ?? []) as { imagery_id: number }[]).map((r) => r.imagery_id),
   );
-  const rows = [...merged.values()]
-    .filter((item) => !taken.has(item.imagery_id))
-    .map((item) => ({ ...item, song_id: songId, meaning_id: null }));
-  const skipped = merged.size - rows.length;
-  if (rows.length === 0) return { created: 0, skipped, newImagery };
+  const fresh = [...merged.values()].filter(
+    (item) => !taken.has(item.imagery_id),
+  );
+  const skipped = merged.size - fresh.length;
+  if (fresh.length === 0) return { created: 0, skipped, newImagery };
+
+  const motifs = await registerMotifs(supabase, fresh);
+  const rows = withParts(
+    fresh.map((item) => ({ ...item, song_id: songId, meaning_id: null })),
+    motifs,
+  );
 
   const { error } = await supabase.from(TABLES.IMAGERY_OCC).insert(rows);
   if (error) {
@@ -574,7 +664,7 @@ export async function createOccurrencesBatch(
     }
     throw error;
   }
-  return { created: rows.length, skipped, newImagery };
+  return { created: fresh.length, skipped, newImagery };
 }
 
 export async function updateOccurrence(
@@ -592,6 +682,21 @@ export async function updateOccurrence(
   }
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
+  if (data.category_id !== undefined) {
+    let imageryId = data.imagery_id;
+    if (imageryId === undefined) {
+      const { data: current, error: currentError } = await supabase
+        .from(TABLES.IMAGERY_OCC)
+        .select("imagery_id")
+        .eq("id", id)
+        .single();
+      if (currentError) throw currentError;
+      imageryId = (current as { imagery_id: number }).imagery_id;
+    }
+    await registerMotifs(supabase, [
+      { imagery_id: imageryId, category_id: data.category_id },
+    ]);
+  }
   const { error } = await supabase
     .from(TABLES.IMAGERY_OCC)
     .update(data)

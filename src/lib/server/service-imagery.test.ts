@@ -18,10 +18,7 @@ import { getServiceClient, getUserClient } from "@/lib/db/supabase-server";
 import {
   createImagery,
   createImageryCategory,
-  createImageryMeaning,
-  deleteMeaning,
   deleteOccurrence,
-  getImageryMeanings,
   getOccurrencesForImagery,
   getOccurrencesForSong,
   getSongsForImagery,
@@ -30,7 +27,6 @@ import {
   getImageryWithCounts,
   updateImagery,
   updateImageryCategory,
-  updateMeaning,
   updateOccurrence,
   getImageryLastModified,
 } from "./service-imagery";
@@ -87,7 +83,7 @@ describe("getImageryWithCounts", () => {
 });
 
 describe("getOccurrencesForImagery（数据行映射）", () => {
-  it("嵌套的 music/imagery/category/meaning 关联被拍平为 OccurrenceWithSong", async () => {
+  it("嵌套的 music/imagery/category 关联被拍平为 OccurrenceWithSong", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({
@@ -97,12 +93,10 @@ describe("getOccurrencesForImagery（数据行映射）", () => {
               song_id: 10,
               imagery_id: 20,
               category_id: 30,
-              meaning_id: null,
               lyric_timetag: ["01:00"],
               music: { title: "标题", album: "专辑" },
               imagery: { name: "明月" },
               imagery_categories: { name: "自然" },
-              imagery_meanings: null,
             },
           ],
           error: null,
@@ -116,7 +110,6 @@ describe("getOccurrencesForImagery（数据行映射）", () => {
       song_album: "专辑",
       imagery_name: "明月",
       category_name: "自然",
-      meaning_label: null,
     });
   });
 
@@ -307,12 +300,10 @@ describe("createOccurrence（叶子分类校验）", () => {
             song_id: 1,
             imagery_id: 2,
             category_id: 3,
-            meaning_id: null,
             lyric_timetag: [],
             music: { title: "标题" },
             imagery: null,
             imagery_categories: null,
-            imagery_meanings: null,
           },
           error: null,
         }), // 回查完整记录
@@ -327,7 +318,6 @@ describe("createOccurrence（叶子分类校验）", () => {
       song_id: 1,
       imagery_id: 2,
       category_id: 3,
-      meaning_id: null,
       lyric_timetag: [],
     });
     expect(updateBuilder.update).toHaveBeenCalledWith({
@@ -375,7 +365,6 @@ describe("createOccurrencesBatch", () => {
         category_id: 10,
         lyric_timetag: [],
         song_id: 5,
-        meaning_id: null,
       },
     ]);
   });
@@ -423,14 +412,12 @@ describe("createOccurrencesBatch", () => {
         category_id: 10,
         lyric_timetag: [],
         song_id: 5,
-        meaning_id: null,
       },
       {
         imagery_id: 31,
         category_id: 12,
         lyric_timetag: [],
         song_id: 5,
-        meaning_id: null,
       },
     ]);
   });
@@ -552,36 +539,6 @@ describe("createOccurrencesBatch", () => {
   });
 });
 
-describe("getImageryMeanings", () => {
-  it("service client 不可用时返回空数组", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(null);
-    expect(await getImageryMeanings()).toEqual([]);
-  });
-
-  it("查询出错时返回空数组", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: null, error: { message: "boom" } }),
-      ]),
-    );
-    expect(await getImageryMeanings()).toEqual([]);
-  });
-
-  it("正常返回按 label 排序的含义列表", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: [{ id: 1, label: "思念", description: null }],
-          error: null,
-        }),
-      ]),
-    );
-    expect(await getImageryMeanings()).toEqual([
-      { id: 1, label: "思念", description: null },
-    ]);
-  });
-});
-
 describe("createImagery / updateImagery", () => {
   it("createImagery：user client 不可用时抛异常", async () => {
     vi.mocked(getUserClient).mockReturnValue(null);
@@ -609,50 +566,6 @@ describe("createImagery / updateImagery", () => {
   });
 });
 
-describe("createImageryMeaning / updateMeaning / deleteMeaning", () => {
-  it("createImageryMeaning 创建成功", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: { id: 1, label: "思念", description: null },
-          error: null,
-        }),
-      ]),
-    );
-    const result = await createImageryMeaning("思念", null, "token");
-    expect(result).toMatchObject({ label: "思念" });
-  });
-
-  it("updateMeaning 更新成功", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: { id: 1, label: "改名", description: null },
-          error: null,
-        }),
-      ]),
-    );
-    const result = await updateMeaning(1, "改名", null, "token");
-    expect(result).toMatchObject({ label: "改名" });
-  });
-
-  it("deleteMeaning 出错时抛异常", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: null, error: { message: "in use" } }),
-      ]),
-    );
-    await expect(deleteMeaning(1, "token")).rejects.toBeTruthy();
-  });
-
-  it("deleteMeaning 成功时不抛异常", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([makeQueryBuilder({ data: null, error: null })]),
-    );
-    await expect(deleteMeaning(1, "token")).resolves.toBeUndefined();
-  });
-});
-
 describe("updateOccurrence / deleteOccurrence（叶子分类校验同样适用于更新）", () => {
   it("更新时切换到非叶子分类会被拒绝", async () => {
     vi.mocked(getUserClient).mockReturnValue(
@@ -676,18 +589,16 @@ describe("updateOccurrence / deleteOccurrence（叶子分类校验同样适用�
             song_id: 1,
             imagery_id: 2,
             category_id: 3,
-            meaning_id: null,
             lyric_timetag: [],
             music: null,
             imagery: null,
             imagery_categories: null,
-            imagery_meanings: null,
           },
           error: null,
         }), // 回查
       ]),
     );
-    const result = await updateOccurrence(1, { meaning_id: 4 }, "token");
+    const result = await updateOccurrence(1, { imagery_id: 2 }, "token");
     expect(result).toMatchObject({ id: 1 });
   });
 

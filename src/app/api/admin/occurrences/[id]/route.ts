@@ -16,7 +16,6 @@ import { parseJsonBody } from "@/lib/server/parse-body";
 const UpdateOccurrenceSchema = z.object({
   imagery_id: z.number().int().positive().optional(),
   category_id: z.number().int().positive().optional(),
-  meaning_id: z.number().int().positive().nullable().optional(),
 });
 
 function getIdFromUrl(request: NextRequest): number | null {

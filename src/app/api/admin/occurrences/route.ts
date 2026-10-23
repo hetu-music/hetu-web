@@ -17,7 +17,6 @@ const CreateOccurrenceSchema = z.object({
   song_id: z.number().int().positive(),
   imagery_id: z.number().int().positive(),
   category_id: z.number().int().positive(),
-  meaning_id: z.number().int().positive().nullable().optional(),
 });
 
 export const GET = withAuth(

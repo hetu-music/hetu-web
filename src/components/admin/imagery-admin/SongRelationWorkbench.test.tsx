@@ -29,8 +29,8 @@ const song = {
 };
 
 const items: ImageryItem[] = [
-  { id: 1, name: "明月", count: 44, categoryIds: [100], meaningCount: 0 },
-  { id: 2, name: "天涯", count: 27, categoryIds: [200], meaningCount: 0 },
+  { id: 1, name: "明月", count: 44, categoryIds: [100] },
+  { id: 2, name: "天涯", count: 27, categoryIds: [200] },
 ];
 const leafCategories: ImageryCategory[] = [
   { id: 100, name: "星相", parent_id: 10, level: 3, description: null },
@@ -48,7 +48,6 @@ function occurrence(
     song_id: 7,
     imagery_id: 1,
     category_id: 100,
-    meaning_id: null,
     lyric_timetag: [],
     song_title: "测试",
     song_album: null,
@@ -69,7 +68,6 @@ function renderWorkbench(occurrences: OccurrenceWithSong[] = []) {
       loading={false}
       items={items}
       leafCategories={leafCategories}
-      meanings={[]}
       submitting={false}
       getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
       onSave={onSave}
@@ -120,7 +118,6 @@ describe("SongRelationWorkbench", () => {
       imageryId: 1,
       imageryName: "明月",
       categoryId: 100,
-      meaningId: null,
     });
   });
 
@@ -137,7 +134,6 @@ describe("SongRelationWorkbench", () => {
       imageryId: 2,
       imageryName: "天涯",
       categoryId: 200,
-      meaningId: null,
     });
   });
 
@@ -177,7 +173,6 @@ describe("SongRelationWorkbench", () => {
       imageryId: null,
       imageryName: "天地",
       categoryId: 200,
-      meaningId: null,
     });
   });
 

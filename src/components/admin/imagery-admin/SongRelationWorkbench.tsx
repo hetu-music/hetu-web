@@ -3,7 +3,7 @@
 import { linesForWord } from "@/lib/imagery/consistency";
 import { parseLrcLines, type LrcLine } from "@/lib/imagery/suggest";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import type { ImageryCategory, ImageryItem, ImageryMeaning } from "@/lib/types";
+import type { ImageryCategory, ImageryItem } from "@/lib/types";
 import { AlertCircle, Plus, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +16,6 @@ import {
   PANEL_CLASS,
   SELECT_CLASS,
   SOLID_BUTTON_CLASS,
-  TAG_CLASS,
   TEXT_BUTTON_CLASS,
 } from "../kit/styles";
 import { cn } from "@/lib/utils/utils";
@@ -27,7 +26,6 @@ export interface RelationDraft {
   imageryId: number | null;
   imageryName: string;
   categoryId: number;
-  meaningId: number | null;
 }
 
 /** 正在编辑的关系；occurrenceId 为 null 表示新建。出现位置由歌词算出，不在这里 */
@@ -35,7 +33,6 @@ interface EditorState {
   occurrenceId: number | null;
   imageryName: string;
   categoryId: number | null;
-  meaningId: number | null;
 }
 
 type Tone = "draft" | "hover" | "candidate" | "saved";
@@ -119,7 +116,6 @@ export default function SongRelationWorkbench({
   loading,
   items,
   leafCategories,
-  meanings,
   submitting,
   getCategoryPath,
   onSave,
@@ -131,7 +127,6 @@ export default function SongRelationWorkbench({
   loading: boolean;
   items: ImageryItem[];
   leafCategories: ImageryCategory[];
-  meanings: ImageryMeaning[];
   submitting: boolean;
   getCategoryPath: (categoryId: number) => string;
   onSave: (
@@ -265,7 +260,6 @@ export default function SongRelationWorkbench({
       occurrenceId: o.id,
       imageryName: o.imagery_name ?? "",
       categoryId: o.category_id,
-      meaningId: o.meaning_id,
     });
     const first = sortTags(o.lyric_timetag).find((t) => lyricTags.has(t));
     if (first) {
@@ -290,7 +284,6 @@ export default function SongRelationWorkbench({
       occurrenceId: null,
       imageryName: name,
       categoryId: item?.categoryIds[0] ?? null,
-      meaningId: null,
     });
   };
 
@@ -331,7 +324,6 @@ export default function SongRelationWorkbench({
       imageryId: resolvedItem?.id ?? null,
       imageryName: editor.imageryName.trim(),
       categoryId: editor.categoryId,
-      meaningId: editor.meaningId,
     });
     if (ok) {
       setEditor(null);
@@ -618,31 +610,6 @@ export default function SongRelationWorkbench({
                 </select>
               </label>
 
-              {meanings.length > 0 && (
-                <label className="block space-y-1">
-                  <span className={LABEL_CLASS}>含义（可选）</span>
-                  <select
-                    value={editor.meaningId ?? ""}
-                    onChange={(e) =>
-                      setEditor({
-                        ...editor,
-                        meaningId: e.target.value
-                          ? Number(e.target.value)
-                          : null,
-                      })
-                    }
-                    className={SELECT_CLASS}
-                  >
-                    <option value="">— 不设置 —</option>
-                    {meanings.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
               <div className="space-y-1">
                 <span className={LABEL_CLASS}>
                   出现位置 {draftTags.length} 处（词在歌词里字面出现的行）
@@ -740,9 +707,6 @@ export default function SongRelationWorkbench({
                         <span className="text-[11px] text-slate-400">
                           {shortPath(getCategoryPath(o.category_id))}
                         </span>
-                        {o.meaning_label && (
-                          <span className={TAG_CLASS}>{o.meaning_label}</span>
-                        )}
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">
                         <span>{o.lyric_timetag.length} 处</span>

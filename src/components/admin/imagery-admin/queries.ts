@@ -5,18 +5,16 @@ import { useCallback } from "react";
 import {
   apiGetImageryCategories,
   apiGetImageryItems,
-  apiGetMeanings,
 } from "@/lib/api/client-api";
-import type { ImageryCategory, ImageryItem, ImageryMeaning } from "@/lib/types";
+import type { ImageryCategory, ImageryItem } from "@/lib/types";
 
 /**
- * 意象词典、分类、含义的查询：意象库各页与歌曲工作台的「意象」一栏共用同一份缓存，
+ * 意象词典、分类的查询：意象库各页与歌曲工作台的「意象」一栏共用同一份缓存，
  * 在两边之间来回切不必重取，一边改了另一边也跟着变。
  */
 export const IMAGERY_KEYS = {
   items: ["admin", "imagery", "items"],
   categories: ["admin", "imagery", "categories"],
-  meanings: ["admin", "imagery", "meanings"],
 } as const;
 
 const STALE_MS = 5 * 60 * 1000;
@@ -36,14 +34,6 @@ export function useImageryCategoriesQuery(initialData?: ImageryCategory[]) {
     queryFn: apiGetImageryCategories,
     staleTime: STALE_MS,
     initialData,
-  });
-}
-
-export function useImageryMeaningsQuery() {
-  return useQuery<ImageryMeaning[]>({
-    queryKey: IMAGERY_KEYS.meanings,
-    queryFn: apiGetMeanings,
-    staleTime: STALE_MS,
   });
 }
 

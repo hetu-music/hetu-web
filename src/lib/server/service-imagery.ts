@@ -6,25 +6,18 @@ import {
   TABLES,
 } from "@/lib/db/supabase-server";
 import { songTimetags } from "@/lib/imagery/consistency";
-import type {
-  ImageryCategory,
-  ImageryItem,
-  ImageryMeaning,
-  SongRef,
-} from "@/lib/types";
+import type { ImageryCategory, ImageryItem, SongRef } from "@/lib/types";
 
 export type OccurrenceWithSong = {
   id: number;
   song_id: number;
   imagery_id: number;
   category_id: number;
-  meaning_id: number | null;
   lyric_timetag: string[];
   song_title: string;
   song_album: string | null;
   imagery_name?: string;
   category_name?: string;
-  meaning_label?: string | null;
 };
 
 // ─── helper ───────────────────────────────────────────────────────────────────
@@ -33,19 +26,16 @@ function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceWithSong {
   const music = row.music as { title?: string; album?: string } | null;
   const imagery = row.imagery as { name?: string } | null;
   const imageryCategories = row.imagery_categories as { name?: string } | null;
-  const imageryMeanings = row.imagery_meanings as { label?: string } | null;
   return {
     id: row.id as number,
     song_id: row.song_id as number,
     imagery_id: row.imagery_id as number,
     category_id: row.category_id as number,
-    meaning_id: (row.meaning_id as number | null) ?? null,
     lyric_timetag: (row.lyric_timetag as string[]) ?? [],
     song_title: music?.title ?? "",
     song_album: music?.album ?? null,
     imagery_name: imagery?.name,
     category_name: imageryCategories?.name,
-    meaning_label: imageryMeanings?.label ?? null,
   };
 }
 
@@ -88,7 +78,6 @@ export const getImageryWithCounts = cache(
         categoryIds: (item.categoryIds ?? [])
           .map((value) => Number(value))
           .filter(Number.isFinite),
-        meaningCount: 0,
       }));
     } catch (e) {
       console.error("[getImageryWithCounts]", e);
@@ -96,49 +85,6 @@ export const getImageryWithCounts = cache(
     }
   },
 );
-
-/* ─────────────────────────────────────────────────────────────────────────────
- * ⚠️ 释义（imagery_meanings）子系统目前不可用，且设计未定，暂缓处理
- *
- * 现状（2026-09-15 核实）：
- *   · imagery_meanings 表 0 行；imagery_occurrences 共 6573 行，meaning_id 全为 NULL
- *   · 表结构声明的是「按意象隔离」：
- *       imagery_id  bigint  NOT NULL  FK → imagery.id   且无默认值
- *   · 但下面的 createImageryMeaning() 插入时不带 imagery_id
- *     → 后台「含义」页点新增会被 NOT NULL 约束拒掉，这才是表一直为空的原因，
- *       而不是「还没人用」
- *
- * 另有两套并行 API，只有前者接进了 UI：
- *   · 全局    /api/admin/meanings              ← 后台「含义」Tab 在用（存不进去）
- *   · 按意象  /api/admin/imagery/[id]/meanings ← 端到端写好了，但零调用
- *
- * 真要启用时需要先定方向，二选一：
- *   A. 跟随表结构做「按意象隔离」——释义挂在具体意象下，出现记录的下拉只列本意象的；
- *      改 UI，删掉全局那套；代价是无法跨意象聚合。
- *   B. 改成「全局共享词表」——DROP 掉 imagery_id 列，删掉按意象那套；
- *      可以回答「哪些意象都表达过思念」，代价是下拉框会随词表变长。
- *
- * 在方向定下来之前不要往这几个函数上叠功能。
- * ────────────────────────────────────────────────────────────────────────── */
-
-export async function getImageryMeanings(): Promise<ImageryMeaning[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  try {
-    const { data, error } = await supabase
-      .from(TABLES.IMAGERY_MEANINGS)
-      .select("id,label,description")
-      .order("label", { ascending: true });
-    if (error) {
-      console.error("[getImageryMeanings]", error);
-      return [];
-    }
-    return (data ?? []) as ImageryMeaning[];
-  } catch (e) {
-    console.error("[getImageryMeanings]", e);
-    return [];
-  }
-}
 
 export async function getOccurrencesForImagery(
   imageryId: number,
@@ -148,9 +94,7 @@ export async function getOccurrencesForImagery(
   try {
     const { data, error } = await supabase
       .from(TABLES.IMAGERY_OCC)
-      .select(
-        "*, music(title, album), imagery(name), imagery_categories(name), imagery_meanings(label)",
-      )
+      .select("*, music(title, album), imagery(name), imagery_categories(name)")
       .eq("imagery_id", imageryId);
     if (error) {
       console.error("[getOccurrencesForImagery]", error);
@@ -171,9 +115,7 @@ export async function getOccurrencesForSong(
   try {
     const { data, error } = await supabase
       .from(TABLES.IMAGERY_OCC)
-      .select(
-        "*, music(title, album), imagery(name), imagery_categories(name), imagery_meanings(label)",
-      )
+      .select("*, music(title, album), imagery(name), imagery_categories(name)")
       .eq("song_id", songId);
     if (error) {
       console.error("[getOccurrencesForSong]", error);
@@ -338,68 +280,16 @@ export async function updateImageryCategory(
   return updated;
 }
 
-// ─── write functions: meanings ────────────────────────────────────────────────
-
 async function getOccurrenceWithRelationsById(id: number, accessToken: string) {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_OCC)
-    .select(
-      "*, music(title, album), imagery(name), imagery_categories(name), imagery_meanings(label)",
-    )
+    .select("*, music(title, album), imagery(name), imagery_categories(name)")
     .eq("id", id)
     .single();
   if (error) throw error;
   return mapOccurrenceRow(data as Record<string, unknown>);
-}
-
-/**
- * ⚠️ 当前必定失败：imagery_meanings.imagery_id 为 NOT NULL 且无默认值，
- * 而这里没有传。属于上面那段「释义子系统待定」的一部分，方向定了再改。
- */
-export async function createImageryMeaning(
-  label: string,
-  description: string | null,
-  accessToken: string,
-) {
-  const supabase = getUserClient(accessToken);
-  if (!supabase) throw new Error("Supabase client unavailable");
-  const { data, error } = await supabase
-    .from(TABLES.IMAGERY_MEANINGS)
-    .insert({ label, description })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-export async function updateMeaning(
-  id: number,
-  label: string,
-  description: string | null,
-  accessToken: string,
-) {
-  const supabase = getUserClient(accessToken);
-  if (!supabase) throw new Error("Supabase client unavailable");
-  const { data, error } = await supabase
-    .from(TABLES.IMAGERY_MEANINGS)
-    .update({ label, description })
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-export async function deleteMeaning(id: number, accessToken: string) {
-  const supabase = getUserClient(accessToken);
-  if (!supabase) throw new Error("Supabase client unavailable");
-  const { error } = await supabase
-    .from(TABLES.IMAGERY_MEANINGS)
-    .delete()
-    .eq("id", id);
-  if (error) throw error;
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -603,7 +493,6 @@ export async function createOccurrence(
     song_id: number;
     imagery_id: number;
     category_id: number;
-    meaning_id?: number | null;
   },
   accessToken: string,
 ) {
@@ -618,7 +507,6 @@ export async function createOccurrence(
         song_id: data.song_id,
         imagery_id: data.imagery_id,
         category_id: data.category_id,
-        meaning_id: data.meaning_id ?? null,
         lyric_timetag: [] as string[],
       },
     ],
@@ -755,7 +643,7 @@ export async function createOccurrencesBatch(
 
   const motifs = await registerMotifs(supabase, fresh);
   const rows = withParts(
-    fresh.map((item) => ({ ...item, song_id: songId, meaning_id: null })),
+    fresh.map((item) => ({ ...item, song_id: songId })),
     motifs,
   );
 
@@ -777,7 +665,6 @@ export async function updateOccurrence(
   data: {
     imagery_id?: number;
     category_id?: number;
-    meaning_id?: number | null;
   },
   accessToken: string,
 ) {
@@ -807,7 +694,6 @@ export async function updateOccurrence(
     .update({
       imagery_id: data.imagery_id,
       category_id: data.category_id,
-      meaning_id: data.meaning_id,
     })
     .eq("id", id)
     .select("id")

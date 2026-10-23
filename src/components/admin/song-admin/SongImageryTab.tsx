@@ -18,7 +18,6 @@ import {
   IMAGERY_KEYS,
   useImageryCategoriesQuery,
   useImageryItemsQuery,
-  useImageryMeaningsQuery,
 } from "../imagery-admin/queries";
 import { getCategoryPath } from "../imagery-admin/utils";
 import { EmptyState, ErrorState, LoadingState } from "../kit/parts";
@@ -47,7 +46,6 @@ export default function SongImageryTab({
 
   const items = useImageryItemsQuery();
   const categories = useImageryCategoriesQuery();
-  const meanings = useImageryMeaningsQuery();
   const occurrences = useQuery<OccurrenceWithSong[]>({
     queryKey: songOccurrencesKey(song.id),
     queryFn: () => apiGetOccurrencesForSong(song.id),
@@ -93,7 +91,6 @@ export default function SongImageryTab({
       const payload = {
         imagery_id: imageryId,
         category_id: draft.categoryId,
-        meaning_id: draft.meaningId,
       };
       if (occurrenceId === null) {
         await apiCreateOccurrence({ song_id: song.id, ...payload });
@@ -166,7 +163,6 @@ export default function SongImageryTab({
         loading={occurrences.isPending}
         items={items.data ?? []}
         leafCategories={leafCategories}
-        meanings={meanings.data ?? []}
         submitting={submitting}
         getCategoryPath={pathOf}
         onReload={reload}

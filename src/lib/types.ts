@@ -187,18 +187,11 @@ export type ImageryCategory = {
   description: string | null;
 };
 
-export type ImageryMeaning = {
-  id: number;
-  label: string;
-  description: string | null;
-};
-
 export type ImageryItem = {
   id: number;
   name: string;
   count: number;
   categoryIds: number[];
-  meaningCount: number;
 };
 
 export type ImageryOccurrence = {
@@ -206,8 +199,19 @@ export type ImageryOccurrence = {
   song_id: number;
   imagery_id: number;
   category_id: number;
-  meaning_id: number | null;
   lyric_timetag: string[];
+};
+
+/** 歌曲基调词表的一项（见 IMAGERY.md） */
+export type Emotion = {
+  id: number;
+  name: string;
+  description: string;
+  /** 情绪的冷暖 */
+  tone: "明" | "暗";
+  /** 情绪的强弱 */
+  energy: "扬" | "抑";
+  sort: number;
 };
 
 export type SongRef = {

@@ -137,13 +137,13 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "黄昏时分，你走进一座古城。最先去——",
     options: [
       {
-        text: "城里正下初雪，去街上买串糖葫芦，看孩子们打雪仗",
+        text: "雪后的夜市，买一盏精巧的花灯",
         dims: { tianxiang: 2, qiyong: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["雪"],
       },
       {
-        text: "城隍庙前的旧书摊，翻一本比你年纪还大的书",
+        text: "庙前的旧书摊，翻看那些泛黄的书",
         dims: { guangyin: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },

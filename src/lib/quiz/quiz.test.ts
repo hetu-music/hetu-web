@@ -301,9 +301,9 @@ describe("evaluate", () => {
       model,
       QUESTIONS.map(() => 0),
     );
-    expect(result.imagery).toContain("酒");
+    expect(result.imagery).toContain("山");
     expect(result.imagery).toContain("江河");
-    expect(result.imagery).not.toContain("月");
+    expect(result.imagery).not.toContain("酒");
   });
 
   it("z 分数并列时，人格取作为主维度被选中更多的维度", () => {

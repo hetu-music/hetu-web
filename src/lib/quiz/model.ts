@@ -313,6 +313,28 @@ function explain(
   );
 }
 
+/** z 分数相差小于此值视为并列（解析标准化的浮点误差远小于它） */
+const TIE_EPSILON = 1e-9;
+
+/** 每个维度在所选选项中作为主维度（该选项权重最高的维度）出现的次数 */
+function primaryPicks(
+  model: QuizModel,
+  answers: Answers,
+): Map<DimensionKey, number> {
+  const counts = new Map<DimensionKey, number>();
+  answers.forEach((choice, q) => {
+    const dims = Object.entries(model.questions[q].options[choice].dims);
+    const top = Math.max(...dims.map(([, w]) => w ?? 0));
+    for (const [key, w] of dims) {
+      if (w === top) {
+        const k = key as DimensionKey;
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+      }
+    }
+  });
+  return counts;
+}
+
 export function evaluate(
   model: QuizModel,
   answers: Answers,
@@ -320,20 +342,34 @@ export function evaluate(
 ): QuizResult {
   const { raw, z } = userVector(model, answers);
   const scores = scoreSongs(model, z);
-  const matches: SongMatch[] = rankSongs(model, scores, topN).map((j) => ({
+  const picked = rankSongs(model, scores, topN);
+  const matches: SongMatch[] = picked.map((j) => ({
     songId: model.songs[j].id,
     score: scores[j],
     percent: toPercent(scores[j]),
     reasons: explain(model, z, j, 3),
   }));
 
-  const profile: QuizResult["profile"] = [];
+  const profile: Array<QuizResult["profile"][number] & { f: number }> = [];
   const imagery: string[] = [];
   model.features.forEach((feat, f) => {
-    if (feat.kind === "dimension") profile.push({ key: feat.key, z: z[f] });
+    if (feat.kind === "dimension") profile.push({ key: feat.key, z: z[f], f });
     else if (feat.kind === "imagery" && raw[f] > 0) imagery.push(feat.name);
   });
-  profile.sort((a, b) => b.z - a.z);
+  // 维度分配越均衡，z 分数越容易完全相同；并列时不能按维度定义顺序决定人格。
+  // 先看哪个维度被用户更多地作为主维度选中，再看第一契合歌曲在哪个维度上更突出
+  const picks = primaryPicks(model, answers);
+  const topSong = picked.length > 0 ? model.songVectors[picked[0]] : null;
+  profile.sort((a, b) => {
+    if (Math.abs(a.z - b.z) > TIE_EPSILON) return b.z - a.z;
+    const byPicks = (picks.get(b.key) ?? 0) - (picks.get(a.key) ?? 0);
+    if (byPicks !== 0) return byPicks;
+    return topSong ? topSong[b.f] - topSong[a.f] : 0;
+  });
 
-  return { profile, imagery, matches };
+  return {
+    profile: profile.map(({ key, z: score }) => ({ key, z: score })),
+    imagery,
+    matches,
+  };
 }

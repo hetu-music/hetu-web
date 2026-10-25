@@ -306,6 +306,40 @@ describe("evaluate", () => {
     expect(result.imagery).not.toContain("月");
   });
 
+  it("z 分数并列时，人格取作为主维度被选中更多的维度", () => {
+    // 天象与山河的解析分布完全相同；全选第一项时两者原始分都是 2（高于均值 4/3），
+    // 但山河来自一次主维度，天象来自两次副维度。按定义顺序天象在前，并列规则应让山河胜出
+    const neutral = { tone: 0, energy: 0 };
+    const filler = {
+      title: "",
+      stem: "",
+      options: [
+        { text: "", dims: { caomu: 2, tianxiang: 1 }, mood: neutral },
+        { text: "", dims: { caomu: 2, shanhe: 1 }, mood: neutral },
+        { text: "", dims: { caomu: 2 }, mood: neutral },
+      ],
+    };
+    const questions: QuizQuestion[] = [
+      {
+        title: "",
+        stem: "",
+        options: [
+          { text: "", dims: { shanhe: 2 }, mood: neutral },
+          { text: "", dims: { tianxiang: 2 }, mood: neutral },
+          { text: "", dims: { qiyong: 2 }, mood: neutral },
+        ],
+      },
+      filler,
+      filler,
+    ];
+    const tied = buildModel([], questions);
+    const result = evaluate(tied, [0, 0, 0]);
+    const z = (key: string) => result.profile.find((p) => p.key === key)?.z;
+    expect(z("shanhe")).toBe(z("tianxiang"));
+    expect(result.profile[0].key).toBe("shanhe");
+    expect(result.profile[1].key).toBe("tianxiang");
+  });
+
   it("五人及以上演唱的歌扣除固定分值，其余不受影响", () => {
     const rows = makeRows();
     rows.songs[0].artist = ["甲", "乙", "丙", "丁"];

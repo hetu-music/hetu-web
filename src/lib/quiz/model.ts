@@ -25,8 +25,13 @@ import type {
 
 /** 招牌意象特征相对维度特征的权重 */
 const IMAGERY_GROUP_WEIGHT = 0.6;
-/** 情绪坐标每条轴相对维度特征的权重 */
-export const MOOD_WEIGHT = 1;
+/**
+ * 情绪坐标每条轴相对维度特征的权重。
+ * 选项的情绪写在字面上、每题占满四个象限后，情绪才可靠到值得加重：
+ * 1.5 比 1 让第一契合与用户情绪同向的比例从约 79% 升到 85%，推荐也更分散，
+ * 代价是第一契合在用户主维度上偏高的比例少约 1 个百分点
+ */
+export const MOOD_WEIGHT = 1.5;
 const MOOD_AXES = ["tone", "energy"] as const;
 /** 结果中同一专辑最多出现几首 */
 const MAX_PER_ALBUM = 2;

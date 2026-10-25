@@ -22,26 +22,26 @@ export const QUIZ_VERSION = "0.4.1";
 export const QUESTIONS: readonly QuizQuestion[] = [
   {
     title: "临行",
-    stem: "明日便要远行。今夜，你在做什么？",
+    stem: "明日便要远行。今夜，你要——",
     options: [
       {
-        text: "爬上屋顶看远处的山，满天星斗，只等天亮出发",
+        text: "远望山峦与群星，只等天亮出发",
         dims: { shanhe: 2, tianxiang: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["山"],
       },
       {
-        text: "陪家中老人喝茶，听那些讲了许多遍的旧事",
+        text: "掌一盏灯走过熟悉的街巷，与亲友道别",
         dims: { diangu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "在老树上刻下今天——不管多少年，总要回来刻第二道",
+        text: "在庭前老树上刻下记号，算作不知何时的归期",
         dims: { guangyin: 2, caomu: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "独坐空屋到深夜，想着一个不会来送你的人",
+        text: "独倚栏杆，想一个不会来送行的人",
         dims: { loutai: 2, qingsi: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -49,27 +49,27 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "行囊",
-    stem: "天亮出门前，你往行囊里多放了一样东西——",
+    stem: "出门前，你往行囊里多放了一样东西——",
     options: [
       {
-        text: "挂在堂上多年的那柄剑，终于取下来了",
+        text: "一柄挂在堂上多年的剑",
         dims: { qiyong: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["剑"],
       },
       {
-        text: "一截带着晨露的柳枝，插在哪里都能活",
+        text: "一截带着晨露的柳枝",
         dims: { caomu: 2, tianxiang: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["柳"],
       },
       {
-        text: "一封那人多年前的信，读了无数遍，还是要带上",
+        text: "一封珍藏多年的信",
         dims: { guangyin: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "一本前人的游记，写到的地方，如今大半已不在了",
+        text: "一本来自前朝的游记",
         dims: { diangu: 2, shanhe: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -80,23 +80,23 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "行至半途，忽然落起雨来。你会——",
     options: [
       {
-        text: "不躲了，淋着雨大步赶路——年少时不就该这样",
+        text: "迎着雨大步赶路，趁天色尚早，能走几里是几里",
         dims: { guangyin: 2, shanhe: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "躲进路边古寺，听老僧讲寺里的来历",
+        text: "躲进路边古寺，借机品读前人的碑刻",
         dims: { loutai: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "要一坛烈酒，和邻桌的陌生人对饮，骂这世道",
+        text: "在野店要一坛酒，与满身风尘的行客对饮",
         dims: { renjian: 2, qiyong: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["酒"],
       },
       {
-        text: "看着雨渐渐变成雪，落满路边的枯枝",
+        text: "停在荒野枯林边，看雨渐渐化作风雪，埋了来时的路",
         dims: { tianxiang: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雪"],
@@ -105,27 +105,27 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "歧路",
-    stem: "前面分出几条路。你走哪一条？",
+    stem: "前面分出几条路。你选择——",
     options: [
       {
-        text: "通往那座高楼的路，满院海棠，楼上正有人唱歌",
+        text: "尽头似有绿柳朱楼的那条，远远望去颇具气象",
         dims: { loutai: 2, caomu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["楼"],
       },
       {
-        text: "绕远的那条，经过儿时的村子，顺路和旧邻说说话",
+        text: "通向渡口集市的那条，或可一睹渔舟唱晚",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "逆着江水一路向北，去那座被攻破过的城关",
+        text: "沿着江水那条，去那座被攻破过的城关",
         dims: { shanhe: 2, loutai: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "那人当年离开时走的那条，那天也下着雨",
+        text: "雨幕无人那条，远方皆是一片模糊",
         dims: { qingsi: 2, tianxiang: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雨"],
@@ -134,7 +134,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "古城",
-    stem: "黄昏时分，你走进一座古城。最先去哪里？",
+    stem: "黄昏时分，你走进一座古城。最先去——",
     options: [
       {
         text: "城里正下初雪，去街上买串糖葫芦，看孩子们打雪仗",

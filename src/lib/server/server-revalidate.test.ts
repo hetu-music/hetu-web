@@ -20,6 +20,7 @@ import {
 import {
   refreshAudioPages,
   refreshImagery,
+  refreshQuizPool,
   refreshSongPages,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
@@ -114,5 +115,17 @@ describe("refreshImagery", () => {
     );
     // 重复的歌只清一次
     expect(purged().filter((p) => p === "/zh-CN/song/3")).toHaveLength(1);
+  });
+});
+
+describe("refreshQuizPool", () => {
+  it("只失效寻曲候选池标签，不清页面，也不提交 CDN", async () => {
+    const report = await refreshQuizPool();
+    expect(revalidateTag).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
+    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(purgeCloudflareCache).not.toHaveBeenCalled();
+    expect(purgeEdgeOneCache).not.toHaveBeenCalled();
+    expect(vi.mocked(purgeCloudFrontCache).mock.calls).toEqual([[[], []]]);
+    expect(report).toEqual({ failed: [] });
   });
 });

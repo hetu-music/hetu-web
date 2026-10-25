@@ -10,6 +10,10 @@ import {
   type SongEmotionErrorCode,
 } from "@/lib/server/service-emotions";
 import { isLlmConfigured } from "@/lib/server/llm";
+import {
+  refreshQuizPool,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -73,7 +77,8 @@ export const PUT = withAuth(
         input.emotion_ids,
         session.access_token,
       );
-      return NextResponse.json({ selected });
+      const purge = await refreshQuizPool();
+      return withPurgeStatus(NextResponse.json({ selected }), purge);
     } catch (e) {
       const code = (e as { code?: string }).code as SongEmotionErrorCode;
       if (code in ERROR_STATUS) {

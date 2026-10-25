@@ -146,6 +146,16 @@ export async function refreshImagery({
   });
 }
 
+/**
+ * 歌曲基调变了：基调目前只参与寻曲测验的匹配。
+ *
+ * 结果页按作答动态渲染，读的是候选池缓存；入口页只用到候选池的歌曲数，
+ * 与基调无关。所以只失效候选池标签，CDN 上没有要清的页面。
+ */
+export async function refreshQuizPool(): Promise<PurgeReport> {
+  return invalidate({ tags: [QUIZ_POOL_TAG] });
+}
+
 /** 部署后预热与外部同步脚本用：列表类页面和各项聚合数据 */
 export async function refreshPublicPages(): Promise<PurgeReport> {
   return invalidate({

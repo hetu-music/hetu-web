@@ -2,637 +2,239 @@
 
 import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
-import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
 import { useIntersection } from "@/hooks/ui/useIntersection";
+import { GRAY_PALETTE } from "@/lib/imagery/palette";
+import type { ImageryCloud, MotifDetail } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useTranslations } from "next-intl";
-
+import { useLocale, useTranslations } from "next-intl";
 import {
-  GRAY_PALETTE,
-  PALETTE_FULL,
-  PALETTE_TEXT,
-  sortLevel1Categories,
-} from "@/lib/imagery/palette";
-import React, {
-  memo,
   useCallback,
   useDeferredValue,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
-import ImageryDetailPanel, {
-  type SongResult,
-  UNKNOWN_LYRICIST,
-} from "./ImageryDetailPanel";
+import {
+  BracketButton,
+  CategoryButton,
+  HeroMarquee,
+  HeroTitle,
+  paletteAt,
+  seededShuffle,
+  VirtualCloud,
+  type CloudItem,
+} from "./cloud";
+import ImageryPanel from "./ImageryPanel";
 
-// ─── constants ────────────────────────────────────────────────────────────────
+type View = "motifs" | "words";
 
-const GAP_X_PX = 40; // gap-x-10 = 2.5rem = 40px
-const GAP_Y_PX = 24; // gap-y-6 = 1.5rem = 24px
 const MARQUEE_SAMPLE_SIZE = 90;
 
-// ─── types ────────────────────────────────────────────────────────────────────
-
-interface Props {
-  items: ImageryItem[];
-  categories: ImageryCategory[];
-}
-
-interface WordDisplayData {
-  item: ImageryItem;
-  paletteText: string;
-  paletteAccent: string;
-  fontSize: number;
-  breatheDuration: number;
-  breatheDelay: number;
-}
-
-// ─── row-grouping helpers ─────────────────────────────────────────────────────
-
-function estimateWordWidthPx(data: WordDisplayData): number {
-  // Chinese chars are approximately 1em wide in serif fonts
-  return Math.ceil(data.item.name.length * data.fontSize * 16);
-}
-
-function groupIntoRows(
-  words: WordDisplayData[],
-  containerWidth: number,
-): WordDisplayData[][] {
-  if (containerWidth <= 0 || words.length === 0) return [words];
-  const rows: WordDisplayData[][] = [];
-  let row: WordDisplayData[] = [];
-  let rowW = 0;
-  for (const word of words) {
-    const w = estimateWordWidthPx(word);
-    const needed = row.length === 0 ? w : w + GAP_X_PX;
-    if (row.length > 0 && rowW + needed > containerWidth) {
-      rows.push(row);
-      row = [word];
-      rowW = w;
-    } else {
-      row.push(word);
-      rowW += needed;
-    }
-  }
-  if (row.length > 0) rows.push(row);
-  return rows;
-}
-
-function estimateRowHeightPx(row: WordDisplayData[]): number {
-  if (!row?.length) return 80;
-  const maxFontSize = Math.max(...row.map((w) => w.fontSize));
-  return Math.ceil(maxFontSize * 16) + GAP_Y_PX;
-}
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-function calcFontSize(count: number, maxCount: number): number {
-  if (maxCount <= 1) return 1.0;
-  const ratio = Math.log(count + 1) / Math.log(maxCount + 1);
-  return 0.85 + ratio * 1.5;
-}
-
-function triggerHaptic(ms = 8) {
-  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate(ms);
-  }
-}
-
-/** 把选中的意象写进网址（?w=<id>），可以直接分享；用原生 history 改，不触发导航 */
-function syncWordParam(id: number | null) {
-  const url = new URL(window.location.href);
-  if (id === null) url.searchParams.delete("w");
-  else url.searchParams.set("w", String(id));
-  window.history.replaceState(null, "", url);
-}
-
-function seededShuffle<T>(list: T[], seed: number): T[] {
-  const result = [...list];
-  let currentSeed = seed || 1;
-
-  for (let i = result.length - 1; i > 0; i -= 1) {
-    currentSeed = (currentSeed * 1664525 + 1013904223) % 4294967296;
-    const nextIndex = currentSeed % (i + 1);
-    [result[i], result[nextIndex]] = [result[nextIndex], result[i]];
-  }
-
-  return result;
-}
-
-// ─── WordItem ─────────────────────────────────────────────────────────────────
-
-const WordItem = memo(function WordItem({
-  data,
-  rowWordIdx,
-  selectedItemId,
-}: {
-  data: WordDisplayData;
-  rowWordIdx: number;
-  selectedItemId: number | null;
-}) {
-  const t = useTranslations("common.imagery");
-  // Stagger words within the same row for a cascade effect on each new batch
-  const unfurlDelay = `${rowWordIdx * 80}ms`;
-  const isSelected = selectedItemId === data.item.id;
-  const hasSelection = selectedItemId !== null;
-
-  const glow = isSelected
-    ? `0 0 10px ${data.paletteAccent}cc, 0 0 26px ${data.paletteAccent}66, 0 0 55px ${data.paletteAccent}22`
-    : undefined;
-
-  return (
-    <div
-      className="relative"
-      style={{
-        opacity: hasSelection ? (isSelected ? 1 : 0.06) : 1,
-        transform: isSelected ? "scale(1.1)" : "scale(1)",
-        zIndex: isSelected ? 30 : undefined,
-        transition:
-          "opacity 0.8s ease, transform 0.8s cubic-bezier(0.16,1,0.3,1)",
-      }}
-    >
-      <div
-        className="relative group/word leading-none word-unfurl-anim"
-        style={{ "--unfurl-delay": unfurlDelay } as React.CSSProperties}
-      >
-        <button
-          data-item-id={data.item.id}
-          aria-label={t("ariaLabel", {
-            name: data.item.name,
-            count: data.item.count,
-          })}
-          className={`font-calligraphy leading-none transition-opacity duration-200 word-breathe-anim ${isSelected ? "word-breathe-force-run" : ""} ${data.paletteText} ${isSelected ? "opacity-100" : "opacity-70 hover:opacity-100"}`}
-          style={
-            {
-              fontSize: `${data.fontSize}rem`,
-              "--word-breathe-duration": `${data.breatheDuration}s`,
-              "--word-breathe-delay": `${data.breatheDelay}s`,
-              textShadow: glow,
-              transition: "text-shadow 0.4s ease, opacity 0.4s ease",
-            } as React.CSSProperties
-          }
-        >
-          {data.item.name}
-        </button>
-      </div>
-    </div>
-  );
-});
-
-// ─── CategoryButton ───────────────────────────────────────────────────────────
-
-const CategoryButton = memo(function CategoryButton({
-  isActive,
-  onClick,
-  label,
-  accentColor,
-}: {
-  isActive: boolean;
-  onClick: () => void;
-  label: React.ReactNode;
-  accentColor: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`group relative py-1.5 text-[14px] transition-all duration-700 font-serif whitespace-nowrap ${
-        isActive
-          ? "text-slate-900 dark:text-white tracking-[0.25em]"
-          : "text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 tracking-[0.2em] hover:tracking-[0.25em]"
-      }`}
-    >
-      {label}
-      <span
-        className={`absolute bottom-0 left-0 h-[1.5px] transition-all duration-1000 ease-out origin-left ${
-          isActive
-            ? "w-[calc(100%-0.25em)] scale-x-100 opacity-80"
-            : "w-[calc(100%-0.25em)] scale-x-0 opacity-0"
-        }`}
-        style={{
-          backgroundColor: accentColor,
-          boxShadow: isActive ? `0 1px 10px ${accentColor}22` : "none",
-        }}
-      />
-    </button>
-  );
-});
-
-// ─── main component ───────────────────────────────────────────────────────────
-
 /**
- * 平滑滚到 top，滚停了再调 done。只用在进页时的一次性跳转，不提供取消：
- * 作为 effect 的清理去取消，依赖一变就会把面板永远卡在不打开
- * 老 Safari 没有 scrollend，逐帧看位置：到了，或连续几帧不动（滚到底到不了），都算停
+ * 把面板状态写进网址：/imagery/<母题>?w=<写法>&view=words，可以直接分享；
+ * 用原生 history 改，不触发导航。关面板回到 /imagery
  */
-function smoothScrollThen(top: number, done: () => void) {
-  const target = Math.max(0, top);
-  if (Math.abs(window.scrollY - target) < 2) {
-    done();
-    return;
-  }
-  let raf = 0;
-  let last = -1;
-  let still = 0;
-  const stop = () => {
-    cancelAnimationFrame(raf);
-    clearTimeout(timer);
-    window.removeEventListener("scrollend", finish);
-  };
-  const finish = () => {
-    stop();
-    done();
-  };
-  const tick = () => {
-    const y = window.scrollY;
-    still = y === last ? still + 1 : 0;
-    last = y;
-    if (Math.abs(y - target) < 2 || still >= 6) finish();
-    else raf = requestAnimationFrame(tick);
-  };
-  window.addEventListener("scrollend", finish);
-  // 兜底：无论如何 1.5 秒后打开
-  const timer = setTimeout(finish, 1500);
-  window.scrollTo({ top: target, behavior: "smooth" });
-  raf = requestAnimationFrame(tick);
+function syncUrl(motifId: number | null, word: number | null, view: View) {
+  const url = new URL(window.location.href);
+  const base = url.pathname.replace(/(\/imagery)(\/\d+)?\/?$/, "$1");
+  url.pathname = motifId === null ? base : `${base}/${motifId}`;
+  url.search = "";
+  if (motifId !== null && word !== null)
+    url.searchParams.set("w", String(word));
+  if (view === "words") url.searchParams.set("view", "words");
+  window.history.replaceState(window.history.state, "", url);
 }
 
-export default function ImageryClient({ items, categories }: Props) {
+export default function ImageryClient({
+  cloud,
+  initialMotif,
+}: {
+  cloud: ImageryCloud;
+  /** 从 /imagery/<母题> 进来时，服务端已取好的面板内容 */
+  initialMotif: MotifDetail | null;
+}) {
   const t = useTranslations("common.imagery");
-  // ── category hierarchy ───────────────────────────────────────────────────
-  const catMap = useMemo(
-    () => new Map(categories.map((c) => [c.id, c])),
-    [categories],
-  );
+  const locale = useLocale();
+  const [view, setView] = useState<View>("motifs");
+  const [l1, setL1] = useState<number | null>(null);
+  const [l2, setL2] = useState<number | null>(null);
+  const deferredL1 = useDeferredValue(l1);
+  const deferredL2 = useDeferredValue(l2);
 
-  const level1Categories = useMemo(
-    () => sortLevel1Categories(categories),
-    [categories],
-  );
-
-  const l1ColorIndex = useMemo(() => {
-    const m = new Map<number, number>();
-    level1Categories.forEach((cat, i) =>
-      m.set(cat.id, i % PALETTE_FULL.length),
-    );
-    return m;
-  }, [level1Categories]);
-
-  const itemToL1 = useMemo(() => {
-    const m = new Map<number, ImageryCategory | null>();
-    for (const item of items) {
-      let found: ImageryCategory | null = null;
-      for (const catId of item.categoryIds) {
-        const l3 = catMap.get(catId);
-        if (!l3?.parent_id) continue;
-        const l2 = catMap.get(l3.parent_id);
-        if (!l2?.parent_id) continue;
-        const l1 = catMap.get(l2.parent_id);
-        if (l1) {
-          found = l1;
-          break;
-        }
-      }
-      m.set(item.id, found);
-    }
-    return m;
-  }, [items, catMap]);
-
-  const itemToL2 = useMemo(() => {
-    const m = new Map<number, ImageryCategory | null>();
-    for (const item of items) {
-      let found: ImageryCategory | null = null;
-      for (const catId of item.categoryIds) {
-        const l3 = catMap.get(catId);
-        if (!l3?.parent_id) continue;
-        const l2 = catMap.get(l3.parent_id);
-        if (l2) {
-          found = l2;
-          break;
-        }
-      }
-      m.set(item.id, found);
-    }
-    return m;
-  }, [items, catMap]);
-
-  // ── state ────────────────────────────────────────────────────────────────
-  const [activeL1Id, setActiveL1Id] = useState<number | null>(null);
-  // Deferred: filter button highlights immediately; cloud re-renders in background
-  const deferredActiveL1Id = useDeferredValue(activeL1Id);
-  const [activeL2Id, setActiveL2Id] = useState<number | null>(null);
-  const deferredActiveL2Id = useDeferredValue(activeL2Id);
-
-  // L2 sub-categories visible when a L1 is selected
-  const level2Categories = useMemo(
-    () =>
-      activeL1Id === null
-        ? []
-        : categories
-            .filter((c) => c.level === 2 && c.parent_id === activeL1Id)
-            .sort((a, b) => a.name.localeCompare(b.name, "zh")),
-    [categories, activeL1Id],
-  );
-  const [selectedItem, setSelectedItem] = useState<ImageryItem | null>(null);
+  // 星：词云里亮着的那一个（母题视图是母题，全部词视图是词）
+  const [star, setStar] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [panelSide, setPanelSide] = useState<"left" | "right">("right");
-  const [hoveredData, setHoveredData] = useState<{
-    itemId: number;
-    count: number;
-    accent: string;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [side, setSide] = useState<"left" | "right">("right");
+  const [motifId, setMotifId] = useState<number | null>(
+    initialMotif?.id ?? null,
+  );
+  const [word, setWord] = useState<number | null>(null);
+  const [reveal, setReveal] = useState<{ id: number; key: number } | null>(
+    null,
+  );
 
-  const isDesktop = useIsDesktop();
-  const cloudRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(960);
-  const [widthMeasured, setWidthMeasured] = useState(false);
-  const [scrollMargin, setScrollMargin] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const [marqueeSeed, setMarqueeSeed] = useState(0);
-  const { ref: headerRef, entry: headerEntry } = useIntersection<HTMLElement>({
+  const [seed, setSeed] = useState(0);
+  const { ref: headerRef, entry } = useIntersection<HTMLElement>({
     threshold: 0.05,
   });
-  const headerVisible = headerEntry?.isIntersecting ?? true;
 
-  // Trigger entrance animation after first paint
+  const motifs = useMemo(() => cloud.groups.flatMap((g) => g.motifs), [cloud]);
+  const wordMotif = useMemo(
+    () => new Map(cloud.words.map((w) => [w.id, w.motif])),
+    [cloud.words],
+  );
+
+  // 进页。?view 与 ?w 在浏览器里读，页面才能整页缓存：
+  // - /imagery/<母题>：点亮它、滚过去、展开面板；?w 是预先选中的写法
+  // - /imagery?w=<词>：旧链接，打开这个词所属的母题
   useEffect(() => {
     requestAnimationFrame(() => {
       setMounted(true);
-      setMarqueeSeed(Math.floor(Math.random() * 2147483647));
+      setSeed(Math.floor(Math.random() * 2147483647));
+      const params = new URLSearchParams(window.location.search);
+      const v: View = params.get("view") === "words" ? "words" : "motifs";
+      const w = Number(params.get("w")) || null;
+      setView(v);
+
+      const mid = initialMotif?.id ?? (w !== null ? wordMotif.get(w) : null);
+      if (mid == null) return;
+      const pick =
+        w !== null &&
+        (!initialMotif || initialMotif.words.some((x) => x.id === w))
+          ? w
+          : null;
+      // 全部词视图里代表母题的词：选中的写法，或归在它名下、写得最多的那个
+      const s =
+        v === "motifs"
+          ? mid
+          : (pick ?? cloud.words.find((x) => x.motif === mid)?.id ?? null);
+      setMotifId(mid);
+      setWord(pick);
+      if (s !== null) {
+        setStar(s);
+        setReveal({ id: s, key: Date.now() });
+      }
+      setPanelOpen(true);
+      syncUrl(mid, pick, v);
     });
-  }, []);
+  }, [initialMotif, wordMotif, cloud.words]);
 
-  // ── precomputed display data ──────────────────────────────────────────────
-  const maxCount = useMemo(
-    () => Math.max(...items.map((i) => i.count), 1),
-    [items],
-  );
-
-  const wordDisplayList = useMemo(() => {
-    let list: ImageryItem[];
-    if (deferredActiveL2Id !== null) {
-      list = items.filter(
-        (item) => itemToL2.get(item.id)?.id === deferredActiveL2Id,
-      );
-    } else if (deferredActiveL1Id !== null) {
-      list = items.filter(
-        (item) => itemToL1.get(item.id)?.id === deferredActiveL1Id,
-      );
-    } else {
-      list = items;
-    }
-    return [...list]
-      .sort((a, b) => b.count - a.count)
-      .map((item, idx) => {
-        const l1 = itemToL1.get(item.id) ?? null;
-        const colorIdx = l1 ? (l1ColorIndex.get(l1.id) ?? 0) : -1;
-        const paletteText =
-          colorIdx >= 0 ? PALETTE_TEXT[colorIdx] : GRAY_PALETTE.text;
-        const paletteAccent =
-          colorIdx >= 0 ? PALETTE_FULL[colorIdx].accent : GRAY_PALETTE.accent;
-        return {
-          item,
-          paletteText,
-          paletteAccent,
-          fontSize: calcFontSize(item.count, maxCount),
-          breatheDuration: 5.5 + (idx % 7) * 0.6,
-          breatheDelay: (idx % 13) * 0.35,
-        };
-      });
-  }, [
-    items,
-    deferredActiveL1Id,
-    deferredActiveL2Id,
-    itemToL1,
-    itemToL2,
-    l1ColorIndex,
-    maxCount,
-  ]);
-
-  const marqueeRows = useMemo(() => {
-    const sampled = seededShuffle(items, marqueeSeed).slice(
-      0,
-      MARQUEE_SAMPLE_SIZE,
-    );
-    return [sampled.slice(0, 30), sampled.slice(30, 60), sampled.slice(60, 90)];
-  }, [items, marqueeSeed]);
-
-  // ── selected item helpers ─────────────────────────────────────────────────
-  const selectedCategoryPath = useMemo(() => {
-    if (!selectedItem) return [];
-    const catId = selectedItem.categoryIds[0];
-    if (!catId) return [];
-    const l3 = catMap.get(catId);
-    if (!l3) return [];
-    const l2 = l3.parent_id ? catMap.get(l3.parent_id) : null;
-    const l1 = l2?.parent_id ? catMap.get(l2.parent_id) : null;
-    return [l1?.name, l2?.name, l3.name].filter(Boolean) as string[];
-  }, [selectedItem, catMap]);
-
-  const songsQuery = useQuery({
-    queryKey: ["imagery", "songs", selectedItem?.id],
-    queryFn: async (): Promise<SongResult[]> => {
-      if (!selectedItem) {
-        return [];
-      }
-
-      const response = await fetch(`/api/imagery/${selectedItem.id}/songs`);
-      if (!response.ok) {
-        throw new Error(t("loadError"));
-      }
-
-      const data: { songs?: SongResult[] } = await response.json();
-      return data.songs ?? [];
+  const motifQuery = useQuery({
+    queryKey: ["imagery", "motif", motifId, locale],
+    queryFn: async (): Promise<MotifDetail> => {
+      const query = locale === "zh-TW" ? "?locale=zh-TW" : "";
+      const res = await fetch(`/api/imagery/motifs/${motifId}${query}`);
+      if (!res.ok) throw new Error(t("panel.loadError"));
+      const body: { motif: MotifDetail } = await res.json();
+      return body.motif;
     },
-    enabled: panelOpen && !!selectedItem,
+    enabled: motifId !== null,
+    initialData:
+      initialMotif && motifId === initialMotif.id ? initialMotif : undefined,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 
-  const songs = useMemo(() => songsQuery.data ?? [], [songsQuery.data]);
-  const songsLoading = songsQuery.isPending;
-
-  const lyricistCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    songs.forEach((song) => {
-      const lyricists = song.lyricist ?? [];
-      if (lyricists.length === 0) {
-        counts.set(UNKNOWN_LYRICIST, (counts.get(UNKNOWN_LYRICIST) ?? 0) + 1);
-      } else {
-        lyricists.forEach((l) => counts.set(l, (counts.get(l) ?? 0) + 1));
-      }
-    });
-    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [songs]);
-
-  const selectedPalette = useMemo(() => {
-    if (!selectedItem) return GRAY_PALETTE;
-    const l1 = itemToL1.get(selectedItem.id);
-    const colorIdx = l1 ? (l1ColorIndex.get(l1.id) ?? 0) : -1;
-    return colorIdx >= 0 ? PALETTE_FULL[colorIdx] : GRAY_PALETTE;
-  }, [selectedItem, itemToL1, l1ColorIndex]);
-
-  // ── effects ──────────────────────────────────────────────────────────────
-
-  // Measure cloud container width for row grouping
-  useEffect(() => {
-    const el = cloudRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setContainerWidth(entry.contentRect.width);
-    });
-    ro.observe(el);
-    setContainerWidth(el.getBoundingClientRect().width);
-    setWidthMeasured(true);
-    return () => ro.disconnect();
-  }, []);
-
-  // Measure scroll margin (distance from doc top to cloud container top)
-  useLayoutEffect(() => {
-    const update = () => {
-      if (cloudRef.current) {
-        setScrollMargin(
-          cloudRef.current.getBoundingClientRect().top + window.scrollY,
-        );
-      }
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [wordDisplayList.length]);
-
-  // ── virtualizer ──────────────────────────────────────────────────────────
-
-  const wordRows = useMemo(
-    () => groupIntoRows(wordDisplayList, containerWidth),
-    [wordDisplayList, containerWidth],
+  // ── 词云 ──
+  const l2Options = useMemo(
+    () =>
+      l1 === null
+        ? []
+        : cloud.groups
+            .filter((g) => g.l1 === l1)
+            .map((g) => ({ id: g.id, name: g.name })),
+    [cloud, l1],
   );
 
-  const rowVirtualizer = useWindowVirtualizer({
-    count: wordRows.length,
-    estimateSize: useCallback(
-      (i: number) => estimateRowHeightPx(wordRows[i] ?? []),
-      [wordRows],
-    ),
-    overscan: 8,
-    scrollMargin,
-  });
-
-  // ── handlers ─────────────────────────────────────────────────────────────
-
-  // O(1) lookup: item id → WordDisplayData, rebuilt when filtered list changes
-  const itemLookup = useMemo(() => {
-    const map = new Map<number, WordDisplayData>();
-    wordDisplayList.forEach((d) => map.set(d.item.id, d));
-    return map;
-  }, [wordDisplayList]);
-
-  const handleCloudClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>(
-        "button[data-item-id]",
-      );
-      if (!btn) return;
-      const itemId = Number(btn.dataset.itemId);
-      const d = itemLookup.get(itemId);
-      if (!d) return;
-      triggerHaptic();
-      const rect = btn.getBoundingClientRect();
-      const clickX = rect.left + rect.width / 2;
-      const cloudRect = cloudRef.current?.getBoundingClientRect();
-      const cloudRight = cloudRect ? cloudRect.right : window.innerWidth;
-      setPanelSide(clickX > (cloudRight * 3) / 4 ? "left" : "right");
-      setSelectedItem(d.item);
-      setPanelOpen(true);
-      syncWordParam(d.item.id);
-      // Dismiss tooltip immediately when panel opens
-      hoveredBtnRef.current = null;
-      setHoveredData(null);
-    },
-    [itemLookup],
-  );
-
-  // Keep a ref in sync with panelOpen so mouse handlers avoid stale closures
-  const panelOpenRef = useRef(panelOpen);
-  useEffect(() => {
-    panelOpenRef.current = panelOpen;
-  }, [panelOpen]);
-
-  const hoveredBtnRef = useRef<number | null>(null);
-
-  const handleCloudMouseOver = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (panelOpenRef.current) return;
-      const btn = (e.target as HTMLElement).closest<HTMLElement>(
-        "button[data-item-id]",
-      );
-      if (!btn) return;
-      const itemId = Number(btn.dataset.itemId);
-      if (hoveredBtnRef.current === itemId) return;
-      // eslint-disable-next-line react-hooks/immutability
-      hoveredBtnRef.current = itemId;
-      const d = itemLookup.get(itemId);
-      if (!d) return;
-      const rect = btn.getBoundingClientRect();
-      setHoveredData({
-        itemId,
-        count: d.item.count,
-        accent: d.paletteAccent,
-        x: rect.left + rect.width / 2,
-        y: rect.top,
-      });
-    },
-    [itemLookup],
-  );
-
-  const handleCloudMouseLeave = useCallback(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    hoveredBtnRef.current = null;
-    setHoveredData(null);
-  }, []);
-
-  const handleClose = useCallback(() => {
-    setPanelOpen(false);
-    syncWordParam(null);
-  }, []);
-
-  // 从网址 ?w=<意象id> 进来（如歌曲页的意象书眉）：先把这个词滚到视口中间，
-  // 再打开它的面板。要等容器宽度量好、分好行，滚动位置才准，所以只在那之后做一次
-  const deepLinkDone = useRef(false);
-  useEffect(() => {
-    if (deepLinkDone.current || !widthMeasured || scrollMargin === 0) return;
-    deepLinkDone.current = true;
-    const id = Number(new URLSearchParams(window.location.search).get("w"));
-    if (!id) return;
-    const rowIndex = wordRows.findIndex((row) =>
-      row.some((d) => d.item.id === id),
-    );
-    const item = items.find((i) => i.id === id);
-    if (rowIndex < 0 || !item) {
-      syncWordParam(null);
-      return;
+  const items: CloudItem[] = useMemo(() => {
+    const inScope = (x: { l1: number; l2: number }) =>
+      deferredL2 !== null
+        ? x.l2 === deferredL2
+        : deferredL1 === null || x.l1 === deferredL1;
+    if (view === "words") {
+      return cloud.words.filter(inScope).map((w) => ({
+        id: w.id,
+        name: w.name,
+        count: w.songCount,
+        palette: w.palette,
+      }));
     }
-    const open = () => {
-      // 行高是边滚边量的，按估算滚过去可能差一点；停下后附近的行都量过了，再校正一次
-      rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
-      requestAnimationFrame(() => {
-        setPanelSide("right");
-        setSelectedItem(item);
-        setPanelOpen(true);
-      });
-    };
-    const target = rowVirtualizer.getOffsetForIndex(rowIndex, "center")?.[0];
-    if (target === undefined) open();
-    else smoothScrollThen(target, open);
-  }, [widthMeasured, scrollMargin, wordRows, items, rowVirtualizer]);
+    return motifs
+      .filter(inScope)
+      .sort((a, b) => b.songCount - a.songCount)
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        count: m.songCount,
+        palette: m.palette,
+      }));
+  }, [cloud.words, motifs, view, deferredL1, deferredL2]);
 
-  // ── render ────────────────────────────────────────────────────────────────
+  const motifWordCount = useMemo(
+    () => new Map(motifs.map((m) => [m.id, m.wordCount])),
+    [motifs],
+  );
+  const tooltip = useCallback(
+    (item: CloudItem) =>
+      view === "motifs"
+        ? t("motifTooltip", {
+            count: item.count,
+            words: motifWordCount.get(item.id) ?? 0,
+          })
+        : t("wordTooltip", { count: item.count }),
+    [view, motifWordCount, t],
+  );
+  const ariaLabel = useCallback(
+    (item: CloudItem) => t("ariaLabel", { name: item.name, count: item.count }),
+    [t],
+  );
+
+  // ── 交互 ──
+  const onSelect = useCallback(
+    (id: number, from: "left" | "right") => {
+      const mid = view === "motifs" ? id : (wordMotif.get(id) ?? null);
+      if (mid === null) return;
+      const w = view === "words" ? id : null;
+      setSide(from);
+      setStar(id);
+      setMotifId(mid);
+      setWord(w);
+      setPanelOpen(true);
+      syncUrl(mid, w, view);
+    },
+    [view, wordMotif],
+  );
+
+  const onWord = useCallback(
+    (w: number | null) => {
+      setWord(w);
+      syncUrl(motifId, w, view);
+    },
+    [motifId, view],
+  );
+
+  const onClose = useCallback(() => {
+    setPanelOpen(false);
+    setStar(null);
+    syncUrl(null, null, view);
+  }, [view]);
+
+  const switchView = (next: View) => {
+    if (next === view) return;
+    setView(next);
+    setPanelOpen(false);
+    setStar(null);
+    syncUrl(null, null, next);
+  };
+
+  const marqueeRows = useMemo(() => {
+    const sample = seededShuffle(cloud.words, seed)
+      .slice(0, MARQUEE_SAMPLE_SIZE)
+      .map((w) => w.name);
+    return [sample.slice(0, 30), sample.slice(30, 60), sample.slice(60, 90)];
+  }, [cloud.words, seed]);
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-slate-800 dark:text-slate-200">
       <TopBar exit={{ kind: "logo" }} />
@@ -643,77 +245,23 @@ export default function ImageryClient({ items, categories }: Props) {
         className="relative overflow-hidden pt-32 pb-12 px-6 text-center"
       >
         <div className="relative z-10">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-1/2 z-0 flex -translate-y-1/2 select-none flex-col justify-center gap-5 overflow-hidden opacity-[0.045] dark:opacity-[0.055]"
-          >
-            {(
-              [
-                {
-                  d: "42s",
-                  m: "10s",
-                  dir: "imagery-marquee-ltr",
-                  size: "text-2xl md:text-4xl",
-                },
-                {
-                  d: "60s",
-                  m: "15s",
-                  dir: "imagery-marquee-rtl",
-                  size: "text-xl md:text-3xl",
-                },
-                {
-                  d: "78s",
-                  m: "20s",
-                  dir: "imagery-marquee-ltr",
-                  size: "text-lg md:text-2xl",
-                },
-              ] as const
-            ).map(({ d, m, dir, size }, ri) => {
-              const rowWords = marqueeRows[ri % marqueeRows.length] || [];
-              const duration = isDesktop ? d : m;
-              return (
-                <div
-                  key={ri}
-                  className="flex whitespace-nowrap font-calligraphy will-change-transform"
-                  style={{
-                    animationName: dir,
-                    animationDuration: duration,
-                    animationTimingFunction: "linear",
-                    animationIterationCount: "infinite",
-                    animationPlayState: headerVisible ? "running" : "paused",
-                  }}
-                >
-                  {[...rowWords, ...rowWords].map((w, i) => (
-                    <span
-                      key={i}
-                      className={`${size} mx-5 text-slate-900 dark:text-white`}
-                    >
-                      {w.name}
-                    </span>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-
-          <h1 className="font-serif text-5xl md:text-7xl text-slate-800 dark:text-slate-100 mb-4 flex justify-center items-center gap-4 sm:gap-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.05)]">
-            {t("title")
-              .split("")
-              .map((char, i) => (
-                <span
-                  key={i}
-                  className={`hero-title-char inline-block ${mounted ? "" : "opacity-0"}`}
-                  style={{ animationDelay: `${i * 300}ms` }}
-                >
-                  {char}
-                </span>
-              ))}
-          </h1>
+          <HeroMarquee
+            rows={marqueeRows}
+            running={entry?.isIntersecting ?? true}
+          />
+          <HeroTitle
+            text={t("title")}
+            mounted={mounted}
+            className="font-serif text-5xl md:text-7xl text-slate-800 dark:text-slate-100 mb-4 flex justify-center items-center gap-4 sm:gap-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.05)]"
+          />
           <p
             className={`font-kaiti text-base md:text-xl text-slate-500 dark:text-slate-400 tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
             style={{ animationDelay: "1650ms" }}
           >
-            {t("subtitle", { count: wordDisplayList.length })}
+            {t("subtitle", {
+              motifs: cloud.motifCount,
+              words: cloud.words.length,
+            })}
           </p>
         </div>
       </header>
@@ -721,100 +269,83 @@ export default function ImageryClient({ items, categories }: Props) {
       {/* ── category filter ── */}
       <div className="sticky top-(--nav-h) z-20 bg-[#FAFAFA]/40 dark:bg-[#0B0F19]/40 backdrop-blur-2xl border-b border-slate-200/10 dark:border-slate-800/20 transition-all duration-1000">
         <div className="max-w-5xl mx-auto px-6 py-2.5">
-          {/* L1 filter row */}
           <div className="flex items-center gap-8 overflow-x-auto no-scrollbar py-1 mask-linear-fade-edges">
-            {/* Start spacer for mask */}
             <div className="min-w-2" />
-
             <CategoryButton
               label={t("all")}
-              isActive={activeL1Id === null}
+              isActive={l1 === null}
               onClick={() => {
-                setActiveL1Id(null);
-                setActiveL2Id(null);
+                setL1(null);
+                setL2(null);
               }}
               accentColor={GRAY_PALETTE.accent}
             />
-
-            {level1Categories.map((cat, i) => {
-              const palette = PALETTE_FULL[i % PALETTE_FULL.length];
-              const isActive = activeL1Id === cat.id;
+            {cloud.l1.map((c) => {
+              const active = l1 === c.id;
               return (
-                <div key={cat.id} className="flex items-center gap-8">
+                <div key={c.id} className="flex items-center gap-8">
                   <div className="w-[0.5px] h-3 bg-slate-200/50 dark:bg-slate-800/30 rotate-12" />
                   <CategoryButton
-                    label={cat.name}
-                    isActive={isActive}
+                    label={c.name}
+                    isActive={active}
                     onClick={() => {
-                      setActiveL1Id(isActive ? null : cat.id);
-                      setActiveL2Id(null);
+                      setL1(active ? null : c.id);
+                      setL2(null);
                     }}
-                    accentColor={palette.accent}
+                    accentColor={paletteAt(c.palette).accent}
                   />
                 </div>
               );
             })}
-
-            {/* End spacer for mask */}
+            {/* 视图：母题 / 全部词 */}
+            <div className="ml-auto flex items-center gap-2 pl-6">
+              <BracketButton
+                label={t("views.motifs")}
+                size="text-[13px]"
+                isActive={view === "motifs"}
+                onClick={() => switchView("motifs")}
+                accentColor={GRAY_PALETTE.accent}
+              />
+              <BracketButton
+                label={t("views.words")}
+                size="text-[13px]"
+                isActive={view === "words"}
+                onClick={() => switchView("words")}
+                accentColor={GRAY_PALETTE.accent}
+              />
+            </div>
             <div className="min-w-2" />
           </div>
 
-          {/* L2 sub-filter row — calligraphic list */}
+          {/* L2 sub-filter row */}
           <div
-            className={`grid transition-[grid-template-rows,opacity,margin] duration-1000 ease-[cubic-bezier(0.19,1,0.22,1)] ${level2Categories.length > 0 ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"}`}
+            className={`grid transition-[grid-template-rows,opacity,margin] duration-1000 ease-[cubic-bezier(0.19,1,0.22,1)] ${l2Options.length > 0 ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"}`}
           >
             <div className="overflow-hidden">
               <div className="grid grid-cols-3 sm:flex sm:items-center gap-y-4 gap-x-6 sm:gap-6 sm:flex-wrap pt-3 border-t border-slate-200/20 dark:border-slate-800/10">
-                {/* On desktop, we keep the spacer; on mobile grid, we skip it or use it as a grid item if needed.
-                    Actually, let's keep it and adjust the grid flow. */}
                 <div className="hidden sm:block min-w-2" />
-
-                {level2Categories.map((cat) => {
-                  const isActive = activeL2Id === cat.id;
-                  const l1Idx =
-                    activeL1Id !== null
-                      ? (l1ColorIndex.get(activeL1Id) ?? 0)
-                      : 0;
-                  const palette = PALETTE_FULL[l1Idx % PALETTE_FULL.length];
-
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => setActiveL2Id(isActive ? null : cat.id)}
-                      className={`group relative text-[12px] transition-all duration-700 font-serif tracking-widest whitespace-nowrap py-1 ${
-                        isActive
-                          ? "text-slate-700 dark:text-slate-300"
-                          : "text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 hover:tracking-[0.15em]"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block transition-all duration-700 ${isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"} mr-1.5`}
-                        style={{ color: palette.accent }}
-                      >
-                        「
-                      </span>
-                      {cat.name}
-                      <span
-                        className={`inline-block transition-all duration-700 ${isActive ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"} ml-1.5`}
-                        style={{ color: palette.accent }}
-                      >
-                        」
-                      </span>
-                      {/* Subtle hover indicator for L2 */}
-                      <span
-                        className={`absolute -bottom-1 left-0 w-full h-[0.5px] bg-slate-300 dark:bg-slate-700 scale-x-0 transition-transform duration-500 group-hover:scale-x-100`}
-                      />
-                    </button>
-                  );
-                })}
+                {l2Options.map((c) => (
+                  <BracketButton
+                    key={c.id}
+                    label={c.name}
+                    isActive={l2 === c.id}
+                    onClick={() => setL2(l2 === c.id ? null : c.id)}
+                    accentColor={
+                      paletteAt(
+                        cloud.l1.find((x) => x.id === l1)?.palette ?? -1,
+                      ).accent
+                    }
+                  />
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── word cloud ── */}
+      {/* ── cloud ── */}
       <main
+        key={view}
         className={`max-w-5xl mx-auto px-8 py-16 min-h-[40vh] ${mounted ? "" : "opacity-0"}`}
         style={
           mounted
@@ -825,107 +356,47 @@ export default function ImageryClient({ items, categories }: Props) {
             : undefined
         }
       >
-        {wordDisplayList.length === 0 ? (
+        {items.length === 0 ? (
           <div className="text-center font-kaiti text-sm py-24 text-slate-400 dark:text-slate-500">
             {t("noData")}
           </div>
         ) : (
           <>
-            {/* Virtual word cloud: position:relative container whose height equals all rows */}
-            <div
-              ref={cloudRef}
-              onClick={handleCloudClick}
-              onMouseOver={handleCloudMouseOver}
-              onMouseLeave={handleCloudMouseLeave}
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                position: "relative",
-              }}
-            >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const row = wordRows[virtualRow.index];
-                if (!row) return null;
-                return (
-                  <div
-                    key={virtualRow.key}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
-                    }}
-                    className="flex justify-center items-center gap-x-10 pb-6"
-                  >
-                    {row.map((data, wordIdx) => (
-                      <WordItem
-                        key={data.item.id}
-                        data={data}
-                        rowWordIdx={wordIdx}
-                        selectedItemId={
-                          panelOpen ? (selectedItem?.id ?? null) : null
-                        }
-                      />
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Tooltip — count only, desktop only, tinted with the word's accent color */}
-            {hoveredData && isDesktop && (
-              <div
-                key={hoveredData.itemId}
-                className="fixed z-60 pointer-events-none"
-                style={{
-                  left: hoveredData.x,
-                  top: hoveredData.y - 8,
-                  transform: "translate(-50%, -100%)",
-                }}
-              >
-                <div
-                  className="px-2.5 py-1 rounded-full text-xs tracking-wider font-serif font-light whitespace-nowrap shadow-sm backdrop-blur-sm tooltip-appear"
-                  style={{
-                    backgroundColor: `${hoveredData.accent}22`,
-                    color: hoveredData.accent,
-                    border: `1px solid ${hoveredData.accent}44`,
-                  }}
-                >
-                  {t("times", { count: hoveredData.count })}
-                </div>
-              </div>
-            )}
-
-            {/* Total count */}
+            <VirtualCloud
+              items={items}
+              selectedId={panelOpen ? star : null}
+              onSelect={onSelect}
+              tooltip={tooltip}
+              ariaLabel={ariaLabel}
+              reveal={reveal}
+              onReveal={setSide}
+            />
             <div className="mt-12 flex justify-center">
               <p className="text-xs text-slate-300 dark:text-slate-700 tracking-[0.2em] select-none font-serif">
-                {t("totalCount", { count: wordDisplayList.length })}
+                {view === "motifs"
+                  ? t("motifTotal", { count: items.length })
+                  : t("wordTotal", { count: items.length })}
               </p>
             </div>
           </>
         )}
       </main>
 
-      {/* ── footer ── */}
       <footer className="max-w-5xl mx-auto px-8 pb-12">
         <div className="border-t border-slate-100 dark:border-slate-800 pt-8 text-center">
           <SiteMark />
         </div>
       </footer>
 
-      {/* ── Detail panel (desktop slide-in / mobile drawer) ── */}
-      <ImageryDetailPanel
+      <ImageryPanel
         open={panelOpen}
-        panelSide={panelSide}
-        selectedItem={selectedItem}
-        selectedPalette={selectedPalette}
-        selectedCategoryPath={selectedCategoryPath}
-        songs={songs}
-        songsLoading={songsLoading}
-        lyricistCounts={lyricistCounts}
-        onClose={handleClose}
+        side={side}
+        motif={motifQuery.data ?? null}
+        loading={motifQuery.isPending}
+        error={motifQuery.isError}
+        word={word}
+        onWord={onWord}
+        onClose={onClose}
       />
     </div>
   );

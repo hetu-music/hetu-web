@@ -29,7 +29,7 @@ const PUBLIC_CACHEABLE_API = [
   /^\/api\/public\/songs\/lyrics-index$/,
   /^\/api\/public\/songs\/\d+\/lyrics$/,
   /^\/api\/public\/contributors$/,
-  /^\/api\/imagery\/\d+\/songs$/,
+  /^\/api\/imagery\/motifs\/\d+$/,
 ];
 
 // 旧版本 SW 把全部 /api/** 写进了 "api-data"，其中可能残留上一个登录

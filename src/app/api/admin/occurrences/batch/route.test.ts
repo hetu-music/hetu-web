@@ -73,20 +73,20 @@ describe("POST /api/admin/occurrences/batch", () => {
     );
   });
 
-  it("写入后按这首歌现有的标注刷新缓存", async () => {
+  it("写入后按这首歌现有标注的母题刷新缓存", async () => {
     vi.mocked(createOccurrencesBatch).mockResolvedValue({
       created: 1,
       skipped: 0,
       newImagery: 0,
     });
     vi.mocked(getOccurrencesForSong).mockResolvedValue([
-      { imagery_id: 1 },
-      { imagery_id: 7 },
+      { imagery_id: 1, category_id: 30 },
+      { imagery_id: 7, category_id: 31 },
     ] as Awaited<ReturnType<typeof getOccurrencesForSong>>);
     await POST(post({ song_id: 5, items: [validItem] }));
     expect(refreshImagery).toHaveBeenCalledWith({
       songIds: [5],
-      imageryIds: [1, 7],
+      motifIds: [30, 31],
     });
   });
 

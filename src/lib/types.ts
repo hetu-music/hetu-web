@@ -80,6 +80,8 @@ export interface SongDetailClientProps {
 export interface SongImageryMark {
   id: number;
   name: string;
+  /** 这个词在本曲所指的母题，意象词云里按它打开面板 */
+  motifId: number;
   /** 一级 → 末级分类名 */
   path: string[];
   /** 一级分类配色 */
@@ -101,6 +103,85 @@ export interface RelatedSong {
 export interface SongImageryView {
   marks: SongImageryMark[];
   related: RelatedSong[];
+}
+
+// 意象词云：以母题为单位（见 IMAGERY.md）。palette 是 PALETTE_FULL 的下标，-1 为灰
+export interface CloudMotif {
+  id: number;
+  name: string;
+  l1: number;
+  l2: number;
+  palette: number;
+  songCount: number;
+  /** 这个母题下有几种写法 */
+  wordCount: number;
+}
+
+export interface CloudWord {
+  id: number;
+  name: string;
+  /** 写到这个词的作品数，多义词各母题合计 */
+  songCount: number;
+  /** 作品最多的那个母题：点这个词时打开它的面板 */
+  motif: number;
+  l1: number;
+  l2: number;
+  palette: number;
+}
+
+export interface CloudMotifGroup {
+  /** 二级分类 */
+  id: number;
+  name: string;
+  l1: number;
+  palette: number;
+  motifs: CloudMotif[];
+}
+
+export interface ImageryCloud {
+  l1: Array<{ id: number; name: string; palette: number }>;
+  groups: CloudMotifGroup[];
+  words: CloudWord[];
+  motifCount: number;
+}
+
+export interface MotifWord {
+  id: number;
+  name: string;
+  songCount: number;
+}
+
+export interface MotifWork {
+  id: number;
+  title: string;
+  year: string | null;
+  lyricist: string[] | null;
+  /** 本曲在这个母题下用到的写法 */
+  wordIds: number[];
+}
+
+export interface MotifLink {
+  id: number;
+  name: string;
+  palette: number;
+  /** 一起写到的作品数 */
+  both: number;
+  /** 是随机情况的几倍 */
+  lift: number;
+}
+
+export interface MotifDetail {
+  id: number;
+  name: string;
+  /** 一级、二级分类名 */
+  path: string[];
+  palette: number;
+  description: string | null;
+  songCount: number;
+  words: MotifWord[];
+  works: MotifWork[];
+  /** 常与之同写；面板不展示，留给以后的母题关系图 */
+  cowritten: MotifLink[];
 }
 
 // 评点：详情页上的批注
@@ -212,12 +293,6 @@ export type Emotion = {
   /** 情绪的强弱 */
   energy: "扬" | "抑";
   sort: number;
-};
-
-export type SongRef = {
-  id: number;
-  title: string;
-  lyricist: string[] | null;
 };
 
 // 歌曲字段配置类型（用于管理页面表单渲染和校验）

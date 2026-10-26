@@ -130,18 +130,26 @@ export async function refreshAudioPages(
 }
 
 /**
- * 意象标注变了：详情页的意象与相关作品、意象页、寻曲候选池都由标注聚合而来。
+ * 意象标注变了：详情页的意象与相关作品、意象词云、寻曲候选池都由标注聚合而来。
  *
- * 标签让 Next 上的全部详情页失效（相关作品会牵动别的歌）；CDN 上只清
- * 列出来的歌，以及这些意象的歌曲列表接口。
+ * 标签让 Next 上的全部详情页与母题页失效（相关作品、作品数会牵动别处）；CDN 上只清
+ * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等 2 小时到期。
  */
 export async function refreshImagery({
   songIds = [],
-  imageryIds = [],
-}: { songIds?: number[]; imageryIds?: number[] } = {}): Promise<PurgeReport> {
+  motifIds = [],
+}: { songIds?: number[]; motifIds?: number[] } = {}): Promise<PurgeReport> {
   return invalidate({
-    pages: ["/imagery", "/quiz", ...songIds.map(songPage)],
-    paths: imageryIds.map((id) => `/api/imagery/${id}/songs`),
+    pages: [
+      "/imagery",
+      "/quiz",
+      ...songIds.map(songPage),
+      ...motifIds.map((id) => `/imagery/${id}`),
+    ],
+    paths: motifIds.flatMap((id) => [
+      `/api/imagery/motifs/${id}`,
+      `/api/imagery/motifs/${id}?locale=zh-TW`,
+    ]),
     tags: [SONG_IMAGERY_TAG, QUIZ_POOL_TAG],
   });
 }

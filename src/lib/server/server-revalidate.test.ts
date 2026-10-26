@@ -101,8 +101,8 @@ describe("清 CDN 的结果", () => {
 });
 
 describe("refreshImagery", () => {
-  it("失效意象数据标签，清意象页、寻曲页、详情页和意象歌曲接口", async () => {
-    await refreshImagery({ songIds: [3, 3], imageryIds: [9] });
+  it("失效意象数据标签，清意象页、寻曲页、详情页、母题页和母题接口", async () => {
+    await refreshImagery({ songIds: [3, 3], motifIds: [9] });
     expect(revalidateTag).toHaveBeenCalledWith("song-imagery", { expire: 0 });
     expect(revalidateTag).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
     expect(purged()).toEqual(
@@ -110,7 +110,9 @@ describe("refreshImagery", () => {
         "/zh-CN/imagery",
         "/zh-TW/quiz",
         "/zh-CN/song/3",
-        "/api/imagery/9/songs",
+        "/zh-TW/imagery/9",
+        "/api/imagery/motifs/9",
+        "/api/imagery/motifs/9?locale=zh-TW",
       ]),
     );
     // 重复的歌只清一次

@@ -6,7 +6,7 @@ import {
   TABLES,
 } from "@/lib/db/supabase-server";
 import { songTimetags } from "@/lib/imagery/consistency";
-import type { ImageryCategory, ImageryItem, SongRef } from "@/lib/types";
+import type { ImageryCategory, ImageryItem } from "@/lib/types";
 
 export type OccurrenceWithSong = {
   id: number;
@@ -134,19 +134,27 @@ export async function getOccurrencesForSong(
   }
 }
 
-/** 标注属于哪首歌、哪个意象；改动或删除标注前查出来，好刷新对应缓存 */
+/** 标注属于哪首歌、哪个意象、哪个母题；改动或删除标注前查出来，好刷新对应缓存 */
 export async function getOccurrenceRefs(
   id: number,
-): Promise<{ song_id: number; imagery_id: number } | null> {
+): Promise<{
+  song_id: number;
+  imagery_id: number;
+  category_id: number;
+} | null> {
   const supabase = getServiceClient();
   if (!supabase) return null;
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_OCC)
-    .select("song_id,imagery_id")
+    .select("song_id,imagery_id,category_id")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return data as { song_id: number; imagery_id: number } | null;
+  return data as {
+    song_id: number;
+    imagery_id: number;
+    category_id: number;
+  } | null;
 }
 
 // ─── write functions: imagery ─────────────────────────────────────────────────
@@ -726,44 +734,6 @@ export async function deleteOccurrence(id: number, accessToken: string) {
 }
 
 // ─── public read functions ─────────────────────────────────────────────────────
-
-export async function getSongsForImagery(
-  imageryId: number,
-): Promise<SongRef[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  try {
-    const { data, error } = await supabase
-      .from(TABLES.IMAGERY_OCC)
-      .select("song_id, music(id, title, lyricist)")
-      .eq("imagery_id", imageryId);
-    if (error) {
-      console.error("[getSongsForImagery]", error);
-      return [];
-    }
-    const seen = new Set<number>();
-    const results: SongRef[] = [];
-    for (const row of (data ?? []) as Record<string, unknown>[]) {
-      const m = row.music as {
-        id?: number;
-        title?: string;
-        lyricist?: string[] | null;
-      } | null;
-      if (m?.id && !seen.has(m.id)) {
-        seen.add(m.id);
-        results.push({
-          id: m.id,
-          title: m.title ?? "",
-          lyricist: m.lyricist ?? null,
-        });
-      }
-    }
-    return results;
-  } catch (e) {
-    console.error("[getSongsForImagery]", e);
-    return [];
-  }
-}
 
 /**
  * 意象页内容的最后变更时间，供 sitemap 使用。

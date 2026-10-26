@@ -41,22 +41,28 @@
   "all": "全部",
   "imagery": {
     "title": "意象詞雲",
-    "description": "在 {count} 個精選意象中發現河圖音樂的詩意世界。涵蓋 {categoryNames} 等分類，探索山川、日月、草木、時令在歌詞中的流轉。",
-    "subtitle": "{count} 回眸遍，長歌踏雪去何方",
+    "description": "在 {count} 個意象母題中發現河圖音樂的詩意世界。涵蓋 {categoryNames} 等分類，探索山川、日月、草木、時令在歌詞中的流轉。",
+    "motifDescription": "河圖作品中，{count} 首寫到「{name}」，寫法有{words}等。",
+    "subtitle": "{motifs} 個母題 · {words} 種寫法",
     "all": "全部",
+    "views": {
+      "motifs": "母題",
+      "words": "全部詞"
+    },
+    "motifTooltip": "{count} 首 · {words} 種寫法",
+    "wordTooltip": "{count} 首",
+    "motifTotal": "共 {count} 個母題",
+    "wordTotal": "共 {count} 種寫法",
+    "ariaLabel": "{name}，{count} 首作品",
     "noData": "暫無數據",
-    "times": "{count} 次",
-    "totalCount": "共 {count} 個意象",
-    "ariaLabel": "意象：{name}，出現 {count} 次",
-    "loadError": "載入意象關聯歌曲失敗",
-    "detailPanel": {
-      "noWorks": "暫無相關詞作",
-      "lyricistLabel": "詞作",
-      "relatedSongs": "相關曲目",
-      "songsByLyricist": "{name}的曲目",
-      "appears": "出現 {count} 次",
-      "title": "意象詳情",
-      "description": "{name}在河圖作品中出現 {count} 次"
+    "panel": {
+      "meta": "{songs} 首作品 · {words} 種寫法",
+      "words": "寫法",
+      "works": "相關作品",
+      "worksOf": "寫作「{name}」",
+      "more": "另 {count} 種",
+      "fold": "收起",
+      "loadError": "沒能取到這個母題，稍後再試"
     }
   },
   "story": {

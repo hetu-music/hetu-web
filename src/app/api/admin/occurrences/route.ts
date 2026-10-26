@@ -77,7 +77,7 @@ export const POST = withAuth(
       const created = await createOccurrence(input, session.access_token);
       const purge = await refreshImagery({
         songIds: [created.song_id],
-        imageryIds: [created.imagery_id],
+        motifIds: [created.category_id],
       });
       return withPurgeStatus(NextResponse.json(created), purge);
     } catch (e) {

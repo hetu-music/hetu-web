@@ -197,6 +197,7 @@ export async function getSongImagery(
     byImagery.set(occ.imagery_id, {
       id: occ.imagery_id,
       name: tr(imageryName.get(occ.imagery_id) ?? ""),
+      motifId: occ.category_id,
       path: path.map((c) => tr(c.name)),
       accent: (path[0] && l1Color.get(path[0].id)) ?? GRAY_PALETTE.accent,
       timetags: [...new Set(occ.lyric_timetag ?? [])],

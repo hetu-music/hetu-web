@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * 意象原型共用的词云部件，照搬旧意象页（ImageryClient / ImageryDetailPanel）的写法：
- * 书法字按门类着色、呼吸浮动、逐行展开，选中时发光、其余淡出；悬停出胶囊提示。
+ * 意象词云的部件：书法字按门类着色、呼吸浮动、逐行展开；
+ * 点中一个，它像夜空里的孤星一样发光，其余都暗下去；悬停出胶囊提示。
  */
 
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
@@ -58,7 +58,7 @@ export type CloudItem = {
   palette: number;
 };
 
-export const CloudWord = memo(function CloudWord({
+export const WordItem = memo(function WordItem({
   item,
   fontSize,
   index,
@@ -217,6 +217,7 @@ export function VirtualCloud({
   selectedId,
   onSelect,
   tooltip,
+  ariaLabel,
   reveal,
   onReveal,
 }: {
@@ -225,6 +226,7 @@ export function VirtualCloud({
   /** side：面板该从哪边出来，避开被点的词 */
   onSelect: (id: number, side: "left" | "right") => void;
   tooltip: (item: CloudItem) => string;
+  ariaLabel: (item: CloudItem) => string;
   /** 把这个词滚到视口中间；key 变了才再滚一次 */
   reveal?: { id: number; key: number } | null;
   /** 滚过去之后告诉外面它在左半还是右半，面板好从另一边出来 */
@@ -387,14 +389,14 @@ export function VirtualCloud({
               className="flex justify-center items-center gap-x-10 pb-6"
             >
               {row.map((w, i) => (
-                <CloudWord
+                <WordItem
                   key={w.item.id}
                   item={w.item}
                   fontSize={w.fontSize}
                   index={indexOf.get(w.item.id) ?? 0}
                   rowIndex={i}
                   selectedId={selectedId}
-                  label={`${w.item.name}，${tooltip(w.item)}`}
+                  label={ariaLabel(w.item)}
                 />
               ))}
             </div>

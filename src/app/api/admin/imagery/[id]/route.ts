@@ -72,7 +72,7 @@ export const PUT = withAuth(
       const occurrences = await getOccurrencesForImagery(imageryId);
       const purge = await refreshImagery({
         songIds: occurrences.map((o) => o.song_id),
-        imageryIds: [imageryId],
+        motifIds: occurrences.map((o) => o.category_id),
       });
       return withPurgeStatus(NextResponse.json(updated), purge);
     } catch (e) {

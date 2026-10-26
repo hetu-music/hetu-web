@@ -14,20 +14,22 @@ import {
 } from "@/components/ui/sheet";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import { Link } from "@/i18n/navigation";
+import type { MotifDetail } from "@/lib/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { BracketButton, paletteAt, SectionLabel } from "./cloud";
-import type { MotifData } from "./data";
 
 /** 写法多的母题先列这么多，其余收起 */
 const WORDS_FOLDED = 18;
 
-export interface MotifPanelProps {
+export interface ImageryPanelProps {
   open: boolean;
   side: "left" | "right";
-  motif: MotifData | null;
+  motif: MotifDetail | null;
   loading: boolean;
+  error: boolean;
   /** 只看用这种写法的作品；null 为全部 */
   word: number | null;
   onWord: (id: number | null) => void;
@@ -38,9 +40,10 @@ function PanelHeader({
   motif,
   isDesktop,
 }: {
-  motif: MotifData;
+  motif: MotifDetail;
   isDesktop: boolean;
 }) {
+  const t = useTranslations("common.imagery.panel");
   const palette = paletteAt(motif.palette);
   const meta = (
     <div className="space-y-1">
@@ -48,7 +51,7 @@ function PanelHeader({
         {motif.path.join(" · ")}
       </p>
       <p className="font-kaiti text-sm text-slate-600 dark:text-slate-300">
-        {motif.songCount} 首作品 · {motif.words.length} 种写法
+        {t("meta", { songs: motif.songCount, words: motif.words.length })}
       </p>
     </div>
   );
@@ -68,6 +71,7 @@ function PanelHeader({
 
   return (
     <div className="relative shrink-0 px-12 pt-10 pb-7 overflow-hidden border-b border-slate-100/40 dark:border-slate-800/40">
+      {/* 背景里一个淡淡的大字 */}
       <span
         aria-hidden
         className="pointer-events-none select-none absolute -bottom-6 -right-3 font-calligraphy leading-none"
@@ -97,18 +101,26 @@ function PanelHeader({
 function PanelBody({
   motif,
   loading,
+  error,
   word,
   onWord,
   onClose,
-}: Omit<MotifPanelProps, "open" | "side" | "motif"> & {
-  motif: MotifData | null;
-}) {
+}: Omit<ImageryPanelProps, "open" | "side">) {
+  const t = useTranslations("common.imagery");
+  const tCommon = useTranslations("common");
   const [unfolded, setUnfolded] = useState(false);
   const wordName = useMemo(
     () => new Map((motif?.words ?? []).map((w) => [w.id, w.name])),
     [motif],
   );
 
+  if (error && !motif) {
+    return (
+      <p className="text-center font-kaiti text-sm py-16 text-slate-400 dark:text-slate-500">
+        {t("panel.loadError")}
+      </p>
+    );
+  }
   if (loading || !motif) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -130,13 +142,17 @@ function PanelBody({
 
   return (
     <>
-      {/* 写法 */}
+      {/* 写法：只有一种时不用筛 */}
       {motif.words.length > 1 && (
         <>
-          <SectionLabel label="写法" accent={palette.accent} compact />
+          <SectionLabel
+            label={t("panel.words")}
+            accent={palette.accent}
+            compact
+          />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-2">
             <BracketButton
-              label="全部"
+              label={t("all")}
               size="text-[13px]"
               isActive={word === null}
               onClick={() => onWord(null)}
@@ -159,8 +175,10 @@ function PanelBody({
                 className="text-[11px] tracking-widest text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors py-1"
               >
                 {unfolded
-                  ? "收起"
-                  : `另 ${motif.words.length - WORDS_FOLDED} 种`}
+                  ? t("panel.fold")
+                  : t("panel.more", {
+                      count: motif.words.length - WORDS_FOLDED,
+                    })}
               </button>
             )}
           </div>
@@ -171,7 +189,9 @@ function PanelBody({
       <div className="mt-2">
         <SectionLabel
           label={
-            word !== null ? `写作「${wordName.get(word) ?? ""}」` : "相关作品"
+            word !== null
+              ? t("panel.worksOf", { name: wordName.get(word) ?? "" })
+              : t("panel.works")
           }
           accent={palette.accent}
           compact
@@ -209,7 +229,10 @@ function PanelBody({
                       {song.title}
                     </div>
                     <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate tracking-wide">
-                      {[song.year, song.lyricist?.join("  ·  ") || "佚名"]
+                      {[
+                        song.year,
+                        song.lyricist?.join("  ·  ") || tCommon("unknown"),
+                      ]
                         .filter(Boolean)
                         .join("  ·  ")}
                     </div>
@@ -228,20 +251,23 @@ function PanelBody({
   );
 }
 
-export default function MotifPanel(props: MotifPanelProps) {
+/** 点中一个意象后的面板：桌面从侧边滑出，手机是底部抽屉 */
+export default function ImageryPanel(props: ImageryPanelProps) {
   const { open, side, motif, onClose } = props;
+  const t = useTranslations("common.imagery");
   const isDesktop = useIsDesktop();
-  const title = motif?.name ?? "意象词云";
+  const title = motif?.name ?? t("title");
   const description = motif
-    ? `${motif.name}：${motif.songCount} 首作品写到，${motif.words.length} 种写法`
-    : "意象词云";
-  // 换母题时重置写法折叠
+    ? t("panel.meta", { songs: motif.songCount, words: motif.words.length })
+    : t("title");
+  // 换母题时重置写法的折叠
   const body = <PanelBody key={motif?.id} {...props} />;
 
   if (!isDesktop) {
     return (
       <Drawer open={open} onOpenChange={(v) => !v && onClose()}>
         <DrawerContent
+          // 意象页独有的半透明毛玻璃面板（DESIGN.md 第四节）
           className="h-[65dvh] bg-[#FAFAFA]/96 dark:bg-[#0B0F19]/96 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/50"
           contentClassName="flex flex-col overflow-hidden px-0 pb-0"
           transparentBackdrop

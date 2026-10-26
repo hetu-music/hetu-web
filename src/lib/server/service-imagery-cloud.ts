@@ -1,13 +1,23 @@
-import "server-only";
-
 import { unstable_cache } from "next/cache";
 import { fetchAll, getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { PALETTE_FULL, sortLevel1Categories } from "@/lib/imagery/palette";
 import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
+import type {
+  CloudMotif,
+  CloudMotifGroup,
+  CloudWord,
+  ImageryCloud,
+  MotifDetail,
+  MotifLink,
+  MotifWork,
+  MotifWord,
+} from "@/lib/types";
+import { toTraditional, toTraditionalArray } from "@/lib/utils/utils-convert";
 
 /**
- * 意象页原型（母题为单位）的数据。全库标注一次读进来，跨请求缓存；
- * 面板要的母题内容也从这份缓存里算，不另查库。
+ * 意象词云的数据，以母题为单位（见 IMAGERY.md）：词云列母题或全部写法，
+ * 面板列一个母题的写法与作品。全库标注一次读进来，跨请求缓存；面板也从这份缓存里算。
+ * 作品数一律按歌去重，只算曲库里的歌。
  */
 
 type CategoryRow = {
@@ -25,19 +35,18 @@ type Index = {
     song_id: number;
     imagery_id: number;
     category_id: number;
-    lyric_timetag: string[] | null;
   }>;
   songs: Array<{
     id: number;
     title: string;
     date: string | null;
-    hascover: boolean | null;
     lyricist: string[] | null;
   }>;
 };
 
 const loadIndex = unstable_cache(
   async (): Promise<Index> => {
+    // 失败时抛错而不返回空数据：unstable_cache 不缓存异常
     const supabase = getServiceClient();
     if (!supabase) throw new Error("Supabase 未配置");
     const [categories, imagery, occurrences, songs] = await Promise.all([
@@ -50,12 +59,12 @@ const loadIndex = unstable_cache(
       fetchAll<Index["occurrences"][number]>(
         supabase,
         TABLES.IMAGERY_OCC,
-        "song_id,imagery_id,category_id,lyric_timetag",
+        "song_id,imagery_id,category_id",
       ),
       fetchAll<Index["songs"][number]>(
         supabase,
         TABLES.MUSIC_CATALOG,
-        "id,title,date,hascover,lyricist",
+        "id,title,date,lyricist",
       ),
     ]);
     if (occurrences.length === 0 || songs.length === 0) {
@@ -63,11 +72,10 @@ const loadIndex = unstable_cache(
     }
     return { categories, imagery, occurrences, songs };
   },
-  ["lab-motif-index-v3"],
+  ["imagery-cloud-index-v1"],
   { revalidate: 7200, tags: [SONG_IMAGERY_TAG] },
 );
 
-/** 只算曲库里的歌；作品数一律按歌去重 */
 function derive(index: Index) {
   const catById = new Map(index.categories.map((c) => [c.id, c]));
   const l1 = sortLevel1Categories(index.categories);
@@ -92,7 +100,7 @@ function derive(index: Index) {
   const catalog = new Set(index.songs.map((s) => s.id));
   const songsByMotif = new Map<number, Set<number>>();
   const motifsBySong = new Map<number, Set<number>>();
-  // 词 → 母题 → 歌：多义词在不同母题下各算各的
+  // 词 → 母题 → 歌：多义词（烟花：焰火 / 春）在不同母题下各算各的
   const wordMotifSongs = new Map<number, Map<number, Set<number>>>();
   for (const occ of index.occurrences) {
     if (!catalog.has(occ.song_id)) continue;
@@ -114,60 +122,28 @@ function derive(index: Index) {
     paletteOfL1,
     pathOf,
     paletteOf,
-    catalog,
     songsByMotif,
     motifsBySong,
     wordMotifSongs,
   };
 }
 
-// ─── 索引页 ────────────────────────────────────────────────────────────────
+function translator(locale: string) {
+  return locale === "zh-TW"
+    ? (s: string) => toTraditional(s) ?? s
+    : (s: string) => s;
+}
 
-export type IndexMotif = {
-  id: number;
-  name: string;
-  l1: number;
-  l2: number;
-  palette: number;
-  songCount: number;
-  /** 这个母题下的写法，按作品数排；搜索时用 */
-  words: string[];
-};
+// ─── 词云 ──────────────────────────────────────────────────────────────────
 
-export type IndexWord = {
-  id: number;
-  name: string;
-  songCount: number;
-  /** 作品最多的那个母题：点词时去它的母题页 */
-  motif: number;
-  l1: number;
-  l2: number;
-  palette: number;
-};
-
-export type IndexGroup = {
-  id: number;
-  name: string;
-  l1: number;
-  palette: number;
-  motifs: IndexMotif[];
-};
-
-export type IndexData = {
-  l1: Array<{ id: number; name: string; palette: number }>;
-  groups: IndexGroup[];
-  words: IndexWord[];
-  motifCount: number;
-  songCount: number;
-};
-
-export async function getMotifIndex(): Promise<IndexData> {
+export async function getImageryCloud(locale: string): Promise<ImageryCloud> {
   const index = await loadIndex();
   const d = derive(index);
+  const tr = translator(locale);
   const wordName = new Map(index.imagery.map((i) => [i.id, i.name]));
 
-  const wordsOfMotif = new Map<number, Array<[string, number]>>();
-  const words: IndexWord[] = [];
+  const wordCount = new Map<number, number>();
+  const words: CloudWord[] = [];
   for (const [wordId, byMotif] of d.wordMotifSongs) {
     const name = wordName.get(wordId);
     if (!name) continue;
@@ -177,14 +153,12 @@ export async function getMotifIndex(): Promise<IndexData> {
     for (const [motifId, songs] of byMotif) {
       for (const s of songs) all.add(s);
       if (songs.size > topSize) [top, topSize] = [motifId, songs.size];
-      let list = wordsOfMotif.get(motifId);
-      if (!list) wordsOfMotif.set(motifId, (list = []));
-      list.push([name, songs.size]);
+      wordCount.set(motifId, (wordCount.get(motifId) ?? 0) + 1);
     }
     const [root, l2] = d.pathOf(top);
     words.push({
       id: wordId,
-      name,
+      name: tr(name),
       songCount: all.size,
       motif: top,
       l1: root?.id ?? 0,
@@ -194,10 +168,9 @@ export async function getMotifIndex(): Promise<IndexData> {
   }
   words.sort((a, b) => b.songCount - a.songCount || a.id - b.id);
 
-  const groups = new Map<number, IndexGroup>();
+  const groups = new Map<number, CloudMotifGroup>();
   for (const [motifId, songs] of d.songsByMotif) {
-    const path = d.pathOf(motifId);
-    const [root, l2, motif] = path;
+    const [root, l2, motif] = d.pathOf(motifId);
     if (!root || !l2 || !motif) continue;
     let group = groups.get(l2.id);
     if (!group) {
@@ -205,26 +178,27 @@ export async function getMotifIndex(): Promise<IndexData> {
         l2.id,
         (group = {
           id: l2.id,
-          name: l2.name,
+          name: tr(l2.name),
           l1: root.id,
           palette: d.paletteOf(motifId),
           motifs: [],
         }),
       );
     }
-    group.motifs.push({
+    const item: CloudMotif = {
       id: motifId,
-      name: motif.name,
+      name: tr(motif.name),
       l1: root.id,
       l2: l2.id,
       palette: group.palette,
       songCount: songs.size,
-      words: (wordsOfMotif.get(motifId) ?? [])
-        .sort((a, b) => b[1] - a[1])
-        .map(([w]) => w),
-    });
+      wordCount: wordCount.get(motifId) ?? 0,
+    };
+    group.motifs.push(item);
   }
   const l1Order = new Map(d.l1.map((c, i) => [c.id, i]));
+  const total = (g: CloudMotifGroup) =>
+    g.motifs.reduce((s, m) => s + m.songCount, 0);
   const sortedGroups = [...groups.values()]
     .map((g) => ({
       ...g,
@@ -233,56 +207,22 @@ export async function getMotifIndex(): Promise<IndexData> {
     .sort(
       (a, b) =>
         (l1Order.get(a.l1) ?? 99) - (l1Order.get(b.l1) ?? 99) ||
-        b.motifs.reduce((s, m) => s + m.songCount, 0) -
-          a.motifs.reduce((s, m) => s + m.songCount, 0),
+        total(b) - total(a),
     );
 
   return {
     l1: d.l1.map((c) => ({
       id: c.id,
-      name: c.name,
+      name: tr(c.name),
       palette: d.paletteOfL1.get(c.id) ?? -1,
     })),
     groups: sortedGroups,
     words,
     motifCount: d.songsByMotif.size,
-    songCount: d.motifsBySong.size,
   };
 }
 
-// ─── 面板 ────────────────────────────────────────────────────────────────
-
-export type MotifWord = { id: number; name: string; songCount: number };
-
-export type MotifWork = {
-  id: number;
-  title: string;
-  year: string | null;
-  lyricist: string[] | null;
-  /** 本曲在这个母题下用到的写法 */
-  wordIds: number[];
-};
-
-export type MotifLink = {
-  id: number;
-  name: string;
-  palette: number;
-  both: number;
-  lift: number;
-};
-
-export type MotifData = {
-  id: number;
-  name: string;
-  path: string[];
-  palette: number;
-  description: string | null;
-  songCount: number;
-  words: MotifWord[];
-  works: MotifWork[];
-  /** 面板不展示，留给以后的母题关系图 */
-  cowritten: MotifLink[];
-};
+// ─── 面板 ──────────────────────────────────────────────────────────────────
 
 /**
  * 同写：两个母题同在一首歌里的次数是随机情况的几倍（lift = 同写数 × N ÷ (|A| × |B|)），
@@ -294,13 +234,17 @@ const COWRITE_MIN_OTHER = 5;
 const COWRITE_MIN_LIFT = 1.8;
 const COWRITE_LIMIT = 10;
 
-export async function getMotif(motifId: number): Promise<MotifData | null> {
+/** 一个母题的面板内容；不是母题、或曲库里没有歌写到它时返回 null */
+export async function getMotifDetail(
+  motifId: number,
+  locale: string,
+): Promise<MotifDetail | null> {
   const index = await loadIndex();
   const d = derive(index);
+  const tr = translator(locale);
   const motif = d.catById.get(motifId);
   const own = d.songsByMotif.get(motifId);
   if (!motif || motif.level !== 3 || !own) return null;
-  const path = d.pathOf(motifId);
   const wordName = new Map(index.imagery.map((i) => [i.id, i.name]));
 
   // 写法
@@ -310,14 +254,14 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
     if (songs) {
       words.push({
         id: wordId,
-        name: wordName.get(wordId) ?? "",
+        name: tr(wordName.get(wordId) ?? ""),
         songCount: songs.size,
       });
     }
   }
   words.sort((a, b) => b.songCount - a.songCount || a.id - b.id);
 
-  // 作品
+  // 作品：新的在前
   const wordsBySong = new Map<number, Set<number>>();
   for (const occ of index.occurrences) {
     if (occ.category_id !== motifId || !own.has(occ.song_id)) continue;
@@ -332,9 +276,10 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
     if (!song) continue;
     works.push({
       id: songId,
-      title: song.title,
+      title: tr(song.title),
       year: song.date?.slice(0, 4) ?? null,
-      lyricist: song.lyricist,
+      lyricist:
+        locale === "zh-TW" ? toTraditionalArray(song.lyricist) : song.lyricist,
       wordIds: [...wordIds],
     });
   }
@@ -342,7 +287,7 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
     (a, b) => (b.year ?? "0").localeCompare(a.year ?? "0") || a.id - b.id,
   );
 
-  // 常与之同写：按超出随机的倍数（lift）
+  // 常与之同写：面板不展示，留给以后的母题关系图
   const n = d.motifsBySong.size;
   const cowritten: MotifLink[] = [];
   for (const [otherId, songs] of d.songsByMotif) {
@@ -354,7 +299,7 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
     if (lift < COWRITE_MIN_LIFT) continue;
     cowritten.push({
       id: otherId,
-      name: d.catById.get(otherId)?.name ?? "",
+      name: tr(d.catById.get(otherId)?.name ?? ""),
       palette: d.paletteOf(otherId),
       both,
       lift,
@@ -364,10 +309,13 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
 
   return {
     id: motifId,
-    name: motif.name,
-    path: path.slice(0, -1).map((c) => c.name),
+    name: tr(motif.name),
+    path: d
+      .pathOf(motifId)
+      .slice(0, -1)
+      .map((c) => tr(c.name)),
     palette: d.paletteOf(motifId),
-    description: motif.description,
+    description: motif.description ? tr(motif.description) : null,
     songCount: own.size,
     words,
     works,

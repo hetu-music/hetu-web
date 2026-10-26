@@ -143,18 +143,18 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["雪"],
       },
       {
-        text: "庙前的旧书摊，翻看那些泛黄的书",
+        text: "庙前的书摊，翻看那些泛黄的书",
         dims: { guangyin: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "去马市挑一匹最快的马，追一个不告而别的人",
+        text: "城边的驿站，寻一匹作伴的马",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["马"],
       },
       {
-        text: "住进临街客栈，隔窗看人来人往，一个也不认识",
+        text: "临街的客栈，隔窗看陌生的过客",
         dims: { renjian: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
       },

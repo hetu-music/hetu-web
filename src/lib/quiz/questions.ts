@@ -149,12 +149,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "城门外的老槐下，等一个说好要来的人，天黑也不走",
+        text: "城角旧园，探看草木掩映的旧誓",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "临街的客栈，隔窗看陌生的过客",
+        text: "临街客栈，隔窗看陌生的过客",
         dims: { renjian: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
       },

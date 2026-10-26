@@ -221,7 +221,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "夜深风止，合眼沉睡。梦里，你又回到——",
     options: [
       {
-        text: "那年在花下嬉戏奔跑，笑声止也止不住",
+        text: "落满繁花的庭院，嬉闹追逐，笑声不绝",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["花"],
@@ -306,7 +306,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "旅途将尽。如果能换一种活法，你想成为——",
     options: [
       {
-        text: "走到哪儿都有朋友的游侠，天下就是家",
+        text: "",
         dims: { renjian: 2, shanhe: 1 },
         mood: { tone: 1, energy: 1 },
       },

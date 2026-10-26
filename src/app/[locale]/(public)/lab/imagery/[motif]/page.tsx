@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
-import MotifPageProto from "@/components/lab/imagery/MotifPageProto";
-import { getMotif } from "@/components/lab/imagery/data";
+import MotifIndexProto from "@/components/lab/imagery/MotifIndexProto";
+import { getMotif, getMotifIndex } from "@/components/lab/imagery/data";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ locale: string; motif: string }>;
-  searchParams: Promise<{ w?: string; q?: string }>;
+  searchParams: Promise<{ w?: string; view?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -20,19 +20,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/** 一个母题的网址：打开的是整片词云，这个母题亮着、面板展开 */
 export default async function MotifProtoPage({ params, searchParams }: Props) {
   const { locale, motif } = await params;
   setRequestLocale(locale);
   const id = Number(motif);
   if (!Number.isInteger(id)) notFound();
-  const data = await getMotif(id);
-  if (!data) notFound();
-
-  // ?w=<词 id> 直接选中；?q= 是从索引页搜索过来的，选中第一个含它的写法
-  const { w, q } = await searchParams;
-  const byId = data.words.find((x) => x.id === Number(w));
-  const byQuery = q ? data.words.find((x) => x.name.includes(q)) : undefined;
+  const [data, current, { w, view }] = await Promise.all([
+    getMotifIndex(),
+    getMotif(id),
+    searchParams,
+  ]);
+  if (!current) notFound();
+  const word = current.words.find((x) => x.id === Number(w))?.id ?? null;
   return (
-    <MotifPageProto motif={data} initialWord={(byId ?? byQuery)?.id ?? null} />
+    <MotifIndexProto
+      data={data}
+      initialView={view === "words" ? "words" : "motifs"}
+      initialMotif={current}
+      initialWord={word}
+    />
   );
 }

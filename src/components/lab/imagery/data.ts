@@ -2,13 +2,12 @@ import "server-only";
 
 import { unstable_cache } from "next/cache";
 import { fetchAll, getServiceClient, TABLES } from "@/lib/db/supabase-server";
-import { parseLrcLines } from "@/lib/imagery/suggest";
 import { PALETTE_FULL, sortLevel1Categories } from "@/lib/imagery/palette";
 import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
 
 /**
  * 意象页原型（母题为单位）的数据。全库标注一次读进来，跨请求缓存；
- * 母题页只另取写到该母题的歌的歌词。
+ * 面板要的母题内容也从这份缓存里算，不另查库。
  */
 
 type CategoryRow = {
@@ -17,14 +16,6 @@ type CategoryRow = {
   parent_id: number | null;
   level: number | null;
   description: string | null;
-};
-
-type EmotionRow = {
-  id: number;
-  name: string;
-  tone: string;
-  energy: string;
-  sort: number;
 };
 
 type Index = {
@@ -43,49 +34,36 @@ type Index = {
     hascover: boolean | null;
     lyricist: string[] | null;
   }>;
-  emotions: EmotionRow[];
-  songEmotions: Array<{ song_id: number; emotion_id: number; rank: number }>;
 };
 
 const loadIndex = unstable_cache(
   async (): Promise<Index> => {
     const supabase = getServiceClient();
     if (!supabase) throw new Error("Supabase 未配置");
-    const [categories, imagery, occurrences, songs, emotions, songEmotions] =
-      await Promise.all([
-        fetchAll<Index["categories"][number]>(
-          supabase,
-          TABLES.IMAGERY_CAT,
-          "id,name,parent_id,level,description",
-        ),
-        fetchAll<Index["imagery"][number]>(supabase, TABLES.IMAGERY, "id,name"),
-        fetchAll<Index["occurrences"][number]>(
-          supabase,
-          TABLES.IMAGERY_OCC,
-          "song_id,imagery_id,category_id,lyric_timetag",
-        ),
-        fetchAll<Index["songs"][number]>(
-          supabase,
-          TABLES.MUSIC_CATALOG,
-          "id,title,date,hascover,lyricist",
-        ),
-        fetchAll<EmotionRow>(
-          supabase,
-          TABLES.EMOTIONS,
-          "id,name,tone,energy,sort",
-        ),
-        fetchAll<Index["songEmotions"][number]>(
-          supabase,
-          TABLES.SONG_EMOTIONS,
-          "song_id,emotion_id,rank",
-        ),
-      ]);
+    const [categories, imagery, occurrences, songs] = await Promise.all([
+      fetchAll<Index["categories"][number]>(
+        supabase,
+        TABLES.IMAGERY_CAT,
+        "id,name,parent_id,level,description",
+      ),
+      fetchAll<Index["imagery"][number]>(supabase, TABLES.IMAGERY, "id,name"),
+      fetchAll<Index["occurrences"][number]>(
+        supabase,
+        TABLES.IMAGERY_OCC,
+        "song_id,imagery_id,category_id,lyric_timetag",
+      ),
+      fetchAll<Index["songs"][number]>(
+        supabase,
+        TABLES.MUSIC_CATALOG,
+        "id,title,date,hascover,lyricist",
+      ),
+    ]);
     if (occurrences.length === 0 || songs.length === 0) {
       throw new Error("意象索引数据为空");
     }
-    return { categories, imagery, occurrences, songs, emotions, songEmotions };
+    return { categories, imagery, occurrences, songs };
   },
-  ["lab-motif-index-v2"],
+  ["lab-motif-index-v3"],
   { revalidate: 7200, tags: [SONG_IMAGERY_TAG] },
 );
 
@@ -272,7 +250,7 @@ export async function getMotifIndex(): Promise<IndexData> {
   };
 }
 
-// ─── 母题页 ────────────────────────────────────────────────────────────────
+// ─── 面板 ────────────────────────────────────────────────────────────────
 
 export type MotifWord = { id: number; name: string; songCount: number };
 
@@ -280,24 +258,9 @@ export type MotifWork = {
   id: number;
   title: string;
   year: string | null;
-  hascover: boolean | null;
   lyricist: string[] | null;
   /** 本曲在这个母题下用到的写法 */
   wordIds: number[];
-  /** 写到它的歌词，按出现顺序；没有时间轴的歌按字面找行 */
-  lines: string[];
-};
-
-export type MotifEmotion = {
-  id: number;
-  name: string;
-  tone: string;
-  energy: string;
-  /** 写到这个母题的歌里，主基调是它的比例 */
-  share: number;
-  count: number;
-  /** 全库的比例 */
-  base: number;
 };
 
 export type MotifLink = {
@@ -317,12 +280,7 @@ export type MotifData = {
   songCount: number;
   words: MotifWord[];
   works: MotifWork[];
-  emotions: MotifEmotion[];
-  /** 有基调的作品数；太少时不显示偏向 */
-  emotionSample: number;
   cowritten: MotifLink[];
-  /** 同一二级分类下的其他母题 */
-  siblings: Array<{ id: number; name: string; songCount: number }>;
 };
 
 /** 同写：至少几首歌一起写到、对方至少写到几首，才算数 */
@@ -354,91 +312,30 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
   }
   words.sort((a, b) => b.songCount - a.songCount || a.id - b.id);
 
-  // 作品与歌词
-  const supabase = getServiceClient();
-  const lyricsRows = supabase
-    ? await fetchAll<{ id: number; lyrics: string | null }>(
-        supabase,
-        TABLES.MUSIC_CATALOG,
-        "id,lyrics",
-        (q) => q.in("id", [...own]),
-      )
-    : [];
-  const lyricsById = new Map(lyricsRows.map((r) => [r.id, r.lyrics]));
-  const occBySong = new Map<
-    number,
-    Array<{ imagery_id: number; lyric_timetag: string[] | null }>
-  >();
+  // 作品
+  const wordsBySong = new Map<number, Set<number>>();
   for (const occ of index.occurrences) {
     if (occ.category_id !== motifId || !own.has(occ.song_id)) continue;
-    let list = occBySong.get(occ.song_id);
-    if (!list) occBySong.set(occ.song_id, (list = []));
-    list.push(occ);
+    let set = wordsBySong.get(occ.song_id);
+    if (!set) wordsBySong.set(occ.song_id, (set = new Set()));
+    set.add(occ.imagery_id);
   }
   const songById = new Map(index.songs.map((s) => [s.id, s]));
   const works: MotifWork[] = [];
-  for (const [songId, occs] of occBySong) {
+  for (const [songId, wordIds] of wordsBySong) {
     const song = songById.get(songId);
     if (!song) continue;
-    const lyrics = lyricsById.get(songId) ?? null;
-    const lrc = parseLrcLines(lyrics);
-    const tags = new Set(occs.flatMap((o) => o.lyric_timetag ?? []));
-    let lines = lrc.filter((l) => tags.has(l.tag)).map((l) => l.text);
-    if (lines.length === 0) {
-      // 没有时间轴：按字面找
-      const names = occs.map((o) => wordName.get(o.imagery_id) ?? "");
-      lines = (lyrics ?? "")
-        .split("\n")
-        .map((l) => l.replace(/\[[^\]]*\]/g, "").trim())
-        .filter((l) => l && names.some((n) => n && l.includes(n)));
-    }
     works.push({
       id: songId,
       title: song.title,
       year: song.date?.slice(0, 4) ?? null,
-      hascover: song.hascover,
       lyricist: song.lyricist,
-      wordIds: [...new Set(occs.map((o) => o.imagery_id))],
-      lines: [...new Set(lines)],
+      wordIds: [...wordIds],
     });
   }
   works.sort(
     (a, b) => (b.year ?? "0").localeCompare(a.year ?? "0") || a.id - b.id,
   );
-
-  // 基调偏向：只看主基调，与全库（有意象的曲库歌曲）比
-  const mainOf = new Map(
-    index.songEmotions
-      .filter((r) => r.rank === 1)
-      .map((r) => [r.song_id, r.emotion_id]),
-  );
-  const baseCount = new Map<number, number>();
-  let baseTotal = 0;
-  for (const songId of d.motifsBySong.keys()) {
-    const e = mainOf.get(songId);
-    if (e === undefined) continue;
-    baseCount.set(e, (baseCount.get(e) ?? 0) + 1);
-    baseTotal++;
-  }
-  const ownCount = new Map<number, number>();
-  let ownTotal = 0;
-  for (const songId of own) {
-    const e = mainOf.get(songId);
-    if (e === undefined) continue;
-    ownCount.set(e, (ownCount.get(e) ?? 0) + 1);
-    ownTotal++;
-  }
-  const emotions: MotifEmotion[] = [...index.emotions]
-    .sort((a, b) => a.sort - b.sort)
-    .map((e) => ({
-      id: e.id,
-      name: e.name,
-      tone: e.tone,
-      energy: e.energy,
-      count: ownCount.get(e.id) ?? 0,
-      share: ownTotal ? (ownCount.get(e.id) ?? 0) / ownTotal : 0,
-      base: baseTotal ? (baseCount.get(e.id) ?? 0) / baseTotal : 0,
-    }));
 
   // 常与之同写：按超出随机的倍数（lift）
   const n = d.motifsBySong.size;
@@ -460,19 +357,6 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
   }
   cowritten.sort((a, b) => b.lift - a.lift);
 
-  const l2 = path[1];
-  const siblings = l2
-    ? index.categories
-        .filter((c) => c.parent_id === l2.id && c.id !== motifId)
-        .map((c) => ({
-          id: c.id,
-          name: c.name,
-          songCount: d.songsByMotif.get(c.id)?.size ?? 0,
-        }))
-        .filter((c) => c.songCount > 0)
-        .sort((a, b) => b.songCount - a.songCount)
-    : [];
-
   return {
     id: motifId,
     name: motif.name,
@@ -482,9 +366,6 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
     songCount: own.size,
     words,
     works,
-    emotions,
-    emotionSample: ownTotal,
     cowritten: cowritten.slice(0, COWRITE_LIMIT),
-    siblings,
   };
 }

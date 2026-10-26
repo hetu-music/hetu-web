@@ -22,12 +22,13 @@ export default async function MotifIndexProtoPage({
 }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const data = await getMotifIndex();
-  const { view } = await searchParams;
+  const [data, { view }] = await Promise.all([getMotifIndex(), searchParams]);
   return (
     <MotifIndexProto
       data={data}
       initialView={view === "words" ? "words" : "motifs"}
+      initialMotif={null}
+      initialWord={null}
     />
   );
 }

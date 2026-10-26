@@ -217,14 +217,22 @@ export function VirtualCloud({
   selectedId,
   onSelect,
   tooltip,
+  reveal,
+  onReveal,
 }: {
   items: CloudItem[];
   selectedId: number | null;
-  onSelect: (id: number) => void;
+  /** side：面板该从哪边出来，避开被点的词 */
+  onSelect: (id: number, side: "left" | "right") => void;
   tooltip: (item: CloudItem) => string;
+  /** 把这个词滚到视口中间；key 变了才再滚一次 */
+  reveal?: { id: number; key: number } | null;
+  /** 滚过去之后告诉外面它在左半还是右半，面板好从另一边出来 */
+  onReveal?: (side: "left" | "right") => void;
 }) {
   const cloudRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
+  const [widthMeasured, setWidthMeasured] = useState(false);
   const [scrollMargin, setScrollMargin] = useState(0);
 
   const maxCount = useMemo(
@@ -257,6 +265,7 @@ export function VirtualCloud({
     );
     ro.observe(el);
     setWidth(el.getBoundingClientRect().width);
+    setWidthMeasured(true);
     return () => ro.disconnect();
   }, []);
 
@@ -285,6 +294,38 @@ export function VirtualCloud({
     scrollMargin,
   });
 
+  // 要等宽度量好、分好行，滚动位置才准
+  const revealed = useRef<number | null>(null);
+  useEffect(() => {
+    if (!reveal || !widthMeasured || scrollMargin === 0) return;
+    if (revealed.current === reveal.key) return;
+    revealed.current = reveal.key;
+    const rowIndex = rows.findIndex((row) =>
+      row.some((w) => w.item.id === reveal.id),
+    );
+    if (rowIndex < 0) return;
+    const top = virtualizer.getOffsetForIndex(rowIndex, "center")?.[0];
+    if (top !== undefined) {
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }
+    // 词还没渲染出来（虚拟滚动），按分行时的估算宽度算它在行里的位置：行居中排
+    const row = rows[rowIndex];
+    const widthOf = (w: Sized) =>
+      Math.ceil(w.item.name.length * w.fontSize * 16);
+    const rowWidth =
+      row.reduce((sum, w) => sum + widthOf(w), 0) + GAP_X_PX * (row.length - 1);
+    let x = (width - rowWidth) / 2;
+    for (const w of row) {
+      if (w.item.id === reveal.id) {
+        x += widthOf(w) / 2;
+        break;
+      }
+      x += widthOf(w) + GAP_X_PX;
+    }
+    const left = cloudRef.current?.getBoundingClientRect().left ?? 0;
+    onReveal?.(left + x > ((left + width) * 3) / 4 ? "left" : "right");
+  }, [reveal, widthMeasured, scrollMargin, rows, virtualizer, width, onReveal]);
+
   const lookup = useCallback(
     (id: number) => {
       const item = byId.get(id);
@@ -310,7 +351,16 @@ export function VirtualCloud({
           if (!btn) return;
           if ("vibrate" in navigator) navigator.vibrate(8);
           clear();
-          onSelect(Number(btn.dataset.itemId));
+          const rect = btn.getBoundingClientRect();
+          const cloudRight =
+            cloudRef.current?.getBoundingClientRect().right ??
+            window.innerWidth;
+          onSelect(
+            Number(btn.dataset.itemId),
+            rect.left + rect.width / 2 > (cloudRight * 3) / 4
+              ? "left"
+              : "right",
+          );
         }}
         onMouseOver={onMouseOver}
         onMouseLeave={onMouseLeave}
@@ -447,12 +497,15 @@ export function BracketButton({
 export function SectionLabel({
   label,
   accent,
+  compact = false,
 }: {
   label: string;
   accent: string;
+  /** 面板里用小一号 */
+  compact?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 my-8">
+    <div className={`flex items-center gap-3 ${compact ? "my-5" : "my-8"}`}>
       <div className="flex-1 h-px bg-slate-200/70 dark:bg-slate-800" />
       <div className="relative h-4 flex items-center justify-center min-w-[30%]">
         <AnimatePresence mode="wait">
@@ -462,7 +515,7 @@ export function SectionLabel({
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
             transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-            className="absolute text-[11px] tracking-[0.3em] pl-[0.3em] font-medium whitespace-nowrap"
+            className={`absolute ${compact ? "text-[10px]" : "text-[11px]"} tracking-[0.3em] pl-[0.3em] font-medium whitespace-nowrap`}
             style={{ color: accent }}
           >
             {label}

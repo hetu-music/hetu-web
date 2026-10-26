@@ -1,10 +1,10 @@
 "use client";
 
 import { useIntersection } from "@/hooks/ui/useIntersection";
-import { useRouter } from "@/i18n/navigation";
 import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { GRAY_PALETTE } from "@/lib/imagery/palette";
+import { useQuery } from "@tanstack/react-query";
 import {
   useCallback,
   useDeferredValue,
@@ -22,49 +22,107 @@ import {
   VirtualCloud,
   type CloudItem,
 } from "./cloud";
-import type { IndexData } from "./data";
+import type { IndexData, MotifData } from "./data";
+import MotifPanel from "./MotifPanel";
 
 type View = "motifs" | "words";
 
-/** 点中后先让它亮一下、其余淡出，再进母题页 */
-const NAVIGATE_DELAY_MS = 450;
+/**
+ * 把面板状态写进网址：/lab/imagery/<母题>?w=<写法>&view=words，可以直接分享；
+ * 用原生 history 改，不触发导航。关面板回到 /lab/imagery
+ */
+function syncUrl(motifId: number | null, word: number | null, view: View) {
+  const url = new URL(window.location.href);
+  const base = url.pathname.replace(/(\/lab\/imagery)(\/\d+)?\/?$/, "$1");
+  url.pathname = motifId === null ? base : `${base}/${motifId}`;
+  url.search = "";
+  if (motifId !== null && word !== null)
+    url.searchParams.set("w", String(word));
+  if (view === "words") url.searchParams.set("view", "words");
+  window.history.replaceState(window.history.state, "", url);
+}
 
 export default function MotifIndexProto({
   data,
   initialView,
+  initialMotif,
+  initialWord,
 }: {
   data: IndexData;
   initialView: View;
+  /** 从 /lab/imagery/<母题> 进来时，服务端已取好的面板内容 */
+  initialMotif: MotifData | null;
+  initialWord: number | null;
 }) {
-  const router = useRouter();
   const [view, setView] = useState<View>(initialView);
   const [l1, setL1] = useState<number | null>(null);
   const [l2, setL2] = useState<number | null>(null);
   const deferredL1 = useDeferredValue(l1);
   const deferredL2 = useDeferredValue(l2);
-  const deferredView = useDeferredValue(view);
-  const [selected, setSelected] = useState<number | null>(null);
+
+  // 星：当前词云里亮着的那一个（母题视图是母题，全部词视图是词）
+  const [star, setStar] = useState<number | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [side, setSide] = useState<"left" | "right">("right");
+  const [motifId, setMotifId] = useState<number | null>(
+    initialMotif?.id ?? null,
+  );
+  const [word, setWord] = useState<number | null>(initialWord);
+  const [reveal, setReveal] = useState<{ id: number; key: number } | null>(
+    null,
+  );
 
   const [mounted, setMounted] = useState(false);
   const [seed, setSeed] = useState(0);
   const { ref: headerRef, entry } = useIntersection<HTMLElement>({
     threshold: 0.05,
   });
+
+  const motifs = useMemo(() => data.groups.flatMap((g) => g.motifs), [data]);
+  const wordMotif = useMemo(
+    () => new Map(data.words.map((w) => [w.id, w.motif])),
+    [data.words],
+  );
+  /** 全部词视图里代表一个母题的词：归在它名下、写得最多的那个 */
+  const leadWordOf = useCallback(
+    (mid: number) => data.words.find((w) => w.motif === mid)?.id ?? null,
+    [data.words],
+  );
+
+  // 进页：从 /lab/imagery/<母题> 进来的，先点亮、滚到它，再展开面板
   useEffect(() => {
     requestAnimationFrame(() => {
       setMounted(true);
       setSeed(Math.floor(Math.random() * 2147483647));
+      if (!initialMotif) return;
+      const s =
+        initialView === "motifs"
+          ? initialMotif.id
+          : (initialWord ?? leadWordOf(initialMotif.id));
+      if (s !== null) {
+        setStar(s);
+        setReveal({ id: s, key: Date.now() });
+      }
+      setPanelOpen(true);
     });
-  }, []);
+  }, [initialMotif, initialView, initialWord, leadWordOf]);
 
-  // 从母题页按返回回来时，页面可能从缓存里恢复，选中的发光要清掉
-  useEffect(() => {
-    const reset = () => setSelected(null);
-    window.addEventListener("pageshow", reset);
-    return () => window.removeEventListener("pageshow", reset);
-  }, []);
+  const motifQuery = useQuery({
+    queryKey: ["lab-motif", motifId],
+    queryFn: async (): Promise<MotifData> => {
+      const res = await fetch(`/api/lab/motifs/${motifId}`);
+      if (!res.ok) throw new Error("母题没取到");
+      const body: { motif: MotifData } = await res.json();
+      return body.motif;
+    },
+    enabled: motifId !== null,
+    initialData:
+      initialMotif && motifId === initialMotif.id ? initialMotif : undefined,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
 
-  const motifs = useMemo(() => data.groups.flatMap((g) => g.motifs), [data]);
+  // ── 词云 ──
   const l2Options = useMemo(
     () =>
       l1 === null
@@ -87,7 +145,7 @@ export default function MotifIndexProto({
       deferredL2 !== null
         ? x.l2 === deferredL2
         : deferredL1 === null || x.l1 === deferredL1;
-    if (deferredView === "words") {
+    if (view === "words") {
       return data.words.filter(inScope).map((w) => ({
         id: w.id,
         name: w.name,
@@ -104,36 +162,73 @@ export default function MotifIndexProto({
         count: m.songCount,
         palette: m.palette,
       }));
-  }, [data.words, motifs, deferredView, deferredL1, deferredL2]);
+  }, [data.words, motifs, view, deferredL1, deferredL2]);
 
-  const wordMotif = useMemo(
-    () => new Map(data.words.map((w) => [w.id, w.motif])),
-    [data.words],
-  );
-  const motifWords = useMemo(
+  const motifWordCount = useMemo(
     () => new Map(motifs.map((m) => [m.id, m.words.length])),
     [motifs],
   );
-
   const tooltip = useCallback(
     (item: CloudItem) =>
-      deferredView === "motifs"
-        ? `${item.count} 首 · ${motifWords.get(item.id) ?? 0} 种写法`
+      view === "motifs"
+        ? `${item.count} 首 · ${motifWordCount.get(item.id) ?? 0} 种写法`
         : `${item.count} 首`,
-    [deferredView, motifWords],
+    [view, motifWordCount],
   );
 
+  // ── 交互 ──
   const onSelect = useCallback(
-    (id: number) => {
-      setSelected(id);
-      const href =
-        deferredView === "motifs"
-          ? `/lab/imagery/${id}`
-          : `/lab/imagery/${wordMotif.get(id)}?w=${id}`;
-      setTimeout(() => router.push(href), NAVIGATE_DELAY_MS);
+    (id: number, from: "left" | "right") => {
+      const mid = view === "motifs" ? id : (wordMotif.get(id) ?? null);
+      if (mid === null) return;
+      const w = view === "words" ? id : null;
+      setSide(from);
+      setStar(id);
+      setMotifId(mid);
+      setWord(w);
+      setPanelOpen(true);
+      syncUrl(mid, w, view);
     },
-    [deferredView, wordMotif, router],
+    [view, wordMotif],
   );
+
+  /** 同写：星光移到另一个母题，面板跟着换 */
+  const onJump = useCallback(
+    (mid: number) => {
+      const s = view === "motifs" ? mid : leadWordOf(mid);
+      // 被筛选挡住的话放开筛选，好让它在云里亮起来
+      setL1(null);
+      setL2(null);
+      setMotifId(mid);
+      setWord(null);
+      setStar(s);
+      if (s !== null) setReveal({ id: s, key: Date.now() });
+      syncUrl(mid, null, view);
+    },
+    [view, leadWordOf],
+  );
+
+  const onWord = useCallback(
+    (w: number | null) => {
+      setWord(w);
+      syncUrl(motifId, w, view);
+    },
+    [motifId, view],
+  );
+
+  const onClose = useCallback(() => {
+    setPanelOpen(false);
+    setStar(null);
+    syncUrl(null, null, view);
+  }, [view]);
+
+  const switchView = (next: View) => {
+    if (next === view) return;
+    setView(next);
+    setPanelOpen(false);
+    setStar(null);
+    syncUrl(null, null, next);
+  };
 
   const marqueeRows = useMemo(() => {
     const sample = seededShuffle(data.words, seed)
@@ -141,15 +236,6 @@ export default function MotifIndexProto({
       .map((w) => w.name);
     return [sample.slice(0, 30), sample.slice(30, 60), sample.slice(60, 90)];
   }, [data.words, seed]);
-
-  const switchView = (next: View) => {
-    setView(next);
-    setSelected(null);
-    const url = new URL(window.location.href);
-    if (next === "words") url.searchParams.set("view", "words");
-    else url.searchParams.delete("view");
-    window.history.replaceState(window.history.state, "", url);
-  };
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-slate-800 dark:text-slate-200">
@@ -257,7 +343,7 @@ export default function MotifIndexProto({
 
       {/* ── 词云 ── */}
       <main
-        key={deferredView}
+        key={view}
         className={`max-w-5xl mx-auto px-8 py-16 min-h-[40vh] ${mounted ? "" : "opacity-0"}`}
         style={
           mounted
@@ -270,13 +356,15 @@ export default function MotifIndexProto({
       >
         <VirtualCloud
           items={items}
-          selectedId={selected}
+          selectedId={panelOpen ? star : null}
           onSelect={onSelect}
           tooltip={tooltip}
+          reveal={reveal}
+          onReveal={setSide}
         />
         <div className="mt-12 flex justify-center">
           <p className="text-xs text-slate-300 dark:text-slate-700 tracking-[0.2em] select-none font-serif">
-            {deferredView === "motifs"
+            {view === "motifs"
               ? `共 ${items.length} 个母题`
               : `共 ${items.length} 种写法`}
           </p>
@@ -288,6 +376,17 @@ export default function MotifIndexProto({
           <SiteMark />
         </div>
       </footer>
+
+      <MotifPanel
+        open={panelOpen}
+        side={side}
+        motif={motifQuery.data ?? null}
+        loading={motifQuery.isPending}
+        word={word}
+        onWord={onWord}
+        onJump={onJump}
+        onClose={onClose}
+      />
     </div>
   );
 }

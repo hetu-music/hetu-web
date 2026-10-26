@@ -149,7 +149,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "城角旧园，探看草木掩映的旧誓",
+        text: "城角旧园，探寻草木掩映的旧誓",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },

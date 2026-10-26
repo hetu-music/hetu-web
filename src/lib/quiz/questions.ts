@@ -246,26 +246,26 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "题壁",
-    stem: "夜宿荒驿，墙上满是前人的诗。你也提笔，写下——",
+    stem: "暂宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
       {
-        text: "「乘风万里，四海皆是故人」",
+        text: "「万里长风吹客袖，四海相逢皆故人」",
         dims: { tianxiang: 2, renjian: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["风"],
       },
       {
-        text: "「此间小住三日，晴，甚好」",
+        text: "「小阁凭栏留数日，晴光满榻不知年」",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "「便是化成石头，也站在这里等」",
+        text: "「客榻难分庄蝶梦，狂心未肯负深情」",
         dims: { qingsi: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "「一盏冷茶，半窗落叶，无人来」",
+        text: "「一盏寒茶尘满案，半窗落木悄无声」",
         dims: { caomu: 2, qiyong: 1 },
         mood: { tone: -1, energy: -1 },
       },

@@ -300,7 +300,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "回望",
-    stem: "回望来路，若为它写一句收尾——",
+    stem: "回望来路，若为这一程写一句收尾——",
     options: [
       {
         text: "「江声吞赤壁，帆影过金陵」",
@@ -329,28 +329,28 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "此生",
-    stem: "千帆过尽。如果能换一种活法，你想成为——",
+    title: "浮生",
+    stem: "千帆过尽。如果能选一种活法，你想成为——",
     options: [
       {
-        text: "",
+        text: "走遍天南地北、处处有人共饮的人",
         dims: { renjian: 2, shanhe: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "在巷口卖了一辈子灯笼的手艺人",
+        text: "一灯一卷，把日子慢慢过旧的人",
         dims: { qiyong: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["灯"],
       },
       {
-        text: "守着传说中那株千年不谢的花，一守就是一生",
+        text: "守一树残花，直到最后一瓣落尽的人",
         dims: { caomu: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["花"],
       },
       {
-        text: "独守观星台、对着月亮过完一生的人",
+        text: "夜对空庭，等一轮清月照亮瓦檐的人",
         dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["月"],

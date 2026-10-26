@@ -221,7 +221,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "暂宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
       {
-        text: "「万里长风吹客袖，四海相逢皆故人」",
+        text: "「万里长风吹客袖，逢人尽是旧相知」",
         dims: { tianxiang: 2, renjian: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["风"],
@@ -232,7 +232,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "「客榻难分庄蝶梦，挑灯细认旧时名」",
+        text: "「回文织就无人读，犹向空墙刻一行」",
         dims: { qingsi: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
       },

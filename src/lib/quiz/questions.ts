@@ -276,7 +276,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "旅途将尽，你想把自己的名字写在哪里？",
     options: [
       {
-        text: "写进志怪传奇里，让后人编成传说",
+        text: "写进志怪传奇里，与天上星宿并列",
         dims: { diangu: 2, tianxiang: 1 },
         mood: { tone: 1, energy: 1 },
       },

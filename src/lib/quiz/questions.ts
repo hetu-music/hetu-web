@@ -272,35 +272,6 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "此生",
-    stem: "旅途将尽。如果能换一种活法，你想成为——",
-    options: [
-      {
-        text: "",
-        dims: { renjian: 2, shanhe: 1 },
-        mood: { tone: 1, energy: 1 },
-      },
-      {
-        text: "在巷口卖了一辈子灯笼的手艺人",
-        dims: { qiyong: 2, guangyin: 1 },
-        mood: { tone: 1, energy: -1 },
-        imagery: ["灯"],
-      },
-      {
-        text: "守着传说中那株千年不谢的花，一守就是一生",
-        dims: { caomu: 2, diangu: 1 },
-        mood: { tone: -1, energy: 1 },
-        imagery: ["花"],
-      },
-      {
-        text: "独守观星台、对着月亮过完一生的人",
-        dims: { tianxiang: 2, loutai: 1 },
-        mood: { tone: -1, energy: -1 },
-        imagery: ["月"],
-      },
-    ],
-  },
-  {
     title: "留名",
     stem: "此行的最后，你想把自己的名字写在哪里？",
     options: [
@@ -354,6 +325,35 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],
+      },
+    ],
+  },
+  {
+    title: "此生",
+    stem: "旅途将尽。如果能换一种活法，你想成为——",
+    options: [
+      {
+        text: "",
+        dims: { renjian: 2, shanhe: 1 },
+        mood: { tone: 1, energy: 1 },
+      },
+      {
+        text: "在巷口卖了一辈子灯笼的手艺人",
+        dims: { qiyong: 2, guangyin: 1 },
+        mood: { tone: 1, energy: -1 },
+        imagery: ["灯"],
+      },
+      {
+        text: "守着传说中那株千年不谢的花，一守就是一生",
+        dims: { caomu: 2, diangu: 1 },
+        mood: { tone: -1, energy: 1 },
+        imagery: ["花"],
+      },
+      {
+        text: "独守观星台、对着月亮过完一生的人",
+        dims: { tianxiang: 2, loutai: 1 },
+        mood: { tone: -1, energy: -1 },
+        imagery: ["月"],
       },
     ],
   },

@@ -286,7 +286,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "刻在古道长亭的木柱上，任岁月风尘洗刷",
+        text: "留在一路相逢的行客心中，纵使终会被遗忘",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },

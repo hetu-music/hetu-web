@@ -85,7 +85,7 @@ export interface SongImageryMark {
   /** 一级分类配色 */
   accent: string;
   timetags: string[];
-  /** 全库写到该意象的作品数（含本曲） */
+  /** 曲库里写到这个词的作品数（含本曲）；按词不按母题，与意象页一致 */
   songCount: number;
 }
 

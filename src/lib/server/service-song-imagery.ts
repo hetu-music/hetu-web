@@ -159,15 +159,20 @@ export async function getSongImagery(
     return path;
   };
 
-  // 每首歌的母题集合，以及每个母题覆盖的作品数。按母题而非词聚合：
+  // 每首歌的母题集合，以及每个母题覆盖的作品数。相关作品按母题而非词聚合：
   // 写「明月」与写「月光」的歌算作写了同一个东西（见 IMAGERY.md）
   const songIds = new Set(index.songs.map((s) => s.id));
   const imageryBySong = new Map<number, Set<number>>();
+  // 题签上的作品数按词算，与「探索」跳到的意象页一致：「暖风」不报「风」的数
+  const songsByWord = new Map<number, Set<number>>();
   for (const occ of index.occurrences) {
     if (!songIds.has(occ.song_id)) continue;
     let set = imageryBySong.get(occ.song_id);
     if (!set) imageryBySong.set(occ.song_id, (set = new Set()));
     set.add(occ.category_id);
+    let songs = songsByWord.get(occ.imagery_id);
+    if (!songs) songsByWord.set(occ.imagery_id, (songs = new Set()));
+    songs.add(occ.song_id);
   }
   const df = new Map<number, number>();
   for (const set of imageryBySong.values()) {
@@ -195,7 +200,7 @@ export async function getSongImagery(
       path: path.map((c) => tr(c.name)),
       accent: (path[0] && l1Color.get(path[0].id)) ?? GRAY_PALETTE.accent,
       timetags: [...new Set(occ.lyric_timetag ?? [])],
-      songCount: df.get(occ.category_id) ?? 1,
+      songCount: songsByWord.get(occ.imagery_id)?.size ?? 1,
     });
   }
   const marks = [...byImagery.values()].filter((m) => m.name);

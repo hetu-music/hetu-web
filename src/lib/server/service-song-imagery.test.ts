@@ -147,14 +147,14 @@ describe("getSongImagery", () => {
     const { marks } = await getSongImagery(1, "zh-CN");
 
     expect(marks).toEqual([
-      // 作品数按母题算：写月光的 4 也计入
+      // 作品数按词算：写月光的 4 同属母题「月」，但不计入
       {
         id: 10,
         name: "明月",
         path: ["自然", "天象", "月"],
         accent: PALETTE_FULL[0].accent,
         timetags: ["00:10.00", "00:40.00"],
-        songCount: 7,
+        songCount: 6,
       },
       {
         id: 11,

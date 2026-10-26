@@ -273,25 +273,25 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "留名",
-    stem: "此行的最后，你想把自己的名字写在哪里？",
+    stem: "旅途将尽，你想把自己的名字写在哪里？",
     options: [
       {
-        text: "化作一颗星，让后人编成传说",
+        text: "写进志怪传奇里，让后人编成传说",
         dims: { diangu: 2, tianxiang: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "绣在给那人的帕子一角，小小的，只那人知道",
+        text: "隐刻在古琴腹底，借每一次拨弦，无声呼应心意",
         dims: { qingsi: 2, qiyong: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "刻在战友的墓碑旁，年年回来描一遍",
+        text: "刻在古道长亭的木柱上，任岁月风尘洗刷",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "刻在深山里一棵树上，等树长高，就再没人看得见",
+        text: "留在荒山绝壁上，任青苔荒草掩没，与山同寂",
         dims: { shanhe: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["山"],
@@ -330,7 +330,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "此生",
-    stem: "旅途将尽。如果能换一种活法，你想成为——",
+    stem: "千帆过尽。如果能换一种活法，你想成为——",
     options: [
       {
         text: "",

@@ -31,8 +31,6 @@ export interface MotifPanelProps {
   /** 只看用这种写法的作品；null 为全部 */
   word: number | null;
   onWord: (id: number | null) => void;
-  /** 点「常与之同写」里的母题：星光移过去，面板换成它 */
-  onJump: (motifId: number) => void;
   onClose: () => void;
 }
 
@@ -101,7 +99,6 @@ function PanelBody({
   loading,
   word,
   onWord,
-  onJump,
   onClose,
 }: Omit<MotifPanelProps, "open" | "side" | "motif"> & {
   motif: MotifData | null;
@@ -230,26 +227,6 @@ function PanelBody({
           </AnimatePresence>
         </div>
       </div>
-
-      {/* 常与之同写 */}
-      {motif.cowritten.length > 0 && (
-        <div className="mt-4 pb-4">
-          <SectionLabel label="常与之同写" accent={palette.accent} compact />
-          <div className="flex flex-wrap items-baseline justify-center gap-x-6 gap-y-3 pt-1">
-            {motif.cowritten.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => onJump(m.id)}
-                title={`${m.both} 首同写`}
-                className={`font-calligraphy text-2xl leading-none opacity-70 hover:opacity-100 transition-opacity ${paletteAt(m.palette).text}`}
-              >
-                {m.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 }

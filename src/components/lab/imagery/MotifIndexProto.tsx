@@ -192,22 +192,6 @@ export default function MotifIndexProto({
     [view, wordMotif],
   );
 
-  /** 同写：星光移到另一个母题，面板跟着换 */
-  const onJump = useCallback(
-    (mid: number) => {
-      const s = view === "motifs" ? mid : leadWordOf(mid);
-      // 被筛选挡住的话放开筛选，好让它在云里亮起来
-      setL1(null);
-      setL2(null);
-      setMotifId(mid);
-      setWord(null);
-      setStar(s);
-      if (s !== null) setReveal({ id: s, key: Date.now() });
-      syncUrl(mid, null, view);
-    },
-    [view, leadWordOf],
-  );
-
   const onWord = useCallback(
     (w: number | null) => {
       setWord(w);
@@ -384,7 +368,6 @@ export default function MotifIndexProto({
         loading={motifQuery.isPending}
         word={word}
         onWord={onWord}
-        onJump={onJump}
         onClose={onClose}
       />
     </div>

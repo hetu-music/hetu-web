@@ -280,10 +280,15 @@ export type MotifData = {
   songCount: number;
   words: MotifWord[];
   works: MotifWork[];
+  /** 面板不展示，留给以后的母题关系图 */
   cowritten: MotifLink[];
 };
 
-/** 同写：至少几首歌一起写到、对方至少写到几首，才算数 */
+/**
+ * 同写：两个母题同在一首歌里的次数是随机情况的几倍（lift = 同写数 × N ÷ (|A| × |B|)），
+ * 只看同歌、不看同句。lift 上限是 N ÷ 较大一方的作品数，月、风这类高频母题到不了门槛。
+ * 门槛凭结果目测定的：至少几首歌一起写到、对方至少写到几首，才算数
+ */
 const COWRITE_MIN_BOTH = 4;
 const COWRITE_MIN_OTHER = 5;
 const COWRITE_MIN_LIFT = 1.8;

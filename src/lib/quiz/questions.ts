@@ -300,7 +300,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "回望",
-    stem: "回望来路，总有一段过往放不下。若为它写一句收尾——",
+    stem: "回望来路，若为它写一句收尾——",
     options: [
       {
         text: "「大江东去，我也算其中一朵浪」",
@@ -309,7 +309,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["江河"],
       },
       {
-        text: "「剑挂在桃树上，不再取下来了」",
+        text: "「宝剑挂桃枝，休问恩仇，且共桃花老」",
         dims: { qiyong: 2, caomu: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["剑"],

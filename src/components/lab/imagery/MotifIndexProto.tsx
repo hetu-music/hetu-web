@@ -5,6 +5,7 @@ import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { GRAY_PALETTE } from "@/lib/imagery/palette";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import {
   useCallback,
   useDeferredValue,
@@ -54,6 +55,7 @@ export default function MotifIndexProto({
   initialMotif: MotifData | null;
   initialWord: number | null;
 }) {
+  const t = useTranslations("common.imagery");
   const [view, setView] = useState<View>(initialView);
   const [l1, setL1] = useState<number | null>(null);
   const [l2, setL2] = useState<number | null>(null);
@@ -229,7 +231,7 @@ export default function MotifIndexProto({
             running={entry?.isIntersecting ?? true}
           />
           <HeroTitle
-            text="意象"
+            text={t("title")}
             mounted={mounted}
             className="font-serif text-5xl md:text-7xl text-slate-800 dark:text-slate-100 mb-4 flex justify-center items-center gap-4 sm:gap-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.05)]"
           />

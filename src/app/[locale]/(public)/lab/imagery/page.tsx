@@ -5,7 +5,7 @@ import { getMotifIndex } from "@/components/lab/imagery/data";
 
 // 原型页：不进搜索引擎
 export const metadata: Metadata = {
-  title: "意象原型",
+  title: "意象词云（原型）",
   robots: { index: false, follow: false },
 };
 

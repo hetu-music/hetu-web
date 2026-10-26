@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { motif } = await params;
   const data = await getMotif(Number(motif));
   return {
-    title: data ? `${data.name} · 意象原型` : "意象原型",
+    title: data ? `${data.name} · 意象词云（原型）` : "意象词云（原型）",
     robots: { index: false, follow: false },
   };
 }

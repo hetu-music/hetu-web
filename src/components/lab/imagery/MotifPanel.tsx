@@ -171,9 +171,7 @@ function PanelBody({
       <div className="mt-2">
         <SectionLabel
           label={
-            word !== null
-              ? `写作「${wordName.get(word) ?? ""}」的作品`
-              : "相关作品"
+            word !== null ? `写作「${wordName.get(word) ?? ""}」` : "相关作品"
           }
           accent={palette.accent}
           compact
@@ -233,10 +231,10 @@ function PanelBody({
 export default function MotifPanel(props: MotifPanelProps) {
   const { open, side, motif, onClose } = props;
   const isDesktop = useIsDesktop();
-  const title = motif?.name ?? "意象";
+  const title = motif?.name ?? "意象词云";
   const description = motif
     ? `${motif.name}：${motif.songCount} 首作品写到，${motif.words.length} 种写法`
-    : "意象";
+    : "意象词云";
   // 换母题时重置写法折叠
   const body = <PanelBody key={motif?.id} {...props} />;
 

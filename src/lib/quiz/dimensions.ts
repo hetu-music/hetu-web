@@ -61,7 +61,7 @@ export const DIMENSIONS: readonly Dimension[] = [
     label: "情思",
     categories: ["情感", "心象"],
     motto: "情之所钟",
-    description: "你不绕弯子，爱与恨、离与别，都要写到最深处。",
+    description: "你总被那些未了的心意打动，爱与恨、离与别，都要写到最深处。",
   },
   {
     key: "diangu",

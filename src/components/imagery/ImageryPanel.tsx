@@ -18,7 +18,7 @@ import type { MotifDetail } from "@/lib/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { BracketButton, paletteAt, SectionLabel } from "./cloud";
 
 /** 写法多的母题先列这么多，其余收起 */
@@ -263,10 +263,21 @@ export default function ImageryPanel(props: ImageryPanelProps) {
   // 换母题时重置写法的折叠
   const body = <PanelBody key={motif?.id} {...props} />;
 
+  // 打开时焦点落在面板本身：默认会落到第一个按钮（写法的「全部」），
+  // 从链接直接打开时没有点击在先，浏览器当作键盘焦点，画出一圈焦点框。
+  // 只有用键盘打开时照默认来，让键盘用户看得到焦点在哪
+  const popupRef = useRef<HTMLDivElement>(null);
+  const initialFocus = useCallback(
+    (type: string) => (type === "keyboard" ? true : popupRef.current),
+    [],
+  );
+
   if (!isDesktop) {
     return (
       <Drawer open={open} onOpenChange={(v) => !v && onClose()}>
         <DrawerContent
+          ref={popupRef}
+          initialFocus={initialFocus}
           // 意象页独有的半透明毛玻璃面板（DESIGN.md 第四节）
           className="h-[65dvh] bg-[#FAFAFA]/96 dark:bg-[#0B0F19]/96 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/50"
           contentClassName="flex flex-col overflow-hidden px-0 pb-0"
@@ -288,6 +299,8 @@ export default function ImageryPanel(props: ImageryPanelProps) {
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
+        ref={popupRef}
+        initialFocus={initialFocus}
         side={side}
         className={`top-(--nav-h) h-[calc(100dvh-var(--nav-h))] w-[min(440px,42vw)] ${
           side === "right"

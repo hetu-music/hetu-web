@@ -8,7 +8,6 @@ import {
   encodeAnswers,
   evaluate,
   getDimension,
-  IMAGERY_ALIAS,
   POOL_VERSION,
   QUIZ_POOL_TAG,
   QUESTIONS,
@@ -36,29 +35,36 @@ const loadQuizPool = unstable_cache(
     // 否则一次查询失败会让残缺的候选池被缓存 2 小时
     const supabase = getServiceClient();
     if (!supabase) throw new Error("Supabase 未配置");
-    const [categories, imagery, occurrences, songs] = await Promise.all([
-      fetchAll<PoolRows["categories"][number]>(
-        supabase,
-        TABLES.IMAGERY_CAT,
-        "id,name,parent_id,level",
-      ),
-      fetchAll<PoolRows["imagery"][number]>(
-        supabase,
-        TABLES.IMAGERY,
-        "id,name",
-      ),
-      // 候选池只取计入曲库的歌
-      fetchAll<PoolRows["occurrences"][number]>(
-        supabase,
-        TABLES.IMAGERY_OCC_CATALOG,
-        "song_id,category_id,imagery_id,lyric_timetag",
-      ),
-      fetchAll<PoolRows["songs"][number]>(
-        supabase,
-        TABLES.MUSIC_CATALOG,
-        "id,title,artist,album,hascover,has_audio,type",
-      ),
-    ]);
+    const [categories, imagery, occurrences, songs, songEmotions] =
+      await Promise.all([
+        fetchAll<PoolRows["categories"][number]>(
+          supabase,
+          TABLES.IMAGERY_CAT,
+          "id,name,parent_id,level",
+        ),
+        fetchAll<PoolRows["imagery"][number]>(
+          supabase,
+          TABLES.IMAGERY,
+          "id,name",
+        ),
+        // 候选池只取计入曲库的歌
+        fetchAll<PoolRows["occurrences"][number]>(
+          supabase,
+          TABLES.IMAGERY_OCC_CATALOG,
+          "song_id,category_id,imagery_id,lyric_timetag",
+        ),
+        fetchAll<PoolRows["songs"][number]>(
+          supabase,
+          TABLES.MUSIC_CATALOG,
+          "id,title,artist,album,hascover,has_audio,type,date",
+        ),
+        // 基调只参与匹配；没标基调的歌情绪取中性，所以这张表允许为空
+        fetchAll<NonNullable<PoolRows["songEmotions"]>[number]>(
+          supabase,
+          TABLES.SONG_EMOTIONS,
+          "song_id,rank,emotions(tone,energy)",
+        ),
+      ]);
     // fetchAll 出错时只记日志并返回已取到的部分，这里至少拦住整表为空的情况
     const empty = Object.entries({ categories, imagery, occurrences, songs })
       .filter(([, rows]) => rows.length === 0)
@@ -66,7 +72,13 @@ const loadQuizPool = unstable_cache(
     if (empty.length > 0) {
       throw new Error(`候选池数据为空：${empty.join(", ")}`);
     }
-    const pool = buildPool({ categories, imagery, occurrences, songs });
+    const pool = buildPool({
+      categories,
+      imagery,
+      occurrences,
+      songs,
+      songEmotions,
+    });
     if (pool.length === 0) throw new Error("候选池为空");
     return pool;
   },
@@ -151,7 +163,7 @@ function pickLines(
       if (!o.timetag) return false;
       return reason.kind === "dimension"
         ? o.dim === reason.key
-        : IMAGERY_ALIAS.get(o.imagery) === reason.name;
+        : o.signature === reason.name;
     });
     const text = lineAt(occ?.timetag ?? null);
     if (text && !picked.includes(text)) picked.push(text);

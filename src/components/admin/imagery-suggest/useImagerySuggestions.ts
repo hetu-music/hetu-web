@@ -23,8 +23,6 @@ export interface SuggestionDraft {
   /** 保存时使用的意象名，默认为候选原名，审核时可改 */
   name: string;
   categoryId: number | null;
-  /** 取消勾选的时间标签 */
-  excludedTags: string[];
 }
 
 export type PanelMessage = { type: "success" | "error"; text: string };
@@ -39,7 +37,6 @@ function initialDraft(s: ImagerySuggestion): SuggestionDraft {
     checked: s.recommended,
     name: s.name,
     categoryId: s.categoryIds[0] ?? null,
-    excludedTags: [],
   };
 }
 
@@ -139,16 +136,6 @@ export function useImagerySuggestions(
       })),
     [],
   );
-
-  const toggleTag = useCallback((imageryId: number, tag: string) => {
-    setDrafts((current) => {
-      const draft = current[imageryId];
-      const excludedTags = draft.excludedTags.includes(tag)
-        ? draft.excludedTags.filter((t) => t !== tag)
-        : [...draft.excludedTags, tag];
-      return { ...current, [imageryId]: { ...draft, excludedTags } };
-    });
-  }, []);
 
   const setChecked = useCallback((imageryIds: number[], checked: boolean) => {
     setDrafts((current) => {
@@ -297,7 +284,6 @@ export function useImagerySuggestions(
     const items: OccurrenceBatchItem[] = [];
     for (const s of selected) {
       const draft = drafts[s.imageryId];
-      const tags = s.timetags.filter((t) => !draft.excludedTags.includes(t));
       const name = draft.name.trim();
       if (!name || name.length > IMAGERY_NAME_MAX) {
         setMessage({
@@ -310,15 +296,10 @@ export function useImagerySuggestions(
         setMessage({ type: "error", text: `「${name}」还没有选择母题` });
         return;
       }
-      if (tags.length === 0) {
-        setMessage({ type: "error", text: `「${name}」至少要保留一处歌词` });
-        return;
-      }
       const entry = resolveName(name);
       items.push({
         ...(entry ? { imagery_id: entry.id } : { imagery_name: name }),
         category_id: draft.categoryId,
-        lyric_timetag: tags,
       });
     }
     if (items.length === 0) return;
@@ -370,7 +351,6 @@ export function useImagerySuggestions(
     resolveName,
     rename,
     updateDraft,
-    toggleTag,
     setChecked,
     save,
   };

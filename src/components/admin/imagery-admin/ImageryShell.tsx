@@ -6,16 +6,15 @@ import AdminShell from "../kit/AdminShell";
 import { AdminToolbar, type Stat } from "../kit/parts";
 import { optionClass } from "../kit/styles";
 
-export type ImagerySub = "items" | "categories" | "meanings";
+export type ImagerySub = "items" | "categories";
 
 const SUBS: { key: ImagerySub; href: string; label: string }[] = [
   { key: "items", href: "/admin/imagery", label: "词条" },
   { key: "categories", href: "/admin/imagery/categories", label: "分类" },
-  { key: "meanings", href: "/admin/imagery/meanings", label: "含义" },
 ];
 
 /**
- * 意象库三个子页的外壳：词条、分类、含义各有自己的地址。
+ * 意象库两个子页的外壳：词条、分类各有自己的地址。
  * 某首歌标了哪些意象，在歌曲工作台的「意象」一栏里编辑。
  */
 export default function ImageryShell({
@@ -38,7 +37,7 @@ export default function ImageryShell({
       title="意象"
       description={
         <>
-          维护意象词典、分类树与含义库。某首歌标了哪些意象，到
+          维护意象词典与分类树。某首歌标了哪些意象，到
           <Link
             href="/admin/songs"
             className="mx-1 text-(--tone) hover:opacity-75"

@@ -2,6 +2,7 @@
 import { apiRequest } from "@/lib/api/request";
 import type {
   CreateRequestPayload,
+  Emotion,
   ReplyRequestPayload,
   Song,
   UserRecord,
@@ -130,65 +131,6 @@ export function apiUpdateImageryCategory(
   });
 }
 
-// ─── Imagery meanings API ──────────────────────────────────────────────────────
-
-type MeaningInput = { label: string; description?: string | null };
-
-export function apiGetMeanings() {
-  return apiRequest<Untyped>("/api/admin/meanings", {
-    fallback: "获取含义列表失败",
-  });
-}
-
-export function apiCreateMeaning(imageryId: number, data: MeaningInput) {
-  return apiRequest<Untyped>(`/api/admin/imagery/${imageryId}/meanings`, {
-    method: "POST",
-    body: data,
-    fallback: "新增含义失败",
-  });
-}
-
-export function apiUpdateMeaning(
-  imageryId: number,
-  meaningId: number,
-  data: MeaningInput,
-) {
-  return apiRequest<Untyped>(
-    `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
-    { method: "PUT", body: data, fallback: "更新含义失败" },
-  );
-}
-
-export function apiDeleteMeaning(imageryId: number, meaningId: number) {
-  return apiRequest<Untyped>(
-    `/api/admin/imagery/${imageryId}/meanings/${meaningId}`,
-    { method: "DELETE", fallback: "删除含义失败" },
-  );
-}
-
-export function apiCreateGlobalMeaning(data: MeaningInput) {
-  return apiRequest<Untyped>("/api/admin/meanings", {
-    method: "POST",
-    body: data,
-    fallback: "新增含义失败",
-  });
-}
-
-export function apiUpdateGlobalMeaning(meaningId: number, data: MeaningInput) {
-  return apiRequest<Untyped>(`/api/admin/meanings/${meaningId}`, {
-    method: "PUT",
-    body: data,
-    fallback: "更新含义失败",
-  });
-}
-
-export function apiDeleteGlobalMeaning(meaningId: number) {
-  return apiRequest<Untyped>(`/api/admin/meanings/${meaningId}`, {
-    method: "DELETE",
-    fallback: "删除含义失败",
-  });
-}
-
 // ─── Occurrences API ───────────────────────────────────────────────────────────
 
 export function apiGetOccurrencesForImagery(imageryId: number) {
@@ -203,17 +145,17 @@ export function apiGetOccurrencesForSong(songId: number) {
   });
 }
 
+/** 时间标签由服务端按歌词算出；400 带着可读的原因（词不在歌词里等） */
 export function apiCreateOccurrence(data: {
   song_id: number;
   imagery_id: number;
   category_id: number;
-  meaning_id?: number | null;
-  lyric_timetag: string[];
 }) {
   return apiRequest<Untyped>("/api/admin/occurrences", {
     method: "POST",
     body: data,
     fallback: "新增关系失败",
+    serverMessage: [400],
   });
 }
 
@@ -258,14 +200,13 @@ export function apiUpdateOccurrence(
   data: {
     imagery_id?: number;
     category_id?: number;
-    meaning_id?: number | null;
-    lyric_timetag?: string[];
   },
 ) {
   return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "PUT",
     body: data,
     fallback: "更新关系失败",
+    serverMessage: [400],
   });
 }
 
@@ -273,6 +214,43 @@ export function apiDeleteOccurrence(id: number) {
   return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "DELETE",
     fallback: "删除关系失败",
+  });
+}
+
+// ─── Song Emotions API ─────────────────────────────────────────────────────────
+
+export function apiGetSongEmotions(songId: number) {
+  return apiRequest<{
+    emotions: Emotion[];
+    selected: number[];
+    /** ai：批量预标、尚未确认；human：人工标注或确认过；null：还没标 */
+    source: "human" | "ai" | null;
+    llmEnabled: boolean;
+  }>(`/api/admin/song-emotions?song_id=${songId}`, {
+    fallback: "获取基调失败",
+  });
+}
+
+/** 每次调用都产生模型费用；502/503 是 LLM 侧的问题，服务端给的信息可以直接展示 */
+export function apiSuggestSongEmotions(songId: number) {
+  return apiRequest<{ emotionIds: number[]; reason: string }>(
+    "/api/admin/song-emotions/suggest",
+    {
+      method: "POST",
+      body: { song_id: songId },
+      fallback: "AI 建议失败",
+      serverMessage: [404, 502, 503],
+    },
+  );
+}
+
+/** emotionIds 按主、副顺序；400 带着可读的原因（歌曲未发布等） */
+export function apiSetSongEmotions(songId: number, emotionIds: number[]) {
+  return apiRequest<{ selected: number[] }>("/api/admin/song-emotions", {
+    method: "PUT",
+    body: { song_id: songId, emotion_ids: emotionIds },
+    fallback: "保存基调失败",
+    serverMessage: [400],
   });
 }
 

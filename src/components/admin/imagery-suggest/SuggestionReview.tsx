@@ -172,7 +172,6 @@ function SuggestionRow({
   dictionaryListId,
   onUpdate,
   onRename,
-  onToggleTag,
 }: {
   suggestion: ImagerySuggestion;
   draft: SuggestionDraft;
@@ -186,7 +185,6 @@ function SuggestionRow({
   dictionaryListId: string;
   onUpdate: (patch: Partial<SuggestionDraft>) => void;
   onRename: (name: string) => void;
-  onToggleTag: (tag: string) => void;
 }) {
   const renamed = draft.name !== suggestion.name;
   const categoryIds =
@@ -256,28 +254,18 @@ function SuggestionRow({
           {!renamed && <HistoryBadge suggestion={suggestion} />}
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {suggestion.timetags.map((tag, i) => {
-            const excluded = draft.excludedTags.includes(tag);
-            return (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => onToggleTag(tag)}
-                title={excluded ? "点击恢复" : "点击排除这一处"}
-                className={cn(
-                  "rounded-md border px-2 py-0.5 text-left text-xs transition-colors",
-                  excluded
-                    ? "border-dashed border-slate-200 text-slate-400 line-through dark:border-slate-700"
-                    : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300",
-                )}
-              >
-                <span className="mr-1.5 font-mono text-[10px] text-slate-400">
-                  {tag}
-                </span>
-                {suggestion.lines[i]}
-              </button>
-            );
-          })}
+          {/* 出现位置由服务端按歌词算出，这里只列出 */}
+          {suggestion.timetags.map((tag, i) => (
+            <span
+              key={tag}
+              className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
+            >
+              <span className="mr-1.5 font-mono text-[10px] text-slate-400">
+                {tag}
+              </span>
+              {suggestion.lines[i]}
+            </span>
+          ))}
         </div>
       </div>
     </div>
@@ -335,7 +323,6 @@ export default function SuggestionReview({
             dictionaryListId={dictionaryListId}
             onUpdate={(patch) => imagery.updateDraft(s.imageryId, patch)}
             onRename={(name) => imagery.rename(s.imageryId, name)}
-            onToggleTag={(tag) => imagery.toggleTag(s.imageryId, tag)}
           />
         </div>
       );

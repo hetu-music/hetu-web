@@ -52,12 +52,14 @@ export const TABLES = {
 
   // 意象系统表
   IMAGERY: "imagery",
-  IMAGERY_SUMMARY: "imagery_summary",
+  IMAGERY_SUMMARY: "imagery_summary", // 视图：曲库歌曲里出现过的词及次数（公开意象页）
+  IMAGERY_SUMMARY_ALL: "imagery_summary_all", // 视图：全部词，次数含争议歌曲（后台）
   IMAGERY_CAT: "imagery_categories",
-  IMAGERY_MEANINGS: "imagery_meanings",
   IMAGERY_MOTIFS: "imagery_motifs", // 词 → 可取的母题（见 IMAGERY.md）
   IMAGERY_OCC: "imagery_occurrences",
   IMAGERY_OCC_CATALOG: "imagery_occurrences_catalog", // 视图：只含 MUSIC_CATALOG 歌曲的出处
+  EMOTIONS: "emotions", // 基调词表（见 IMAGERY.md）
+  SONG_EMOTIONS: "song_emotions", // 每首歌的主、副基调
 
   // 用户与互动表
   USERS: "users",

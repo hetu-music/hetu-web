@@ -50,7 +50,6 @@ function post(body: unknown) {
 const validItem = {
   imagery_id: 1,
   category_id: 10,
-  lyric_timetag: ["01:26.04"],
 };
 
 beforeEach(() => {
@@ -110,13 +109,13 @@ describe("POST /api/admin/occurrences/batch", () => {
     const res = await POST(
       post({
         song_id: 5,
-        items: [{ imagery_name: " 孤灯 ", category_id: 10, lyric_timetag: [] }],
+        items: [{ imagery_name: " 孤灯 ", category_id: 10 }],
       }),
     );
     expect(res.status).toBe(200);
     expect(createOccurrencesBatch).toHaveBeenCalledWith(
       5,
-      [{ imagery_name: "孤灯", category_id: 10, lyric_timetag: [] }],
+      [{ imagery_name: "孤灯", category_id: 10 }],
       "test-token",
     );
   });
@@ -124,19 +123,12 @@ describe("POST /api/admin/occurrences/batch", () => {
   it.each([
     ["空列表", { song_id: 5, items: [] }],
     [
-      "时间标签格式错误",
-      { song_id: 5, items: [{ ...validItem, lyric_timetag: ["1:2"] }] },
-    ],
-    [
       "新意象名为空",
-      {
-        song_id: 5,
-        items: [{ imagery_name: "  ", category_id: 10, lyric_timetag: [] }],
-      },
+      { song_id: 5, items: [{ imagery_name: "  ", category_id: 10 }] },
     ],
     [
       "既无 imagery_id 也无 imagery_name",
-      { song_id: 5, items: [{ category_id: 10, lyric_timetag: [] }] },
+      { song_id: 5, items: [{ category_id: 10 }] },
     ],
   ])("%s 时返回 400", async (_, body) => {
     const res = await POST(post(body));
@@ -153,6 +145,17 @@ describe("POST /api/admin/occurrences/batch", () => {
     const res = await POST(post({ song_id: 5, items: [validItem] }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("尚未发布");
+  });
+
+  it("词不在歌词里时返回 400 和可读的错误信息", async () => {
+    vi.mocked(createOccurrencesBatch).mockRejectedValue(
+      Object.assign(new Error("歌词里没有「孤灯」"), {
+        code: "IMAGERY_NOT_IN_LYRICS",
+      }),
+    );
+    const res = await POST(post({ song_id: 5, items: [validItem] }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("孤灯");
   });
 
   it("未知错误返回 500", async () => {

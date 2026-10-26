@@ -3,16 +3,23 @@ import { getQuizPoolSize, getQuizQuestions } from "@/lib/server/service-quiz";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/constants";
+import { getSongs } from "@/lib/server/service-songs";
+import { countCatalogSongs } from "@/lib/utils/utils-song";
 
 type Props = {
   params: Promise<{ locale: string }>;
 };
 
+/** 对外展示的曲库总数，与首页统计同一口径；候选池的真实大小不对外展示 */
+async function getSongCount(locale: string): Promise<number> {
+  return countCatalogSongs(await getSongs(undefined, undefined, true, locale));
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "quiz" });
   const tSite = await getTranslations({ locale, namespace: "common" });
-  const count = await getQuizPoolSize();
+  const count = await getSongCount(locale);
   const title = t("title");
   const description = t("metaDescription", { count });
 
@@ -41,9 +48,18 @@ export default async function QuizPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const questions = getQuizQuestions(locale);
-  const poolSize = await getQuizPoolSize();
+  const [poolSize, songCount] = await Promise.all([
+    getQuizPoolSize(),
+    getSongCount(locale),
+  ]);
 
-  return <QuizClient questions={questions} poolSize={poolSize} />;
+  return (
+    <QuizClient
+      questions={questions}
+      poolSize={poolSize}
+      songCount={songCount}
+    />
+  );
 }
 
 export const revalidate = 7200;

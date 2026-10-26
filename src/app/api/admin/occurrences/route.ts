@@ -17,8 +17,6 @@ const CreateOccurrenceSchema = z.object({
   song_id: z.number().int().positive(),
   imagery_id: z.number().int().positive(),
   category_id: z.number().int().positive(),
-  meaning_id: z.number().int().positive().nullable().optional(),
-  lyric_timetag: z.array(z.string()).default([]),
 });
 
 export const GET = withAuth(
@@ -85,7 +83,9 @@ export const POST = withAuth(
     } catch (e) {
       if (
         e instanceof Error &&
-        (e as Error & { code?: string }).code === "NOT_LEAF_CATEGORY"
+        ["NOT_LEAF_CATEGORY", "IMAGERY_NOT_IN_LYRICS"].includes(
+          (e as Error & { code?: string }).code ?? "",
+        )
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

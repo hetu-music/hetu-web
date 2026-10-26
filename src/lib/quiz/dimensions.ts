@@ -40,7 +40,7 @@ export const DIMENSIONS: readonly Dimension[] = [
     label: "楼台",
     categories: ["建筑"],
     motto: "倚遍楼台",
-    description: "你偏爱有檐有窗的地方，在楼阁庭院里等一个人、看一场雪。",
+    description: "你偏爱有檐有窗的地方，愿意在楼阁庭院里等一个人、看一场雪。",
   },
   {
     key: "guangyin",
@@ -61,7 +61,7 @@ export const DIMENSIONS: readonly Dimension[] = [
     label: "情思",
     categories: ["情感", "心象"],
     motto: "情之所钟",
-    description: "你不绕弯子，爱与恨、离与别，都要写到最深处。",
+    description: "你总被那些未了的心意打动，爱与恨、离与别，都要写到最深处。",
   },
   {
     key: "diangu",
@@ -90,26 +90,37 @@ export const CATEGORY_TO_DIMENSION: ReadonlyMap<string, DimensionKey> = new Map(
 );
 
 /**
- * 招牌意象：原创歌曲中出现最多的意象，题目选项可直接指向它们。
+ * 招牌意象：原创歌曲中出现最多的具体意象，题目选项可直接指向它们。
+ * 按母题计数：挂在该母题上的词都算（清风、长风都是「风」）。
+ * 「花」只算母题「花」；桃、梅、梨等品种花是单列的母题，不并入，以免与「草木」维度重叠。
+ * 每个招牌意象都是独立的匹配特征，同一维度不宜挑太多，否则该维度在匹配里分量过重；
+ * 岁月、人间等高频母题太抽象，不适合作为「你偏爱的意象」展示，故不入选。
+ * 母题改名时需同步这里（pnpm quiz:check 会报出找不到的母题）。
  */
 export const SIGNATURE_IMAGERY: readonly SignatureImagery[] = [
-  { name: "风", aliases: ["风", "春风", "西风", "东风", "秋风"] },
-  { name: "花", aliases: ["花", "落花", "桃花", "繁花"] },
-  { name: "月", aliases: ["月", "明月", "月光", "月色"] },
-  { name: "雪", aliases: ["雪", "飞雪", "大雪"] },
-  { name: "雨", aliases: ["雨", "烟雨", "细雨"] },
-  { name: "云", aliases: ["云", "浮云", "白云"] },
-  { name: "酒", aliases: ["酒", "美酒", "浊酒"] },
-  { name: "梦", aliases: ["梦", "梦境", "旧梦"] },
-  { name: "山", aliases: ["山", "青山", "关山"] },
-  { name: "灯", aliases: ["灯", "灯火"] },
-  { name: "柳", aliases: ["柳", "杨柳", "垂柳"] },
-  { name: "马", aliases: ["马", "白马"] },
-  { name: "星辰", aliases: ["星辰", "星", "星河"] },
-  { name: "窗", aliases: ["窗", "轩窗"] },
+  // 天象
+  { name: "风", motif: "风" },
+  { name: "月", motif: "月" },
+  { name: "雪", motif: "雪" },
+  { name: "雨", motif: "雨" },
+  // 山河
+  { name: "山", motif: "山" },
+  { name: "江河", motif: "江河" },
+  // 草木
+  { name: "花", motif: "花" },
+  { name: "柳", motif: "柳" },
+  { name: "马", motif: "马" },
+  // 器用
+  { name: "酒", motif: "酒" },
+  { name: "灯", motif: "灯" },
+  { name: "剑", motif: "剑" },
+  // 情思
+  { name: "梦", motif: "梦" },
+  // 楼台
+  { name: "楼", motif: "楼" },
 ];
 
-/** 数据库意象名 → 招牌意象名 */
-export const IMAGERY_ALIAS: ReadonlyMap<string, string> = new Map(
-  SIGNATURE_IMAGERY.flatMap((s) => s.aliases.map((a) => [a, s.name])),
+/** 母题名 → 招牌意象名 */
+export const MOTIF_TO_SIGNATURE: ReadonlyMap<string, string> = new Map(
+  SIGNATURE_IMAGERY.map((s) => [s.motif, s.name]),
 );

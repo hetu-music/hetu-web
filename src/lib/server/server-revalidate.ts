@@ -146,6 +146,22 @@ export async function refreshImagery({
   });
 }
 
+/**
+ * 歌曲基调变了：基调参与寻曲测验的匹配和详情页相关作品的排序，页面上都不显示。
+ *
+ * 寻曲结果页按作答动态渲染，读的是候选池缓存；入口页只用到候选池的歌曲数，
+ * 与基调无关。相关作品会牵动别的歌，标签让 Next 上的全部详情页失效；
+ * CDN 上只清这首歌的详情页。
+ */
+export async function refreshSongEmotions(
+  songId: number,
+): Promise<PurgeReport> {
+  return invalidate({
+    pages: [songPage(songId)],
+    tags: [QUIZ_POOL_TAG, SONG_IMAGERY_TAG],
+  });
+}
+
 /** 部署后预热与外部同步脚本用：列表类页面和各项聚合数据 */
 export async function refreshPublicPages(): Promise<PurgeReport> {
   return invalidate({

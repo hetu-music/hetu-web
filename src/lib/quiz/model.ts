@@ -12,18 +12,27 @@ import type {
 /**
  * 匹配模型。
  *
- * 特征 = 9 个意象维度 + 若干招牌意象。用户与歌曲各自标准化后比较「偏向」：
+ * 特征 = 9 个意象维度 + 若干招牌意象 + 情绪坐标（明暗、扬抑两条轴）。
+ * 情绪只参与匹配，不出现在匹配理由与结果画像里。用户与歌曲各自标准化后比较「偏向」：
  *
  * - 用户：假设每题独立、选项等概率，特征加总的均值与方差可由选项权重直接解析算出，
  *   据此把原始分转为 z 分数。无需模拟，也无需手调中心值。
  * - 歌曲：维度取占比（消除歌词长短的影响），招牌意象取 log(1+次数)，
- *   再在候选池内逐特征标准化。
+ *   情绪取由基调算出的坐标（没有基调的歌取池内均值），再在候选池内逐特征标准化。
  * - 匹配：加权余弦相似度。比较方向而非距离，避免靠近均值的「中庸」歌曲包揽第一。
- *   多人合唱的歌再减去一个固定值，见 ENSEMBLE_PENALTY。
+ *   多人合唱、商业作品再各减去一个固定值，见 ENSEMBLE_PENALTY、COMMERCIAL_PENALTY。
  */
 
 /** 招牌意象特征相对维度特征的权重 */
 const IMAGERY_GROUP_WEIGHT = 0.6;
+/**
+ * 情绪坐标每条轴相对维度特征的权重。
+ * 选项的情绪写在字面上、每题占满四个象限后，情绪才可靠到值得加重：
+ * 1.5 比 1 让第一契合与用户情绪同向的比例从约 79% 升到 85%，推荐也更分散，
+ * 代价是第一契合在用户主维度上偏高的比例少约 1 个百分点
+ */
+export const MOOD_WEIGHT = 1.5;
+const MOOD_AXES = ["tone", "energy"] as const;
 /** 结果中同一专辑最多出现几首 */
 const MAX_PER_ALBUM = 2;
 /** 演唱者达到几人算多人合唱 */
@@ -33,9 +42,17 @@ const ENSEMBLE_SIZE = 5;
  * 这类歌多是群像、拼盘，意象堆得密，容易靠特征「撞」进前列，但作为推荐价值不高
  */
 export const ENSEMBLE_PENALTY = 0.1;
+/**
+ * 商业作品（游戏、影视等的定制曲）从相似度里减去的值。
+ * 不排除，只降低出现机会：0.05 让它们当第一的比例从约 13%（与在候选池的占比相当）降到约 6%，
+ * 每首仍有机会当第一。与多人合唱的降权可以叠加
+ */
+export const COMMERCIAL_PENALTY = 0.05;
 
 type FeatureKey =
-  { kind: "dimension"; key: DimensionKey } | { kind: "imagery"; name: string };
+  | { kind: "dimension"; key: DimensionKey }
+  | { kind: "imagery"; name: string }
+  | { kind: "mood"; axis: (typeof MOOD_AXES)[number] };
 
 export interface QuizModel {
   questions: readonly QuizQuestion[];
@@ -61,6 +78,7 @@ function buildFeatures(): FeatureKey[] {
       kind: "imagery" as const,
       name: s.name,
     })),
+    ...MOOD_AXES.map((axis) => ({ kind: "mood" as const, axis })),
   ];
 }
 
@@ -87,6 +105,8 @@ export function buildModel(
   questions: readonly QuizQuestion[],
   /** 只给诊断脚本比较不同取值用 */
   ensemblePenalty = ENSEMBLE_PENALTY,
+  moodWeight = MOOD_WEIGHT,
+  commercialPenalty = COMMERCIAL_PENALTY,
 ): QuizModel {
   const features = buildFeatures();
   const F = features.length;
@@ -94,12 +114,21 @@ export function buildModel(
   const imageryIndex = new Map<string, number>();
   features.forEach((feat, i) => {
     if (feat.kind === "dimension") dimIndex.set(feat.key, i);
-    else imageryIndex.set(feat.name, i);
+    else if (feat.kind === "imagery") imageryIndex.set(feat.name, i);
   });
 
   const weights = new Float64Array(
     features.map((feat) =>
-      feat.kind === "dimension" ? 1 : IMAGERY_GROUP_WEIGHT,
+      feat.kind === "dimension"
+        ? 1
+        : feat.kind === "imagery"
+          ? IMAGERY_GROUP_WEIGHT
+          : moodWeight,
+    ),
+  );
+  const moodIndex = new Map(
+    features.flatMap((feat, i) =>
+      feat.kind === "mood" ? [[feat.axis, i] as const] : [],
     ),
   );
 
@@ -120,6 +149,10 @@ export function buildModel(
           throw new Error(`题目「${question.title}」含未知意象 ${name}`);
         }
         vec[i] += 1;
+      }
+      for (const axis of MOOD_AXES) {
+        const i = moodIndex.get(axis);
+        if (i !== undefined) vec[i] += option.mood[axis];
       }
       return vec;
     }),
@@ -145,13 +178,25 @@ export function buildModel(
   const userSd = userVar.map(Math.sqrt);
 
   // ── 歌曲侧：原始特征 → 池内标准化 ──
+  // 没有基调的歌取有基调歌曲的均值，标准化后为 0，即情绪上不偏不倚
+  const moodMean = Object.fromEntries(
+    MOOD_AXES.map((axis) => {
+      const values = pool.flatMap((s) => (s.mood ? [s.mood[axis]] : []));
+      return [
+        axis,
+        values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0,
+      ];
+    }),
+  ) as Record<(typeof MOOD_AXES)[number], number>;
   const songVectors = pool.map((song) => {
     const vec = new Float64Array(F);
     features.forEach((feat, i) => {
       vec[i] =
         feat.kind === "dimension"
           ? song.dimCounts[feat.key] / Math.max(song.total, 1)
-          : Math.log1p(song.imageryCounts[feat.name] ?? 0);
+          : feat.kind === "imagery"
+            ? Math.log1p(song.imageryCounts[feat.name] ?? 0)
+            : (song.mood?.[feat.axis] ?? moodMean[feat.axis]);
     });
     return vec;
   });
@@ -160,8 +205,10 @@ export function buildModel(
     songVectors.map((v) => weightedNorm(v, weights)),
   );
   const songPenalties = new Float64Array(
-    pool.map((song) =>
-      (song.artist?.length ?? 0) >= ENSEMBLE_SIZE ? ensemblePenalty : 0,
+    pool.map(
+      (song) =>
+        ((song.artist?.length ?? 0) >= ENSEMBLE_SIZE ? ensemblePenalty : 0) +
+        (song.type?.includes("商业") ? commercialPenalty : 0),
     ),
   );
 
@@ -202,7 +249,7 @@ export function userVector(
   return { raw, z };
 }
 
-/** 所有歌曲的余弦相似度（已扣除多人合唱的降权），与 model.songs 对齐 */
+/** 所有歌曲的余弦相似度（已扣除多人合唱、商业作品的降权），与 model.songs 对齐 */
 export function scoreSongs(model: QuizModel, z: Float64Array): Float64Array {
   const { weights, songVectors, songNorms, songPenalties } = model;
   const userNorm = weightedNorm(z, weights);
@@ -258,21 +305,48 @@ function explain(
   limit: number,
 ): MatchReason[] {
   const s = model.songVectors[songIndex];
-  return model.features
-    .map((feat, f) => ({
-      feat,
-      c: model.weights[f] * z[f] * s[f],
-      u: z[f],
-      v: s[f],
-    }))
-    .filter((x) => x.u > 0 && x.v > 0)
-    .sort((a, b) => b.c - a.c)
-    .slice(0, limit)
-    .map(({ feat }): MatchReason =>
-      feat.kind === "dimension"
-        ? { kind: "dimension", key: feat.key }
-        : { kind: "imagery", name: feat.name },
-    );
+  return (
+    model.features
+      .map((feat, f) => ({
+        feat,
+        c: model.weights[f] * z[f] * s[f],
+        u: z[f],
+        v: s[f],
+      }))
+      // 情绪只参与匹配，不作为理由展示
+      .filter((x) => x.feat.kind !== "mood" && x.u > 0 && x.v > 0)
+      .sort((a, b) => b.c - a.c)
+      .slice(0, limit)
+      .flatMap(({ feat }): MatchReason[] =>
+        feat.kind === "dimension"
+          ? [{ kind: "dimension", key: feat.key }]
+          : feat.kind === "imagery"
+            ? [{ kind: "imagery", name: feat.name }]
+            : [],
+      )
+  );
+}
+
+/** z 分数相差小于此值视为并列（解析标准化的浮点误差远小于它） */
+const TIE_EPSILON = 1e-9;
+
+/** 每个维度在所选选项中作为主维度（该选项权重最高的维度）出现的次数 */
+function primaryPicks(
+  model: QuizModel,
+  answers: Answers,
+): Map<DimensionKey, number> {
+  const counts = new Map<DimensionKey, number>();
+  answers.forEach((choice, q) => {
+    const dims = Object.entries(model.questions[q].options[choice].dims);
+    const top = Math.max(...dims.map(([, w]) => w ?? 0));
+    for (const [key, w] of dims) {
+      if (w === top) {
+        const k = key as DimensionKey;
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+      }
+    }
+  });
+  return counts;
 }
 
 export function evaluate(
@@ -282,20 +356,34 @@ export function evaluate(
 ): QuizResult {
   const { raw, z } = userVector(model, answers);
   const scores = scoreSongs(model, z);
-  const matches: SongMatch[] = rankSongs(model, scores, topN).map((j) => ({
+  const picked = rankSongs(model, scores, topN);
+  const matches: SongMatch[] = picked.map((j) => ({
     songId: model.songs[j].id,
     score: scores[j],
     percent: toPercent(scores[j]),
     reasons: explain(model, z, j, 3),
   }));
 
-  const profile: QuizResult["profile"] = [];
+  const profile: Array<QuizResult["profile"][number] & { f: number }> = [];
   const imagery: string[] = [];
   model.features.forEach((feat, f) => {
-    if (feat.kind === "dimension") profile.push({ key: feat.key, z: z[f] });
-    else if (raw[f] > 0) imagery.push(feat.name);
+    if (feat.kind === "dimension") profile.push({ key: feat.key, z: z[f], f });
+    else if (feat.kind === "imagery" && raw[f] > 0) imagery.push(feat.name);
   });
-  profile.sort((a, b) => b.z - a.z);
+  // 维度分配越均衡，z 分数越容易完全相同；并列时不能按维度定义顺序决定人格。
+  // 先看哪个维度被用户更多地作为主维度选中，再看第一契合歌曲在哪个维度上更突出
+  const picks = primaryPicks(model, answers);
+  const topSong = picked.length > 0 ? model.songVectors[picked[0]] : null;
+  profile.sort((a, b) => {
+    if (Math.abs(a.z - b.z) > TIE_EPSILON) return b.z - a.z;
+    const byPicks = (picks.get(b.key) ?? 0) - (picks.get(a.key) ?? 0);
+    if (byPicks !== 0) return byPicks;
+    return topSong ? topSong[b.f] - topSong[a.f] : 0;
+  });
 
-  return { profile, imagery, matches };
+  return {
+    profile: profile.map(({ key, z: score }) => ({ key, z: score })),
+    imagery,
+    matches,
+  };
 }

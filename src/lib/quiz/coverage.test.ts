@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkCoverage, MIN_ALIAS_SONGS } from "./coverage";
+import { checkCoverage } from "./coverage";
 import { MIN_OCCURRENCES, type PoolRows } from "./pool";
 
 const categories: PoolRows["categories"] = [
@@ -38,6 +38,7 @@ function song(
   title = `歌${id}`,
   type: string[] | null = null,
   lyrics: string | null = "[00:01.00]词",
+  date: string | null = "2012-01-01",
 ) {
   return {
     id,
@@ -47,12 +48,13 @@ function song(
     hascover: null,
     has_audio: null,
     type,
+    date,
     lyrics,
   };
 }
 
-/** 歌 1–5 各含 月/皓月/岁月/风月/风，足以触发别名建议的门槛 */
-const songIds = Array.from({ length: MIN_ALIAS_SONGS }, (_, i) => i + 1);
+/** 歌 1–5 各含 月/皓月/岁月/风月/风 */
+const songIds = [1, 2, 3, 4, 5];
 const occurrences: Occ[] = songIds.flatMap((id) => [
   occ(id, 1, 100),
   occ(id, 2, 100),
@@ -70,6 +72,7 @@ const report = checkCoverage({
     song(20, "翻唱歌", ["翻唱"]),
     song(21, "某歌（纯歌版）"),
     song(22, "无词歌", null, null),
+    song(23, "无日期歌", null, "[00:01.00]词", null),
   ],
 });
 
@@ -88,6 +91,8 @@ describe("checkCoverage", () => {
     expect(titles).toContain("无词歌");
     expect(titles).not.toContain("翻唱歌");
     expect(titles).not.toContain("某歌（纯歌版）");
+    // 日期未知的作品不入池，补标注也进不了测验，不算待标注
+    expect(titles).not.toContain("无日期歌");
     expect(report.pendingSongs.find((s) => s.id === 22)?.hasLyrics).toBe(false);
   });
 
@@ -102,36 +107,16 @@ describe("checkCoverage", () => {
     expect(report.missingCategories).not.toContain("天象");
   });
 
-  it("报告意象表中不存在的别名", () => {
-    expect(report.missingAliases).toContainEqual({
-      signature: "月",
-      alias: "明月",
+  it("报告招牌意象指向、但数据库中不存在的母题", () => {
+    // 测试数据只有母题「月」「岁月」「其他」
+    expect(report.missingMotifs).toContainEqual({
+      signature: "风",
+      motif: "风",
     });
-    expect(report.missingAliases).not.toContainEqual({
-      signature: "月",
-      alias: "月",
+    expect(report.missingMotifs).toContainEqual({
+      signature: "江河",
+      motif: "江河",
     });
-  });
-
-  it("只建议与现有别名同类、且只含一个招牌字的词", () => {
-    const suggested = report.aliasSuggestions.map((s) => s.name);
-    expect(report.aliasSuggestions).toContainEqual({
-      signature: "月",
-      name: "皓月",
-      category: "天象",
-      songs: MIN_ALIAS_SONGS,
-    });
-    expect(suggested).not.toContain("岁月"); // 属于「时间」，不是天象的月
-    expect(suggested).not.toContain("风月"); // 同时含「风」「月」，归属不明
-  });
-
-  it("出现歌曲数不足门槛的词不建议", () => {
-    const few = checkCoverage({
-      categories,
-      imagery,
-      occurrences: [occ(1, 1, 100), occ(1, 2, 100)],
-      songs: [song(1)],
-    });
-    expect(few.aliasSuggestions).toEqual([]);
+    expect(report.missingMotifs.map((m) => m.motif)).not.toContain("月");
   });
 });

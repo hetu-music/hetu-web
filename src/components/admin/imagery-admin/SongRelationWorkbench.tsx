@@ -1,9 +1,10 @@
 "use client";
 
+import { linesForWord } from "@/lib/imagery/consistency";
 import { parseLrcLines, type LrcLine } from "@/lib/imagery/suggest";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import type { ImageryCategory, ImageryItem, ImageryMeaning } from "@/lib/types";
-import { AlertCircle, Plus, Wand2, X } from "lucide-react";
+import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import { AlertCircle, Plus, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SuggestionReview from "../imagery-suggest/SuggestionReview";
@@ -15,7 +16,6 @@ import {
   PANEL_CLASS,
   SELECT_CLASS,
   SOLID_BUTTON_CLASS,
-  TAG_CLASS,
   TEXT_BUTTON_CLASS,
 } from "../kit/styles";
 import { cn } from "@/lib/utils/utils";
@@ -26,17 +26,13 @@ export interface RelationDraft {
   imageryId: number | null;
   imageryName: string;
   categoryId: number;
-  meaningId: number | null;
-  timetags: string[];
 }
 
-/** 正在编辑的关系；occurrenceId 为 null 表示新建 */
+/** 正在编辑的关系；occurrenceId 为 null 表示新建。出现位置由歌词算出，不在这里 */
 interface EditorState {
   occurrenceId: number | null;
   imageryName: string;
   categoryId: number | null;
-  meaningId: number | null;
-  timetags: string[];
 }
 
 type Tone = "draft" | "hover" | "candidate" | "saved";
@@ -111,7 +107,7 @@ function shortPath(path: string): string {
 
 /**
  * 关系管理的对照编辑：左侧整首歌词，右侧该歌的意象关系。
- * 在左侧点歌词行增删当前关系的时间标签，划选词语可直接新建关系。
+ * 出现位置按歌词自动确定（词字面出现的行），划选词语可直接新建关系。
  * 右侧可切换到「候选审核」：词典匹配 + AI 校验生成候选，勾选的候选在歌词中就地标出。
  */
 export default function SongRelationWorkbench({
@@ -120,7 +116,6 @@ export default function SongRelationWorkbench({
   loading,
   items,
   leafCategories,
-  meanings,
   submitting,
   getCategoryPath,
   onSave,
@@ -132,7 +127,6 @@ export default function SongRelationWorkbench({
   loading: boolean;
   items: ImageryItem[];
   leafCategories: ImageryCategory[];
-  meanings: ImageryMeaning[];
   submitting: boolean;
   getCategoryPath: (categoryId: number) => string;
   onSave: (
@@ -148,6 +142,8 @@ export default function SongRelationWorkbench({
     [song.lyrics],
   );
   const lyricTags = useMemo(() => new Set(lines.map((l) => l.tag)), [lines]);
+  // 与服务端一致：制作名单行不算歌词
+  const lyricLines = useMemo(() => parseLrcLines(song.lyrics), [song.lyrics]);
   const textByTag = useMemo(
     () => new Map(lines.map((l) => [l.tag, l.text])),
     [lines],
@@ -210,7 +206,6 @@ export default function SongRelationWorkbench({
       const draft = suggest.drafts[s.imageryId];
       if (!draft?.checked && s.imageryId !== hoverSuggestionId) continue;
       for (const tag of s.timetags) {
-        if (draft?.excludedTags.includes(tag)) continue;
         map.set(tag, [
           ...(map.get(tag) ?? []),
           { id: s.imageryId, name: s.name },
@@ -247,14 +242,17 @@ export default function SongRelationWorkbench({
         )
       : undefined;
 
-  const linesContaining = (name: string) => {
-    const key = name.trim().toLowerCase();
-    return key
-      ? lines
-          .filter((l) => l.text.toLowerCase().includes(key))
-          .map((l) => l.tag)
-      : [];
-  };
+  /** 词在本曲应有的出现位置：字面出现的行，被同曲其他更长标注词覆盖的除外（见 IMAGERY.md） */
+  const linesFor = (name: string, exceptOccurrenceId: number | null = null) =>
+    linesForWord(lyricLines, name.trim(), [
+      ...occurrences
+        .filter((o) => o.id !== exceptOccurrenceId)
+        .map((o) => o.imagery_name ?? ""),
+      name.trim(),
+    ]);
+  const draftTags = editor
+    ? linesFor(editor.imageryName, editor.occurrenceId)
+    : [];
 
   const openExisting = (o: OccurrenceWithSong) => {
     setNotice(null);
@@ -262,8 +260,6 @@ export default function SongRelationWorkbench({
       occurrenceId: o.id,
       imageryName: o.imagery_name ?? "",
       categoryId: o.category_id,
-      meaningId: o.meaning_id,
-      timetags: sortTags(o.lyric_timetag),
     });
     const first = sortTags(o.lyric_timetag).find((t) => lyricTags.has(t));
     if (first) {
@@ -273,7 +269,7 @@ export default function SongRelationWorkbench({
     }
   };
 
-  const startNew = (name = "", timetags?: string[]) => {
+  const startNew = (name = "") => {
     const item = itemByName.get(name.trim().toLowerCase());
     const existing = item
       ? occurrences.find((o) => o.imagery_id === item.id)
@@ -288,18 +284,6 @@ export default function SongRelationWorkbench({
       occurrenceId: null,
       imageryName: name,
       categoryId: item?.categoryIds[0] ?? null,
-      meaningId: null,
-      timetags: sortTags(timetags ?? (focusTag ? [focusTag] : [])),
-    });
-  };
-
-  const toggleTag = (tag: string) => {
-    if (!editor) return;
-    setEditor({
-      ...editor,
-      timetags: editor.timetags.includes(tag)
-        ? editor.timetags.filter((t) => t !== tag)
-        : sortTags([...editor.timetags, tag]),
     });
   };
 
@@ -331,8 +315,7 @@ export default function SongRelationWorkbench({
   const onLineClick = (tag: string) => {
     // 划选文字时的 mouseup 也会触发 click，不当作点行
     if (window.getSelection()?.toString().trim()) return;
-    if (editor && view === "relations") toggleTag(tag);
-    else setFocusTag((current) => (current === tag ? null : tag));
+    setFocusTag((current) => (current === tag ? null : tag));
   };
 
   const save = async () => {
@@ -341,8 +324,6 @@ export default function SongRelationWorkbench({
       imageryId: resolvedItem?.id ?? null,
       imageryName: editor.imageryName.trim(),
       categoryId: editor.categoryId,
-      meaningId: editor.meaningId,
-      timetags: editor.timetags,
     });
     if (ok) {
       setEditor(null);
@@ -363,7 +344,8 @@ export default function SongRelationWorkbench({
     editor !== null &&
     nameError === null &&
     editor.categoryId !== null &&
-    editor.timetags.length > 0 &&
+    // 歌词没有时间轴时无从核对，不拦
+    (lyricLines.length === 0 || draftTags.length > 0) &&
     !submitting;
 
   const annotatedLineCount = lines.filter((l) =>
@@ -374,7 +356,7 @@ export default function SongRelationWorkbench({
 
   const renderLine = (line: LrcLine, index: number) => {
     const onLine = occurrencesByTag.get(line.tag) ?? [];
-    const inDraft = editor?.timetags.includes(line.tag) ?? false;
+    const inDraft = draftTags.includes(line.tag);
     const marks: Array<{ name: string; tone: Tone }> = onLine.map((o) => ({
       name: o.imagery_name ?? "",
       tone: o.id === hoverId ? "hover" : "saved",
@@ -454,7 +436,7 @@ export default function SongRelationWorkbench({
             {view === "suggestions"
               ? "虚线为已勾选的候选，悬停候选可定位"
               : editor
-                ? "点击行加入 / 移出当前关系"
+                ? "出现位置按歌词自动确定"
                 : "点击行查看该行意象，划选词语可新建关系"}
           </span>
         </header>
@@ -466,13 +448,13 @@ export default function SongRelationWorkbench({
             <button
               type="button"
               onClick={() => {
-                startNew(selection.text, linesContaining(selection.text));
+                startNew(selection.text);
                 setSelection(null);
                 setView("relations");
               }}
               className="text-xs tracking-wider text-(--tone) hover:opacity-75"
             >
-              新建关系（匹配 {linesContaining(selection.text).length} 行）
+              新建关系（出现在 {linesFor(selection.text).length} 行）
             </button>
             {editor && (
               <button
@@ -628,92 +610,35 @@ export default function SongRelationWorkbench({
                 </select>
               </label>
 
-              {meanings.length > 0 && (
-                <label className="block space-y-1">
-                  <span className={LABEL_CLASS}>含义（可选）</span>
-                  <select
-                    value={editor.meaningId ?? ""}
-                    onChange={(e) =>
-                      setEditor({
-                        ...editor,
-                        meaningId: e.target.value
-                          ? Number(e.target.value)
-                          : null,
-                      })
-                    }
-                    className={SELECT_CLASS}
-                  >
-                    <option value="">— 不设置 —</option>
-                    {meanings.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className={LABEL_CLASS}>
-                    出现位置 {editor.timetags.length} 处（在左侧点击歌词行增删）
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditor({
-                        ...editor,
-                        timetags: sortTags([
-                          ...new Set([
-                            ...editor.timetags,
-                            ...linesContaining(editor.imageryName),
-                          ]),
-                        ]),
-                      })
-                    }
-                    disabled={!editor.imageryName.trim()}
-                    title="把歌词中所有含该意象名的行都加进来"
-                    className="flex items-center gap-1 text-[11px] text-(--tone) hover:opacity-75 disabled:opacity-40"
-                  >
-                    <Wand2 size={11} />
-                    匹配全部行
-                  </button>
-                </div>
-                {editor.timetags.length === 0 ? (
-                  <p className="text-xs text-slate-400">至少选择一行歌词</p>
+                <span className={LABEL_CLASS}>
+                  出现位置 {draftTags.length} 处（词在歌词里字面出现的行）
+                </span>
+                {lyricLines.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    歌词没有时间轴，无法定位
+                  </p>
+                ) : draftTags.length === 0 ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {editor.imageryName.trim()
+                      ? "歌词里没有这个词，或只出现在同曲更长的标注词里"
+                      : "填写意象后自动定位"}
+                  </p>
                 ) : (
                   <ul className="max-h-48 space-y-1 overflow-y-auto">
-                    {editor.timetags.map((tag) => {
-                      const text = textByTag.get(tag);
-                      return (
-                        <li
-                          key={tag}
-                          className="flex items-center gap-2 border-b border-slate-200/70 py-1 text-xs last:border-0 dark:border-slate-800"
-                        >
-                          <span className="font-mono text-[10px] text-slate-400">
-                            {tag}
-                          </span>
-                          <span
-                            className={cn(
-                              "min-w-0 flex-1 truncate",
-                              text
-                                ? "text-slate-600 dark:text-slate-300"
-                                : "text-amber-600 dark:text-amber-400",
-                            )}
-                          >
-                            {text ?? "歌词中找不到这个时间"}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => toggleTag(tag)}
-                            className="text-slate-300 hover:text-rose-500 dark:text-slate-600"
-                            aria-label={`移除 ${tag}`}
-                          >
-                            <X size={12} />
-                          </button>
-                        </li>
-                      );
-                    })}
+                    {draftTags.map((tag) => (
+                      <li
+                        key={tag}
+                        className="flex items-center gap-2 border-b border-slate-200/70 py-1 text-xs last:border-0 dark:border-slate-800"
+                      >
+                        <span className="font-mono text-[10px] text-slate-400">
+                          {tag}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-slate-600 dark:text-slate-300">
+                          {textByTag.get(tag)}
+                        </span>
+                      </li>
+                    ))}
                   </ul>
                 )}
               </div>
@@ -782,9 +707,6 @@ export default function SongRelationWorkbench({
                         <span className="text-[11px] text-slate-400">
                           {shortPath(getCategoryPath(o.category_id))}
                         </span>
-                        {o.meaning_label && (
-                          <span className={TAG_CLASS}>{o.meaning_label}</span>
-                        )}
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">
                         <span>{o.lyric_timetag.length} 处</span>

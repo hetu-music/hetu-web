@@ -44,7 +44,11 @@ async function main() {
     ),
     songs: await fetchAll(
       "music",
-      "id,title,artist,album,hascover,has_audio,type",
+      "id,title,artist,album,hascover,has_audio,type,date",
+    ),
+    songEmotions: await fetchAll(
+      "song_emotions",
+      "song_id,rank,emotions(tone,energy)",
     ),
   };
 

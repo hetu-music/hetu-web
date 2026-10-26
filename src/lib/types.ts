@@ -85,7 +85,7 @@ export interface SongImageryMark {
   /** 一级分类配色 */
   accent: string;
   timetags: string[];
-  /** 全库写到该意象的作品数（含本曲） */
+  /** 曲库里写到这个词的作品数（含本曲）；按词不按母题，与意象页一致 */
   songCount: number;
 }
 
@@ -187,18 +187,11 @@ export type ImageryCategory = {
   description: string | null;
 };
 
-export type ImageryMeaning = {
-  id: number;
-  label: string;
-  description: string | null;
-};
-
 export type ImageryItem = {
   id: number;
   name: string;
   count: number;
   categoryIds: number[];
-  meaningCount: number;
 };
 
 export type ImageryOccurrence = {
@@ -206,8 +199,19 @@ export type ImageryOccurrence = {
   song_id: number;
   imagery_id: number;
   category_id: number;
-  meaning_id: number | null;
   lyric_timetag: string[];
+};
+
+/** 歌曲基调词表的一项（见 IMAGERY.md） */
+export type Emotion = {
+  id: number;
+  name: string;
+  description: string;
+  /** 情绪的冷暖 */
+  tone: "明" | "暗";
+  /** 情绪的强弱 */
+  energy: "扬" | "抑";
+  sort: number;
 };
 
 export type SongRef = {

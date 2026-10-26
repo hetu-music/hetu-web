@@ -125,8 +125,6 @@ function getEntityIdentity(
       return data.name ? `意象：${data.name}` : null;
     case "imagery_categories":
       return data.name ? `分类：${data.name}` : null;
-    case "imagery_meanings":
-      return data.label ? `释义：${data.label}` : null;
     case "imagery_occurrences":
       return `标注 (曲目 ID: ${data.song_id}, 意象 ID: ${data.imagery_id})`;
     default:
@@ -151,7 +149,6 @@ const TABLE_FILTERS = [
   { id: "temp", label: "曲目" },
   { id: "imagery", label: "意象" },
   { id: "imagery_categories", label: "意象分类" },
-  { id: "imagery_meanings", label: "意象释义" },
   { id: "imagery_occurrences", label: "意象标注" },
 ];
 

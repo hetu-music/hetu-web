@@ -1,13 +1,12 @@
 /**
- * 意象标注的一致性检查（规则见 IMAGERY.md）。纯逻辑，供 scripts/imagery-check.ts 与单测共用。
+ * 意象标注的一致性检查（规则见 IMAGERY.md）。纯逻辑，供 scripts/imagery-check.ts、
+ * 写标注的服务端与单测共用。
  *
  * 检查四件事：
  * - 每个词都有默认母题
  * - 每条标注都挂在该词登记的母题上
  * - 并列词挂了默认母题时，其余组成也各有一条
- * - 时间标签覆盖词在本曲字面出现的所有行（被同曲更长标注覆盖的行除外），且都指向现存的歌词行
- *
- * 标在没有出现该词、但确实在写它的行上（「雪吹满鬓发」之于白发）是允许的，只提示不算错。
+ * - 时间标签恰好是词在本曲字面出现的所有行（被同曲更长标注覆盖的行除外）
  */
 import { parseLrcLines, type LrcLine, type MotifEntry } from "./suggest";
 
@@ -24,15 +23,13 @@ export interface TimetagIssue {
   songId: number;
   name: string;
   current: string[];
-  /** 修复后的时间标签：补上漏标的行、去掉歌词里已不存在的标签，其余保持原样 */
+  /** 应有的时间标签：词字面出现的行 */
   fixed: string[];
   /** 词字面出现但没标的行 */
   missing: string[];
-  /** 歌词里已不存在的时间标签（多半是歌词改过时间轴） */
-  stale: string[];
-  /** 标在没有出现该词的行上：可能是有意的引申，也可能标错了，由人判断 */
-  offLine: string[];
-  /** 歌词里一处都找不到这个词 */
+  /** 多出的标签：标在没有该词的行上，或歌词里已不存在（多半是歌词改过时间轴） */
+  extra: string[];
+  /** 歌词里一处都找不到这个词：标注本身有误，要删掉或改标歌词里实际写的词 */
   notFound: boolean;
 }
 
@@ -51,27 +48,46 @@ export interface ConsistencyReport {
   timetags: TimetagIssue[];
 }
 
+/** 比对用的形式：英文不分大小写；行内空白不算（「地老 天荒」即「地老天荒」） */
+function normalize(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, "");
+}
+
 /**
  * 词在歌词里出现的行：至少有一处不落在同曲更长的标注词里（「岁月」里的「月」不算）。
- * 英文词大小写不敏感。返回时间标签，按时间顺序去重。
+ * 返回时间标签，按时间顺序去重。
  */
 export function linesForWord(
   lines: readonly LrcLine[],
   name: string,
-  longerNames: readonly string[],
+  songNames: readonly string[],
 ): string[] {
-  const target = name.toLowerCase();
-  const longer = longerNames
-    .map((n) => n.toLowerCase())
+  const target = normalize(name);
+  if (!target) return [];
+  const longer = songNames
+    .map(normalize)
     .filter((n) => n.length > target.length && n.includes(target))
     .sort((a, b) => b.length - a.length);
   const tags: string[] = [];
   for (const line of lines) {
-    let rest = line.text.toLowerCase();
+    let rest = normalize(line.text);
     for (const word of longer) rest = rest.split(word).join("\u0000");
     if (rest.includes(target) && !tags.includes(line.tag)) tags.push(line.tag);
   }
   return tags;
+}
+
+/**
+ * 一首歌各标注词应有的时间标签。歌词没有时间轴时返回 null（无从定位，标签留空）。
+ * names 为该歌标注的全部词，用来排除被更长词覆盖的行。
+ */
+export function songTimetags(
+  lyrics: string | null | undefined,
+  names: readonly string[],
+): Map<string, string[]> | null {
+  const lines = parseLrcLines(lyrics);
+  if (lines.length === 0) return null;
+  return new Map(names.map((n) => [n, linesForWord(lines, n, names)]));
 }
 
 export function checkConsistency(input: {
@@ -134,38 +150,33 @@ export function checkConsistency(input: {
   const lyricsOf = new Map(input.songs.map((s) => [s.id, s.lyrics]));
   const timetags: TimetagIssue[] = [];
   for (const [songId, list] of bySong) {
-    const lines = parseLrcLines(lyricsOf.get(songId));
-    // 没有带时间标签的歌词时无从核对
-    if (lines.length === 0) continue;
     const names = [...new Set(list.map((o) => nameOf.get(o.imagery_id) ?? ""))];
+    const expected = songTimetags(lyricsOf.get(songId), names);
+    // 没有带时间轴的歌词时无从核对
+    if (!expected) continue;
     for (const o of list) {
       const name = nameOf.get(o.imagery_id);
       if (!name) continue;
-      const literal = linesForWord(lines, name, names);
+      const fixed = expected.get(name) ?? [];
       const current = o.lyric_timetag ?? [];
-      const existing = new Set(lines.map((l) => l.tag));
-      const missing = literal.filter((t) => !current.includes(t));
-      const stale = current.filter((t) => !existing.has(t));
-      const offLine = current.filter(
-        (t) => existing.has(t) && !literal.includes(t),
-      );
-      if (missing.length + stale.length + offLine.length === 0) continue;
+      const missing = fixed.filter((t) => !current.includes(t));
+      const extra = current.filter((t) => !fixed.includes(t));
+      // 长度不同说明有重复的标签
+      if (
+        missing.length + extra.length === 0 &&
+        current.length === fixed.length
+      ) {
+        continue;
+      }
       timetags.push({
         occurrenceId: o.id,
         songId,
         name,
         current,
-        fixed: lines
-          .map((l) => l.tag)
-          .filter(
-            (t, i, all) =>
-              all.indexOf(t) === i &&
-              (literal.includes(t) || (current.includes(t) && existing.has(t))),
-          ),
+        fixed,
         missing,
-        stale,
-        offLine,
-        notFound: literal.length === 0,
+        extra,
+        notFound: fixed.length === 0,
       });
     }
   }

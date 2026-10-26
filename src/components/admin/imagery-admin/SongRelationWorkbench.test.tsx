@@ -29,8 +29,8 @@ const song = {
 };
 
 const items: ImageryItem[] = [
-  { id: 1, name: "明月", count: 44, categoryIds: [100], meaningCount: 0 },
-  { id: 2, name: "天涯", count: 27, categoryIds: [200], meaningCount: 0 },
+  { id: 1, name: "明月", count: 44, categoryIds: [100] },
+  { id: 2, name: "天涯", count: 27, categoryIds: [200] },
 ];
 const leafCategories: ImageryCategory[] = [
   { id: 100, name: "星相", parent_id: 10, level: 3, description: null },
@@ -48,7 +48,6 @@ function occurrence(
     song_id: 7,
     imagery_id: 1,
     category_id: 100,
-    meaning_id: null,
     lyric_timetag: [],
     song_title: "测试",
     song_album: null,
@@ -69,7 +68,6 @@ function renderWorkbench(occurrences: OccurrenceWithSong[] = []) {
       loading={false}
       items={items}
       leafCategories={leafCategories}
-      meanings={[]}
       submitting={false}
       getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
       onSave={onSave}
@@ -104,46 +102,59 @@ describe("SongRelationWorkbench", () => {
     expect(screen.getByText("4 行 · 已标注 2 行")).toBeTruthy();
   });
 
-  it("编辑已有关系：点击歌词行增删时间标签后保存", async () => {
+  it("编辑已有关系：出现位置按歌词自动确定，点击歌词行不改动", async () => {
     const { container } = renderWorkbench([
       occurrence({ id: 1, lyric_timetag: ["00:10.00"] }),
     ]);
     fireEvent.click(screen.getByText("明月", { selector: "span" }));
     expect(screen.getByText("编辑关系 #1")).toBeTruthy();
+    expect(screen.getByText(/出现位置 2 处/)).toBeTruthy();
 
-    fireEvent.click(line(container, "01:10.00"));
     fireEvent.click(line(container, "00:10.00"));
+    expect(screen.getByText(/出现位置 2 处/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(onSave).toHaveBeenCalledWith(1, {
       imageryId: 1,
       imageryName: "明月",
       categoryId: 100,
-      meaningId: null,
-      timetags: ["01:10.00"],
     });
   });
 
-  it("新增关系：填已有意象时带出常用分类，匹配全部行", () => {
+  it("新增关系：填已有意象时带出常用分类，列出它出现的行", () => {
     renderWorkbench();
     fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
       target: { value: "天涯" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /匹配全部行/ }));
+    expect(screen.getByText(/出现位置 2 处/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(onSave).toHaveBeenCalledWith(null, {
       imageryId: 2,
       imageryName: "天涯",
       categoryId: 200,
-      meaningId: null,
-      timetags: ["00:10.00", "01:10.00"],
     });
   });
 
+  it("歌词里没有的词不能保存", () => {
+    renderWorkbench();
+    fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
+    fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
+      target: { value: "孤灯" },
+    });
+    fireEvent.change(screen.getByDisplayValue("— 选择母题 —"), {
+      target: { value: "200" },
+    });
+    expect(screen.getByText(/歌词里没有这个词/)).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "保存" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+
   it("词典里没有的意象标为新意象，保存时 imageryId 为 null", () => {
-    const { container } = renderWorkbench();
+    renderWorkbench();
     fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
       target: { value: "天地" },
@@ -151,7 +162,6 @@ describe("SongRelationWorkbench", () => {
     expect(screen.getByText("新意象，保存时创建")).toBeTruthy();
 
     // 新意象没有常用分类，未选分类前不能保存
-    fireEvent.click(line(container, "00:20.00"));
     const saveButton = screen.getByRole("button", { name: "保存" });
     expect((saveButton as HTMLButtonElement).disabled).toBe(true);
 
@@ -163,8 +173,6 @@ describe("SongRelationWorkbench", () => {
       imageryId: null,
       imageryName: "天地",
       categoryId: 200,
-      meaningId: null,
-      timetags: ["00:20.00"],
     });
   });
 
@@ -244,11 +252,7 @@ describe("SongRelationWorkbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存选中" }));
     await vi.waitFor(() => expect(onReload).toHaveBeenCalled());
     expect(apiCreateOccurrencesBatch).toHaveBeenCalledWith(7, [
-      {
-        imagery_id: 2,
-        category_id: 200,
-        lyric_timetag: ["00:10.00", "01:10.00"],
-      },
+      { imagery_id: 2, category_id: 200 },
     ]);
   });
 });

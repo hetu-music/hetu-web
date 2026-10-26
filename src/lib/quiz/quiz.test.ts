@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { decodeAnswers, encodeAnswers } from "./codec";
 import { DIMENSIONS, DIMENSION_KEYS } from "./dimensions";
 import {
+  COMMERCIAL_PENALTY,
   ENSEMBLE_PENALTY,
+  MOOD_WEIGHT,
   buildModel,
   evaluate,
   scoreSongs,
@@ -26,9 +28,10 @@ function makeRows(): PoolRows {
       parent_id: null,
       level: 2,
     });
+    // 天象的母题取名「月」，让「明月」计入招牌意象「月」
     categories.push({
       id: id++,
-      name: `${dim.label}-子类`,
+      name: dim.key === "tianxiang" ? "月" : `${dim.label}-子类`,
       parent_id: l2,
       level: 3,
     });
@@ -51,6 +54,7 @@ function makeRows(): PoolRows {
       hascover: true,
       has_audio: true,
       type: ["原创"],
+      date: "2012-01-01",
     });
     // 主维度 10 条，其余维度各 1 条
     DIMENSIONS.forEach((_, k) => {
@@ -74,6 +78,7 @@ function makeRows(): PoolRows {
     hascover: null,
     has_audio: null,
     type: ["翻唱"],
+    date: "2012-01-01",
   });
   songs.push({
     id: 901,
@@ -83,6 +88,7 @@ function makeRows(): PoolRows {
     hascover: null,
     has_audio: null,
     type: ["原创"],
+    date: "2012-01-01",
   });
   songs.push({
     id: 902,
@@ -92,6 +98,7 @@ function makeRows(): PoolRows {
     hascover: null,
     has_audio: null,
     type: ["原创"],
+    date: "2012-01-01",
   });
   for (const songId of [900, 901]) {
     for (let c = 0; c < 12; c += 1) {
@@ -169,6 +176,7 @@ describe("buildPool", () => {
         hascover: null,
         has_audio: null,
         type,
+        date: "2012-01-01",
       });
       for (let c = 0; c < 12; c += 1) {
         rows.occurrences.push({
@@ -185,7 +193,15 @@ describe("buildPool", () => {
     expect(ids).not.toContain(915);
   });
 
-  it("三级分类归入维度，别名归入招牌意象", () => {
+  it("排除日期未知的作品", () => {
+    const rows = makeRows();
+    rows.songs[0].date = null;
+    const ids = buildPool(rows).map((s) => s.id);
+    expect(ids).not.toContain(rows.songs[0].id);
+    expect(ids).toHaveLength(DIMENSIONS.length - 1);
+  });
+
+  it("母题向上归入维度，并按母题计入招牌意象", () => {
     const song = buildPool(makeRows())[0];
     expect(song.dimCounts.tianxiang).toBe(10);
     expect(song.dimCounts.shanhe).toBe(1);
@@ -193,8 +209,13 @@ describe("buildPool", () => {
     expect(song.occurrences[0]).toMatchObject({
       dim: "tianxiang",
       imagery: "明月",
+      signature: "月",
       timetag: "00:10.00",
     });
+    // 不是招牌意象母题的标注不计入
+    expect(song.occurrences.find((o) => o.dim === "shanhe")?.signature).toBe(
+      null,
+    );
   });
 });
 
@@ -206,17 +227,26 @@ describe("userVector", () => {
         title: "甲",
         stem: "",
         options: [
-          { text: "", dims: { tianxiang: 2 } },
-          { text: "", dims: { shanhe: 1 } },
-          { text: "", dims: { tianxiang: 1, qingsi: 2 } },
+          { text: "", dims: { tianxiang: 2 }, mood: { tone: 1, energy: 0 } },
+          { text: "", dims: { shanhe: 1 }, mood: { tone: -1, energy: 1 } },
+          {
+            text: "",
+            dims: { tianxiang: 1, qingsi: 2 },
+            mood: { tone: 0, energy: -1 },
+          },
         ],
       },
       {
         title: "乙",
         stem: "",
         options: [
-          { text: "", dims: { tianxiang: 1 } },
-          { text: "", dims: { qingsi: 2 }, imagery: ["月"] },
+          { text: "", dims: { tianxiang: 1 }, mood: { tone: 1, energy: 1 } },
+          {
+            text: "",
+            dims: { qingsi: 2 },
+            imagery: ["月"],
+            mood: { tone: -1, energy: -1 },
+          },
         ],
       },
     ];
@@ -286,9 +316,43 @@ describe("evaluate", () => {
       model,
       QUESTIONS.map(() => 0),
     );
-    expect(result.imagery).toContain("月");
-    expect(result.imagery).toContain("雨");
+    expect(result.imagery).toContain("山");
+    expect(result.imagery).toContain("江河");
     expect(result.imagery).not.toContain("酒");
+  });
+
+  it("z 分数并列时，人格取作为主维度被选中更多的维度", () => {
+    // 天象与山河的解析分布完全相同；全选第一项时两者原始分都是 2（高于均值 4/3），
+    // 但山河来自一次主维度，天象来自两次副维度。按定义顺序天象在前，并列规则应让山河胜出
+    const neutral = { tone: 0, energy: 0 };
+    const filler = {
+      title: "",
+      stem: "",
+      options: [
+        { text: "", dims: { caomu: 2, tianxiang: 1 }, mood: neutral },
+        { text: "", dims: { caomu: 2, shanhe: 1 }, mood: neutral },
+        { text: "", dims: { caomu: 2 }, mood: neutral },
+      ],
+    };
+    const questions: QuizQuestion[] = [
+      {
+        title: "",
+        stem: "",
+        options: [
+          { text: "", dims: { shanhe: 2 }, mood: neutral },
+          { text: "", dims: { tianxiang: 2 }, mood: neutral },
+          { text: "", dims: { qiyong: 2 }, mood: neutral },
+        ],
+      },
+      filler,
+      filler,
+    ];
+    const tied = buildModel([], questions);
+    const result = evaluate(tied, [0, 0, 0]);
+    const z = (key: string) => result.profile.find((p) => p.key === key)?.z;
+    expect(z("shanhe")).toBe(z("tianxiang"));
+    expect(result.profile[0].key).toBe("shanhe");
+    expect(result.profile[1].key).toBe("tianxiang");
   });
 
   it("五人及以上演唱的歌扣除固定分值，其余不受影响", () => {
@@ -306,6 +370,95 @@ describe("evaluate", () => {
         song.id === rows.songs[1].id ? before[j] - ENSEMBLE_PENALTY : before[j];
       expect(after[j]).toBeCloseTo(expected, 12);
     });
+  });
+
+  it("商业作品扣除固定分值，与多人合唱的降权叠加", () => {
+    const rows = makeRows();
+    rows.songs[2].type = ["商业"];
+    rows.songs[3].type = ["商业"];
+    rows.songs[3].artist = ["甲", "乙", "丙", "丁", "戊"];
+    const pool = buildPool(rows);
+    const plain = buildModel(pool, QUESTIONS, 0, MOOD_WEIGHT, 0);
+    const penalized = buildModel(pool, QUESTIONS);
+    const { z } = userVector(plain, answersFavoring(DIMENSION_KEYS[2]));
+    const before = scoreSongs(plain, z);
+    const after = scoreSongs(penalized, z);
+    plain.songs.forEach((song, j) => {
+      const penalty =
+        song.id === rows.songs[2].id
+          ? COMMERCIAL_PENALTY
+          : song.id === rows.songs[3].id
+            ? COMMERCIAL_PENALTY + ENSEMBLE_PENALTY
+            : 0;
+      expect(after[j]).toBeCloseTo(before[j] - penalty, 12);
+    });
+  });
+});
+
+describe("情绪坐标", () => {
+  const emotion = (
+    song_id: number,
+    rank: number,
+    tone: string,
+    energy: string,
+  ) => ({
+    song_id,
+    rank,
+    emotions: { tone, energy },
+  });
+
+  it("主基调权重 2、副基调 1，明 / 扬为正；没有基调的歌为 null", () => {
+    const rows = makeRows();
+    rows.songEmotions = [
+      // 悲怆（暗扬）为主，执守（暗扬）、苍凉（暗抑）为副
+      emotion(100, 1, "暗", "扬"),
+      emotion(100, 2, "暗", "扬"),
+      emotion(100, 3, "暗", "抑"),
+    ];
+    const pool = buildPool(rows);
+    expect(pool.find((s) => s.id === 100)?.mood).toEqual({
+      tone: -1,
+      energy: 0.5,
+    });
+    expect(pool.find((s) => s.id === 101)?.mood).toBeNull();
+  });
+
+  it("意象相同时，情绪相近的歌排在前面；情绪不出现在匹配理由里", () => {
+    const rows = makeRows();
+    // 两首意象完全相同的歌：复制 100 号为 200 号，只有基调不同
+    rows.songs.push({ ...rows.songs[0], id: 200, album: "另一张专辑" });
+    rows.occurrences.push(
+      ...rows.occurrences
+        .filter((o) => o.song_id === 100)
+        .map((o) => ({ ...o, song_id: 200 })),
+    );
+    rows.songEmotions = [
+      emotion(100, 1, "暗", "抑"),
+      emotion(200, 1, "明", "扬"),
+    ];
+    const questions: QuizQuestion[] = [
+      {
+        title: "情绪",
+        stem: "",
+        options: [
+          { text: "", dims: { tianxiang: 1 }, mood: { tone: -1, energy: -1 } },
+          { text: "", dims: { tianxiang: 1 }, mood: { tone: 1, energy: 1 } },
+        ],
+      },
+    ];
+    const model = buildModel(buildPool(rows), questions);
+    const rank = (answer: number) => {
+      const result = evaluate(model, [answer], model.songs.length);
+      const order = result.matches.map((m) => m.songId);
+      expect(
+        result.matches
+          .flatMap((m) => m.reasons)
+          .every((r) => ["dimension", "imagery"].includes(r.kind)),
+      ).toBe(true);
+      return order.indexOf(100) - order.indexOf(200);
+    };
+    expect(rank(0)).toBeLessThan(0); // 选「暗·抑」：100 号在前
+    expect(rank(1)).toBeGreaterThan(0); // 选「明·扬」：200 号在前
   });
 });
 

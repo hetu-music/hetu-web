@@ -22,6 +22,7 @@ vi.mock("next/cache", () => ({
 
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { DIMENSIONS, QUESTIONS, encodeAnswers } from "@/lib/quiz";
+import { toTraditional } from "@/lib/utils/utils-convert";
 import {
   getQuizPoolSize,
   getQuizQuestions,
@@ -53,7 +54,8 @@ function makeRows(): Rows {
     const leaf = catId++;
     categories.push({
       id: leaf,
-      name: `${dim.label}子类`,
+      // 天象的母题取名「月」，让「明月」计入招牌意象「月」
+      name: dim.key === "tianxiang" ? "月" : `${dim.label}子类`,
       parent_id: l2,
       level: 3,
     });
@@ -78,6 +80,7 @@ function makeRows(): Rows {
       hascover: true,
       has_audio: true,
       type: ["原创"],
+      date: "2012-01-01",
     });
     const lrc: string[] = [];
     DIMENSIONS.forEach((_, k) => {
@@ -109,6 +112,7 @@ function mockClient(rows: Rows, lyricsResult?: MockResult) {
     [TABLES.IMAGERY]: () => makeQueryBuilder(ok(rows.imagery)),
     [TABLES.IMAGERY_OCC_CATALOG]: () => makeQueryBuilder(ok(rows.occurrences)),
     [TABLES.MUSIC_CATALOG]: () => makeQueryBuilder(ok(rows.songs)),
+    [TABLES.SONG_EMOTIONS]: () => makeQueryBuilder(ok([])),
     [TABLES.MUSIC]: () => makeQueryBuilder(lyricsResult ?? ok(rows.lyrics)),
   };
   const from = vi.fn((table: string) => byTable[table]());
@@ -158,7 +162,10 @@ describe("getQuizQuestions", () => {
   it("繁体转换题目文本", () => {
     const [first] = getQuizQuestions("zh-TW");
     expect(first.title).toBe("臨行");
-    expect(first.options[1]).toContain("溫");
+    expect(first.options).toEqual(
+      QUESTIONS[0].options.map((o) => toTraditional(o.text)),
+    );
+    expect(first.options).not.toEqual(QUESTIONS[0].options.map((o) => o.text));
   });
 });
 
@@ -240,7 +247,7 @@ describe("getQuizResult", () => {
 
   it("次要维度为正时给出「兼有」", async () => {
     mockClient(makeRows());
-    // 全选第一项：天象最高，楼台次之
+    // 全选第一项：各题第一项的主维度分散在多个维度，次要维度为正
     const result = await getQuizResult("A".repeat(QUESTIONS.length), "zh-CN");
     expect(result?.secondary).not.toBeNull();
     expect(result?.secondary?.label).not.toBe(result?.persona.label);

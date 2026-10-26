@@ -3,14 +3,8 @@ import {
   categoryFormSchema,
   createCategoryFormValues,
   createImageryFormValues,
-  createMeaningFormValues,
-  createRelationFormValues,
   imageryFormSchema,
-  lyricTimetagItemSchema,
-  relationFormSchema,
   toCategoryPayload,
-  toMeaningPayload,
-  toRelationPayload,
 } from "./imagery-form";
 import type { ImageryCategory } from "@/lib/types";
 
@@ -27,6 +21,13 @@ describe("imageryFormSchema", () => {
     expect(imageryFormSchema.safeParse({ name: "a".repeat(51) }).success).toBe(
       false,
     );
+  });
+
+  it("名称为 null 时按空字符串处理并拒绝，非字符串转为字符串", () => {
+    expect(imageryFormSchema.safeParse({ name: null }).success).toBe(false);
+    const result = imageryFormSchema.safeParse({ name: 123 });
+    expect(result.success).toBe(true);
+    expect(result.data?.name).toBe("123");
   });
 });
 
@@ -50,47 +51,6 @@ describe("categoryFormSchema", () => {
   });
 });
 
-describe("lyricTimetagItemSchema", () => {
-  it("空字符串视为占位项，不报错（提交时再过滤）", () => {
-    expect(lyricTimetagItemSchema.safeParse({ value: "" }).success).toBe(true);
-  });
-
-  it.each(["01:26", "01:26.04", "01:26.045"])(
-    "合法时间戳格式 %s 通过",
-    (value) => {
-      expect(lyricTimetagItemSchema.safeParse({ value }).success).toBe(true);
-    },
-  );
-
-  it("非法格式拒绝", () => {
-    expect(
-      lyricTimetagItemSchema.safeParse({ value: "not-a-timestamp" }).success,
-    ).toBe(false);
-  });
-});
-
-describe("relationFormSchema", () => {
-  it("imagery_id / category_id 必须为正整数", () => {
-    const result = relationFormSchema.safeParse({
-      imagery_id: 0,
-      category_id: 1,
-      meaning_id: null,
-      lyric_timetag: [],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("合法数据通过", () => {
-    const result = relationFormSchema.safeParse({
-      imagery_id: 1,
-      category_id: 2,
-      meaning_id: null,
-      lyric_timetag: [{ value: "01:00" }],
-    });
-    expect(result.success).toBe(true);
-  });
-});
-
 describe("默认值工厂", () => {
   it("createImageryFormValues 无参数时返回空名称", () => {
     expect(createImageryFormValues()).toEqual({ name: "" });
@@ -106,21 +66,15 @@ describe("默认值工厂", () => {
     ).toEqual({ name: "山川", parent_id: 3, description: "d" });
   });
 
-  it("createMeaningFormValues 无参数时返回空值", () => {
-    expect(createMeaningFormValues()).toEqual({ label: "", description: "" });
-  });
-
-  it("createRelationFormValues 将 lyric_timetag 字符串数组包裹为 {value}", () => {
-    const result = createRelationFormValues({
-      imagery_id: 1,
-      category_id: 2,
-      meaning_id: 3,
-      lyric_timetag: ["01:00", "02:00"],
+  it("createCategoryFormValues 无参数时返回空值，顶级分类 parent_id 为 null", () => {
+    expect(createCategoryFormValues()).toEqual({
+      name: "",
+      parent_id: null,
+      description: "",
     });
-    expect(result.lyric_timetag).toEqual([
-      { value: "01:00" },
-      { value: "02:00" },
-    ]);
+    expect(
+      createCategoryFormValues({ name: "顶级", parent_id: null }).parent_id,
+    ).toBeNull();
   });
 });
 
@@ -150,23 +104,30 @@ describe("toCategoryPayload", () => {
     expect(payload.level).toBe(1);
     expect(payload.description).toBeNull();
   });
-});
 
-describe("toMeaningPayload / toRelationPayload", () => {
-  it("toMeaningPayload 去除首尾空白，空描述转 null", () => {
-    expect(toMeaningPayload({ label: " 思念 ", description: "  " })).toEqual({
-      label: "思念",
-      description: null,
-    });
+  it("父分类缺少 level 时按 1 级计算", () => {
+    const payload = toCategoryPayload(
+      { name: "子分类", parent_id: 2, description: "描述" },
+      [
+        {
+          id: 2,
+          name: "无层级父分类",
+          parent_id: null,
+          level: null,
+          description: null,
+        },
+      ],
+    );
+    expect(payload.level).toBe(2);
+    expect(payload.description).toBe("描述");
   });
 
-  it("toRelationPayload 过滤空的 lyric_timetag 项并取出 value", () => {
-    const payload = toRelationPayload({
-      imagery_id: 1,
-      category_id: 2,
-      meaning_id: null,
-      lyric_timetag: [{ value: "01:00" }, { value: "  " }, { value: "02:00" }],
-    });
-    expect(payload.lyric_timetag).toEqual(["01:00", "02:00"]);
+  it("parent_id 在分类列表中找不到时 level 为 1", () => {
+    const payload = toCategoryPayload(
+      { name: "孤儿", parent_id: 99, description: "" },
+      categories,
+    );
+    expect(payload.parent_id).toBe(99);
+    expect(payload.level).toBe(1);
   });
 });

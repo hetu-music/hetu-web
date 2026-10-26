@@ -33,8 +33,17 @@ export interface Dimension {
 export interface SignatureImagery {
   /** 展示名，也是特征 key */
   name: string;
-  /** 数据库中计入该招牌意象的意象名（如「月」含「明月」「月光」） */
-  aliases: readonly string[];
+  /** 计入该招牌意象的母题（三级分类）名：挂在这个母题上的词都算，如「月」含明月、月光、皓月 */
+  motif: string;
+}
+
+/**
+ * 情绪坐标：两条轴，取值 -1 到 1。只参与匹配，不在结果中展示。
+ * tone 明（+1）↔ 暗（-1），energy 扬（+1）↔ 抑（-1），对应 emotions 表的 tone、energy。
+ */
+export interface Mood {
+  tone: number;
+  energy: number;
 }
 
 export interface QuizOption {
@@ -43,6 +52,8 @@ export interface QuizOption {
   dims: Partial<Record<DimensionKey, number>>;
   /** 选中后表示偏爱的招牌意象 */
   imagery?: readonly string[];
+  /** 这个选项流露的情绪；说不清的轴记 0 */
+  mood: Mood;
 }
 
 export interface QuizQuestion {
@@ -62,11 +73,15 @@ export interface PoolSong {
   album: string | null;
   hascover: boolean | null;
   hasAudio: boolean;
+  /** 作品类型，如「原创」「商业」；用于匹配时的降权 */
+  type: string[] | null;
   /** 该歌意象出现总次数 */
   total: number;
   dimCounts: Record<DimensionKey, number>;
   /** 招牌意象出现次数，只记录出现过的 */
   imageryCounts: Record<string, number>;
+  /** 由歌曲基调算出的情绪坐标；还没标基调时为 null */
+  mood: Mood | null;
   /** 用于生成匹配理由的意象出现记录（只保留第一个时间标签） */
   occurrences: PoolOccurrence[];
 }
@@ -74,6 +89,8 @@ export interface PoolSong {
 export interface PoolOccurrence {
   dim: DimensionKey | null;
   imagery: string;
+  /** 这条标注计入的招牌意象，不计入时为 null */
+  signature: string | null;
   timetag: string | null;
 }
 

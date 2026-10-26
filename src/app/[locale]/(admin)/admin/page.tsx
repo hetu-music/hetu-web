@@ -75,8 +75,11 @@ export default async function AdminOverviewPage({ params }: Props) {
         ) as Record<(typeof PLATFORM_LINKS)[number]["key"], number>,
         lacksImagery: songs.filter(
           (s) =>
-            isPoolEligible({ title: s.title, type: s.type ?? null }) &&
-            (occurrenceCounts[s.id] ?? 0) < MIN_OCCURRENCES,
+            isPoolEligible({
+              title: s.title,
+              type: s.type ?? null,
+              date: s.date ?? null,
+            }) && (occurrenceCounts[s.id] ?? 0) < MIN_OCCURRENCES,
         ).length,
       }}
     />

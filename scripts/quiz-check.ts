@@ -4,8 +4,8 @@
  * 并列出还差标注才能进入测验的歌曲。只读，不写数据库。
  *
  * 用法：pnpm quiz:check [--strict]
- *   --strict  发现结构性漂移（未映射/已消失的分类、失效的别名）时以退出码 1 结束，
- *             供定时任务或 CI 使用；待标注歌曲和别名建议只提示，不算失败。
+ *   --strict  发现结构性漂移（未映射/已消失的分类、招牌意象找不到母题）时以退出码 1 结束，
+ *             供定时任务或 CI 使用；待标注歌曲只提示，不算失败。
  */
 import { createClient } from "@supabase/supabase-js";
 import { checkCoverage } from "../src/lib/quiz/coverage";
@@ -45,7 +45,7 @@ async function main() {
     ),
     fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
       "music",
-      "id,title,artist,album,hascover,has_audio,type,lyrics",
+      "id,title,artist,album,hascover,has_audio,type,date,lyrics",
     ),
   ]);
   const report = checkCoverage({ categories, imagery, occurrences, songs });
@@ -68,29 +68,15 @@ async function main() {
     console.log(`  ✗ 映射引用的「${name}」已不在数据库中（是否改名了？）`);
   }
 
-  section("招牌意象别名");
-  if (report.missingAliases.length === 0) {
-    console.log("  ✓ 所有别名都存在于意象表");
+  section("招牌意象与母题");
+  if (report.missingMotifs.length === 0) {
+    console.log("  ✓ 所有招牌意象指向的母题都在数据库中");
   }
-  for (const a of report.missingAliases) {
+  for (const m of report.missingMotifs) {
     problems += 1;
     console.log(
-      `  ✗ 「${a.signature}」的别名「${a.alias}」不在意象表中，不会命中`,
+      `  ✗ 「${m.signature}」指向的母题「${m.motif}」不在数据库中（是否改名了？），不会被计数`,
     );
-  }
-  if (report.aliasSuggestions.length > 0) {
-    console.log(
-      `\n  可考虑加入别名（与现有别名同类、出现在多首歌中；修改后记得递增 POOL_VERSION）：`,
-    );
-    const bySignature = new Map<string, string[]>();
-    for (const s of report.aliasSuggestions) {
-      const list = bySignature.get(s.signature) ?? [];
-      list.push(`${s.name}(${s.songs})`);
-      bySignature.set(s.signature, list);
-    }
-    for (const [signature, names] of bySignature) {
-      console.log(`    ${signature}：${names.join(" ")}`);
-    }
   }
 
   section(`待标注歌曲（少于 ${MIN_OCCURRENCES} 个意象，暂不进入测验）`);

@@ -165,7 +165,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "倏忽几日，又要上路。送你出城的人，临别给了你——",
     options: [
       {
-        text: "一幅手绘的明楼并肩长卷",
+        text: "一幅手绘长卷，画着你们并肩登城远眺",
         dims: { qingsi: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
       },

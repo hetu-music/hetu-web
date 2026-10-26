@@ -55,42 +55,39 @@ export const getImageryCategories = cache(
 );
 
 /**
- * 意象词及其出现次数。
- * - public（默认，公开意象页）：只列曲库歌曲里出现过的词，次数只算曲库，争议歌曲不计
- * - all（后台）：列全部词，次数含争议歌曲，没有标注的词为 0
- *
- * cache(): 同上，意象页两处调用去重
+ * 后台词典：全部意象词及其出现次数，次数含争议歌曲，没有标注的词为 0。
+ * 公开的意象词云另按母题聚合，见 service-imagery-cloud。
  */
-export const getImageryWithCounts = cache(async function getImageryWithCounts(
-  scope: "public" | "all" = "public",
-): Promise<ImageryItem[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  try {
-    const rows = (await fetchAll(
-      supabase,
-      scope === "all" ? TABLES.IMAGERY_SUMMARY_ALL : TABLES.IMAGERY_SUMMARY,
-      'id,name,count,"categoryIds"',
-    )) as Array<{
-      id: number;
-      name: string;
-      count: number | null;
-      categoryIds: Array<number | string> | null;
-    }>;
+export const getImageryWithCounts = cache(
+  async function getImageryWithCounts(): Promise<ImageryItem[]> {
+    const supabase = getServiceClient();
+    if (!supabase) return [];
+    try {
+      const rows = (await fetchAll(
+        supabase,
+        TABLES.IMAGERY_SUMMARY_ALL,
+        'id,name,count,"categoryIds"',
+      )) as Array<{
+        id: number;
+        name: string;
+        count: number | null;
+        categoryIds: Array<number | string> | null;
+      }>;
 
-    return rows.map((item) => ({
-      id: item.id,
-      name: item.name,
-      count: item.count ?? 0,
-      categoryIds: (item.categoryIds ?? [])
-        .map((value) => Number(value))
-        .filter(Number.isFinite),
-    }));
-  } catch (e) {
-    console.error("[getImageryWithCounts]", e);
-    return [];
-  }
-});
+      return rows.map((item) => ({
+        id: item.id,
+        name: item.name,
+        count: item.count ?? 0,
+        categoryIds: (item.categoryIds ?? [])
+          .map((value) => Number(value))
+          .filter(Number.isFinite),
+      }));
+    } catch (e) {
+      console.error("[getImageryWithCounts]", e);
+      return [];
+    }
+  },
+);
 
 export async function getOccurrencesForImagery(
   imageryId: number,
@@ -135,9 +132,7 @@ export async function getOccurrencesForSong(
 }
 
 /** 标注属于哪首歌、哪个意象、哪个母题；改动或删除标注前查出来，好刷新对应缓存 */
-export async function getOccurrenceRefs(
-  id: number,
-): Promise<{
+export async function getOccurrenceRefs(id: number): Promise<{
   song_id: number;
   imagery_id: number;
   category_id: number;

@@ -51,16 +51,13 @@ describe("getImageryWithCounts", () => {
     expect(result[0].categoryIds).toEqual([1, 2]);
   });
 
-  it("公开口径读曲库视图，后台口径读含争议歌曲、含 0 次的全量视图", async () => {
+  it("读含争议歌曲、含 0 次的全量视图", async () => {
     const client = createMockSupabaseClient([
-      makeQueryBuilder({ data: [], error: null }),
       makeQueryBuilder({ data: [], error: null }),
     ]);
     vi.mocked(getServiceClient).mockReturnValue(client);
     await getImageryWithCounts();
-    await getImageryWithCounts("all");
     expect(client.from.mock.calls.map((c: unknown[]) => c[0])).toEqual([
-      "imagery_summary",
       "imagery_summary_all",
     ]);
   });

@@ -344,7 +344,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["灯"],
       },
       {
-        text: "扫去一春落花，在残瓣上题满前人旧句的人",
+        text: "扫去一春落花，在残瓣上题写前人旧句的人",
         dims: { caomu: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["花"],

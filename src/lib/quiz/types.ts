@@ -73,6 +73,8 @@ export interface PoolSong {
   album: string | null;
   hascover: boolean | null;
   hasAudio: boolean;
+  /** 作品类型，如「原创」「商业」；用于匹配时的降权 */
+  type: string[] | null;
   /** 该歌意象出现总次数 */
   total: number;
   dimCounts: Record<DimensionKey, number>;

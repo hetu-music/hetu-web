@@ -45,7 +45,7 @@ export interface PoolRows {
  */
 export const EXCLUDED_TYPES: readonly string[] = ["翻唱", "参与"];
 /** 入池规则版本：修改排除类型、标注门槛、招牌意象计法、情绪坐标等规则时递增，使服务端缓存失效 */
-export const POOL_VERSION = 7;
+export const POOL_VERSION = 8;
 /** 候选池服务端缓存的标签，revalidate 接口据此刷新 */
 export const QUIZ_POOL_TAG = "quiz-pool";
 /** 主基调在情绪坐标里的权重，副基调为 1 */
@@ -181,6 +181,7 @@ export function buildPool(rows: PoolRows): PoolSong[] {
       album: song.album,
       hascover: song.hascover,
       hasAudio: song.has_audio ?? false,
+      type: song.type,
       total: occs.length,
       dimCounts,
       imageryCounts,

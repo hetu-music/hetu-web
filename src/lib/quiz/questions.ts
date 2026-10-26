@@ -17,7 +17,7 @@ import type { QuizQuestion } from "./types";
  * 修改题目或权重会改变测验结果，需同步更新 QUIZ_VERSION 与测试快照。
  * 作答短串按题目顺序逐位编码，调整顺序后旧的分享链接会对应到别的题。
  */
-export const QUIZ_VERSION = "0.4.1";
+export const QUIZ_VERSION = "0.4.2";
 
 export const QUESTIONS: readonly QuizQuestion[] = [
   {

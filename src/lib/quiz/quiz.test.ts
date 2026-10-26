@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { decodeAnswers, encodeAnswers } from "./codec";
 import { DIMENSIONS, DIMENSION_KEYS } from "./dimensions";
 import {
+  COMMERCIAL_PENALTY,
   ENSEMBLE_PENALTY,
+  MOOD_WEIGHT,
   buildModel,
   evaluate,
   scoreSongs,
@@ -367,6 +369,28 @@ describe("evaluate", () => {
       const expected =
         song.id === rows.songs[1].id ? before[j] - ENSEMBLE_PENALTY : before[j];
       expect(after[j]).toBeCloseTo(expected, 12);
+    });
+  });
+
+  it("商业作品扣除固定分值，与多人合唱的降权叠加", () => {
+    const rows = makeRows();
+    rows.songs[2].type = ["商业"];
+    rows.songs[3].type = ["商业"];
+    rows.songs[3].artist = ["甲", "乙", "丙", "丁", "戊"];
+    const pool = buildPool(rows);
+    const plain = buildModel(pool, QUESTIONS, 0, MOOD_WEIGHT, 0);
+    const penalized = buildModel(pool, QUESTIONS);
+    const { z } = userVector(plain, answersFavoring(DIMENSION_KEYS[2]));
+    const before = scoreSongs(plain, z);
+    const after = scoreSongs(penalized, z);
+    plain.songs.forEach((song, j) => {
+      const penalty =
+        song.id === rows.songs[2].id
+          ? COMMERCIAL_PENALTY
+          : song.id === rows.songs[3].id
+            ? COMMERCIAL_PENALTY + ENSEMBLE_PENALTY
+            : 0;
+      expect(after[j]).toBeCloseTo(before[j] - penalty, 12);
     });
   });
 });

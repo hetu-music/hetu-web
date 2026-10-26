@@ -20,7 +20,7 @@ import type {
  * - 歌曲：维度取占比（消除歌词长短的影响），招牌意象取 log(1+次数)，
  *   情绪取由基调算出的坐标（没有基调的歌取池内均值），再在候选池内逐特征标准化。
  * - 匹配：加权余弦相似度。比较方向而非距离，避免靠近均值的「中庸」歌曲包揽第一。
- *   多人合唱的歌再减去一个固定值，见 ENSEMBLE_PENALTY。
+ *   多人合唱、商业作品再各减去一个固定值，见 ENSEMBLE_PENALTY、COMMERCIAL_PENALTY。
  */
 
 /** 招牌意象特征相对维度特征的权重 */
@@ -42,6 +42,12 @@ const ENSEMBLE_SIZE = 5;
  * 这类歌多是群像、拼盘，意象堆得密，容易靠特征「撞」进前列，但作为推荐价值不高
  */
 export const ENSEMBLE_PENALTY = 0.1;
+/**
+ * 商业作品（游戏、影视等的定制曲）从相似度里减去的值。
+ * 不排除，只降低出现机会：0.05 让它们当第一的比例从约 13%（与在候选池的占比相当）降到约 6%，
+ * 每首仍有机会当第一。与多人合唱的降权可以叠加
+ */
+export const COMMERCIAL_PENALTY = 0.05;
 
 type FeatureKey =
   | { kind: "dimension"; key: DimensionKey }
@@ -100,6 +106,7 @@ export function buildModel(
   /** 只给诊断脚本比较不同取值用 */
   ensemblePenalty = ENSEMBLE_PENALTY,
   moodWeight = MOOD_WEIGHT,
+  commercialPenalty = COMMERCIAL_PENALTY,
 ): QuizModel {
   const features = buildFeatures();
   const F = features.length;
@@ -198,8 +205,10 @@ export function buildModel(
     songVectors.map((v) => weightedNorm(v, weights)),
   );
   const songPenalties = new Float64Array(
-    pool.map((song) =>
-      (song.artist?.length ?? 0) >= ENSEMBLE_SIZE ? ensemblePenalty : 0,
+    pool.map(
+      (song) =>
+        ((song.artist?.length ?? 0) >= ENSEMBLE_SIZE ? ensemblePenalty : 0) +
+        (song.type?.includes("商业") ? commercialPenalty : 0),
     ),
   );
 
@@ -240,7 +249,7 @@ export function userVector(
   return { raw, z };
 }
 
-/** 所有歌曲的余弦相似度（已扣除多人合唱的降权），与 model.songs 对齐 */
+/** 所有歌曲的余弦相似度（已扣除多人合唱、商业作品的降权），与 model.songs 对齐 */
 export function scoreSongs(model: QuizModel, z: Float64Array): Float64Array {
   const { weights, songVectors, songNorms, songPenalties } = model;
   const userNorm = weightedNorm(z, weights);

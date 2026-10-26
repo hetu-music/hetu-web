@@ -36,7 +36,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "为院中老马填一次料，约定未知的归期",
+        text: "抚过相伴多年的老马，约定未知的归期",
         dims: { guangyin: 2, caomu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["马"],

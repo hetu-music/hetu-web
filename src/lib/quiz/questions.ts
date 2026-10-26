@@ -162,7 +162,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "赠别",
-    stem: "住了几日，又要上路。送你出城的人，临别给了你——",
+    stem: "倏忽几日，又要上路。送你出城的人，临别给了你——",
     options: [
       {
         text: "一把院门钥匙，笑着说：「下回来，直接进门！」",

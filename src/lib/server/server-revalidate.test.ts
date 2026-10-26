@@ -20,7 +20,7 @@ import {
 import {
   refreshAudioPages,
   refreshImagery,
-  refreshQuizPool,
+  refreshSongEmotions,
   refreshSongPages,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
@@ -118,14 +118,15 @@ describe("refreshImagery", () => {
   });
 });
 
-describe("refreshQuizPool", () => {
-  it("只失效寻曲候选池标签，不清页面，也不提交 CDN", async () => {
-    const report = await refreshQuizPool();
+describe("refreshSongEmotions", () => {
+  it("失效寻曲候选池与意象数据标签，只清这首歌的详情页", async () => {
+    const report = await refreshSongEmotions(3);
     expect(revalidateTag).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
-    expect(revalidatePath).not.toHaveBeenCalled();
-    expect(purgeCloudflareCache).not.toHaveBeenCalled();
-    expect(purgeEdgeOneCache).not.toHaveBeenCalled();
-    expect(vi.mocked(purgeCloudFrontCache).mock.calls).toEqual([[[], []]]);
+    expect(revalidateTag).toHaveBeenCalledWith("song-imagery", { expire: 0 });
+    expect(purged()).toEqual(
+      expect.arrayContaining(["/zh-CN/song/3", "/zh-TW/song/3", "/song/3"]),
+    );
+    expect(purged()).not.toContain("/zh-CN/quiz");
     expect(report).toEqual({ failed: [] });
   });
 });

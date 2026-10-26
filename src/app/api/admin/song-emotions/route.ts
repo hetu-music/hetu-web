@@ -11,7 +11,7 @@ import {
 } from "@/lib/server/service-emotions";
 import { isLlmConfigured } from "@/lib/server/llm";
 import {
-  refreshQuizPool,
+  refreshSongEmotions,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
@@ -77,7 +77,7 @@ export const PUT = withAuth(
         input.emotion_ids,
         session.access_token,
       );
-      const purge = await refreshQuizPool();
+      const purge = await refreshSongEmotions(input.song_id);
       return withPurgeStatus(NextResponse.json({ selected }), purge);
     } catch (e) {
       const code = (e as { code?: string }).code as SongEmotionErrorCode;

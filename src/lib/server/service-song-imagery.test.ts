@@ -105,6 +105,7 @@ type Tables = {
   imagery: unknown[];
   occurrences: unknown[];
   songs: unknown[];
+  songEmotions: unknown[];
 };
 
 function mockClient(overrides: Partial<Tables> = {}) {
@@ -113,6 +114,7 @@ function mockClient(overrides: Partial<Tables> = {}) {
     imagery,
     occurrences,
     songs,
+    songEmotions: [],
     ...overrides,
   };
   const byTable: Record<string, unknown[]> = {
@@ -120,6 +122,7 @@ function mockClient(overrides: Partial<Tables> = {}) {
     [TABLES.IMAGERY]: rows.imagery,
     [TABLES.IMAGERY_OCC]: rows.occurrences,
     [TABLES.MUSIC_CATALOG]: rows.songs,
+    [TABLES.SONG_EMOTIONS]: rows.songEmotions,
   };
   const from = vi.fn((table: string) =>
     makeQueryBuilder({ data: byTable[table], error: null }),
@@ -197,6 +200,26 @@ describe("getSongImagery", () => {
       // 共有母题按少见程度排序
       shared: ["剑", "月"],
     });
+  });
+
+  it("相关作品：意象相近时基调相近的靠前，但盖不过意象上的差距", async () => {
+    mockClient({
+      songEmotions: [
+        { song_id: 1, emotion_id: 1, rank: 1 },
+        { song_id: 1, emotion_id: 2, rank: 2 },
+        // 与本曲主基调相同
+        { song_id: 8, emotion_id: 1, rank: 1 },
+        // 只有副基调相同
+        { song_id: 6, emotion_id: 3, rank: 1 },
+        { song_id: 6, emotion_id: 2, rank: 2 },
+        // 基调完全不同：共有两个母题，仍排第一
+        { song_id: 3, emotion_id: 4, rank: 1 },
+      ],
+    });
+    const { related } = await getSongImagery(1, "zh-CN");
+
+    // 4、6、8 只共有「月」，意象上同分；8 主基调相同，6 副基调相同，4 没标基调
+    expect(related.map((r) => r.id)).toEqual([3, 8, 6, 4]);
   });
 
   it("繁体站点转换意象名、分类、歌名与歌手", async () => {

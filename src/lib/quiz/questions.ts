@@ -218,10 +218,10 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "旧梦",
-    stem: "夜宿荒驿，你梦见自己回到——",
+    stem: "夜深风止，合眼沉睡。梦里，你又回到——",
     options: [
       {
-        text: "那年和那人在花下追着跑，笑得停不下来",
+        text: "那年在花下嬉戏奔跑，笑声止也止不住",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["花"],
@@ -246,7 +246,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "题壁",
-    stem: "驿站的墙上满是前人题的诗。你也提笔，写下——",
+    stem: "夜宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
       {
         text: "「乘风万里，四海皆是故人」",

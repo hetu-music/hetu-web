@@ -165,24 +165,24 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "倏忽几日，又要上路。送你出城的人，临别给了你——",
     options: [
       {
-        text: "一把院门钥匙，笑着说：「下回来，直接进门！」",
+        text: "一幅手绘的城中明楼长卷",
         dims: { qingsi: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "一匹跟了主人半辈子的老马，说它认得回来的路",
+        text: "一匹温驯的瘦马，缰绳尚带掌心温热",
         dims: { caomu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["马"],
       },
       {
-        text: "一句话：「塞外月冷，你也别回头」",
+        text: "一首诗，月冷路远，山川广大",
         dims: { tianxiang: 2, shanhe: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["月"],
       },
       {
-        text: "一方旧砚，说是祖上传下来的，从此再没人用了",
+        text: "一方古砚，虽残了一角，墨痕犹沉",
         dims: { diangu: 2, qiyong: 1 },
         mood: { tone: -1, energy: -1 },
       },

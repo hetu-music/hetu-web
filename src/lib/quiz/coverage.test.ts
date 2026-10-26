@@ -38,6 +38,7 @@ function song(
   title = `歌${id}`,
   type: string[] | null = null,
   lyrics: string | null = "[00:01.00]词",
+  date: string | null = "2012-01-01",
 ) {
   return {
     id,
@@ -47,6 +48,7 @@ function song(
     hascover: null,
     has_audio: null,
     type,
+    date,
     lyrics,
   };
 }
@@ -70,6 +72,7 @@ const report = checkCoverage({
     song(20, "翻唱歌", ["翻唱"]),
     song(21, "某歌（纯歌版）"),
     song(22, "无词歌", null, null),
+    song(23, "无日期歌", null, "[00:01.00]词", null),
   ],
 });
 
@@ -88,6 +91,8 @@ describe("checkCoverage", () => {
     expect(titles).toContain("无词歌");
     expect(titles).not.toContain("翻唱歌");
     expect(titles).not.toContain("某歌（纯歌版）");
+    // 日期未知的作品不入池，补标注也进不了测验，不算待标注
+    expect(titles).not.toContain("无日期歌");
     expect(report.pendingSongs.find((s) => s.id === 22)?.hasLyrics).toBe(false);
   });
 

@@ -56,7 +56,7 @@ const loadQuizPool = unstable_cache(
         fetchAll<PoolRows["songs"][number]>(
           supabase,
           TABLES.MUSIC_CATALOG,
-          "id,title,artist,album,hascover,has_audio,type",
+          "id,title,artist,album,hascover,has_audio,type,date",
         ),
         // 基调只参与匹配；没标基调的歌情绪取中性，所以这张表允许为空
         fetchAll<NonNullable<PoolRows["songEmotions"]>[number]>(

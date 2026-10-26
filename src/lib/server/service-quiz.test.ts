@@ -80,6 +80,7 @@ function makeRows(): Rows {
       hascover: true,
       has_audio: true,
       type: ["原创"],
+      date: "2012-01-01",
     });
     const lrc: string[] = [];
     DIMENSIONS.forEach((_, k) => {

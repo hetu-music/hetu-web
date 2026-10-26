@@ -42,11 +42,14 @@ const PLATFORM_LABEL = new Map(PLATFORM_LINKS.map((p) => [p.key, p.label]));
 /** 表头与每一行共用的列宽 */
 const GRID_COLS = "lg:grid-cols-[3rem_2.5rem_minmax(0,1fr)_9rem_5rem_14rem]";
 
-/** 进不了寻曲测验的歌：类型允许入池，但意象标注不够 */
+/** 进不了寻曲测验的歌：类型与日期允许入池，但意象标注不够 */
 function lacksImagery(song: SongDetail, count: number) {
   return (
-    isPoolEligible({ title: song.title, type: song.type ?? null }) &&
-    count < MIN_OCCURRENCES
+    isPoolEligible({
+      title: song.title,
+      type: song.type ?? null,
+      date: song.date ?? null,
+    }) && count < MIN_OCCURRENCES
   );
 }
 

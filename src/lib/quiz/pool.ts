@@ -28,6 +28,8 @@ export interface PoolRows {
     hascover: boolean | null;
     has_audio: boolean | null;
     type: string[] | null;
+    /** 发布日期；为空表示日期未知 */
+    date: string | null;
   }>;
   /** 歌曲基调（song_emotions 连 emotions），用于算情绪坐标；省略时所有歌都没有坐标 */
   songEmotions?: Array<{
@@ -43,7 +45,7 @@ export interface PoolRows {
  */
 export const EXCLUDED_TYPES: readonly string[] = ["翻唱", "参与"];
 /** 入池规则版本：修改排除类型、标注门槛、招牌意象计法、情绪坐标等规则时递增，使服务端缓存失效 */
-export const POOL_VERSION = 6;
+export const POOL_VERSION = 7;
 /** 候选池服务端缓存的标签，revalidate 接口据此刷新 */
 export const QUIZ_POOL_TAG = "quiz-pool";
 /** 主基调在情绪坐标里的权重，副基调为 1 */
@@ -72,11 +74,16 @@ export const MIN_OCCURRENCES = 10;
 /** 「（纯歌版）」「(DJ版)」等衍生版本与原曲意象相同，不重复入池 */
 const VARIANT_TITLE = /[（(][^（）()]*版[）)]/;
 
-/** 作品类型与标题是否允许入池（不看标注数量） */
+/**
+ * 作品类型、标题与日期是否允许入池（不看标注数量）。
+ * 日期未知的作品来历不明，不推荐给用户。
+ */
 export function isPoolEligible(song: {
   title: string;
   type: string[] | null;
+  date: string | null;
 }): boolean {
+  if (!song.date) return false;
   if (song.type?.some((t) => EXCLUDED_TYPES.includes(t))) return false;
   return !VARIANT_TITLE.test(song.title);
 }

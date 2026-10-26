@@ -45,7 +45,7 @@ async function main() {
     ),
     fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
       "music",
-      "id,title,artist,album,hascover,has_audio,type,lyrics",
+      "id,title,artist,album,hascover,has_audio,type,date,lyrics",
     ),
   ]);
   const report = checkCoverage({ categories, imagery, occurrences, songs });

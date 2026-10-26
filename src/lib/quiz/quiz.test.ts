@@ -52,6 +52,7 @@ function makeRows(): PoolRows {
       hascover: true,
       has_audio: true,
       type: ["原创"],
+      date: "2012-01-01",
     });
     // 主维度 10 条，其余维度各 1 条
     DIMENSIONS.forEach((_, k) => {
@@ -75,6 +76,7 @@ function makeRows(): PoolRows {
     hascover: null,
     has_audio: null,
     type: ["翻唱"],
+    date: "2012-01-01",
   });
   songs.push({
     id: 901,
@@ -84,6 +86,7 @@ function makeRows(): PoolRows {
     hascover: null,
     has_audio: null,
     type: ["原创"],
+    date: "2012-01-01",
   });
   songs.push({
     id: 902,
@@ -93,6 +96,7 @@ function makeRows(): PoolRows {
     hascover: null,
     has_audio: null,
     type: ["原创"],
+    date: "2012-01-01",
   });
   for (const songId of [900, 901]) {
     for (let c = 0; c < 12; c += 1) {
@@ -170,6 +174,7 @@ describe("buildPool", () => {
         hascover: null,
         has_audio: null,
         type,
+        date: "2012-01-01",
       });
       for (let c = 0; c < 12; c += 1) {
         rows.occurrences.push({
@@ -184,6 +189,14 @@ describe("buildPool", () => {
     expect(ids).toEqual(expect.arrayContaining([911, 912, 913, 914]));
     expect(ids).not.toContain(910);
     expect(ids).not.toContain(915);
+  });
+
+  it("排除日期未知的作品", () => {
+    const rows = makeRows();
+    rows.songs[0].date = null;
+    const ids = buildPool(rows).map((s) => s.id);
+    expect(ids).not.toContain(rows.songs[0].id);
+    expect(ids).toHaveLength(DIMENSIONS.length - 1);
   });
 
   it("母题向上归入维度，并按母题计入招牌意象", () => {

@@ -245,7 +245,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "旧梦",
-    stem: "夜深风止，合眼沉睡。梦里，你又回到——",
+    stem: "夜深人静，合眼沉睡。梦里，你又回到——",
     options: [
       {
         text: "落满繁花的庭院，嬉闹追逐，笑声不绝",

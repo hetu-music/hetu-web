@@ -91,7 +91,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "在野店要一坛酒，与满身风尘的行客对饮",
+        text: "在野店要一坛酒，与鬓已微霜的行客共饮",
         dims: { renjian: 2, qiyong: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["酒"],

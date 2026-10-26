@@ -22,6 +22,13 @@ describe("imageryFormSchema", () => {
       false,
     );
   });
+
+  it("名称为 null 时按空字符串处理并拒绝，非字符串转为字符串", () => {
+    expect(imageryFormSchema.safeParse({ name: null }).success).toBe(false);
+    const result = imageryFormSchema.safeParse({ name: 123 });
+    expect(result.success).toBe(true);
+    expect(result.data?.name).toBe("123");
+  });
 });
 
 describe("categoryFormSchema", () => {
@@ -58,6 +65,17 @@ describe("默认值工厂", () => {
       }),
     ).toEqual({ name: "山川", parent_id: 3, description: "d" });
   });
+
+  it("createCategoryFormValues 无参数时返回空值，顶级分类 parent_id 为 null", () => {
+    expect(createCategoryFormValues()).toEqual({
+      name: "",
+      parent_id: null,
+      description: "",
+    });
+    expect(
+      createCategoryFormValues({ name: "顶级", parent_id: null }).parent_id,
+    ).toBeNull();
+  });
 });
 
 describe("toCategoryPayload", () => {
@@ -85,5 +103,31 @@ describe("toCategoryPayload", () => {
     );
     expect(payload.level).toBe(1);
     expect(payload.description).toBeNull();
+  });
+
+  it("父分类缺少 level 时按 1 级计算", () => {
+    const payload = toCategoryPayload(
+      { name: "子分类", parent_id: 2, description: "描述" },
+      [
+        {
+          id: 2,
+          name: "无层级父分类",
+          parent_id: null,
+          level: null,
+          description: null,
+        },
+      ],
+    );
+    expect(payload.level).toBe(2);
+    expect(payload.description).toBe("描述");
+  });
+
+  it("parent_id 在分类列表中找不到时 level 为 1", () => {
+    const payload = toCategoryPayload(
+      { name: "孤儿", parent_id: 99, description: "" },
+      categories,
+    );
+    expect(payload.parent_id).toBe(99);
+    expect(payload.level).toBe(1);
   });
 });

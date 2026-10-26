@@ -20,6 +20,27 @@ describe("toSongFormState / toSongFormPayload 往返转换", () => {
     expect(payload.title).toBe("测试歌曲");
   });
 
+  it("所有 field array 字段都还原为字符串数组，往返后与原值一致", () => {
+    const song: Partial<SongDetail> = {
+      title: "标题",
+      lyricist: ["甲"],
+      composer: ["乙"],
+      arranger: ["丙"],
+      artist: ["丁", "戊"],
+      albumartist: ["己"],
+      type: ["原创"],
+    };
+
+    const payload = toSongFormPayload(toSongFormState(song));
+    expect(payload.lyricist).toEqual(["甲"]);
+    expect(payload.composer).toEqual(["乙"]);
+    expect(payload.arranger).toEqual(["丙"]);
+    expect(payload.artist).toEqual(["丁", "戊"]);
+    expect(payload.albumartist).toEqual(["己"]);
+    // type / genre 不走 field array，保持字符串数组
+    expect(payload.type).toEqual(["原创"]);
+  });
+
   it("song → state 时数组字段包裹为 {value} 供 useFieldArray 使用", () => {
     const song: Partial<SongDetail> = {
       title: "标题",
@@ -46,6 +67,17 @@ describe("toSongFormState / toSongFormPayload 往返转换", () => {
     expect(state.title).toBe("123");
     expect(state.length).toBeNull();
     expect(state.hascover).toBeNull();
+  });
+
+  it("数组字段中的非字符串项被转为字符串，非数组被视为空数组", () => {
+    const song = {
+      title: "标题",
+      lyricist: [1, "乙"],
+      genre: "流行",
+    } as unknown as Partial<SongDetail>;
+    const state = toSongFormState(song);
+    expect(state.lyricist).toEqual([{ value: "1" }, { value: "乙" }]);
+    expect(state.genre).toEqual([]);
   });
 });
 
@@ -101,6 +133,45 @@ describe("validateSongForm", () => {
     });
     expect(result.data).toBeNull();
     expect(result.errors.length).toBeTruthy();
+  });
+
+  it("length 为空字符串时视为未填写", () => {
+    const result = validateSongForm({
+      ...baseValues(),
+      length: "" as unknown as number,
+    });
+    expect(result.errors.length).toBeUndefined();
+    expect(result.data?.length).toBeNull();
+  });
+
+  it("hascover 缺失时视为 null，非布尔值时报错", () => {
+    const missing = validateSongForm({
+      ...baseValues(),
+      hascover: undefined as unknown as null,
+    });
+    expect(missing.data?.hascover).toBeNull();
+
+    const invalid = validateSongForm({
+      ...baseValues(),
+      hascover: "true" as unknown as boolean,
+    });
+    expect(invalid.data).toBeNull();
+    expect(invalid.errors.hascover).toBeTruthy();
+  });
+
+  it("lyrics_start 接受 LRC 时间标签或留空，拒绝其他格式", () => {
+    expect(
+      validateSongForm({ ...baseValues(), lyrics_start: "00:23.97" }).errors
+        .lyrics_start,
+    ).toBeUndefined();
+    expect(
+      validateSongForm({ ...baseValues(), lyrics_start: "1:05" }).errors
+        .lyrics_start,
+    ).toBeUndefined();
+    expect(
+      validateSongForm({ ...baseValues(), lyrics_start: "23.97" }).errors
+        .lyrics_start,
+    ).toBeTruthy();
   });
 
   it("一个字段有多个校验错误时，只记录第一条错误信息", () => {

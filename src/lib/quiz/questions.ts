@@ -217,34 +217,6 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "旧梦",
-    stem: "夜深风止，合眼沉睡。梦里，你又回到——",
-    options: [
-      {
-        text: "落满繁花的庭院，嬉闹追逐，笑声不绝",
-        dims: { caomu: 2, qingsi: 1 },
-        mood: { tone: 1, energy: 1 },
-        imagery: ["花"],
-      },
-      {
-        text: "儿时的屋檐下，晒着太阳，听檐铃轻响",
-        dims: { tianxiang: 2, loutai: 1 },
-        mood: { tone: 1, energy: -1 },
-      },
-      {
-        text: "千年前的一座城，城破那夜，鼓声响了一整晚",
-        dims: { diangu: 2, guangyin: 1 },
-        mood: { tone: -1, energy: 1 },
-      },
-      {
-        text: "渡口边一张旧桌，两杯冷酒，只有你一个人",
-        dims: { qiyong: 2, shanhe: 1 },
-        mood: { tone: -1, energy: -1 },
-        imagery: ["酒"],
-      },
-    ],
-  },
-  {
     title: "题壁",
     stem: "暂宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
@@ -272,32 +244,30 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "回望",
-    stem: "回望来路，总有一段过往放不下。若为它写一句收尾——",
+    title: "旧梦",
+    stem: "夜深风止，合眼沉睡。梦里，你又回到——",
     options: [
       {
-        text: "「大江东去，我也算其中一朵浪」",
-        dims: { shanhe: 2, diangu: 1 },
+        text: "落满繁花的庭院，嬉闹追逐，笑声不绝",
+        dims: { caomu: 2, qingsi: 1 },
         mood: { tone: 1, energy: 1 },
-        imagery: ["江河"],
+        imagery: ["花"],
       },
       {
-        text: "「剑挂在桃树上，不再取下来了」",
-        dims: { qiyong: 2, caomu: 1 },
+        text: "儿时的屋檐下，晒着太阳，听檐铃轻响",
+        dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: 1, energy: -1 },
-        imagery: ["剑"],
       },
       {
-        text: "「那座楼我替你守着，守到哪一年都行」",
-        dims: { loutai: 2, guangyin: 1 },
+        text: "千年前的一座城，城破那夜，鼓声响了一整晚",
+        dims: { diangu: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
-        imagery: ["楼"],
       },
       {
-        text: "「就当是一场梦，醒来各自是陌生人」",
-        dims: { qingsi: 2, renjian: 1 },
+        text: "渡口边一张旧桌，两杯冷酒，只有你一个人",
+        dims: { qiyong: 2, shanhe: 1 },
         mood: { tone: -1, energy: -1 },
-        imagery: ["梦"],
+        imagery: ["酒"],
       },
     ],
   },
@@ -354,6 +324,36 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         dims: { shanhe: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["山"],
+      },
+    ],
+  },
+  {
+    title: "回望",
+    stem: "回望来路，总有一段过往放不下。若为它写一句收尾——",
+    options: [
+      {
+        text: "「大江东去，我也算其中一朵浪」",
+        dims: { shanhe: 2, diangu: 1 },
+        mood: { tone: 1, energy: 1 },
+        imagery: ["江河"],
+      },
+      {
+        text: "「剑挂在桃树上，不再取下来了」",
+        dims: { qiyong: 2, caomu: 1 },
+        mood: { tone: 1, energy: -1 },
+        imagery: ["剑"],
+      },
+      {
+        text: "「那座楼我替你守着，守到哪一年都行」",
+        dims: { loutai: 2, guangyin: 1 },
+        mood: { tone: -1, energy: 1 },
+        imagery: ["楼"],
+      },
+      {
+        text: "「就当是一场梦，醒来各自是陌生人」",
+        dims: { qingsi: 2, renjian: 1 },
+        mood: { tone: -1, energy: -1 },
+        imagery: ["梦"],
       },
     ],
   },

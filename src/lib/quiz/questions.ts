@@ -303,25 +303,25 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "回望来路，若为它写一句收尾——",
     options: [
       {
-        text: "「大江东去，我也算其中一朵浪」",
+        text: "「江声吞赤壁，帆影过金陵」",
         dims: { shanhe: 2, diangu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "「宝剑挂桃枝，休问恩仇，且共桃花老」",
+        text: "「收旧剑，挂桃枝，春林深处不须归」",
         dims: { qiyong: 2, caomu: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["剑"],
       },
       {
-        text: "「那座楼我替你守着，守到哪一年都行」",
+        text: "「朝也留，暮也留，留到阶前草几秋，有人犹倚楼」",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["楼"],
       },
       {
-        text: "「就当是一场梦，醒来各自是陌生人」",
+        text: "「一晌，一晌，梦里相看如客」",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],

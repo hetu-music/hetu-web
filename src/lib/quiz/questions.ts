@@ -176,7 +176,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["马"],
       },
       {
-        text: "一首诗，月冷路远，山川广大",
+        text: "一首诗，月冷路远，但行莫回头",
         dims: { tianxiang: 2, shanhe: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["月"],

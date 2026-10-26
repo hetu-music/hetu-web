@@ -11,7 +11,7 @@ import {
   type CreditAliasErrorCode,
 } from "@/lib/server/service-credit-aliases";
 import {
-  refreshSongPages,
+  refreshCredits,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
@@ -39,7 +39,7 @@ async function getAccessToken(): Promise<string | null> {
 /** 别名只影响署有它的歌；主名没署过的歌不用动 */
 async function refreshPagesCreditedAs(alias: string) {
   const ids = await getPublishedSongIdsCreditedAs(alias);
-  return refreshSongPages(ids);
+  return refreshCredits(ids);
 }
 
 export const GET = withAuth(

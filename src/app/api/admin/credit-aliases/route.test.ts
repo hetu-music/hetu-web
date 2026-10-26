@@ -23,7 +23,7 @@ vi.mock("@/lib/server/server-utils", async (importOriginal) => {
 
 vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/server-revalidate")>()),
-  refreshSongPages: vi.fn(async () => ({ failed: [] })),
+  refreshCredits: vi.fn(async () => ({ failed: [] })),
 }));
 
 vi.mock("@/lib/server/service-credit-aliases", () => ({
@@ -34,7 +34,7 @@ vi.mock("@/lib/server/service-credit-aliases", () => ({
   getPublishedSongIdsCreditedAs: vi.fn(async () => [3, 7]),
 }));
 
-import { refreshSongPages } from "@/lib/server/server-revalidate";
+import { refreshCredits } from "@/lib/server/server-revalidate";
 import {
   createCreditAlias,
   deleteCreditAlias,
@@ -98,7 +98,7 @@ describe("POST /api/admin/credit-aliases", () => {
       "萧忆情",
       "test-token",
     );
-    expect(refreshSongPages).toHaveBeenCalledWith([3, 7]);
+    expect(refreshCredits).toHaveBeenCalledWith([3, 7]);
     expect(res.headers.get("x-cdn-purge-failed")).toBeNull();
   });
 
@@ -108,7 +108,7 @@ describe("POST /api/admin/credit-aliases", () => {
       name: "萧忆情",
       created_at: "",
     });
-    vi.mocked(refreshSongPages).mockResolvedValueOnce({
+    vi.mocked(refreshCredits).mockResolvedValueOnce({
       failed: ["Cloudflare"],
     });
     const res = await POST(
@@ -135,7 +135,7 @@ describe("POST /api/admin/credit-aliases", () => {
     );
     expect(res.status).toBe(409);
     expect((await res.json()).error).toContain("已登记过");
-    expect(refreshSongPages).not.toHaveBeenCalled();
+    expect(refreshCredits).not.toHaveBeenCalled();
   });
 
   it("其他错误返回 500，不外泄细节", async () => {
@@ -158,7 +158,7 @@ describe("DELETE /api/admin/credit-aliases", () => {
     );
     expect(res.status).toBe(200);
     expect(deleteCreditAlias).toHaveBeenCalledWith("萧忆情Alex", "test-token");
-    expect(refreshSongPages).toHaveBeenCalledWith([3, 7]);
+    expect(refreshCredits).toHaveBeenCalledWith([3, 7]);
   });
 
   it("别名不存在时 404", async () => {

@@ -3,7 +3,7 @@ import { safeCompareSecret } from "@/lib/server/server-utils";
 import {
   refreshAllSongPages,
   refreshPublicPages,
-  refreshSongPages,
+  refreshSongs,
   type PurgeReport,
 } from "@/lib/server/server-revalidate";
 
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         });
       }
-      const purge = await refreshSongPages([songId]);
+      const purge = await refreshSongs([songId]);
       if (purge.failed.length > 0) return purgeFailedResponse(purge, timestamp);
       response = `SUCCESS: Page /song/${songId} revalidated at ${timestamp}`;
     }

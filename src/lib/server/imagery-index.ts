@@ -1,7 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { fetchAll, getServiceClient, TABLES } from "@/lib/db/supabase-server";
-import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
-import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
+import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
 
 /**
  * 意象相关公开页面共用的一份全库数据：详情页的意象与相关作品（service-song-imagery）、
@@ -11,7 +10,7 @@ import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
  * 标注取全部歌（资料存疑的歌自己的详情页也要标意象），歌曲只取计入曲库的；
  * 统计、推荐、候选池都以曲库为范围，各自按 songs 过滤标注。
  *
- * 跨请求缓存，2 小时刷新；标注、基调、has_audio 变了由 server-revalidate 按标签失效。
+ * 跨请求缓存，2 小时刷新；其中任何数据变了由 server-revalidate 按标签失效。
  */
 
 export type IndexCategory = {
@@ -102,6 +101,7 @@ export const loadImageryIndex = unstable_cache(
     }
     return { categories, imagery, occurrences, songs, songEmotions, emotions };
   },
-  ["imagery-index-v1"],
-  { revalidate: 7200, tags: [SONG_IMAGERY_TAG, QUIZ_POOL_TAG] },
+  // 标签也放进 key：改了标签名，旧标签打的条目刷不到，换 key 让它们作废
+  ["imagery-index-v1", IMAGERY_INDEX_TAG],
+  { revalidate: 7200, tags: [IMAGERY_INDEX_TAG] },
 );

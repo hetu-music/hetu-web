@@ -86,8 +86,7 @@ describe("POST /api/public/revalidate — 鉴权", () => {
     const paths = revalidatePathMock.mock.calls.map((c) => c[0]);
     expect(paths).toContain("/zh-CN/quiz");
     expect(paths).toContain("/zh-TW/quiz");
-    expect(revalidateTagMock).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
-    expect(revalidateTagMock).toHaveBeenCalledWith("song-imagery", {
+    expect(revalidateTagMock).toHaveBeenCalledWith("imagery-index", {
       expire: 0,
     });
   });

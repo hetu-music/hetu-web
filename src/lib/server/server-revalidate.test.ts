@@ -18,10 +18,11 @@ import {
   purgeEdgeOneCache,
 } from "@/lib/server/server-utils";
 import {
-  refreshAudioPages,
+  refreshAudio,
+  refreshCredits,
   refreshImagery,
   refreshSongEmotions,
-  refreshSongPages,
+  refreshSongs,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
 
@@ -32,9 +33,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("refreshSongPages", () => {
+describe("invalidate", () => {
   it("Next 只刷带语言前缀的路由，CDN 另外清无前缀的旧 URL", async () => {
-    await refreshSongPages([1], ["/sitemap.xml"]);
+    await refreshSongs([1]);
     const paths = vi.mocked(revalidatePath).mock.calls.map(([p]) => p);
     expect(paths).toEqual(
       expect.arrayContaining(["/zh-CN", "/zh-TW/song/1", "/sitemap.xml"]),
@@ -46,7 +47,7 @@ describe("refreshSongPages", () => {
   });
 
   it("CloudFront 一次提交全部路径，并连带清带语言前缀页面的查询串变体", async () => {
-    await refreshSongPages([1]);
+    await refreshCredits([1]);
     expect(purgeCloudFrontCache).toHaveBeenCalledTimes(1);
     const [paths, pagePaths] = vi.mocked(purgeCloudFrontCache).mock.calls[0];
     expect(paths).toEqual(expect.arrayContaining(["/zh-CN/song/1", "/song/1"]));
@@ -60,7 +61,7 @@ describe("refreshSongPages", () => {
   });
 
   it("Cloudflare 与 EdgeOne 按每批 30 条拆分", async () => {
-    await refreshSongPages(Array.from({ length: 20 }, (_, i) => i + 1));
+    await refreshCredits(Array.from({ length: 20 }, (_, i) => i + 1));
     for (const fn of [purgeCloudflareCache, purgeEdgeOneCache]) {
       const calls = vi.mocked(fn).mock.calls;
       expect(calls.length).toBeGreaterThan(1);
@@ -77,14 +78,14 @@ describe("清 CDN 的结果", () => {
     vi.mocked(purgeEdgeOneCache).mockResolvedValue("skipped");
     vi.mocked(purgeCloudFrontCache).mockResolvedValue("ok");
     // 20 首歌 × 2 种语言，超过 30 条，Cloudflare 分两批
-    const report = await refreshSongPages(
+    const report = await refreshCredits(
       Array.from({ length: 20 }, (_, i) => i + 1),
     );
     expect(report).toEqual({ failed: ["Cloudflare"] });
   });
 
   it("没有歌曲变化时不刷新，也没有失败", async () => {
-    await expect(refreshAudioPages([])).resolves.toEqual({ failed: [] });
+    await expect(refreshAudio([])).resolves.toEqual({ failed: [] });
     expect(purgeCloudflareCache).not.toHaveBeenCalled();
   });
 
@@ -100,11 +101,35 @@ describe("清 CDN 的结果", () => {
   });
 });
 
+describe("refreshSongs", () => {
+  // 歌名、类型、日期也进了意象索引，审批上线后候选池和相关作品要跟着变
+  it("失效意象索引，连带清歌词接口、歌词索引和 sitemap", async () => {
+    await refreshSongs([5]);
+    expect(revalidateTag).toHaveBeenCalledWith("imagery-index", { expire: 0 });
+    expect(purged()).toEqual(
+      expect.arrayContaining([
+        "/zh-CN/song/5",
+        "/zh-TW/quiz",
+        "/api/public/songs/5/lyrics",
+        "/api/public/songs/lyrics-index",
+        "/sitemap.xml",
+      ]),
+    );
+  });
+});
+
+describe("refreshCredits", () => {
+  it("只清首页和详情页，不动意象索引", async () => {
+    await refreshCredits([5]);
+    expect(revalidateTag).not.toHaveBeenCalled();
+    expect(purged()).not.toContain("/sitemap.xml");
+  });
+});
+
 describe("refreshImagery", () => {
   it("失效意象数据标签，清意象页、寻曲页、详情页、母题页和母题接口", async () => {
     await refreshImagery({ songIds: [3, 3], motifIds: [9] });
-    expect(revalidateTag).toHaveBeenCalledWith("song-imagery", { expire: 0 });
-    expect(revalidateTag).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
+    expect(revalidateTag).toHaveBeenCalledWith("imagery-index", { expire: 0 });
     expect(purged()).toEqual(
       expect.arrayContaining([
         "/zh-CN/imagery",
@@ -123,8 +148,7 @@ describe("refreshImagery", () => {
 describe("refreshSongEmotions", () => {
   it("失效寻曲候选池与意象数据标签，只清这首歌的详情页", async () => {
     const report = await refreshSongEmotions(3);
-    expect(revalidateTag).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
-    expect(revalidateTag).toHaveBeenCalledWith("song-imagery", { expire: 0 });
+    expect(revalidateTag).toHaveBeenCalledWith("imagery-index", { expire: 0 });
     expect(purged()).toEqual(
       expect.arrayContaining(["/zh-CN/song/3", "/zh-TW/song/3", "/song/3"]),
     );

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
 import {
   loadImageryIndex,
   type ImageryIndex,
@@ -13,7 +14,6 @@ import {
   evaluate,
   getDimension,
   POOL_VERSION,
-  QUIZ_POOL_TAG,
   QUESTIONS,
   type MatchReason,
   type PoolRows,
@@ -61,8 +61,8 @@ const loadQuizPool = unstable_cache(
     if (pool.length === 0) throw new Error("候选池为空");
     return pool;
   },
-  [`quiz-pool-v${POOL_VERSION}`],
-  { revalidate: 7200, tags: [QUIZ_POOL_TAG] },
+  [`quiz-pool-v${POOL_VERSION}`, IMAGERY_INDEX_TAG],
+  { revalidate: 7200, tags: [IMAGERY_INDEX_TAG] },
 );
 
 const getQuizModel = cache(async (): Promise<QuizModel> => {

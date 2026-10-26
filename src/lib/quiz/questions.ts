@@ -31,14 +31,15 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["山"],
       },
       {
-        text: "掌一盏灯走过熟悉的街巷，与亲友道别",
+        text: "趁夜走过熟悉的街巷，与亲友一一道别",
         dims: { diangu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "在庭前老树上刻下记号，算作不知何时的归期",
+        text: "为院中老马填一次料，约定未知的归期",
         dims: { guangyin: 2, caomu: 1 },
         mood: { tone: -1, energy: 1 },
+        imagery: ["马"],
       },
       {
         text: "独倚栏杆，想一个不会来送行的人",
@@ -96,7 +97,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["酒"],
       },
       {
-        text: "停在荒野枯林边，看雨渐渐化作风雪，埋了来时的路",
+        text: "停在荒野枯林边，看雨渐渐化雪，埋了来时的路",
         dims: { tianxiang: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雪"],
@@ -137,21 +138,20 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "黄昏时分，你走进一座古城。最先去——",
     options: [
       {
-        text: "雪后的夜市，买一盏精巧的花灯",
+        text: "夜市踏雪，买一盏精巧的花灯",
         dims: { tianxiang: 2, qiyong: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["雪"],
       },
       {
-        text: "庙前的书摊，翻看那些泛黄的书",
+        text: "庙前书摊，翻看那些泛黄的书",
         dims: { guangyin: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "城边的驿站，寻一匹作伴的马",
+        text: "城门外的老槐下，等一个说好要来的人，天黑也不走",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
-        imagery: ["马"],
       },
       {
         text: "临街的客栈，隔窗看陌生的过客",
@@ -227,10 +227,9 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["花"],
       },
       {
-        text: "儿时的屋檐下，风吹得檐铃轻响",
+        text: "儿时的屋檐下，晒着太阳，听檐铃轻响",
         dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: 1, energy: -1 },
-        imagery: ["风"],
       },
       {
         text: "千年前的一座城，城破那夜，鼓声响了一整晚",
@@ -266,10 +265,9 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "「一盏冷茶，半窗落花，无人来」",
+        text: "「一盏冷茶，半窗落叶，无人来」",
         dims: { caomu: 2, qiyong: 1 },
         mood: { tone: -1, energy: -1 },
-        imagery: ["花"],
       },
     ],
   },
@@ -319,9 +317,10 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["灯"],
       },
       {
-        text: "传说里守护神木的人，一守就是一生",
+        text: "守着传说中那株千年不谢的花，一守就是一生",
         dims: { caomu: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
+        imagery: ["花"],
       },
       {
         text: "独守观星台、对着月亮过完一生的人",

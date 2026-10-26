@@ -190,7 +190,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "山行",
-    stem: "出了城，路渐渐进了山。若能让一个景象永远停住，你选——",
+    stem: "出城入山，峰回路转。最触动你心境的一幕是——",
     options: [
       {
         text: "千年古树上挂满祈愿的红绸，在日光里翻飞",
@@ -198,7 +198,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "清溪边并肩坐着的两个人，谁也没说话",
+        text: "清溪边并肩而坐的两个人，谁也没说话",
         dims: { shanhe: 2, qingsi: 1 },
         mood: { tone: 1, energy: -1 },
       },

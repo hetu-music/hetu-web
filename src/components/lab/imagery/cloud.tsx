@@ -450,14 +450,12 @@ export function BracketButton({
   onClick,
   label,
   accentColor,
-  count,
   size = "text-[12px]",
 }: {
   isActive: boolean;
   onClick: () => void;
   label: React.ReactNode;
   accentColor: string;
-  count?: number;
   size?: string;
 }) {
   return (
@@ -483,12 +481,6 @@ export function BracketButton({
       >
         」
       </span>
-      {count !== undefined && (
-        <span className="ml-0.5 text-[10px] opacity-40 tracking-normal group-hover:opacity-60 transition-opacity">
-          {count}
-        </span>
-      )}
-      <span className="absolute -bottom-1 left-0 w-full h-[0.5px] bg-slate-300 dark:bg-slate-700 scale-x-0 transition-transform duration-500 group-hover:scale-x-100" />
     </button>
   );
 }

@@ -129,15 +129,8 @@ export default function MotifIndexProto({
         ? []
         : data.groups
             .filter((g) => g.l1 === l1)
-            .map((g) => ({
-              id: g.id,
-              name: g.name,
-              count:
-                view === "motifs"
-                  ? g.motifs.length
-                  : data.words.filter((w) => w.l2 === g.id).length,
-            })),
-    [data, l1, view],
+            .map((g) => ({ id: g.id, name: g.name })),
+    [data, l1],
   );
 
   const items: CloudItem[] = useMemo(() => {
@@ -310,7 +303,6 @@ export default function MotifIndexProto({
                   <BracketButton
                     key={c.id}
                     label={c.name}
-                    count={c.count}
                     isActive={l2 === c.id}
                     onClick={() => setL2(l2 === c.id ? null : c.id)}
                     accentColor={

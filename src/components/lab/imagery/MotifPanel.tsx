@@ -146,7 +146,6 @@ function PanelBody({
               <BracketButton
                 key={w.id}
                 label={w.name}
-                count={w.songCount}
                 size="text-[13px]"
                 isActive={word === w.id}
                 onClick={() => onWord(word === w.id ? null : w.id)}

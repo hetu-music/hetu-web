@@ -31,7 +31,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["山"],
       },
       {
-        text: "趁夜走过熟悉的街巷，与亲友一一道别",
+        text: "漫步熟悉的街巷，与亲友共叙旧事",
         dims: { diangu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
       },
@@ -53,7 +53,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "出门前，你往行囊里多放了一样东西——",
     options: [
       {
-        text: "一柄挂在堂上多年的剑",
+        text: "一柄挂在堂上多年的剑，今日终于取下",
         dims: { qiyong: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["剑"],
@@ -65,12 +65,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["柳"],
       },
       {
-        text: "一封珍藏多年的信",
+        text: "一封珍藏多年却未拆的信",
         dims: { guangyin: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "一本来自前朝的游记",
+        text: "一本来自前朝的游记，所记半不可寻",
         dims: { diangu: 2, shanhe: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -165,7 +165,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "倏忽几日，又要上路。送你出城的人，临别给了你——",
     options: [
       {
-        text: "一幅手绘的城中明楼长卷",
+        text: "一幅手绘的明楼并肩长卷",
         dims: { qingsi: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
       },

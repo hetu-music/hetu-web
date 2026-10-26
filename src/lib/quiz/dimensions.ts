@@ -40,7 +40,7 @@ export const DIMENSIONS: readonly Dimension[] = [
     label: "楼台",
     categories: ["建筑"],
     motto: "倚遍楼台",
-    description: "你偏爱有檐有窗的地方，在楼阁庭院里等一个人、看一场雪。",
+    description: "你偏爱有檐有窗的地方，愿意在楼阁庭院里等一个人、看一场雪。",
   },
   {
     key: "guangyin",

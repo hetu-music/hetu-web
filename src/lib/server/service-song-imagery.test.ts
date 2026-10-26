@@ -123,6 +123,7 @@ function mockClient(overrides: Partial<Tables> = {}) {
     [TABLES.IMAGERY_OCC]: rows.occurrences,
     [TABLES.MUSIC_CATALOG]: rows.songs,
     [TABLES.SONG_EMOTIONS]: rows.songEmotions,
+    [TABLES.EMOTIONS]: [],
   };
   const from = vi.fn((table: string) =>
     makeQueryBuilder({ data: byTable[table], error: null }),

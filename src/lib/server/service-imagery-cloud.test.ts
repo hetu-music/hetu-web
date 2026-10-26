@@ -70,6 +70,8 @@ function mockClient() {
     [TABLES.IMAGERY]: imagery,
     [TABLES.IMAGERY_OCC]: occurrences,
     [TABLES.MUSIC_CATALOG]: songs,
+    [TABLES.SONG_EMOTIONS]: [],
+    [TABLES.EMOTIONS]: [],
   };
   const from = vi.fn((table: string) =>
     makeQueryBuilder({ data: byTable[table], error: null }),

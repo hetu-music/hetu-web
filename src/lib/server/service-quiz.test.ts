@@ -103,16 +103,17 @@ function makeRows(): Rows {
 }
 
 /**
- * 按表名分发查询：候选池读曲库视图，歌词按 id 读 music 表。
+ * 按表名分发查询：候选池读共用的意象索引，歌词按 id 读 music 表。
  */
 function mockClient(rows: Rows, lyricsResult?: MockResult) {
   const ok = (data: unknown): MockResult => ({ data, error: null });
   const byTable: Record<string, () => unknown> = {
     [TABLES.IMAGERY_CAT]: () => makeQueryBuilder(ok(rows.categories)),
     [TABLES.IMAGERY]: () => makeQueryBuilder(ok(rows.imagery)),
-    [TABLES.IMAGERY_OCC_CATALOG]: () => makeQueryBuilder(ok(rows.occurrences)),
+    [TABLES.IMAGERY_OCC]: () => makeQueryBuilder(ok(rows.occurrences)),
     [TABLES.MUSIC_CATALOG]: () => makeQueryBuilder(ok(rows.songs)),
     [TABLES.SONG_EMOTIONS]: () => makeQueryBuilder(ok([])),
+    [TABLES.EMOTIONS]: () => makeQueryBuilder(ok([])),
     [TABLES.MUSIC]: () => makeQueryBuilder(lyricsResult ?? ok(rows.lyrics)),
   };
   const from = vi.fn((table: string) => byTable[table]());

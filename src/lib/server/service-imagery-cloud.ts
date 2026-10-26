@@ -1,7 +1,9 @@
-import { unstable_cache } from "next/cache";
-import { fetchAll, getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { PALETTE_FULL, sortLevel1Categories } from "@/lib/imagery/palette";
-import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
+import {
+  loadImageryIndex,
+  type ImageryIndex,
+  type IndexCategory,
+} from "@/lib/server/imagery-index";
 import type {
   CloudMotif,
   CloudMotifGroup,
@@ -16,75 +18,19 @@ import { toTraditional, toTraditionalArray } from "@/lib/utils/utils-convert";
 
 /**
  * 意象词云的数据，以母题为单位（见 IMAGERY.md）：词云列母题或全部写法，
- * 面板列一个母题的写法与作品。全库标注一次读进来，跨请求缓存；面板也从这份缓存里算。
+ * 面板列一个母题的写法与作品。都从共用的意象索引（imagery-index）算，不另查库。
  * 作品数一律按歌去重，只算曲库里的歌。
  */
 
-type CategoryRow = {
-  id: number;
-  name: string;
-  parent_id: number | null;
-  level: number | null;
-  description: string | null;
-};
-
-type Index = {
-  categories: CategoryRow[];
-  imagery: Array<{ id: number; name: string }>;
-  occurrences: Array<{
-    song_id: number;
-    imagery_id: number;
-    category_id: number;
-  }>;
-  songs: Array<{
-    id: number;
-    title: string;
-    date: string | null;
-    lyricist: string[] | null;
-  }>;
-};
-
-const loadIndex = unstable_cache(
-  async (): Promise<Index> => {
-    // 失败时抛错而不返回空数据：unstable_cache 不缓存异常
-    const supabase = getServiceClient();
-    if (!supabase) throw new Error("Supabase 未配置");
-    const [categories, imagery, occurrences, songs] = await Promise.all([
-      fetchAll<Index["categories"][number]>(
-        supabase,
-        TABLES.IMAGERY_CAT,
-        "id,name,parent_id,level,description",
-      ),
-      fetchAll<Index["imagery"][number]>(supabase, TABLES.IMAGERY, "id,name"),
-      fetchAll<Index["occurrences"][number]>(
-        supabase,
-        TABLES.IMAGERY_OCC,
-        "song_id,imagery_id,category_id",
-      ),
-      fetchAll<Index["songs"][number]>(
-        supabase,
-        TABLES.MUSIC_CATALOG,
-        "id,title,date,lyricist",
-      ),
-    ]);
-    if (occurrences.length === 0 || songs.length === 0) {
-      throw new Error("意象索引数据为空");
-    }
-    return { categories, imagery, occurrences, songs };
-  },
-  ["imagery-cloud-index-v1"],
-  { revalidate: 7200, tags: [SONG_IMAGERY_TAG] },
-);
-
-function derive(index: Index) {
+function derive(index: ImageryIndex) {
   const catById = new Map(index.categories.map((c) => [c.id, c]));
   const l1 = sortLevel1Categories(index.categories);
   // 配色记成 PALETTE_FULL 的下标，客户端据此取深浅两套颜色；-1 为灰
   const paletteOfL1 = new Map(
     l1.map((c, i) => [c.id, i % PALETTE_FULL.length]),
   );
-  const pathOf = (id: number): CategoryRow[] => {
-    const path: CategoryRow[] = [];
+  const pathOf = (id: number): IndexCategory[] => {
+    const path: IndexCategory[] = [];
     let cat = catById.get(id);
     while (cat && path.length < 5) {
       path.unshift(cat);
@@ -137,7 +83,7 @@ function translator(locale: string) {
 // ─── 词云 ──────────────────────────────────────────────────────────────────
 
 export async function getImageryCloud(locale: string): Promise<ImageryCloud> {
-  const index = await loadIndex();
+  const index = await loadImageryIndex();
   const d = derive(index);
   const tr = translator(locale);
   const wordName = new Map(index.imagery.map((i) => [i.id, i.name]));
@@ -239,7 +185,7 @@ export async function getMotifDetail(
   motifId: number,
   locale: string,
 ): Promise<MotifDetail | null> {
-  const index = await loadIndex();
+  const index = await loadImageryIndex();
   const d = derive(index);
   const tr = translator(locale);
   const motif = d.catById.get(motifId);

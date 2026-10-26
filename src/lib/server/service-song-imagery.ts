@@ -1,11 +1,13 @@
-import { unstable_cache } from "next/cache";
-import { fetchAll, getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import {
   GRAY_PALETTE,
   PALETTE_FULL,
   sortLevel1Categories,
 } from "@/lib/imagery/palette";
-import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
+import {
+  loadImageryIndex,
+  type ImageryIndex,
+  type IndexCategory,
+} from "@/lib/server/imagery-index";
 import type {
   RelatedSong,
   SongImageryMark,
@@ -27,79 +29,6 @@ const SHARED_LIMIT = 3;
  */
 const EMOTION_WEIGHT = 0.3;
 const MAIN_EMOTION_WEIGHT = 2;
-
-type CategoryRow = {
-  id: number;
-  name: string;
-  parent_id: number | null;
-  level: number | null;
-};
-
-type ImageryIndex = {
-  categories: CategoryRow[];
-  imagery: Array<{ id: number; name: string }>;
-  occurrences: Array<{
-    song_id: number;
-    imagery_id: number;
-    category_id: number;
-    lyric_timetag: string[] | null;
-  }>;
-  songs: Array<{
-    id: number;
-    title: string;
-    artist: string[] | null;
-    hascover: boolean | null;
-  }>;
-  songEmotions: Array<{ song_id: number; emotion_id: number; rank: number }>;
-};
-
-/**
- * 相关作品要拿全库标注做相似度，每个详情页各查一遍太重；
- * 与寻曲候选池一样跨请求缓存，2 小时刷新。
- */
-const loadImageryIndex = unstable_cache(
-  async (): Promise<ImageryIndex> => {
-    // 失败时抛错而不返回空数据：unstable_cache 不缓存异常
-    const supabase = getServiceClient();
-    if (!supabase) throw new Error("Supabase 未配置");
-    const [categories, imagery, occurrences, songs, songEmotions] =
-      await Promise.all([
-        fetchAll<ImageryIndex["categories"][number]>(
-          supabase,
-          TABLES.IMAGERY_CAT,
-          "id,name,parent_id,level",
-        ),
-        fetchAll<ImageryIndex["imagery"][number]>(
-          supabase,
-          TABLES.IMAGERY,
-          "id,name",
-        ),
-        fetchAll<ImageryIndex["occurrences"][number]>(
-          supabase,
-          TABLES.IMAGERY_OCC,
-          "song_id,imagery_id,category_id,lyric_timetag",
-        ),
-        // 出处取全部歌曲（存疑的歌自己的详情页也要标意象），
-        // 歌曲只取计入曲库的：作品数统计与相关作品都以它为范围
-        fetchAll<ImageryIndex["songs"][number]>(
-          supabase,
-          TABLES.MUSIC_CATALOG,
-          "id,title,artist,hascover",
-        ),
-        fetchAll<ImageryIndex["songEmotions"][number]>(
-          supabase,
-          TABLES.SONG_EMOTIONS,
-          "song_id,emotion_id,rank",
-        ),
-      ]);
-    if (occurrences.length === 0 || songs.length === 0) {
-      throw new Error("意象索引数据为空");
-    }
-    return { categories, imagery, occurrences, songs, songEmotions };
-  },
-  ["song-imagery-index-v3"],
-  { revalidate: 7200, tags: [SONG_IMAGERY_TAG] },
-);
 
 /**
  * 两首歌基调的余弦相似度，主基调记 2、副基调记 1。
@@ -149,8 +78,8 @@ export async function getSongImagery(
       PALETTE_FULL[i % PALETTE_FULL.length].accent,
     ]),
   );
-  const pathOf = (categoryId: number): CategoryRow[] => {
-    const path: CategoryRow[] = [];
+  const pathOf = (categoryId: number): IndexCategory[] => {
+    const path: IndexCategory[] = [];
     let cat = catById.get(categoryId);
     while (cat && path.length < 5) {
       path.unshift(cat);

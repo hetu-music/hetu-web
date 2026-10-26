@@ -3,11 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { fetchAll, getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { parseLrcLines } from "@/lib/imagery/suggest";
-import {
-  GRAY_PALETTE,
-  PALETTE_FULL,
-  sortLevel1Categories,
-} from "@/lib/imagery/palette";
+import { PALETTE_FULL, sortLevel1Categories } from "@/lib/imagery/palette";
 import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
 
 /**
@@ -45,6 +41,7 @@ type Index = {
     title: string;
     date: string | null;
     hascover: boolean | null;
+    lyricist: string[] | null;
   }>;
   emotions: EmotionRow[];
   songEmotions: Array<{ song_id: number; emotion_id: number; rank: number }>;
@@ -70,7 +67,7 @@ const loadIndex = unstable_cache(
         fetchAll<Index["songs"][number]>(
           supabase,
           TABLES.MUSIC_CATALOG,
-          "id,title,date,hascover",
+          "id,title,date,hascover,lyricist",
         ),
         fetchAll<EmotionRow>(
           supabase,
@@ -88,7 +85,7 @@ const loadIndex = unstable_cache(
     }
     return { categories, imagery, occurrences, songs, emotions, songEmotions };
   },
-  ["lab-motif-index-v1"],
+  ["lab-motif-index-v2"],
   { revalidate: 7200, tags: [SONG_IMAGERY_TAG] },
 );
 
@@ -96,8 +93,9 @@ const loadIndex = unstable_cache(
 function derive(index: Index) {
   const catById = new Map(index.categories.map((c) => [c.id, c]));
   const l1 = sortLevel1Categories(index.categories);
-  const accentOfL1 = new Map(
-    l1.map((c, i) => [c.id, PALETTE_FULL[i % PALETTE_FULL.length].accent]),
+  // 配色记成 PALETTE_FULL 的下标，客户端据此取深浅两套颜色；-1 为灰
+  const paletteOfL1 = new Map(
+    l1.map((c, i) => [c.id, i % PALETTE_FULL.length]),
   );
   const pathOf = (id: number): CategoryRow[] => {
     const path: CategoryRow[] = [];
@@ -108,9 +106,9 @@ function derive(index: Index) {
     }
     return path;
   };
-  const accentOf = (motifId: number) => {
+  const paletteOf = (motifId: number) => {
     const root = pathOf(motifId)[0];
-    return (root && accentOfL1.get(root.id)) ?? GRAY_PALETTE.accent;
+    return (root && paletteOfL1.get(root.id)) ?? -1;
   };
 
   const catalog = new Set(index.songs.map((s) => s.id));
@@ -135,9 +133,9 @@ function derive(index: Index) {
   return {
     catById,
     l1,
-    accentOfL1,
+    paletteOfL1,
     pathOf,
-    accentOf,
+    paletteOf,
     catalog,
     songsByMotif,
     motifsBySong,
@@ -152,7 +150,7 @@ export type IndexMotif = {
   name: string;
   l1: number;
   l2: number;
-  accent: string;
+  palette: number;
   songCount: number;
   /** 这个母题下的写法，按作品数排；搜索时用 */
   words: string[];
@@ -165,19 +163,20 @@ export type IndexWord = {
   /** 作品最多的那个母题：点词时去它的母题页 */
   motif: number;
   l1: number;
-  accent: string;
+  l2: number;
+  palette: number;
 };
 
 export type IndexGroup = {
   id: number;
   name: string;
   l1: number;
-  accent: string;
+  palette: number;
   motifs: IndexMotif[];
 };
 
 export type IndexData = {
-  l1: Array<{ id: number; name: string; accent: string }>;
+  l1: Array<{ id: number; name: string; palette: number }>;
   groups: IndexGroup[];
   words: IndexWord[];
   motifCount: number;
@@ -204,14 +203,15 @@ export async function getMotifIndex(): Promise<IndexData> {
       if (!list) wordsOfMotif.set(motifId, (list = []));
       list.push([name, songs.size]);
     }
-    const root = d.pathOf(top)[0];
+    const [root, l2] = d.pathOf(top);
     words.push({
       id: wordId,
       name,
       songCount: all.size,
       motif: top,
       l1: root?.id ?? 0,
-      accent: d.accentOf(top),
+      l2: l2?.id ?? 0,
+      palette: d.paletteOf(top),
     });
   }
   words.sort((a, b) => b.songCount - a.songCount || a.id - b.id);
@@ -229,7 +229,7 @@ export async function getMotifIndex(): Promise<IndexData> {
           id: l2.id,
           name: l2.name,
           l1: root.id,
-          accent: d.accentOf(motifId),
+          palette: d.paletteOf(motifId),
           motifs: [],
         }),
       );
@@ -239,7 +239,7 @@ export async function getMotifIndex(): Promise<IndexData> {
       name: motif.name,
       l1: root.id,
       l2: l2.id,
-      accent: group.accent,
+      palette: group.palette,
       songCount: songs.size,
       words: (wordsOfMotif.get(motifId) ?? [])
         .sort((a, b) => b[1] - a[1])
@@ -263,7 +263,7 @@ export async function getMotifIndex(): Promise<IndexData> {
     l1: d.l1.map((c) => ({
       id: c.id,
       name: c.name,
-      accent: d.accentOfL1.get(c.id) ?? GRAY_PALETTE.accent,
+      palette: d.paletteOfL1.get(c.id) ?? -1,
     })),
     groups: sortedGroups,
     words,
@@ -281,6 +281,7 @@ export type MotifWork = {
   title: string;
   year: string | null;
   hascover: boolean | null;
+  lyricist: string[] | null;
   /** 本曲在这个母题下用到的写法 */
   wordIds: number[];
   /** 写到它的歌词，按出现顺序；没有时间轴的歌按字面找行 */
@@ -302,7 +303,7 @@ export type MotifEmotion = {
 export type MotifLink = {
   id: number;
   name: string;
-  accent: string;
+  palette: number;
   both: number;
   lift: number;
 };
@@ -311,7 +312,7 @@ export type MotifData = {
   id: number;
   name: string;
   path: string[];
-  accent: string;
+  palette: number;
   description: string | null;
   songCount: number;
   words: MotifWord[];
@@ -337,7 +338,6 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
   const own = d.songsByMotif.get(motifId);
   if (!motif || motif.level !== 3 || !own) return null;
   const path = d.pathOf(motifId);
-  const accent = d.accentOf(motifId);
   const wordName = new Map(index.imagery.map((i) => [i.id, i.name]));
 
   // 写法
@@ -397,6 +397,7 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
       title: song.title,
       year: song.date?.slice(0, 4) ?? null,
       hascover: song.hascover,
+      lyricist: song.lyricist,
       wordIds: [...new Set(occs.map((o) => o.imagery_id))],
       lines: [...new Set(lines)],
     });
@@ -452,7 +453,7 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
     cowritten.push({
       id: otherId,
       name: d.catById.get(otherId)?.name ?? "",
-      accent: d.accentOf(otherId),
+      palette: d.paletteOf(otherId),
       both,
       lift,
     });
@@ -476,7 +477,7 @@ export async function getMotif(motifId: number): Promise<MotifData | null> {
     id: motifId,
     name: motif.name,
     path: path.slice(0, -1).map((c) => c.name),
-    accent,
+    palette: d.paletteOf(motifId),
     description: motif.description,
     songCount: own.size,
     words,

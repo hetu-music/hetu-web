@@ -62,7 +62,7 @@ export default function QuizResultClient({ result }: Props) {
               {t("result.secondary", { motto: result.secondary.motto })}
             </p>
           )}
-          <p className="mx-auto mt-8 max-w-md font-kaiti text-lg leading-loose text-slate-600 dark:text-slate-400">
+          <p className="mx-auto mt-8 max-w-md font-kaiti text-lg leading-loose text-balance text-slate-600 md:max-w-xl dark:text-slate-400">
             {result.persona.description}
           </p>
         </motion.header>
@@ -102,7 +102,6 @@ export default function QuizResultClient({ result }: Props) {
                       {p.label}
                     </span>
                     <div className="relative h-1.5 flex-1 rounded-full bg-slate-100 dark:bg-slate-800/70">
-                      <span className="absolute -inset-y-0.75 left-1/2 w-px bg-slate-300 dark:bg-slate-700" />
                       <motion.span
                         className={
                           positive

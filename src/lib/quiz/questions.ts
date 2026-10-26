@@ -260,7 +260,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "「客榻难分庄蝶梦，狂心未肯负深情」",
+        text: "「客榻难分庄蝶梦，挑灯细认旧时名」",
         dims: { qingsi: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
       },

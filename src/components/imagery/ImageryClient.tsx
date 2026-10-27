@@ -240,6 +240,9 @@ export default function ImageryClient({
     const apply = () => {
       setSwitching(null);
       setBloom(true);
+      // 进页时的「滚到这个母题」只对当时的词云有效。新词云换了 key 重新挂载，
+      // 不清掉会再滚一次，而且拿母题 id 去具象里找，滚到一个同号的不相干的词
+      setReveal(null);
       setView(next);
       syncUrl(null, null, next);
     };

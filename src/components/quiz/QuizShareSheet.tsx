@@ -28,19 +28,51 @@ interface Props {
 type Card = {
   /** 预览用 data URL：微信内置浏览器长按识别、保存 blob: 地址的图片不可靠 */
   src: string;
-  file: File;
+  filename: string;
+  blob: Blob | null;
+  /** File / Web Share 不可用时仍能预览和保存图片。 */
+  file: File | null;
   /** 系统分享面板能否直接收图片（iOS / Android 的浏览器可以，桌面和微信多半不行） */
   shareable: boolean;
 };
 
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("导出图片失败"))),
-      "image/png",
-    ),
-  );
+function exportCard(canvas: HTMLCanvasElement, filename: string): Card {
+  // 预览本来就需要 data URL；只编码一次，也不依赖部分 WebView 的 toBlob。
+  const src = canvas.toDataURL("image/png");
+  const prefix = "data:image/png;base64,";
+  if (!src.startsWith(prefix) || src.length === prefix.length) {
+    throw new Error("PNG 导出为空");
+  }
+
+  let blob: Blob | null = null;
+  let file: File | null = null;
+  let shareable = false;
+  try {
+    const binary = atob(src.slice(prefix.length));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    blob = new Blob([bytes], { type: "image/png" });
+    if (typeof File === "function") {
+      file = new File([blob], filename, { type: "image/png" });
+    }
+  } catch (error) {
+    console.warn("[QuizShareSheet] 文件封装不可用，保留图片预览", error);
+  }
+  if (file && typeof navigator.share === "function") {
+    try {
+      shareable = navigator.canShare?.({ files: [file] }) ?? false;
+    } catch (error) {
+      console.warn("[QuizShareSheet] 系统分享不可用，保留保存图片", error);
+    }
+  }
+  return { src, filename, blob, file, shareable };
 }
+
+type CachedCard = {
+  result: QuizResultView;
+  locale: string;
+  value: Card | "error";
+};
 
 export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
   const t = useTranslations("quiz");
@@ -52,14 +84,20 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
 
   // 深浅两种各画一次就留着，来回切主题不用重画
   const [cards, setCards] = useState<
-    Partial<Record<ShareCardTheme, Card | "error">>
+    Partial<Record<ShareCardTheme, CachedCard>>
   >({});
   const [copied, setCopied] = useState(false);
-  const card = cards[theme];
+  const cached = cards[theme];
+  const card =
+    cached?.result === result && cached.locale === locale
+      ? cached.value
+      : undefined;
 
   useEffect(() => {
-    if (!open || cards[theme]) return;
+    if (!open || card) return;
     let cancelled = false;
+    let stage: "render" | "export" = "render";
+    let size: { width: number; height: number } | undefined;
 
     const path = getPathname({ href: "/quiz", locale });
     const host = window.location.host.replace(/^www\./, "");
@@ -76,7 +114,7 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
       imagery: result.imagery,
       matchesLabel: t("result.matches"),
       matchLabel: t("result.match"),
-      matches: result.matches.slice(0, 3).map((m) => ({
+      matches: result.matches.map((m) => ({
         title: m.song.title,
         meta: [m.song.artist?.join(" / "), m.song.album]
           .filter(Boolean)
@@ -92,39 +130,70 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
     };
 
     renderShareCard(input, theme)
-      .then(async (canvas) => {
-        const blob = await canvasToBlob(canvas);
-        const file = new File([blob], `hetu-quiz-${result.code}.png`, {
-          type: "image/png",
-        });
-        const shareable = navigator.canShare?.({ files: [file] }) ?? false;
-        return { src: canvas.toDataURL("image/png"), file, shareable };
+      .then((canvas) => {
+        stage = "export";
+        size = { width: canvas.width, height: canvas.height };
+        try {
+          if (cancelled) return null;
+          return exportCard(canvas, `hetu-quiz-${result.code}.png`);
+        } finally {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
       })
       .catch((e) => {
-        console.error("[QuizShareSheet] 生成分享图失败", e);
+        if (!cancelled) {
+          console.error(
+            "[QuizShareSheet] 生成分享图失败",
+            { stage, ...size },
+            e,
+          );
+        }
         return "error" as const;
       })
       .then((next) => {
-        if (!cancelled) setCards((prev) => ({ ...prev, [theme]: next }));
+        if (!cancelled && next) {
+          setCards((prev) => ({
+            ...prev,
+            [theme]: { result, locale, value: next },
+          }));
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [open, theme, cards, locale, result, t, tSite]);
+  }, [open, theme, card, locale, result, t, tSite]);
 
   const download = useCallback(() => {
     if (!card || card === "error") return;
-    const url = URL.createObjectURL(card.file);
+    let url: string | null = null;
+    try {
+      if (card.blob && typeof URL.createObjectURL === "function") {
+        url = URL.createObjectURL(card.blob);
+      }
+    } catch (error) {
+      console.warn("[QuizShareSheet] 下载改用图片地址", error);
+    }
     const a = document.createElement("a");
-    a.href = url;
-    a.download = card.file.name;
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = url ?? card.src;
+    a.download = card.filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    try {
+      a.click();
+    } finally {
+      a.remove();
+      // 先让浏览器接手下载，避免点击后同步撤销导致 WebView 读不到文件。
+      if (url) {
+        const objectUrl = url;
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+      }
+    }
   }, [card]);
 
   const shareImage = useCallback(async () => {
-    if (!card || card === "error") return;
+    if (!card || card === "error" || !card.file || !card.shareable) return;
     try {
       await navigator.share({ files: [card.file] });
     } catch {

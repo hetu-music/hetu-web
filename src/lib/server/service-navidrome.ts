@@ -23,10 +23,7 @@ import {
   type NavSong,
   type SyncPlan,
 } from "@/lib/navidrome/sync";
-import {
-  refreshAudio,
-  type PurgeReport,
-} from "@/lib/server/server-revalidate";
+import { refreshAudio, type PurgeReport } from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 
 /** 缺少数据库或 Navidrome 配置，对应 503 */

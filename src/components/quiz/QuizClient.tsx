@@ -4,6 +4,7 @@ import TopBar from "@/components/shared/topbar/TopBar";
 import { useRouter } from "@/i18n/navigation";
 import { encodeAnswers } from "@/lib/quiz/codec";
 import type { QuizQuestionView } from "@/lib/quiz/views";
+import { preloadFontText } from "@/lib/utils/font-preload";
 import { cn } from "@/lib/utils/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
@@ -50,6 +51,25 @@ export default function QuizClient({ questions, poolSize }: Props) {
     },
     [],
   );
+
+  // 中文字体按字切了片，翻到新题才下载会一题一跳：在启程页就把整套题要用的分片下载好
+  useEffect(() => {
+    preloadFontText([
+      {
+        cssVar: "--font-calligraphy",
+        text: questions.map((q) => q.title).join(""),
+      },
+      {
+        cssVar: "--font-serif",
+        text:
+          questions.map((q) => q.stem + q.options.join("")).join("") +
+          t("question.progress", { current: 0, total: questions.length }) +
+          t("question.prev") +
+          "0123456789",
+      },
+      { cssVar: "--font-kaiti", text: t("question.finishing") },
+    ]);
+  }, [questions, t]);
 
   const start = useCallback(() => {
     setOrder(questions.map((q) => shuffledIndices(q.options.length)));

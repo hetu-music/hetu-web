@@ -1,6 +1,7 @@
 "use client";
 
 import { SPLIT_FONT_STYLESHEETS } from "@/lib/split-fonts";
+import { ensureSplitFontStyles } from "@/lib/utils/font-preload";
 import { useEffect } from "react";
 import { preload } from "react-dom";
 
@@ -18,15 +19,7 @@ export function SplitFontStyles() {
   }
 
   useEffect(() => {
-    for (const href of SPLIT_FONT_STYLESHEETS) {
-      if (document.querySelector(`link[rel="stylesheet"][href="${href}"]`)) {
-        continue;
-      }
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = href;
-      document.head.appendChild(link);
-    }
+    ensureSplitFontStyles();
   }, []);
 
   return null;

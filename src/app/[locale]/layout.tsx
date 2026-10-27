@@ -8,8 +8,8 @@ import {
   Noto_Serif_SC,
   Playfair_Display,
 } from "next/font/google";
-import localFont from "next/font/local";
 import { PWARegistration } from "@/components/pwa/PWARegistration";
+import { SplitFontStyles } from "@/components/shared/SplitFontStyles";
 import { Providers } from "@/context/providers";
 
 // 标题字体 - 衬线体
@@ -39,30 +39,6 @@ const notoSansSC = Noto_Sans_SC({
   display: "swap",
 });
 
-const lxgwMono = localFont({
-  src: "../../../public/fonts/LXGWMono.woff2",
-  variable: "--font-mono-cjk",
-  weight: "400",
-  display: "swap",
-  preload: false,
-});
-
-const keben = localFont({
-  src: "../../../public/fonts/keben.woff2",
-  variable: "--font-keben",
-  weight: "400",
-  display: "swap",
-  preload: false,
-});
-
-const customKaiti = localFont({
-  src: "../../../public/fonts/KaiTi.woff2",
-  variable: "--font-kaiti-custom",
-  weight: "400",
-  display: "swap",
-  preload: false,
-});
-
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
@@ -87,10 +63,11 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html
       lang={locale}
       suppressHydrationWarning
-      className={`${playfairDisplay.variable} ${notoSerifSC.variable} ${inter.variable} ${notoSansSC.variable} ${lxgwMono.variable} ${keben.variable} ${customKaiti.variable}`}
+      className={`${playfairDisplay.variable} ${notoSerifSC.variable} ${inter.variable} ${notoSansSC.variable}`}
     >
       <body className="antialiased">
         <PWARegistration />
+        <SplitFontStyles />
         <NextIntlClientProvider messages={messages} locale={locale}>
           <Providers>
             {/* 不要给这层加 z-index：那会自成一个层级上下文，页面里的浮层再高也压不过

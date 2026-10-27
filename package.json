@@ -8,6 +8,7 @@
     "build:next": "next build",
     "build:sw": "pnpm exec tsx scripts/build-sw.ts",
     "build:icons": "pnpm exec tsx scripts/generate-icons.ts",
+    "fonts:split": "pnpm exec tsx scripts/split-fonts.ts",
     "build:pwa": "pnpm build:icons && pnpm build:next && pnpm build:sw",
     "start": "next start",
     "lint": "eslint .",

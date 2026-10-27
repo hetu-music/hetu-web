@@ -226,8 +226,11 @@ describe("renderShareCard complete layout", () => {
   it("默认左右排：意象在左，九项维度在右，并保留结果顺序", async () => {
     await renderShareCard(fullInput, "light");
     const calls = contexts[0].fillText.mock.calls;
-    const last = (text: string) =>
-      calls.filter(([value]) => value === text).at(-1)!;
+    const last = (text: string) => {
+      const call = calls.filter(([value]) => value === text).at(-1);
+      if (!call) throw new Error(`没有绘制文字: ${text}`);
+      return call;
+    };
     for (const word of imagery) expect(last(word)[1]).toBeLessThan(416);
     for (const dimension of dimensions)
       expect(last(dimension.label)[1]).toBe(480);
@@ -238,7 +241,8 @@ describe("renderShareCard complete layout", () => {
 
   it("左右倾向条以零为中心，负值向左、正值向右，零值只留轨道", async () => {
     await renderShareCard(fullInput, "light");
-    const rounded = contexts[0].roundRect!;
+    const rounded = contexts[0].roundRect;
+    if (!rounded) throw new Error("测试环境缺少 roundRect mock");
     const trackLeft = 564;
     const trackWidth = 420;
     const center = trackLeft + trackWidth / 2;

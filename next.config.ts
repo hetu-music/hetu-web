@@ -60,6 +60,17 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // 字体分片（pnpm fonts:split 生成）以内容哈希命名，内容变了名字就变，可以永久缓存。
+        // 同目录的 result.css 名字固定，保持默认的每次校验
+        source: "/fonts/:font/:file([0-9a-f]{32}\\.woff2)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
     ];
   },
   // OG 图片代理：爬虫通过部署服务器中转访问封面图

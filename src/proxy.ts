@@ -203,7 +203,7 @@ export const config = {
      * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - metadata files or static assets with extensions (containing a dot, e.g. favicon.ico, sitemap.xml, robots.txt, manifest.json, sw.js, image.png, LXGWMono.woff2)
+     * - metadata files or static assets with extensions (containing a dot, e.g. favicon.ico, sitemap.xml, robots.txt, manifest.json, sw.js, image.png, font.woff2)
      */
     "/((?!api|_next/static|_next/image|.*\\..*).*)",
   ],

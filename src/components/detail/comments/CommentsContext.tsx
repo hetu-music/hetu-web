@@ -74,9 +74,24 @@ export function CommentsProvider({
     [onSheetOpen],
   );
 
+  // 按赞排序用的是第一次看到这条批注时的赞数：在页面上点赞只改数字、不换位置，
+  // 下次进页才按新的赞数排
+  const [rankLikes, setRankLikes] = useState(() => new Map<number, number>());
+  const unseen = api.comments.filter((c) => !rankLikes.has(c.id));
+  if (unseen.length > 0) {
+    const next = new Map(rankLikes);
+    for (const c of unseen) next.set(c.id, c.likeCount);
+    setRankLikes(next);
+  }
+
   const threads = useMemo(
-    () => groupComments(api.comments, anchorCtx),
-    [api.comments, anchorCtx],
+    () =>
+      groupComments(
+        api.comments,
+        anchorCtx,
+        (c) => rankLikes.get(c.id) ?? c.likeCount,
+      ),
+    [api.comments, anchorCtx, rankLikes],
   );
 
   const { create: apiCreate, edit: apiEdit, remove: apiRemove, like } = api;

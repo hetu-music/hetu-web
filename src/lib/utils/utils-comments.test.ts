@@ -140,7 +140,7 @@ describe("anchorForSlot", () => {
 });
 
 describe("groupComments", () => {
-  it("回复挂到批注下；同处自己的在前，其余新的在前，与赞数无关", () => {
+  it("回复挂到批注下并按时间顺排；同处自己的在前，其余赞多的在前", () => {
     const grouped = groupComments(
       [
         comment({ id: 1, likeCount: 9, createdAt: "2026-09-01T00:00:00Z" }),
@@ -162,9 +162,57 @@ describe("groupComments", () => {
       ctx,
     );
     const song = grouped.get("song") ?? [];
-    expect(song.map((t) => t.comment.id)).toEqual([2, 3, 1]);
-    expect(song[2].replies.map((r) => r.id)).toEqual([5, 4]);
+    expect(song.map((t) => t.comment.id)).toEqual([2, 1, 3]);
+    expect(song[1].replies.map((r) => r.id)).toEqual([5, 4]);
     expect(countThreads(song)).toBe(5);
+  });
+
+  it("自己的只按时间排，不看赞；赞一样时新的在前", () => {
+    const grouped = groupComments(
+      [
+        comment({
+          id: 1,
+          mine: true,
+          likeCount: 5,
+          createdAt: "2026-09-01T00:00:00Z",
+        }),
+        comment({
+          id: 2,
+          mine: true,
+          likeCount: 0,
+          createdAt: "2026-09-02T00:00:00Z",
+        }),
+        comment({ id: 3, likeCount: 2, createdAt: "2026-09-03T00:00:00Z" }),
+        comment({ id: 4, likeCount: 2, createdAt: "2026-09-04T00:00:00Z" }),
+        comment({ id: 5, likeCount: 7, createdAt: "2026-09-05T00:00:00Z" }),
+      ],
+      ctx,
+    );
+    expect((grouped.get("song") ?? []).map((t) => t.comment.id)).toEqual([
+      2, 1, 5, 4, 3,
+    ]);
+  });
+
+  it("按调用方给的赞数排；已删的占位按 0 赞算", () => {
+    const grouped = groupComments(
+      [
+        comment({ id: 1, likeCount: 3, createdAt: "2026-09-01T00:00:00Z" }),
+        // 刚在页面上点了赞，本地已是 4，但排序仍按进页时的 0
+        comment({ id: 2, likeCount: 4, createdAt: "2026-09-02T00:00:00Z" }),
+        comment({
+          id: 3,
+          deleted: true,
+          likeCount: 9,
+          createdAt: "2026-09-03T00:00:00Z",
+        }),
+        comment({ id: 4, parentId: 3, anchor: null }),
+      ],
+      ctx,
+      (c) => (c.id === 2 ? 0 : c.likeCount),
+    );
+    expect((grouped.get("song") ?? []).map((t) => t.comment.id)).toEqual([
+      1, 3, 2,
+    ]);
   });
 
   it("已删的批注只在有回复时保留，且不计数", () => {

@@ -35,10 +35,14 @@ export function PWARegistration() {
       }
     };
 
-    // 当新 SW 接管控制权时，自动刷新页面以显示最新内容
+    // 当新 SW 接管控制权时，自动刷新页面以显示最新内容。
+    // 只在替换旧 SW 时刷新：首次访问时页面本没有 controller，SW 预缓存完
+    // （字体图标约 30MB，移动网络要几十秒）后 clientsClaim 也会触发
+    // controllerchange，此时刷新会打断用户正在做的事（如测验做到一半被重置）
+    const hadController = !!navigator.serviceWorker.controller;
     let refreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
+      if (!hadController || refreshing) return;
       refreshing = true;
       window.location.reload();
     });

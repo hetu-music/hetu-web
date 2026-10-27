@@ -132,13 +132,13 @@ export default function GridCard({
             {song.year || FILTER_OPTION_UNKNOWN}
           </span>
         </div>
-        <p className="flex items-center gap-2 overflow-hidden text-sm font-light text-slate-500 dark:text-slate-400">
+        <p className="flex items-center gap-2 overflow-hidden text-sm font-normal text-slate-500 dark:text-slate-400">
           <span className="truncate">{subtitle}</span>
           {song.type?.[0] && (
             <>
               <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600" />
               {/* 类型只作文字说明，不再逐类上色（各类的解释见「关于」） */}
-              <span className="shrink-0 text-sm font-light tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="shrink-0 text-sm font-normal tracking-wider text-slate-400 dark:text-slate-500">
                 {tEnum.has(`type.${song.type[0]}`)
                   ? tEnum(`type.${song.type[0]}`)
                   : song.type[0]}

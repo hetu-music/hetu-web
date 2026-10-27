@@ -102,12 +102,17 @@ export function resolveSlot(
 }
 
 /**
- * 同一处的批注排序：自己的在前，其余按时间，新的在前。
+ * 同一处的批注排序：自己的在前（新的在前）；其余赞多的在前，赞一样新的在前。
+ * 已删的占位不论原来多少赞都按 0 算。访客没有自己的，直接从赞数排起。
  * 回复按时间顺排。已删且没有回复的批注不显示（服务端通常已滤掉）。
+ *
+ * likesFor：排序用的赞数，默认取当前值。页面上点赞会先改本地的数，
+ * 调用方可传进页时的赞数，免得批注在点完赞后当场换位置。
  */
 export function groupComments(
   comments: SongComment[],
   ctx: AnchorContext,
+  likesFor: (c: SongComment) => number = (c) => c.likeCount,
 ): Map<string, CommentThread[]> {
   const replies = new Map<number, SongComment[]>();
   for (const c of comments) {
@@ -134,12 +139,15 @@ export function groupComments(
     bySlot.set(slot.key, list);
   }
 
+  const likes = (c: SongComment) => (c.deleted ? 0 : likesFor(c));
   for (const list of bySlot.values()) {
-    list.sort(
-      (a, b) =>
-        Number(b.comment.mine) - Number(a.comment.mine) ||
-        b.comment.createdAt.localeCompare(a.comment.createdAt),
-    );
+    list.sort((a, b) => {
+      const mine = Number(b.comment.mine) - Number(a.comment.mine);
+      if (mine !== 0) return mine;
+      const newer = b.comment.createdAt.localeCompare(a.comment.createdAt);
+      if (a.comment.mine) return newer;
+      return likes(b.comment) - likes(a.comment) || newer;
+    });
   }
   return bySlot;
 }

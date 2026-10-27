@@ -1,6 +1,6 @@
 {
   "name": "hetu-web",
-  "version": "1.8.21",
+  "version": "1.8.22",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -33,8 +33,8 @@
     "@marsidev/react-turnstile": "^1.6.3",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
-    "@tanstack/react-query": "^5.104.5",
-    "@tanstack/react-virtual": "^3.14.22",
+    "@tanstack/react-query": "^5.105.0",
+    "@tanstack/react-virtual": "^3.14.23",
     "clsx": "^2.1.1",
     "framer-motion": "^14.6.0",
     "fuse.js": "^7.5.0",

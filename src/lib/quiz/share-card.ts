@@ -8,6 +8,8 @@ import { encode } from "uqr";
  */
 
 export type ShareCardTheme = "light" | "dark";
+/** 两种完整排版共用字号和歌曲列表，便于用同一结果比较可读性。 */
+export type ShareCardLayout = "stacked" | "split";
 
 export type ShareCardInput = {
   eyebrow: string;
@@ -16,7 +18,7 @@ export type ShareCardInput = {
   description: string;
   imageryLabel: string;
   profileLabel: string;
-  /** 各维度的名字与用户在该维度上的 z 分数，图上只画最偏爱的几项 */
+  /** 按结果顺序保留全部维度，正、负倾向都画在以零为中心的条形中。 */
   dimensions: Array<{ label: string; z: number }>;
   imagery: string[];
   matchesLabel: string;
@@ -93,6 +95,8 @@ const QR_SIZE = 140;
 /** 深色卡片上二维码浅底的留边 */
 const QR_TILE_PAD = 10;
 const COVER_SIZE = 148;
+/** 字体或封面不可用时继续出图，避免分享面板一直等待网络。 */
+const ASSET_TIMEOUT_MS = 8_000;
 
 /** 不宜出现在行首的标点 */
 const NO_LINE_START = "，。、；：！？）」』》〉,.;:!?)";
@@ -121,7 +125,8 @@ function resolveFonts(): Fonts {
 }
 
 /** Canvas 不会自己去下载字体：按要画的字逐个触发加载，按 unicode-range 分片的字体才会取到对应分片 */
-async function loadFonts(fonts: Fonts, input: ShareCardInput) {
+async function loadFonts(fonts: Fonts, input: ShareCardInput): Promise<Fonts> {
+  if (typeof document.fonts?.load !== "function") return fonts;
   const serifText = [
     input.eyebrow,
     input.secondary ?? "",
@@ -137,20 +142,48 @@ async function loadFonts(fonts: Fonts, input: ShareCardInput) {
     input.displayUrl,
     ...input.matches.map((m) => m.meta),
   ].join("");
-  await Promise.all([
-    document.fonts.load(`48px ${fonts.serif}`, serifText),
-    document.fonts.load(
-      `48px ${fonts.kaiti}`,
+  const texts: Record<keyof Fonts, string> = {
+    serif: serifText,
+    kaiti:
       input.description +
-        input.scanHint +
-        input.matches.map((m) => m.lyric ?? "").join(""),
+      input.scanHint +
+      input.matches.map((m) => m.lyric ?? "").join(""),
+    calligraphy: input.motto + input.imagery.join(""),
+    sans: sansText,
+  };
+  const loaded = { ...fonts };
+  await Promise.all(
+    (Object.keys(texts) as (keyof Fonts)[]).map(
+      (key) =>
+        new Promise<void>((resolve) => {
+          let settled = false;
+          const finish = (error?: unknown) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timer);
+            if (error) {
+              // 固定使用备用字体，避免超时后字体迟到导致两次排版的测量不同。
+              loaded[key] = key === "sans" ? "sans-serif" : "serif";
+              console.warn("[share-card] 字体未就绪，使用备用字体", key, error);
+            }
+            resolve();
+          };
+          const timer = window.setTimeout(
+            () => finish(new Error("字体加载超时")),
+            ASSET_TIMEOUT_MS,
+          );
+          try {
+            document.fonts.load(`48px ${fonts[key]}`, texts[key]).then(
+              () => finish(),
+              (error) => finish(error),
+            );
+          } catch (error) {
+            finish(error);
+          }
+        }),
     ),
-    document.fonts.load(
-      `48px ${fonts.calligraphy}`,
-      input.motto + input.imagery.join(""),
-    ),
-    document.fonts.load(`48px ${fonts.sans}`, sansText),
-  ]);
+  );
+  return loaded;
 }
 
 /**
@@ -160,10 +193,46 @@ async function loadFonts(fonts: Fonts, input: ShareCardInput) {
 function loadCover(url: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
+    let settled = false;
+    const finish = (cover: HTMLImageElement | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      img.onload = null;
+      img.onerror = null;
+      resolve(cover);
+    };
+    const timer = window.setTimeout(() => finish(null), ASSET_TIMEOUT_MS);
+    img.onload = () => finish(img);
+    img.onerror = () => finish(null);
     img.src = `/_next/image?url=${encodeURIComponent(url)}&w=256&q=75`;
   });
+}
+
+/** 部分 WebView 没有 roundRect，用基础路径画相同的等半径圆角。 */
+function roundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(x, y, width, height, radius);
+    return;
+  }
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.arcTo(x + width, y, x + width, y + r, r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
+  ctx.lineTo(x + r, y + height);
+  ctx.arcTo(x, y + height, x, y + height - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
 }
 
 function setSpacing(ctx: CanvasRenderingContext2D, px: number) {
@@ -236,63 +305,213 @@ function wrapEven(ctx: CanvasRenderingContext2D, text: string, max: number) {
   return best;
 }
 
-/** 只画最偏爱的几项：九项全铺开太杂，题字也已经点出了第一项 */
-const TOP_DIMENSIONS = 3;
 /** 细条满格对应的 z 分数，与结果页倾向条一致 */
 const Z_RANGE = 2.5;
 
-/** 偏爱的维度按 z 从高到低取前几项 */
-function topDimensions(dimensions: ShareCardInput["dimensions"]) {
-  return [...dimensions]
-    .filter((d) => d.z > 0)
-    .sort((a, b) => b.z - a.z)
-    .slice(0, TOP_DIMENSIONS);
-}
-
-/** 最偏爱的几项各一行：维度名后跟一根细条，长短表示偏爱程度 */
-function drawTopBars(
+/** 缩短条长来容纳全部维度；不截掉负值，也不把零画成最小正值。 */
+function drawDimensionBars(
   ctx: CanvasRenderingContext2D,
   dims: ShareCardInput["dimensions"],
+  left: number,
   top: number,
+  width: number,
+  columns: number,
+  rowH: number,
   colors: Palette,
   fonts: Fonts,
 ): number {
-  const width = 640;
-  const left = (WIDTH - width) / 2;
-  const labelW = 110;
-  const trackW = width - labelW;
-  const rowH = 64;
+  if (dims.length === 0) return top;
+  const columnGap = 48;
+  const columnW = (width - (columns - 1) * columnGap) / columns;
+  const labelW = 84;
+  const trackW = columnW - labelW;
   dims.forEach((d, i) => {
-    const y = top + i * rowH;
+    const x = left + (i % columns) * (columnW + columnGap);
+    const y = top + Math.floor(i / columns) * rowH + 16;
     ctx.textAlign = "left";
     ctx.font = `400 32px ${fonts.serif}`;
     ctx.fillStyle = colors.body;
     setSpacing(ctx, 4);
-    ctx.fillText(d.label, left, y + 11);
+    ctx.fillText(d.label, x, y + 11);
     setSpacing(ctx, 0);
+    const trackLeft = x + labelW;
+    const center = trackLeft + trackW / 2;
     ctx.fillStyle = colors.line;
     ctx.beginPath();
-    ctx.roundRect(left + labelW, y - 4, trackW, 8, 4);
+    roundedRectPath(ctx, trackLeft, y - 4, trackW, 8, 4);
     ctx.fill();
-    const w = Math.max(Math.min(d.z / Z_RANGE, 1) * trackW, 8);
-    const grad = ctx.createLinearGradient(
-      left + labelW,
-      0,
-      left + labelW + w,
-      0,
-    );
-    grad.addColorStop(0, `${colors.accent}59`);
-    grad.addColorStop(1, colors.accent);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect(left + labelW, y - 4, w, 8, 4);
-    ctx.fill();
+    const barW = Math.min(Math.abs(d.z) / Z_RANGE, 1) * (trackW / 2);
+    if (barW > 0) {
+      ctx.fillStyle = d.z > 0 ? colors.accent : colors.body;
+      ctx.globalAlpha = d.z > 0 ? 1 : 0.5;
+      ctx.beginPath();
+      roundedRectPath(
+        ctx,
+        d.z > 0 ? center : center - barW,
+        y - 4,
+        barW,
+        8,
+        Math.min(barW / 2, 4),
+      );
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = colors.meta;
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(center - 0.5, y - 9, 1, 18);
+    ctx.globalAlpha = 1;
   });
-  return top + (dims.length - 1) * rowH + 12;
+  return top + (Math.ceil(dims.length / columns) - 1) * rowH + 32;
 }
 
-/** 意象词一行居中，下面接意象倾向 */
-function drawImagerySection(
+/**
+ * 保留词序，用实际字宽寻找均衡的分行，避免把「江河」拆开或让末行只剩一字。
+ * 分行和绘制使用同一个 gap，不用全角空格代替间距。
+ */
+function imageryRows(
+  ctx: CanvasRenderingContext2D,
+  words: string[],
+  maxWidth: number,
+  maxWords: number,
+  gap: number,
+): string[][] {
+  if (words.length === 0) return [];
+  const widths = words.map((word) => ctx.measureText(word).width);
+  for (
+    let rowCount = Math.ceil(words.length / maxWords);
+    rowCount <= words.length;
+    rowCount += 1
+  ) {
+    const ideal =
+      (widths.reduce((sum, w) => sum + w, 0) +
+        (words.length - rowCount) * gap) /
+      rowCount;
+    const memo = new Map<string, { cost: number; rows: string[][] } | null>();
+    const solve = (
+      start: number,
+      remaining: number,
+    ): { cost: number; rows: string[][] } | null => {
+      if (remaining === 0)
+        return start === words.length ? { cost: 0, rows: [] } : null;
+      const key = `${start}:${remaining}`;
+      if (memo.has(key)) return memo.get(key) ?? null;
+      let best: { cost: number; rows: string[][] } | null = null;
+      let width = 0;
+      for (
+        let count = 1;
+        count <= maxWords && start + count <= words.length;
+        count += 1
+      ) {
+        width += widths[start + count - 1] + (count > 1 ? gap : 0);
+        if (width > maxWidth && count > 1) break;
+        const tail = solve(start + count, remaining - 1);
+        if (!tail) continue;
+        const cost = (width - ideal) ** 2 + tail.cost;
+        if (!best || cost < best.cost) {
+          best = {
+            cost,
+            rows: [words.slice(start, start + count), ...tail.rows],
+          };
+        }
+      }
+      memo.set(key, best);
+      return best;
+    };
+    const result = solve(0, rowCount);
+    if (result) return result.rows;
+  }
+  return words.map((word) => [word]);
+}
+
+function drawImageryRows(
+  ctx: CanvasRenderingContext2D,
+  rows: string[][],
+  left: number,
+  top: number,
+  width: number,
+  size: number,
+  gap: number,
+  colors: Palette,
+  fonts: Fonts,
+): number {
+  ctx.font = `400 ${size}px ${fonts.calligraphy}`;
+  ctx.fillStyle = colors.title;
+  ctx.textAlign = "left";
+  const lineH = size + 24;
+  rows.forEach((row, i) => {
+    const widths = row.map((word) => ctx.measureText(word).width);
+    const rowWidth =
+      widths.reduce((sum, w) => sum + w, 0) + (row.length - 1) * gap;
+    let x = left + (width - rowWidth) / 2;
+    row.forEach((word, j) => {
+      ctx.fillText(word, x, top + size + i * lineH);
+      x += widths[j] + gap;
+    });
+  });
+  return top + rows.length * lineH;
+}
+
+/** 左侧留给意象题字，右侧九项一列；较高的一栏决定整节高度。 */
+function drawSplitProfile(
+  ctx: CanvasRenderingContext2D,
+  input: ShareCardInput,
+  top: number,
+  colors: Palette,
+  fonts: Fonts,
+): number {
+  if (input.imagery.length === 0 || input.dimensions.length === 0) {
+    return drawStackedProfile(ctx, input, top, colors, fonts, (base) => base);
+  }
+  const leftW = 320;
+  const columnGap = 64;
+  const rightX = PAD + leftW + columnGap;
+  const rightW = INNER - leftW - columnGap;
+  // 九个起每行容纳三词；四个汉字加两处间距仍放得下「江河」所在的一行。
+  const dense = input.imagery.length >= 9;
+  const size = dense ? 64 : 72;
+  const gap = dense ? 24 : 32;
+  ctx.font = `400 ${size}px ${fonts.calligraphy}`;
+  const rows = imageryRows(ctx, input.imagery, leftW, dense ? 3 : 2, gap);
+  const imageryH = rows.length * (size + 24);
+  const rowH = 44;
+  const barsH = (input.dimensions.length - 1) * rowH + 32;
+  const contentH = Math.max(imageryH, barsH);
+
+  ctx.font = `400 26px ${fonts.serif}`;
+  ctx.fillStyle = colors.meta;
+  ctx.textAlign = "center";
+  setSpacing(ctx, 6);
+  ctx.fillText(input.imageryLabel, PAD + leftW / 2 + 3, top);
+  ctx.fillText(input.profileLabel, rightX + rightW / 2 + 3, top);
+  setSpacing(ctx, 0);
+  const bodyTop = top + 64;
+  drawImageryRows(
+    ctx,
+    rows,
+    PAD,
+    bodyTop + (contentH - imageryH) / 2,
+    leftW,
+    size,
+    gap,
+    colors,
+    fonts,
+  );
+  drawDimensionBars(
+    ctx,
+    input.dimensions,
+    rightX,
+    bodyTop + (contentH - barsH) / 2,
+    rightW,
+    1,
+    rowH,
+    colors,
+    fonts,
+  );
+  return bodyTop + contentH;
+}
+
+/** 上下版使用均衡意象行和两栏短条，同样保留全部九项。 */
+function drawStackedProfile(
   ctx: CanvasRenderingContext2D,
   input: ShareCardInput,
   top: number,
@@ -302,40 +521,41 @@ function drawImagerySection(
 ): number {
   let y = top;
   if (input.imagery.length > 0) {
+    const size = 72;
+    const gap = 44;
+    ctx.font = `400 ${size}px ${fonts.calligraphy}`;
+    const rows = imageryRows(ctx, input.imagery, INNER, 5, gap);
     ctx.font = `400 26px ${fonts.serif}`;
     ctx.fillStyle = colors.meta;
     drawCentered(ctx, input.imageryLabel, y, 8);
-
-    ctx.font = `400 72px ${fonts.calligraphy}`;
-    ctx.fillStyle = colors.title;
-    const gap = 48;
-    const rows: string[][] = [[]];
-    let rowWidth = 0;
-    for (const word of input.imagery) {
-      const w = ctx.measureText(word).width;
-      const row = rows[rows.length - 1];
-      if (row.length > 0 && rowWidth + gap + w > INNER) {
-        rows.push([word]);
-        rowWidth = w;
-      } else {
-        rowWidth += (row.length > 0 ? gap : 0) + w;
-        row.push(word);
-      }
-    }
-    y += 24;
-    for (const row of rows) {
-      y += 92;
-      drawCentered(ctx, row.join("　"), y);
-    }
+    y = drawImageryRows(
+      ctx,
+      rows,
+      PAD,
+      y + 48,
+      INNER,
+      size,
+      gap,
+      colors,
+      fonts,
+    );
   }
-
-  const dims = topDimensions(input.dimensions);
-  if (dims.length === 0) return y;
-  y += input.imagery.length > 0 ? flex(96, 1) : 0;
+  if (input.dimensions.length === 0) return y;
+  y += input.imagery.length > 0 ? flex(48, 0.5) : 0;
   ctx.font = `400 26px ${fonts.serif}`;
   ctx.fillStyle = colors.meta;
   drawCentered(ctx, input.profileLabel, y, 8);
-  return drawTopBars(ctx, dims, y + 64, colors, fonts);
+  return drawDimensionBars(
+    ctx,
+    input.dimensions,
+    PAD,
+    y + 56,
+    INNER,
+    2,
+    52,
+    colors,
+    fonts,
+  );
 }
 
 function hairline(ctx: CanvasRenderingContext2D, y: number, color: string) {
@@ -358,7 +578,8 @@ function drawQr(
   if (colors.qrTile) {
     ctx.fillStyle = colors.qrTile;
     ctx.beginPath();
-    ctx.roundRect(
+    roundedRectPath(
+      ctx,
       x - QR_TILE_PAD,
       y - QR_TILE_PAD,
       QR_SIZE + QR_TILE_PAD * 2,
@@ -390,13 +611,14 @@ function drawCard(
   fonts: Fonts,
   covers: (HTMLImageElement | null)[],
   flex: Flex,
+  layout: ShareCardLayout,
 ): number {
   ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, WIDTH, ctx.canvas.height);
   ctx.textBaseline = "alphabetic";
 
   // ── 气韵 ──
-  let y = flex(PAD, 1.5) + 40;
+  let y = flex(PAD, 1.5) + 26;
   ctx.font = `400 28px ${fonts.serif}`;
   ctx.fillStyle = colors.meta;
   drawCentered(ctx, input.eyebrow, y, 14);
@@ -408,12 +630,12 @@ function drawCard(
     mottoSize -= 8;
     ctx.font = `400 ${mottoSize}px ${fonts.calligraphy}`;
   }
-  y += flex(56, 1) + mottoSize;
+  y += flex(36, 1) + mottoSize;
   ctx.fillStyle = colors.title;
   drawCentered(ctx, input.motto, y);
 
   if (input.secondary) {
-    y += 92;
+    y += 68;
     ctx.font = `400 30px ${fonts.serif}`;
     ctx.fillStyle = colors.accent;
     drawCentered(ctx, input.secondary, y, 9);
@@ -421,35 +643,39 @@ function drawCard(
 
   ctx.font = `400 36px ${fonts.kaiti}`;
   ctx.fillStyle = colors.body;
-  y += flex(40, 0.5);
+  y += flex(32, 0.5);
   for (const line of wrapEven(ctx, input.description, INNER)) {
-    y += 64;
+    y += 52;
     drawCentered(ctx, line, y);
   }
 
   // ── 意象与倾向 ──
-  y += flex(80, 1);
+  y += flex(56, 1);
   hairline(ctx, y, colors.line);
-  y = drawImagerySection(ctx, input, y + flex(88, 1), colors, fonts, flex);
+  y += flex(64, 1);
+  y =
+    layout === "split"
+      ? drawSplitProfile(ctx, input, y, colors, fonts)
+      : drawStackedProfile(ctx, input, y, colors, fonts, flex);
 
   // ── 契合歌曲 ──
   if (input.matches.length > 0) {
-    y += flex(80, 1);
+    y += flex(56, 1);
     hairline(ctx, y, colors.line);
-    y += flex(88, 1);
+    y += flex(68, 1);
     ctx.font = `400 26px ${fonts.serif}`;
     ctx.fillStyle = colors.meta;
     drawCentered(ctx, input.matchesLabel, y, 8);
-    y += flex(48, 0.5);
+    y += flex(40, 0.5);
 
     // 行距每处单独取，量高度时每一处的权重才都算得上
     let top = y;
     input.matches.forEach((match, i) => {
-      if (i > 0) top += COVER_SIZE + flex(36, 0.5);
+      if (i > 0) top += COVER_SIZE + flex(28, 0.5);
       const cover = covers[i];
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(PAD, top, COVER_SIZE, COVER_SIZE, 8);
+      roundedRectPath(ctx, PAD, top, COVER_SIZE, COVER_SIZE, 8);
       ctx.clip();
       ctx.fillStyle = colors.cover;
       ctx.fillRect(PAD, top, COVER_SIZE, COVER_SIZE);
@@ -527,12 +753,12 @@ function drawCard(
 export async function renderShareCard(
   input: ShareCardInput,
   theme: ShareCardTheme,
+  layout: ShareCardLayout = "split",
 ): Promise<HTMLCanvasElement> {
-  const fonts = resolveFonts();
   const colors = PALETTE[theme];
-  const [covers] = await Promise.all([
+  const [covers, fonts] = await Promise.all([
     Promise.all(input.matches.map((m) => loadCover(m.coverUrl))),
-    loadFonts(fonts, input),
+    loadFonts(resolveFonts(), input),
   ]);
 
   const canvas = document.createElement("canvas");
@@ -544,22 +770,40 @@ export async function renderShareCard(
   // 先按自然间距排一遍量出高度，再把与目标高度的差额按权重摊进各处留白，重排一遍。
   // 内容偏多时间距最多收到六成；还放不下就让图片变长，不压字
   let weights = 0;
-  const natural = drawCard(ctx, input, colors, fonts, covers, (base, w) => {
-    weights += w;
-    return base;
-  });
+  const natural = drawCard(
+    ctx,
+    input,
+    colors,
+    fonts,
+    covers,
+    (base, w) => {
+      weights += w;
+      return base;
+    },
+    layout,
+  );
   const slack = (HEIGHT - natural) / weights;
-  const bottom = drawCard(ctx, input, colors, fonts, covers, (base, w) =>
-    Math.max(base * 0.6, base + slack * w),
+  const bottom = drawCard(
+    ctx,
+    input,
+    colors,
+    fonts,
+    covers,
+    (base, w) => Math.max(base * 0.6, base + slack * w),
+    layout,
   );
 
   const out = document.createElement("canvas");
   out.width = WIDTH;
-  out.height = Math.min(Math.max(HEIGHT, Math.ceil(bottom)), MAX_HEIGHT);
+  // 留白分摊可能带来极小浮点尾差，避免本应 2340 的图片偶尔多出一像素。
+  out.height = Math.min(Math.max(HEIGHT, Math.ceil(bottom - 1e-7)), MAX_HEIGHT);
   const outCtx = out.getContext("2d");
   if (!outCtx) throw new Error("Canvas 2D 不可用");
   outCtx.fillStyle = colors.bg;
   outCtx.fillRect(0, 0, out.width, out.height);
   outCtx.drawImage(canvas, 0, 0);
+  // 临时画布不再参与导出，及时释放它的像素缓冲。
+  canvas.width = 0;
+  canvas.height = 0;
   return out;
 }

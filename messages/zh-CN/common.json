@@ -46,7 +46,8 @@
     "view": {
       "label": "切换词云：母题或具象",
       "motifs": "母题",
-      "words": "具象"
+      "words": "具象",
+      "count": "{count} 个"
     },
     "all": "全部",
     "motifTooltip": "{count} 首 · {words} 个具象",

@@ -223,6 +223,8 @@ export type CloudHandle = {
 const EXIT_MS = 460;
 /** 最远的词比最近的晚这么久离场 */
 const EXIT_STAGGER_MS = 260;
+/** 从开始离场到最后一个词离场完 */
+export const CLOUD_EXIT_TOTAL_MS = EXIT_MS + EXIT_STAGGER_MS;
 
 export function VirtualCloud({
   ref,

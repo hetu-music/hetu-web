@@ -28,7 +28,7 @@ import {
 } from "./cloud";
 import ImageryPanel from "./ImageryPanel";
 import ViewSwitch, {
-  METEOR_MS,
+  GLIDE_MS,
   prefersReducedMotion,
   type CloudView as View,
 } from "./ViewSwitch";
@@ -77,7 +77,7 @@ export default function ImageryClient({
   const [reveal, setReveal] = useState<{ id: number; key: number } | null>(
     null,
   );
-  // 切换视图：流星在路上、旧词云在离场时记着要去的视图；换过一次之后新词云从每行中间展开
+  // 切换视图：下划线在滑、旧词云在离场时记着要去的视图；换过一次之后新词云从每行中间展开
   const [switching, setSwitching] = useState<View | null>(null);
   const [bloom, setBloom] = useState(false);
   const cloudHandle = useRef<CloudHandle>(null);
@@ -230,7 +230,7 @@ export default function ImageryClient({
   }, [view]);
 
   /**
-   * 换视图：副标题上流星划过去的同时，词云里看得到的词散开（去具象）或收拢（回母题），
+   * 换视图：副标题的下划线滑过去的同时，词云里看得到的词散开（去具象）或收拢（回母题），
    * 两样都完了再换上新词云，新词云每行从中间往两边展开。系统要求减少动态效果时直接换
    */
   const switchView = (next: View) => {
@@ -250,7 +250,7 @@ export default function ImageryClient({
     setSwitching(next);
     Promise.all([
       cloudHandle.current?.exit(next === "words" ? "scatter" : "gather"),
-      new Promise((resolve) => setTimeout(resolve, METEOR_MS)),
+      new Promise((resolve) => setTimeout(resolve, GLIDE_MS)),
     ]).then(apply);
   };
 
@@ -284,7 +284,8 @@ export default function ImageryClient({
             className="font-serif text-5xl md:text-7xl text-slate-800 dark:text-slate-100 mb-4 flex justify-center items-center gap-4 sm:gap-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.05)]"
           />
           <ViewSwitch
-            lit={switching ? null : view}
+            active={switching ?? view}
+            counts={{ motifs: cloud.motifCount, words: cloud.words.length }}
             onChoose={switchView}
             className={`font-kaiti text-base md:text-xl tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
             style={{ animationDelay: "1650ms" }}

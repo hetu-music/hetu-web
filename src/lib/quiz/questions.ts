@@ -17,7 +17,7 @@ import type { QuizQuestion } from "./types";
  * 修改题目或权重会改变测验结果，需同步更新 QUIZ_VERSION 与测试快照。
  * 作答短串按题目顺序逐位编码，调整顺序后旧的分享链接会对应到别的题。
  */
-export const QUIZ_VERSION = "0.4.3";
+export const QUIZ_VERSION = "0.4.4";
 
 export const QUESTIONS: readonly QuizQuestion[] = [
   {
@@ -221,23 +221,23 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "暂宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
       {
-        text: "「万里长风吹客袖，逢人尽是旧相知」",
+        text: "「浩荡长风卷客衣，相逢借问尽依稀」",
         dims: { tianxiang: 2, renjian: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["风"],
       },
       {
-        text: "「小阁凭栏留数日，晴光满榻不知年」",
+        text: "「小阁凭栏分晚照，晴轩欹枕纳新凉」",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "「回文织就无人读，犹向空墙刻一行」",
+        text: "「回文织就无人读，断句题残未肯休」",
         dims: { qingsi: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "「一盏寒茶尘满案，半窗落木悄无声」",
+        text: "「一盏寒茶凝夜色，半窗落木上秋声」",
         dims: { caomu: 2, qiyong: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -321,7 +321,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["楼"],
       },
       {
-        text: "「一晌，一晌，梦里相看如客」",
+        text: "「一夕，一夕，梦里相看如客」",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],

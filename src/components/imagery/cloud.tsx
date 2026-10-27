@@ -17,6 +17,7 @@ import React, {
   memo,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -62,7 +63,7 @@ export const WordItem = memo(function WordItem({
   item,
   fontSize,
   index,
-  rowIndex,
+  unfurlDelay,
   selectedId,
   dimTo = 0.06,
   label,
@@ -71,8 +72,8 @@ export const WordItem = memo(function WordItem({
   fontSize: number;
   /** 在整个列表里的位置，错开呼吸的节奏 */
   index: number;
-  /** 在一行里的位置，错开展开的时间 */
-  rowIndex: number;
+  /** 展开前等多久（毫秒），按在一行里的位置错开 */
+  unfurlDelay: number;
   selectedId: number | null;
   /** 有选中项时其余词的透明度 */
   dimTo?: number;
@@ -86,6 +87,7 @@ export const WordItem = memo(function WordItem({
     : undefined;
   return (
     <div
+      data-cloud-word
       className="relative"
       style={{
         opacity: hasSelection ? (isSelected ? 1 : dimTo) : 1,
@@ -97,9 +99,7 @@ export const WordItem = memo(function WordItem({
     >
       <div
         className="relative leading-none word-unfurl-anim"
-        style={
-          { "--unfurl-delay": `${rowIndex * 80}ms` } as React.CSSProperties
-        }
+        style={{ "--unfurl-delay": `${unfurlDelay}ms` } as React.CSSProperties}
       >
         <button
           type="button"
@@ -212,7 +212,20 @@ function groupIntoRows(words: Sized[], width: number): Sized[][] {
   return rows;
 }
 
+/** 散：母题被打散，往外飘开；聚：具象往中间收拢 */
+export type CloudExit = "scatter" | "gather";
+
+export type CloudHandle = {
+  /** 视口里看得到的词按离中心的远近依次离场，全部离场后 resolve */
+  exit: (mode: CloudExit) => Promise<void>;
+};
+
+const EXIT_MS = 460;
+/** 最远的词比最近的晚这么久离场 */
+const EXIT_STAGGER_MS = 260;
+
 export function VirtualCloud({
+  ref,
   items,
   selectedId,
   onSelect,
@@ -220,7 +233,9 @@ export function VirtualCloud({
   ariaLabel,
   reveal,
   onReveal,
+  bloom = false,
 }: {
+  ref?: React.Ref<CloudHandle>;
   items: CloudItem[];
   selectedId: number | null;
   /** side：面板该从哪边出来，避开被点的词 */
@@ -231,8 +246,67 @@ export function VirtualCloud({
   reveal?: { id: number; key: number } | null;
   /** 滚过去之后告诉外面它在左半还是右半，面板好从另一边出来 */
   onReveal?: (side: "left" | "right") => void;
+  /** 每行从中间往两边展开（切换视图之后）；否则从左往右 */
+  bloom?: boolean;
 }) {
   const cloudRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    exit(mode) {
+      const root = cloudRef.current;
+      if (!root) return Promise.resolve();
+      const box = root.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // 中心取词云在视口里那一段的中点
+      const cx = box.left + box.width / 2;
+      const cy = (Math.max(box.top, 0) + Math.min(box.bottom, vh)) / 2;
+      const words = [...root.querySelectorAll<HTMLElement>("[data-cloud-word]")]
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            el,
+            x: r.left + r.width / 2 - cx,
+            y: r.top + r.height / 2 - cy,
+            visible: r.bottom > 0 && r.top < vh,
+          };
+        })
+        .filter((w) => w.visible);
+      const far = Math.max(1, ...words.map((w) => Math.hypot(w.x, w.y)));
+      return Promise.all(
+        words.map(({ el, x, y }) => {
+          const d = Math.hypot(x, y) || 1;
+          const t = d / far;
+          const to =
+            mode === "scatter"
+              ? // 顺着离中心的方向飘开一点，放大、虚化
+                {
+                  transform: `translate(${(x / d) * 28}px, ${(y / d) * 28}px) scale(1.15)`,
+                  filter: "blur(6px)",
+                }
+              : // 往中心收一段，缩小
+                {
+                  transform: `translate(${-x * 0.2}px, ${-y * 0.2}px) scale(0.7)`,
+                  filter: "blur(3px)",
+                };
+          return el
+            .animate(
+              [
+                { opacity: 1, transform: "none", filter: "blur(0)" },
+                { opacity: 0, ...to },
+              ],
+              {
+                duration: EXIT_MS,
+                // 散由内向外，聚由外向内
+                delay: (mode === "scatter" ? t : 1 - t) * EXIT_STAGGER_MS,
+                easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+                fill: "forwards",
+              },
+            )
+            .finished.catch(() => undefined);
+        }),
+      ).then(() => undefined);
+    },
+  }));
   const [width, setWidth] = useState(960);
   const [widthMeasured, setWidthMeasured] = useState(false);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -394,7 +468,9 @@ export function VirtualCloud({
                   item={w.item}
                   fontSize={w.fontSize}
                   index={indexOf.get(w.item.id) ?? 0}
-                  rowIndex={i}
+                  unfurlDelay={
+                    bloom ? Math.abs(i - (row.length - 1) / 2) * 90 : i * 80
+                  }
                   selectedId={selectedId}
                   label={ariaLabel(w.item)}
                 />

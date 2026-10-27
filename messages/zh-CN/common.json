@@ -42,25 +42,25 @@
   "imagery": {
     "title": "意象词云",
     "description": "在 {count} 个意象母题中发现河图音乐的诗意世界。涵盖 {categoryNames} 等分类，探索山川、日月、草木、时令在歌词中的流转。",
-    "motifDescription": "河图作品中，{count} 首写到「{name}」，写法有{words}等。",
-    "subtitle": "{motifs} 个母题 · {words} 种写法",
-    "all": "全部",
-    "views": {
+    "motifDescription": "河图作品中，{count} 首写到「{name}」，具象有{words}等。",
+    "view": {
+      "label": "切换词云：母题或具象",
       "motifs": "母题",
-      "words": "全部词"
+      "words": "具象"
     },
-    "motifTooltip": "{count} 首 · {words} 种写法",
+    "all": "全部",
+    "motifTooltip": "{count} 首 · {words} 个具象",
     "wordTooltip": "{count} 首",
     "motifTotal": "共 {count} 个母题",
-    "wordTotal": "共 {count} 种写法",
+    "wordTotal": "共 {count} 个具象",
     "ariaLabel": "{name}，{count} 首作品",
     "noData": "暂无数据",
     "panel": {
-      "meta": "{songs} 首作品 · {words} 种写法",
-      "words": "写法",
+      "meta": "{songs} 首作品 · {words} 个具象",
+      "words": "具象",
       "works": "相关作品",
       "worksOf": "写作「{name}」",
-      "more": "另 {count} 种",
+      "more": "另 {count} 个",
       "fold": "收起",
       "loadError": "没能取到这个母题，稍后再试"
     }

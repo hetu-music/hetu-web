@@ -42,25 +42,25 @@
   "imagery": {
     "title": "意象詞雲",
     "description": "在 {count} 個意象母題中發現河圖音樂的詩意世界。涵蓋 {categoryNames} 等分類，探索山川、日月、草木、時令在歌詞中的流轉。",
-    "motifDescription": "河圖作品中，{count} 首寫到「{name}」，寫法有{words}等。",
-    "subtitle": "{motifs} 個母題 · {words} 種寫法",
-    "all": "全部",
-    "views": {
+    "motifDescription": "河圖作品中，{count} 首寫到「{name}」，具象有{words}等。",
+    "view": {
+      "label": "切換詞雲：母題或具象",
       "motifs": "母題",
-      "words": "全部詞"
+      "words": "具象"
     },
-    "motifTooltip": "{count} 首 · {words} 種寫法",
+    "all": "全部",
+    "motifTooltip": "{count} 首 · {words} 個具象",
     "wordTooltip": "{count} 首",
     "motifTotal": "共 {count} 個母題",
-    "wordTotal": "共 {count} 種寫法",
+    "wordTotal": "共 {count} 個具象",
     "ariaLabel": "{name}，{count} 首作品",
     "noData": "暫無數據",
     "panel": {
-      "meta": "{songs} 首作品 · {words} 種寫法",
-      "words": "寫法",
+      "meta": "{songs} 首作品 · {words} 個具象",
+      "words": "具象",
       "works": "相關作品",
       "worksOf": "寫作「{name}」",
-      "more": "另 {count} 種",
+      "more": "另 {count} 個",
       "fold": "收起",
       "loadError": "沒能取到這個母題，稍後再試"
     }

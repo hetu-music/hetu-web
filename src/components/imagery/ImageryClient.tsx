@@ -12,6 +12,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -22,16 +23,20 @@ import {
   paletteAt,
   seededShuffle,
   VirtualCloud,
+  type CloudHandle,
   type CloudItem,
 } from "./cloud";
 import ImageryPanel from "./ImageryPanel";
-
-type View = "motifs" | "words";
+import ViewSwitch, {
+  METEOR_MS,
+  prefersReducedMotion,
+  type CloudView as View,
+} from "./ViewSwitch";
 
 const MARQUEE_SAMPLE_SIZE = 90;
 
 /**
- * 把面板状态写进网址：/imagery/<母题>?w=<写法>&view=words，可以直接分享；
+ * 把面板状态写进网址：/imagery/<母题>?w=<具象>&view=words，可以直接分享；
  * 用原生 history 改，不触发导航。关面板回到 /imagery
  */
 function syncUrl(motifId: number | null, word: number | null, view: View) {
@@ -61,7 +66,7 @@ export default function ImageryClient({
   const deferredL1 = useDeferredValue(l1);
   const deferredL2 = useDeferredValue(l2);
 
-  // 星：词云里亮着的那一个（母题视图是母题，全部词视图是词）
+  // 星：词云里亮着的那一个（母题视图是母题，具象视图是词）
   const [star, setStar] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [side, setSide] = useState<"left" | "right">("right");
@@ -72,6 +77,10 @@ export default function ImageryClient({
   const [reveal, setReveal] = useState<{ id: number; key: number } | null>(
     null,
   );
+  // 切换视图：流星在路上、旧词云在离场时记着要去的视图；换过一次之后新词云从每行中间展开
+  const [switching, setSwitching] = useState<View | null>(null);
+  const [bloom, setBloom] = useState(false);
+  const cloudHandle = useRef<CloudHandle>(null);
 
   const [mounted, setMounted] = useState(false);
   const [seed, setSeed] = useState(0);
@@ -86,7 +95,7 @@ export default function ImageryClient({
   );
 
   // 进页。?view 与 ?w 在浏览器里读，页面才能整页缓存：
-  // - /imagery/<母题>：点亮它、滚过去、展开面板；?w 是预先选中的写法
+  // - /imagery/<母题>：点亮它、滚过去、展开面板；?w 是预先选中的具象
   // - /imagery?w=<词>：旧链接，打开这个词所属的母题
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -104,7 +113,7 @@ export default function ImageryClient({
         (!initialMotif || initialMotif.words.some((x) => x.id === w))
           ? w
           : null;
-      // 全部词视图里代表母题的词：选中的写法，或归在它名下、写得最多的那个
+      // 具象视图里代表母题的词：选中的具象，或归在它名下、写得最多的那个
       const s =
         v === "motifs"
           ? mid
@@ -220,20 +229,40 @@ export default function ImageryClient({
     syncUrl(null, null, view);
   }, [view]);
 
+  /**
+   * 换视图：副标题上流星划过去的同时，词云里看得到的词散开（去具象）或收拢（回母题），
+   * 两样都完了再换上新词云，新词云每行从中间往两边展开。系统要求减少动态效果时直接换
+   */
   const switchView = (next: View) => {
-    if (next === view) return;
-    setView(next);
+    if (next === view || switching) return;
     setPanelOpen(false);
     setStar(null);
-    syncUrl(null, null, next);
+    const apply = () => {
+      setSwitching(null);
+      setBloom(true);
+      setView(next);
+      syncUrl(null, null, next);
+    };
+    if (prefersReducedMotion()) {
+      apply();
+      return;
+    }
+    setSwitching(next);
+    Promise.all([
+      cloudHandle.current?.exit(next === "words" ? "scatter" : "gather"),
+      new Promise((resolve) => setTimeout(resolve, METEOR_MS)),
+    ]).then(apply);
   };
 
+  // 卷首背后滚动的字幕是另一层：看母题时背后是具象，看具象时背后是母题
   const marqueeRows = useMemo(() => {
-    const sample = seededShuffle(cloud.words, seed)
-      .slice(0, MARQUEE_SAMPLE_SIZE)
-      .map((w) => w.name);
+    const names =
+      view === "motifs"
+        ? cloud.words.map((w) => w.name)
+        : motifs.map((m) => m.name);
+    const sample = seededShuffle(names, seed).slice(0, MARQUEE_SAMPLE_SIZE);
     return [sample.slice(0, 30), sample.slice(30, 60), sample.slice(60, 90)];
-  }, [cloud.words, seed]);
+  }, [cloud.words, motifs, view, seed]);
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-slate-800 dark:text-slate-200">
@@ -254,15 +283,12 @@ export default function ImageryClient({
             mounted={mounted}
             className="font-serif text-5xl md:text-7xl text-slate-800 dark:text-slate-100 mb-4 flex justify-center items-center gap-4 sm:gap-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.05)]"
           />
-          <p
-            className={`font-kaiti text-base md:text-xl text-slate-500 dark:text-slate-400 tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
+          <ViewSwitch
+            lit={switching ? null : view}
+            onChoose={switchView}
+            className={`font-kaiti text-base md:text-xl tracking-[0.4em] pl-[0.4em] mb-3 ${mounted ? "hero-unroll" : "opacity-0"}`}
             style={{ animationDelay: "1650ms" }}
-          >
-            {t("subtitle", {
-              motifs: cloud.motifCount,
-              words: cloud.words.length,
-            })}
-          </p>
+          />
         </div>
       </header>
 
@@ -297,23 +323,6 @@ export default function ImageryClient({
                 </div>
               );
             })}
-            {/* 视图：母题 / 全部词 */}
-            <div className="ml-auto flex items-center gap-2 pl-6">
-              <BracketButton
-                label={t("views.motifs")}
-                size="text-[13px]"
-                isActive={view === "motifs"}
-                onClick={() => switchView("motifs")}
-                accentColor={GRAY_PALETTE.accent}
-              />
-              <BracketButton
-                label={t("views.words")}
-                size="text-[13px]"
-                isActive={view === "words"}
-                onClick={() => switchView("words")}
-                accentColor={GRAY_PALETTE.accent}
-              />
-            </div>
             <div className="min-w-2" />
           </div>
 
@@ -363,6 +372,7 @@ export default function ImageryClient({
         ) : (
           <>
             <VirtualCloud
+              ref={cloudHandle}
               items={items}
               selectedId={panelOpen ? star : null}
               onSelect={onSelect}
@@ -370,6 +380,7 @@ export default function ImageryClient({
               ariaLabel={ariaLabel}
               reveal={reveal}
               onReveal={setSide}
+              bloom={bloom}
             />
             <div className="mt-12 flex justify-center">
               <p className="text-xs text-slate-300 dark:text-slate-700 tracking-[0.2em] select-none font-serif">

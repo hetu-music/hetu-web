@@ -3,6 +3,7 @@
 import type { SongComment } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import type { CommentThread as Thread } from "@/lib/utils/utils-comments";
+import { ThumbsUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useTwoStepConfirm } from "@/hooks/ui/useTwoStepConfirm";
@@ -92,12 +93,18 @@ function CommentItem({
             onClick={() => like(comment.id, !comment.liked)}
             aria-pressed={comment.liked}
             className={cn(
-              "tabular-nums disabled:cursor-default",
+              "inline-flex items-center gap-1 tabular-nums disabled:cursor-default",
               comment.liked ? "text-(--tone)" : loggedIn && action,
             )}
           >
-            {t("like")}
-            {comment.likeCount > 0 && ` ${comment.likeCount}`}
+            {/* 心形已用作收藏，赞用手势，免得同一页上两个意思混在一起 */}
+            <ThumbsUp
+              aria-hidden
+              size={12}
+              className={comment.liked ? "fill-current" : undefined}
+            />
+            <span className="sr-only">{t("like")}</span>
+            {comment.likeCount > 0 && comment.likeCount}
           </button>
         )}
         {onReply && loggedIn && (

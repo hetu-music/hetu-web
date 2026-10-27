@@ -57,6 +57,13 @@ interface CommentRow {
   edited_at: string | null;
 }
 
+type CommentWithAuthor = CommentRow & {
+  author: { name: string | null } | null;
+};
+
+/** Supabase 的 Max Rows 是 1000：一次多要也只给 1000 行，多的悄悄截掉，所以要翻页 */
+const PAGE_SIZE = 1000;
+
 export class CommentError extends Error {
   constructor(
     message: string,
@@ -88,16 +95,25 @@ export async function listSongComments(
     ? `${publicFilter},and(user_id.eq.${viewerId},status.in.(${STATUS.NORMAL},${STATUS.PENDING}))`
     : publicFilter;
 
-  const { data, error } = await db
-    .from(TABLES.COMMENTS)
-    .select(FIELDS)
-    .eq("song_id", songId)
-    .or(filter)
-    .order("created_at", { ascending: true })
-    .limit(2000);
-  if (error) throw error;
+  // 一首歌的批注全部取回：前端按「自己的、赞多的、新的」排，只取一部分就会漏掉排在前面的。
+  // 作者名随批注联表带出（comments 到 users 有两条外键，用 !user_id 指明）。
+  // 翻页按 created_at、id 排，顺序才稳定
+  let rows: CommentWithAuthor[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await db
+      .from(TABLES.COMMENTS)
+      .select(`${FIELDS}, author:${TABLES.USERS}!user_id(name)`)
+      .eq("song_id", songId)
+      .or(filter)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as CommentWithAuthor[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
 
-  let rows = (data ?? []) as CommentRow[];
   // 已删的批注在回复也都删光后不再显示；父批注不可见的回复一并丢掉
   const liveParents = new Set(
     rows
@@ -111,36 +127,19 @@ export async function listSongComments(
   rows = rows.filter((r) => r.parent_id === null || ids.has(r.parent_id));
   if (rows.length === 0) return [];
 
-  const authorIds = [
-    ...new Set(
-      rows.filter((r) => r.status !== STATUS.DELETED).map((r) => r.user_id),
-    ),
-  ];
-  const [authorsRes, likesRes] = await Promise.all([
-    authorIds.length > 0
-      ? db.from(TABLES.USERS).select("id, name").in("id", authorIds)
-      : Promise.resolve({ data: [], error: null }),
-    viewerId
-      ? db
-          .from(TABLES.COMMENT_LIKES)
-          .select("comment_id")
-          .eq("user_id", viewerId)
-          .in("comment_id", [...ids])
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (authorsRes.error) throw authorsRes.error;
-  if (likesRes.error) throw likesRes.error;
-
-  const names = new Map(
-    ((authorsRes.data ?? []) as { id: string; name: string | null }[]).map(
-      (u) => [u.id, u.name],
-    ),
-  );
-  const liked = new Set(
-    ((likesRes.data ?? []) as { comment_id: number }[]).map(
-      (l) => l.comment_id,
-    ),
-  );
+  // 自己在这首歌下赞过的：联表按歌过滤，不必把所有批注的 id 塞进网址
+  const liked = new Set<number>();
+  if (viewerId) {
+    const { data, error } = await db
+      .from(TABLES.COMMENT_LIKES)
+      .select(`comment_id, ${TABLES.COMMENTS}!inner(song_id)`)
+      .eq("user_id", viewerId)
+      .eq(`${TABLES.COMMENTS}.song_id`, songId);
+    if (error) throw error;
+    for (const l of (data ?? []) as { comment_id: number }[]) {
+      liked.add(l.comment_id);
+    }
+  }
 
   return rows.map((r) => {
     const deleted = r.status === STATUS.DELETED;
@@ -158,7 +157,7 @@ export async function listSongComments(
       likeCount: r.like_count,
       liked: liked.has(r.id),
       mine: !deleted && r.user_id === viewerId,
-      author: deleted ? null : (names.get(r.user_id) ?? null),
+      author: deleted ? null : (r.author?.name ?? null),
       createdAt: r.created_at,
       editedAt: r.edited_at,
     };
@@ -245,6 +244,44 @@ function displayQuote(quote: string | null, locale: string): string | null {
   return looksTraditional(quote) ? toSimplified(quote) : quote;
 }
 
+type MyCommentRow = CommentRow & { song_id: number };
+
+type ParentRow = {
+  id: number;
+  body: string;
+  status: number;
+  anchor: CommentAnchor;
+  anchor_quote: string | null;
+  author: { name: string | null } | null;
+};
+
+/** .in() 的 id 都写在网址里，太多会把网址撑得过长，分批查（同 getSongsByIds） */
+const IN_BATCH_SIZE = 200;
+
+/** 所回复的批注及其作者名。别人的批注要跨用户读，走高权限客户端 */
+async function getParentComments(ids: number[]): Promise<ParentRow[]> {
+  const db = getServiceClient();
+  if (!db || ids.length === 0) return [];
+  const batches: number[][] = [];
+  for (let i = 0; i < ids.length; i += IN_BATCH_SIZE) {
+    batches.push(ids.slice(i, i + IN_BATCH_SIZE));
+  }
+  const results = await Promise.all(
+    batches.map((batch) =>
+      db
+        .from(TABLES.COMMENTS)
+        .select(
+          `id, body, status, anchor, anchor_quote, author:${TABLES.USERS}!user_id(name)`,
+        )
+        .in("id", batch),
+    ),
+  );
+  return results.flatMap(({ data, error }) => {
+    if (error) throw error;
+    return (data ?? []) as unknown as ParentRow[];
+  });
+}
+
 /**
  * 个人页：自己写过的批注与回复，按歌分组，最近写过的歌在前。
  * 自己的行用用户会话读（RLS 允许读自己的正常与待审批注）；
@@ -255,18 +292,24 @@ export async function listMyComments(
   userId: string,
   locale: string,
 ): Promise<MyCommentGroup[]> {
-  const { data, error } = await supabase
-    .from(TABLES.COMMENTS)
-    .select(FIELDS + ", song_id")
-    .eq("user_id", userId)
-    .in("status", [STATUS.NORMAL, STATUS.PENDING])
-    .order("created_at", { ascending: false })
-    .limit(1000);
-  if (error) throw error;
-  const rows = (data ?? []) as unknown as (CommentRow & { song_id: number })[];
+  // 自己的批注全部取回，按时间倒序翻页（同 listSongComments）
+  const rows: MyCommentRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(TABLES.COMMENTS)
+      .select(FIELDS + ", song_id")
+      .eq("user_id", userId)
+      .in("status", [STATUS.NORMAL, STATUS.PENDING])
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as MyCommentRow[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
   if (rows.length === 0) return [];
 
-  const db = getServiceClient();
   const songIds = [...new Set(rows.map((r) => r.song_id))];
   const parentIds = [
     ...new Set(
@@ -274,41 +317,11 @@ export async function listMyComments(
     ),
   ];
 
-  const [songs, parentsRes] = await Promise.all([
+  const [songs, parentRows] = await Promise.all([
     getSongsByIds(songIds, locale),
-    db && parentIds.length > 0
-      ? db
-          .from(TABLES.COMMENTS)
-          .select("id, user_id, body, status, anchor, anchor_quote")
-          .in("id", parentIds)
-      : Promise.resolve({ data: [], error: null }),
+    getParentComments(parentIds),
   ]);
-  if (parentsRes.error) throw parentsRes.error;
-  const parents = new Map(
-    (
-      (parentsRes.data ?? []) as {
-        id: number;
-        user_id: string;
-        body: string;
-        status: number;
-        anchor: CommentAnchor;
-        anchor_quote: string | null;
-      }[]
-    ).map((p) => [p.id, p]),
-  );
-
-  const authorIds = [...parents.values()].map((p) => p.user_id);
-  const names = new Map<string, string | null>();
-  if (db && authorIds.length > 0) {
-    const { data: users, error: usersError } = await db
-      .from(TABLES.USERS)
-      .select("id, name")
-      .in("id", [...new Set(authorIds)]);
-    if (usersError) throw usersError;
-    for (const u of (users ?? []) as { id: string; name: string | null }[]) {
-      names.set(u.id, u.name);
-    }
-  }
+  const parents = new Map(parentRows.map((p) => [p.id, p]));
 
   const songById = new Map(songs.map((s) => [s.id, s]));
   const groups = new Map<number, MyCommentGroup>();
@@ -332,7 +345,7 @@ export async function listMyComments(
       editedAt: r.edited_at,
       isReply: r.parent_id !== null,
       replyTo: parentLive
-        ? { author: names.get(parent.user_id) ?? null, body: parent.body }
+        ? { author: parent.author?.name ?? null, body: parent.body }
         : null,
     };
     const group = groups.get(r.song_id);

@@ -34,7 +34,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //
 // 各表对应的默认访问权限：
 //   MUSIC              → getServiceClient (公开只读)    ★ 写入时必须改用 getUserClient
-//   MUSIC_CATALOG / IMAGERY_OCC_CATALOG → getServiceClient (视图，只读)
+//   MUSIC_CATALOG      → getServiceClient (视图，只读)
 //   ADMIN              → getUserClient    (管理员读写)
 //   CREDIT_ALIASES     → getServiceClient (公开只读)
 //   IMAGERY / _CAT / _OCC / _MOTIFS → getServiceClient (公开只读)
@@ -52,12 +52,10 @@ export const TABLES = {
 
   // 意象系统表
   IMAGERY: "imagery",
-  IMAGERY_SUMMARY: "imagery_summary", // 视图：曲库歌曲里出现过的词及次数（公开意象页）
-  IMAGERY_SUMMARY_ALL: "imagery_summary_all", // 视图：全部词，次数含争议歌曲（后台）
+  IMAGERY_SUMMARY_ALL: "imagery_summary_all", // 视图：全部词及次数，含争议歌曲（后台词典）
   IMAGERY_CAT: "imagery_categories",
   IMAGERY_MOTIFS: "imagery_motifs", // 词 → 可取的母题（见 IMAGERY.md）
   IMAGERY_OCC: "imagery_occurrences",
-  IMAGERY_OCC_CATALOG: "imagery_occurrences_catalog", // 视图：只含 MUSIC_CATALOG 歌曲的出处
   EMOTIONS: "emotions", // 基调词表（见 IMAGERY.md）
   SONG_EMOTIONS: "song_emotions", // 每首歌的主、副基调
 

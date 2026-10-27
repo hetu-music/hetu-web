@@ -123,6 +123,7 @@ function mockClient(overrides: Partial<Tables> = {}) {
     [TABLES.IMAGERY_OCC]: rows.occurrences,
     [TABLES.MUSIC_CATALOG]: rows.songs,
     [TABLES.SONG_EMOTIONS]: rows.songEmotions,
+    [TABLES.EMOTIONS]: [],
   };
   const from = vi.fn((table: string) =>
     makeQueryBuilder({ data: byTable[table], error: null }),
@@ -151,6 +152,7 @@ describe("getSongImagery", () => {
       {
         id: 10,
         name: "明月",
+        motifId: 3,
         path: ["自然", "天象", "月"],
         accent: PALETTE_FULL[0].accent,
         timetags: ["00:10.00", "00:40.00"],
@@ -159,6 +161,7 @@ describe("getSongImagery", () => {
       {
         id: 11,
         name: "长剑",
+        motifId: 7,
         path: ["人文", "器物", "剑"],
         accent: PALETTE_FULL[1].accent,
         timetags: [],
@@ -168,6 +171,7 @@ describe("getSongImagery", () => {
       {
         id: 15,
         name: "流云",
+        motifId: 6,
         path: ["飘零"],
         accent: GRAY_PALETTE.accent,
         timetags: ["00:20.00"],
@@ -177,6 +181,7 @@ describe("getSongImagery", () => {
       {
         id: 16,
         name: "风雨",
+        motifId: 20,
         path: ["自然", "天象", "风"],
         accent: PALETTE_FULL[0].accent,
         timetags: ["00:30.00"],

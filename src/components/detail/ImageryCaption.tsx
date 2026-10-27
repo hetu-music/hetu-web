@@ -81,7 +81,7 @@ export default function ImageryCaption({
                       </span>
                       {t("caption.songs", { count: mark.songCount })}
                       <Link
-                        href={`/imagery?w=${mark.id}`}
+                        href={`/imagery/${mark.motifId}?w=${mark.id}`}
                         className="ml-3 inline-flex items-center gap-0.5 whitespace-nowrap font-sans text-xs tracking-wider text-(--tone) hover:underline underline-offset-4"
                       >
                         {t("caption.explore")}

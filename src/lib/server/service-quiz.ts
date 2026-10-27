@@ -1,6 +1,11 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
-import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
+import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
+import {
+  loadImageryIndex,
+  type ImageryIndex,
+} from "@/lib/server/imagery-index";
 import {
   buildModel,
   buildPool,
@@ -9,7 +14,6 @@ import {
   evaluate,
   getDimension,
   POOL_VERSION,
-  QUIZ_POOL_TAG,
   QUESTIONS,
   type MatchReason,
   type PoolRows,
@@ -25,65 +29,40 @@ import { getCreditAliases } from "@/lib/server/service-credit-aliases";
 
 // ─── 候选池 ───────────────────────────────────────────────────────────────────
 
+/** 共用的意象索引转成候选池要的原始行：标注只留曲库里的歌，基调连上明暗与扬抑 */
+function poolRows(index: ImageryIndex): PoolRows {
+  const catalog = new Set(index.songs.map((s) => s.id));
+  const emotionById = new Map(index.emotions.map((e) => [e.id, e]));
+  return {
+    categories: index.categories,
+    imagery: index.imagery,
+    occurrences: index.occurrences.filter((o) => catalog.has(o.song_id)),
+    songs: index.songs,
+    songEmotions: index.songEmotions.map((r) => {
+      const e = emotionById.get(r.emotion_id);
+      return {
+        song_id: r.song_id,
+        rank: r.rank,
+        emotions: e ? { tone: e.tone, energy: e.energy } : null,
+      };
+    }),
+  };
+}
+
 /**
- * 候选池依赖意象标注全表（数千行），结果页又是按 ?a= 动态渲染的，
- * 因此用 unstable_cache 跨请求缓存，2 小时刷新，与意象页 ISR 周期一致。
+ * 结果页按 ?a= 动态渲染，每次都从全库标注建候选池太浪费，
+ * 建好的候选池跨请求缓存，2 小时刷新，与意象页 ISR 周期一致。
  */
 const loadQuizPool = unstable_cache(
   async (): Promise<PoolSong[]> => {
     // 失败时一律抛错而不返回空数组：unstable_cache 不缓存异常，
     // 否则一次查询失败会让残缺的候选池被缓存 2 小时
-    const supabase = getServiceClient();
-    if (!supabase) throw new Error("Supabase 未配置");
-    const [categories, imagery, occurrences, songs, songEmotions] =
-      await Promise.all([
-        fetchAll<PoolRows["categories"][number]>(
-          supabase,
-          TABLES.IMAGERY_CAT,
-          "id,name,parent_id,level",
-        ),
-        fetchAll<PoolRows["imagery"][number]>(
-          supabase,
-          TABLES.IMAGERY,
-          "id,name",
-        ),
-        // 候选池只取计入曲库的歌
-        fetchAll<PoolRows["occurrences"][number]>(
-          supabase,
-          TABLES.IMAGERY_OCC_CATALOG,
-          "song_id,category_id,imagery_id,lyric_timetag",
-        ),
-        fetchAll<PoolRows["songs"][number]>(
-          supabase,
-          TABLES.MUSIC_CATALOG,
-          "id,title,artist,album,hascover,has_audio,type,date",
-        ),
-        // 基调只参与匹配；没标基调的歌情绪取中性，所以这张表允许为空
-        fetchAll<NonNullable<PoolRows["songEmotions"]>[number]>(
-          supabase,
-          TABLES.SONG_EMOTIONS,
-          "song_id,rank,emotions(tone,energy)",
-        ),
-      ]);
-    // fetchAll 出错时只记日志并返回已取到的部分，这里至少拦住整表为空的情况
-    const empty = Object.entries({ categories, imagery, occurrences, songs })
-      .filter(([, rows]) => rows.length === 0)
-      .map(([name]) => name);
-    if (empty.length > 0) {
-      throw new Error(`候选池数据为空：${empty.join(", ")}`);
-    }
-    const pool = buildPool({
-      categories,
-      imagery,
-      occurrences,
-      songs,
-      songEmotions,
-    });
+    const pool = buildPool(poolRows(await loadImageryIndex()));
     if (pool.length === 0) throw new Error("候选池为空");
     return pool;
   },
-  [`quiz-pool-v${POOL_VERSION}`],
-  { revalidate: 7200, tags: [QUIZ_POOL_TAG] },
+  [`quiz-pool-v${POOL_VERSION}`, IMAGERY_INDEX_TAG],
+  { revalidate: 7200, tags: [IMAGERY_INDEX_TAG] },
 );
 
 const getQuizModel = cache(async (): Promise<QuizModel> => {

@@ -53,11 +53,11 @@ export const POST = withAuth(
         session.access_token,
       );
       if (result.created === 0) return NextResponse.json(result);
-      // 新意象名可能落到已有意象上，按入库后的标注取意象
+      // 新意象名可能落到已有意象上，按入库后的标注取母题
       const occurrences = await getOccurrencesForSong(input.song_id);
       const purge = await refreshImagery({
         songIds: [input.song_id],
-        imageryIds: occurrences.map((o) => o.imagery_id),
+        motifIds: occurrences.map((o) => o.category_id),
       });
       return withPurgeStatus(NextResponse.json(result), purge);
     } catch (e) {

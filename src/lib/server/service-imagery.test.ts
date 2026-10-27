@@ -21,7 +21,6 @@ import {
   deleteOccurrence,
   getOccurrencesForImagery,
   getOccurrencesForSong,
-  getSongsForImagery,
   createOccurrence,
   createOccurrencesBatch,
   getImageryWithCounts,
@@ -52,16 +51,13 @@ describe("getImageryWithCounts", () => {
     expect(result[0].categoryIds).toEqual([1, 2]);
   });
 
-  it("公开口径读曲库视图，后台口径读含争议歌曲、含 0 次的全量视图", async () => {
+  it("读含争议歌曲、含 0 次的全量视图", async () => {
     const client = createMockSupabaseClient([
-      makeQueryBuilder({ data: [], error: null }),
       makeQueryBuilder({ data: [], error: null }),
     ]);
     vi.mocked(getServiceClient).mockReturnValue(client);
     await getImageryWithCounts();
-    await getImageryWithCounts("all");
     expect(client.from.mock.calls.map((c: unknown[]) => c[0])).toEqual([
-      "imagery_summary",
       "imagery_summary_all",
     ]);
   });
@@ -655,36 +651,14 @@ describe("updateOccurrence / deleteOccurrence（叶子分类校验同样适用�
   });
 });
 
-describe("getOccurrencesForSong / getSongsForImagery", () => {
-  it("getOccurrencesForSong 查询出错时返回空数组", async () => {
+describe("getOccurrencesForSong", () => {
+  it("查询出错时返回空数组", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({ data: null, error: { message: "boom" } }),
       ]),
     );
     expect(await getOccurrencesForSong(1)).toEqual([]);
-  });
-
-  it("getSongsForImagery 按 song id 去重，只保留第一次出现", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: [
-            { song_id: 1, music: { id: 1, title: "标题A", lyricist: null } },
-            { song_id: 1, music: { id: 1, title: "标题A", lyricist: null } }, // 重复
-            { song_id: 2, music: { id: 2, title: "标题B", lyricist: ["甲"] } },
-          ],
-          error: null,
-        }),
-      ]),
-    );
-    const result = await getSongsForImagery(1);
-    expect(result.map((s) => s.id)).toEqual([1, 2]);
-  });
-
-  it("getSongsForImagery service client 不可用时返回空数组", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(null);
-    expect(await getSongsForImagery(1)).toEqual([]);
   });
 });
 

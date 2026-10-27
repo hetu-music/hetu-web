@@ -10,5 +10,12 @@
 export const PUBLIC_API_CACHE =
   "public, s-maxage=21600, stale-while-revalidate=1800";
 
+/**
+ * 由全库标注聚合出的公开数据（意象词云的母题面板）：一处改动可能牵动任意多条，
+ * 没法逐条清 CDN，与页面一样最多 2 小时后自然更新。
+ */
+export const PUBLIC_AGGREGATE_CACHE =
+  "public, s-maxage=7200, stale-while-revalidate=1800";
+
 /** 与当前用户相关的数据：任何一层都不缓存 */
 export const PRIVATE_NO_STORE = "private, no-store";

@@ -23,10 +23,7 @@ import {
   type NavSong,
   type SyncPlan,
 } from "@/lib/navidrome/sync";
-import {
-  refreshAudioPages,
-  type PurgeReport,
-} from "@/lib/server/server-revalidate";
+import { refreshAudio, type PurgeReport } from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 
 /** 缺少数据库或 Navidrome 配置，对应 503 */
@@ -109,7 +106,7 @@ export async function runAudioSync(): Promise<
     supabase,
     planSync(songs, library, mappings),
   );
-  const purge = await refreshAudioPages(result.hasAudioChanged);
+  const purge = await refreshAudio(result.hasAudioChanged);
   return { ...result, purge };
 }
 
@@ -137,7 +134,7 @@ export async function updateAudioMapping(
   await setSongMapping(supabase, songId, nav);
   const purge =
     Boolean(song.has_audio) !== (navidId !== null)
-      ? await refreshAudioPages([songId])
+      ? await refreshAudio([songId])
       : { failed: [] };
   return { nav, purge };
 }

@@ -3,8 +3,7 @@ import "server-only";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { locales } from "@/i18n/config";
 import { CDN_PURGE_FAILED_HEADER } from "@/lib/cdn-purge";
-import { SONG_IMAGERY_TAG } from "@/lib/imagery/tags";
-import { QUIZ_POOL_TAG } from "@/lib/quiz/pool";
+import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
 import {
   purgeCloudflareCache,
   purgeCloudFrontCache,
@@ -27,6 +26,12 @@ import {
  *
  * 只能靠标签波及、列不出 URL 的页面（如改分类牵动全部详情页），
  * CDN 上的副本要等 s-maxage 到期，最多 2 小时。
+ *
+ * 下面每个 refresh 函数对应一类数据变动，受牵连的页面、接口和标签都写在函数里，
+ * 调用方只说改了哪些歌、哪些母题，不自己补路径。
+ *
+ * 服务端缓存只有一份全库意象索引（及由它算出的寻曲候选池），用 IMAGERY_INDEX_TAG；
+ * 索引里有歌曲资料、has_audio、标注和基调，这几类变动都要失效它。
  */
 
 /** Cloudflare 免费套餐单次按 URL 清缓存的上限，EdgeOne 也按这个拆 */
@@ -99,50 +104,68 @@ async function invalidate({
   };
 }
 
+/** 歌词接口，播放器单独拉取，在 CDN 上缓存 6 小时 */
+const songLyricsApi = (id: number) => `/api/public/songs/${id}/lyrics`;
+
 /**
- * 歌曲资料变了：首页曲库与这些歌的详情页。
- *
- * @param songIds    - 要刷新详情页的歌曲
- * @param extraPaths - 另外要刷新的路径（如 /sitemap.xml），两边都会刷
+ * 歌曲资料变了（审批上线、外部同步）：首页曲库、详情页、播放器的歌词、
+ * 全文搜索的歌词索引和 sitemap。歌名、类型、日期等也进了意象索引，
+ * 意象页的计数、寻曲候选池、别的歌的相关作品都会变，所以要失效标签；
+ * 详情页之外受波及的页面在 CDN 上等到期。
  */
-export async function refreshSongPages(
-  songIds: number[],
-  extraPaths: string[] = [],
-): Promise<PurgeReport> {
+export async function refreshSongs(songIds: number[]): Promise<PurgeReport> {
   return invalidate({
-    pages: ["", ...songIds.map(songPage)],
-    paths: extraPaths,
+    pages: ["", "/imagery", "/quiz", ...songIds.map(songPage)],
+    paths: [
+      "/sitemap.xml",
+      "/api/public/songs/lyrics-index",
+      ...songIds.map(songLyricsApi),
+    ],
+    tags: [IMAGERY_INDEX_TAG],
   });
+}
+
+/**
+ * 署名别名变了：只影响首页曲库和这些歌的详情页（别名在渲染时套用，不进索引）。
+ */
+export async function refreshCredits(songIds: number[]): Promise<PurgeReport> {
+  return invalidate({ pages: ["", ...songIds.map(songPage)] });
 }
 
 /**
  * has_audio 变了：曲库列表、歌曲详情和寻曲测验的播放按钮。
  * navid_id 本身在播放时实时查询，替换映射不需要刷新缓存。
  */
-export async function refreshAudioPages(
-  songIds: number[],
-): Promise<PurgeReport> {
+export async function refreshAudio(songIds: number[]): Promise<PurgeReport> {
   if (songIds.length === 0) return NOTHING_FAILED;
   return invalidate({
     pages: ["", "/quiz", ...songIds.map(songPage)],
-    tags: [QUIZ_POOL_TAG],
+    tags: [IMAGERY_INDEX_TAG],
   });
 }
 
 /**
- * 意象标注变了：详情页的意象与相关作品、意象页、寻曲候选池都由标注聚合而来。
+ * 意象标注变了：详情页的意象与相关作品、意象词云、寻曲候选池都由标注聚合而来。
  *
- * 标签让 Next 上的全部详情页失效（相关作品会牵动别的歌）；CDN 上只清
- * 列出来的歌，以及这些意象的歌曲列表接口。
+ * 标签让 Next 上的全部详情页与母题页失效（相关作品、作品数会牵动别处）；CDN 上只清
+ * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等 2 小时到期。
  */
 export async function refreshImagery({
   songIds = [],
-  imageryIds = [],
-}: { songIds?: number[]; imageryIds?: number[] } = {}): Promise<PurgeReport> {
+  motifIds = [],
+}: { songIds?: number[]; motifIds?: number[] } = {}): Promise<PurgeReport> {
   return invalidate({
-    pages: ["/imagery", "/quiz", ...songIds.map(songPage)],
-    paths: imageryIds.map((id) => `/api/imagery/${id}/songs`),
-    tags: [SONG_IMAGERY_TAG, QUIZ_POOL_TAG],
+    pages: [
+      "/imagery",
+      "/quiz",
+      ...songIds.map(songPage),
+      ...motifIds.map((id) => `/imagery/${id}`),
+    ],
+    paths: motifIds.flatMap((id) => [
+      `/api/imagery/motifs/${id}`,
+      `/api/imagery/motifs/${id}?locale=zh-TW`,
+    ]),
+    tags: [IMAGERY_INDEX_TAG],
   });
 }
 
@@ -158,7 +181,7 @@ export async function refreshSongEmotions(
 ): Promise<PurgeReport> {
   return invalidate({
     pages: [songPage(songId)],
-    tags: [QUIZ_POOL_TAG, SONG_IMAGERY_TAG],
+    tags: [IMAGERY_INDEX_TAG],
   });
 }
 
@@ -167,7 +190,7 @@ export async function refreshPublicPages(): Promise<PurgeReport> {
   return invalidate({
     pages: ["", "/imagery", "/story/qjtx", "/quiz"],
     paths: ["/sitemap.xml", "/api/public/songs/lyrics-index"],
-    tags: [QUIZ_POOL_TAG, SONG_IMAGERY_TAG],
+    tags: [IMAGERY_INDEX_TAG],
   });
 }
 

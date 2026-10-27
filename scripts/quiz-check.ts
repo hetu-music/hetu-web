@@ -44,7 +44,8 @@ async function main() {
       "song_id,category_id,imagery_id,lyric_timetag",
     ),
     fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
-      "music",
+      // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池
+      "music_catalog",
       "id,title,artist,album,hascover,has_audio,type,date,lyrics",
     ),
   ]);

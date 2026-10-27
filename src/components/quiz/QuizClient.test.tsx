@@ -72,7 +72,7 @@ describe("QuizClient", () => {
   }
 
   it("按原始选项下标编码作答，与展示顺序无关", () => {
-    render(<QuizClient questions={questions} poolSize={228} songCount={300} />);
+    render(<QuizClient questions={questions} poolSize={228} />);
     fireEvent.click(screen.getByText("intro.start"));
 
     answer("一B");
@@ -85,7 +85,7 @@ describe("QuizClient", () => {
   });
 
   it("返回上一问后可改选", () => {
-    render(<QuizClient questions={questions} poolSize={228} songCount={300} />);
+    render(<QuizClient questions={questions} poolSize={228} />);
     fireEvent.click(screen.getByText("intro.start"));
 
     answer("一A");
@@ -99,7 +99,7 @@ describe("QuizClient", () => {
   });
 
   it("翻页动画期间忽略连点", () => {
-    render(<QuizClient questions={questions} poolSize={228} songCount={300} />);
+    render(<QuizClient questions={questions} poolSize={228} />);
     fireEvent.click(screen.getByText("intro.start"));
 
     fireEvent.click(screen.getByText("一A"));
@@ -114,7 +114,7 @@ describe("QuizClient", () => {
   });
 
   it("数字键按展示顺序作答", () => {
-    render(<QuizClient questions={questions} poolSize={228} songCount={300} />);
+    render(<QuizClient questions={questions} poolSize={228} />);
     fireEvent.click(screen.getByText("intro.start"));
 
     for (let i = 0; i < 3; i += 1) {

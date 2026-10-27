@@ -140,7 +140,7 @@ describe("runAudioSync", () => {
     const plan = vi.mocked(applySyncPlan).mock.calls[0][1];
     expect(plan.upserts.map((u) => u.song.id)).toEqual([1]);
     expect(revalidatePath).toHaveBeenCalledWith("/zh-CN/song/1");
-    expect(revalidateTag).toHaveBeenCalledWith("quiz-pool", { expire: 0 });
+    expect(revalidateTag).toHaveBeenCalledWith("imagery-index", { expire: 0 });
     expect(purgeCloudflareCache).toHaveBeenCalledWith(
       expect.arrayContaining(["/", "/song/1"]),
     );

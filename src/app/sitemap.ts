@@ -1,5 +1,6 @@
 import { getSongLastModifiedMap, getSongs } from "@/lib/server/service-songs";
 import { getImageryLastModified } from "@/lib/server/service-imagery";
+import { getImageryCloud } from "@/lib/server/service-imagery-cloud";
 import { getStoryLastModified } from "@/lib/server/service-story";
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/constants";
@@ -12,12 +13,13 @@ import { SITE_URL } from "@/lib/constants";
  * 自己的抓取策略），伪造则是有害的。
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [songs, lastModifiedMap, imageryModified, storyModified] =
+  const [songs, lastModifiedMap, imageryModified, storyModified, cloud] =
     await Promise.all([
       getSongs(undefined, undefined, true).catch(() => []),
       getSongLastModifiedMap().catch(() => new Map<number, Date>()),
       getImageryLastModified().catch(() => null),
       getStoryLastModified().catch(() => null),
+      getImageryCloud("zh-CN").catch(() => null),
     ]);
 
   // 首页即曲库列表，其变更时间等于最近一次歌曲更新
@@ -84,7 +86,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ];
   });
 
-  return [...staticRoutes, ...songRoutes];
+  // 意象词云里每个母题一页：打开即点亮该母题、展开面板
+  const motifRoutes: MetadataRoute.Sitemap = (cloud?.groups ?? []).flatMap(
+    (group) =>
+      group.motifs.flatMap((motif) => [
+        {
+          url: `${SITE_URL}/zh-CN/imagery/${motif.id}`,
+          lastModified: imageryModified ?? undefined,
+          changeFrequency: "monthly" as const,
+          priority: 0.6,
+        },
+        {
+          url: `${SITE_URL}/zh-TW/imagery/${motif.id}`,
+          lastModified: imageryModified ?? undefined,
+          changeFrequency: "monthly" as const,
+          priority: 0.5,
+        },
+      ]),
+  );
+
+  return [...staticRoutes, ...songRoutes, ...motifRoutes];
 }
 
 // 使用 ISR，与主页同步更新

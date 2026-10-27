@@ -13,8 +13,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface Props {
   questions: QuizQuestionView[];
   poolSize: number;
-  /** 介绍页展示的曲库总数，与首页统计口径一致，不透露候选池大小 */
-  songCount: number;
 }
 
 type Stage = "intro" | "quiz" | "finishing";
@@ -32,7 +30,7 @@ function shuffledIndices(n: number): number[] {
   return arr;
 }
 
-export default function QuizClient({ questions, poolSize, songCount }: Props) {
+export default function QuizClient({ questions, poolSize }: Props) {
   const t = useTranslations("quiz");
   const router = useRouter();
 
@@ -135,7 +133,7 @@ export default function QuizClient({ questions, poolSize, songCount }: Props) {
                 {t("title")}
               </h1>
               <p className="pl-[0.3em] font-serif text-base tracking-[0.3em] text-slate-600 md:text-lg dark:text-slate-300">
-                {t("intro.subtitle", { count: songCount })}
+                {t("intro.subtitle")}
               </p>
               <p className="mt-4 font-kaiti text-sm text-slate-400 dark:text-slate-500">
                 {t("intro.note")}

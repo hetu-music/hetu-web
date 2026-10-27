@@ -1,9 +1,7 @@
 import ImageryClient from "@/components/imagery/ImageryClient";
 import Loading from "@/components/shared/Loading";
-import {
-  getImageryCategories,
-  getImageryWithCounts,
-} from "@/lib/server/service-imagery";
+import { getImageryCloud } from "@/lib/server/service-imagery-cloud";
+import type { ImageryCloud } from "@/lib/types";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { Suspense } from "react";
@@ -14,26 +12,40 @@ type Props = {
   params: Promise<{ locale: string }>;
 };
 
+const EMPTY_CLOUD: ImageryCloud = {
+  l1: [],
+  groups: [],
+  words: [],
+  motifCount: 0,
+};
+
+async function loadCloud(locale: string): Promise<ImageryCloud> {
+  try {
+    return await getImageryCloud(locale);
+  } catch (e) {
+    console.error("[imagery] 加载意象词云失败", e);
+    return EMPTY_CLOUD;
+  }
+}
+
+function describe(
+  t: Awaited<ReturnType<typeof getTranslations>>,
+  cloud: ImageryCloud,
+) {
+  return t("imagery.description", {
+    count: cloud.motifCount,
+    categoryNames: cloud.groups
+      .slice(0, 6)
+      .map((g) => g.name)
+      .join("、"),
+  });
+}
+
 // 动态生成意象词云 SEO 元数据
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "common" });
-
-  const [items, categories] = await Promise.all([
-    getImageryWithCounts().catch(() => []),
-    getImageryCategories().catch(() => []),
-  ]);
-
-  const count = items.length;
-  const categoryNames = categories
-    .slice(0, 6)
-    .map((c) => c.name)
-    .join("、");
-
-  const description = t("imagery.description", {
-    count,
-    categoryNames,
-  });
+  const description = describe(t, await loadCloud(locale));
   const siteName = t("site.name");
 
   return {
@@ -81,27 +93,13 @@ export default async function ImageryPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "common" });
-
-  const [items, categories] = await Promise.all([
-    getImageryWithCounts().catch(() => []),
-    getImageryCategories().catch(() => []),
-  ]);
-
-  const count = items.length;
-  const categoryNames = categories
-    .slice(0, 6)
-    .map((c) => c.name)
-    .join("、");
-  const description = t("imagery.description", {
-    count,
-    categoryNames,
-  });
+  const cloud = await loadCloud(locale);
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: `${t("imagery.title")} - ${t("site.name")}`,
-    description: description,
+    description: describe(t, cloud),
     url: `${SITE_URL}/zh-CN/imagery`,
     isPartOf: {
       "@type": "WebSite",
@@ -118,7 +116,7 @@ export default async function ImageryPage({ params }: Props) {
         suppressHydrationWarning
       />
       <Suspense fallback={<Loading />}>
-        <ImageryClient items={items} categories={categories} />
+        <ImageryClient cloud={cloud} initialMotif={null} />
       </Suspense>
     </>
   );

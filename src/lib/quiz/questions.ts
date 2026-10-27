@@ -17,7 +17,7 @@ import type { QuizQuestion } from "./types";
  * 修改题目或权重会改变测验结果，需同步更新 QUIZ_VERSION 与测试快照。
  * 作答短串按题目顺序逐位编码，调整顺序后旧的分享链接会对应到别的题。
  */
-export const QUIZ_VERSION = "0.4.2";
+export const QUIZ_VERSION = "0.4.4";
 
 export const QUESTIONS: readonly QuizQuestion[] = [
   {
@@ -165,7 +165,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "倏忽几日，又要上路。送你出城的人，临别给了你——",
     options: [
       {
-        text: "一幅手绘长卷，画着你们并肩登城远眺",
+        text: "一幅手绘长卷，画着你们登城远眺",
         dims: { qingsi: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
       },
@@ -198,7 +198,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "清溪边并肩而坐的两个人，谁也没说话",
+        text: "坐在清溪边的两个人，静听水声潺潺",
         dims: { shanhe: 2, qingsi: 1 },
         mood: { tone: 1, energy: -1 },
       },
@@ -221,23 +221,23 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "暂宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
       {
-        text: "「万里长风吹客袖，逢人尽是旧相知」",
+        text: "「长风浩荡排云去，笑语喧阗逐客来」",
         dims: { tianxiang: 2, renjian: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["风"],
       },
       {
-        text: "「小阁凭栏留数日，晴光满榻不知年」",
+        text: "「小阁凭栏分晚照，晴轩欹枕借新凉」",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "「回文织就无人读，犹向空墙刻一行」",
+        text: "「回文织就无人读，断句题残未肯休」",
         dims: { qingsi: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "「一盏寒茶尘满案，半窗落木悄无声」",
+        text: "「一盏寒茶凝夜色，半窗落木上秋声」",
         dims: { caomu: 2, qiyong: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -303,13 +303,13 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "回望来路，若为这一程写一句收尾——",
     options: [
       {
-        text: "「江声吞赤壁，帆影过金陵」",
+        text: "「六朝烟水一舟轻，江声吞赤壁，帆影过金陵」",
         dims: { shanhe: 2, diangu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "「收旧剑，挂桃枝，春林深处不须归」",
+        text: "「收旧剑，挂桃枝，春林深处好栖迟」",
         dims: { qiyong: 2, caomu: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["剑"],
@@ -321,7 +321,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["楼"],
       },
       {
-        text: "「一晌，一晌，梦里相看如客」",
+        text: "「梦里旧时同路。回顾，回顾，唯有来途如故」",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],

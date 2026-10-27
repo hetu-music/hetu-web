@@ -10,7 +10,7 @@ type Props = {
   params: Promise<{ locale: string }>;
 };
 
-/** 对外展示的曲库总数，与首页统计同一口径；候选池的真实大小不对外展示 */
+/** SEO 描述里的曲库总数，与首页统计同一口径；候选池的真实大小不对外展示 */
 async function getSongCount(locale: string): Promise<number> {
   return countCatalogSongs(await getSongs(undefined, undefined, true, locale));
 }
@@ -48,18 +48,9 @@ export default async function QuizPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const questions = getQuizQuestions(locale);
-  const [poolSize, songCount] = await Promise.all([
-    getQuizPoolSize(),
-    getSongCount(locale),
-  ]);
+  const poolSize = await getQuizPoolSize();
 
-  return (
-    <QuizClient
-      questions={questions}
-      poolSize={poolSize}
-      songCount={songCount}
-    />
-  );
+  return <QuizClient questions={questions} poolSize={poolSize} />;
 }
 
 export const revalidate = 7200;

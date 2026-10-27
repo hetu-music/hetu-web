@@ -40,14 +40,14 @@ export const PUT = withAuth(
       } = await supabase.auth.getSession();
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      // 换了意象的话，原意象的歌曲列表也要刷新
+      // 换了母题的话，原母题也要刷新
       const before = await getOccurrenceRefs(id);
       const updated = await updateOccurrence(id, input, session.access_token);
       const purge = await refreshImagery({
         songIds: [updated.song_id],
-        imageryIds: [
-          updated.imagery_id,
-          ...(before ? [before.imagery_id] : []),
+        motifIds: [
+          updated.category_id,
+          ...(before ? [before.category_id] : []),
         ],
       });
       return withPurgeStatus(NextResponse.json(updated), purge);
@@ -86,7 +86,7 @@ export const DELETE = withAuth(
       const purge = before
         ? await refreshImagery({
             songIds: [before.song_id],
-            imageryIds: [before.imagery_id],
+            motifIds: [before.category_id],
           })
         : { failed: [] };
       return withPurgeStatus(NextResponse.json({ success: true }), purge);

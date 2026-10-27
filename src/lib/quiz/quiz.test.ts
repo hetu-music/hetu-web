@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { decodeAnswers, encodeAnswers } from "./codec";
 import { DIMENSIONS, DIMENSION_KEYS } from "./dimensions";
 import {
-  COMMERCIAL_PENALTY,
   ENSEMBLE_PENALTY,
   MOOD_WEIGHT,
+  TYPE_PENALTIES,
   buildModel,
   evaluate,
   scoreSongs,
@@ -372,13 +372,14 @@ describe("evaluate", () => {
     });
   });
 
-  it("商业作品扣除固定分值，与多人合唱的降权叠加", () => {
+  it("商业、文宣作品按类型扣除固定分值，与多人合唱的降权叠加", () => {
     const rows = makeRows();
     rows.songs[2].type = ["商业"];
     rows.songs[3].type = ["商业"];
     rows.songs[3].artist = ["甲", "乙", "丙", "丁", "戊"];
+    rows.songs[4].type = ["文宣"];
     const pool = buildPool(rows);
-    const plain = buildModel(pool, QUESTIONS, 0, MOOD_WEIGHT, 0);
+    const plain = buildModel(pool, QUESTIONS, 0, MOOD_WEIGHT, {});
     const penalized = buildModel(pool, QUESTIONS);
     const { z } = userVector(plain, answersFavoring(DIMENSION_KEYS[2]));
     const before = scoreSongs(plain, z);
@@ -386,10 +387,12 @@ describe("evaluate", () => {
     plain.songs.forEach((song, j) => {
       const penalty =
         song.id === rows.songs[2].id
-          ? COMMERCIAL_PENALTY
+          ? TYPE_PENALTIES["商业"]
           : song.id === rows.songs[3].id
-            ? COMMERCIAL_PENALTY + ENSEMBLE_PENALTY
-            : 0;
+            ? TYPE_PENALTIES["商业"] + ENSEMBLE_PENALTY
+            : song.id === rows.songs[4].id
+              ? TYPE_PENALTIES["文宣"]
+              : 0;
       expect(after[j]).toBeCloseTo(before[j] - penalty, 12);
     });
   });

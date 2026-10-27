@@ -1,10 +1,10 @@
 {
   "title": "尋曲",
-  "metaDescription": "十二問，從河圖 {count} 首作品的意象裡，尋一首懂你的歌。",
+  "metaDescription": "十二個問題，一段旅程，從河圖 {count} 首作品的意象裡，尋一首懂你的歌。",
   "resultMetaDescription": "我的氣韻是「{motto}」。來尋一首懂你的河圖作品。",
   "intro": {
     "eyebrow": "以意象問心",
-    "subtitle": "十二問，於 {count} 首歌中，尋一首懂你的",
+    "subtitle": "十二個問題，一段旅程，尋一首懂你的歌",
     "note": "題目沒有對錯。憑第一眼的直覺作答即可。",
     "start": "啟程"
   },

@@ -165,7 +165,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "倏忽几日，又要上路。送你出城的人，临别给了你——",
     options: [
       {
-        text: "一幅手绘长卷，画着你们并肩登城远眺",
+        text: "一幅手绘长卷，画着你们登城远眺",
         dims: { qingsi: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
       },
@@ -198,7 +198,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "清溪边并肩而坐的两个人，谁也没说话",
+        text: "坐在清溪边的两个人，静听水声潺潺",
         dims: { shanhe: 2, qingsi: 1 },
         mood: { tone: 1, energy: -1 },
       },
@@ -221,13 +221,13 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "暂宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
       {
-        text: "「浩荡长风卷客衣，相逢借问尽依稀」",
+        text: "「长风浩荡排云去，笑语喧阗逐客来」",
         dims: { tianxiang: 2, renjian: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["风"],
       },
       {
-        text: "「小阁凭栏分晚照，晴轩欹枕纳新凉」",
+        text: "「小阁凭栏分晚照，晴轩欹枕借新凉」",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
       },

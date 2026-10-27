@@ -303,13 +303,13 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "回望来路，若为这一程写一句收尾——",
     options: [
       {
-        text: "「江声吞赤壁，帆影过金陵」",
+        text: "「六朝烟水一舟轻，江声吞赤壁，帆影过金陵」",
         dims: { shanhe: 2, diangu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "「收旧剑，挂桃枝，春林深处不须归」",
+        text: "「收旧剑，挂桃枝，春林深处好栖迟」",
         dims: { qiyong: 2, caomu: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["剑"],
@@ -321,7 +321,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["楼"],
       },
       {
-        text: "「一夕，一夕，梦里相看如客」",
+        text: "「梦里旧时同路。回顾，回顾，唯有来途如故」",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],

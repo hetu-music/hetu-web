@@ -171,7 +171,7 @@ export function CloudTooltip({ hover }: { hover: Hover | null }) {
       }}
     >
       <div
-        className="px-2.5 py-1 rounded-full text-xs tracking-wider font-serif font-light whitespace-nowrap shadow-sm backdrop-blur-sm tooltip-appear"
+        className="px-2.5 py-1 rounded-full text-xs tracking-wider font-serif font-normal whitespace-nowrap shadow-sm backdrop-blur-sm tooltip-appear"
         style={{
           backgroundColor: `${hover.accent}22`,
           color: hover.accent,

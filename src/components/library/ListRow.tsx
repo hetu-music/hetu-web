@@ -62,7 +62,7 @@ export default function ListRow({
             {song.title}
           </SongTitleLink>
         </h3>
-        <p className="truncate text-sm font-light text-slate-500 dark:text-slate-400">
+        <p className="truncate text-sm font-normal text-slate-500 dark:text-slate-400">
           {song.lyricist?.join(" ") || "-"}{" "}
           <span className="mx-1 opacity-50">/</span>{" "}
           {song.composer?.join(" ") || "-"}

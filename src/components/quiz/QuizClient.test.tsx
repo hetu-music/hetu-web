@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { QuizQuestionView } from "@/lib/quiz/views";
+import type { QuizQuestionView, QuizResultGlyphs } from "@/lib/quiz/views";
 import QuizClient from "./QuizClient";
 
 const push = vi.fn();
@@ -52,6 +52,11 @@ const questions: QuizQuestionView[] = [
   { title: "乙", stem: "第二问", options: ["二A", "二B", "二C", "二D"] },
   { title: "丙", stem: "第三问", options: ["三A", "三B", "三C", "三D"] },
 ];
+const glyphs: QuizResultGlyphs = {
+  calligraphy: "仰观天象",
+  serif: "天象",
+  kaiti: "你看得见风月",
+};
 
 describe("QuizClient", () => {
   beforeEach(() => {
@@ -72,7 +77,9 @@ describe("QuizClient", () => {
   }
 
   it("按原始选项下标编码作答，与展示顺序无关", () => {
-    render(<QuizClient questions={questions} poolSize={228} />);
+    render(
+      <QuizClient questions={questions} resultGlyphs={glyphs} poolSize={228} />,
+    );
     fireEvent.click(screen.getByText("intro.start"));
 
     answer("一B");
@@ -85,7 +92,9 @@ describe("QuizClient", () => {
   });
 
   it("返回上一问后可改选", () => {
-    render(<QuizClient questions={questions} poolSize={228} />);
+    render(
+      <QuizClient questions={questions} resultGlyphs={glyphs} poolSize={228} />,
+    );
     fireEvent.click(screen.getByText("intro.start"));
 
     answer("一A");
@@ -99,7 +108,9 @@ describe("QuizClient", () => {
   });
 
   it("翻页动画期间忽略连点", () => {
-    render(<QuizClient questions={questions} poolSize={228} />);
+    render(
+      <QuizClient questions={questions} resultGlyphs={glyphs} poolSize={228} />,
+    );
     fireEvent.click(screen.getByText("intro.start"));
 
     fireEvent.click(screen.getByText("一A"));
@@ -114,7 +125,9 @@ describe("QuizClient", () => {
   });
 
   it("数字键按展示顺序作答", () => {
-    render(<QuizClient questions={questions} poolSize={228} />);
+    render(
+      <QuizClient questions={questions} resultGlyphs={glyphs} poolSize={228} />,
+    );
     fireEvent.click(screen.getByText("intro.start"));
 
     for (let i = 0; i < 3; i += 1) {

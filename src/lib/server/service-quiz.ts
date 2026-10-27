@@ -10,17 +10,23 @@ import {
   buildModel,
   buildPool,
   decodeAnswers,
+  DIMENSIONS,
   encodeAnswers,
   evaluate,
   getDimension,
   POOL_VERSION,
   QUESTIONS,
+  SIGNATURE_IMAGERY,
   type MatchReason,
   type PoolRows,
   type PoolSong,
   type QuizModel,
 } from "@/lib/quiz";
-import type { QuizQuestionView, QuizResultView } from "@/lib/quiz/views";
+import type {
+  QuizQuestionView,
+  QuizResultGlyphs,
+  QuizResultView,
+} from "@/lib/quiz/views";
 import type { Song } from "@/lib/types";
 import { processLyrics } from "@/lib/utils/utils-lyrics";
 import { toTraditional } from "@/lib/utils/utils-convert";
@@ -86,6 +92,25 @@ export function getQuizQuestions(locale: string): QuizQuestionView[] {
     stem: tr(q.stem),
     options: q.options.map((o) => tr(o.text)),
   }));
+}
+
+/**
+ * 结果页上随结果变化、但不随曲库变化的字，按所用字体分好：气韵（各维度的题词、名称、描述）
+ * 与招牌意象都出自固定的几套。答题页拿去预载字体分片，进结果页就不会再跳字
+ */
+export function getQuizResultGlyphs(locale: string): QuizResultGlyphs {
+  const tr = localizer(locale);
+  const imagery = SIGNATURE_IMAGERY.map((s) => tr(s.name)).join("");
+  return {
+    // 主题词作标题，招牌意象单列
+    calligraphy: DIMENSIONS.map((d) => tr(d.motto)).join("") + imagery,
+    // 「兼有 · 题词」、倾向的维度名、契合理由（维度名或「意象」）
+    serif:
+      DIMENSIONS.map((d) => tr(d.motto) + tr(d.label)).join("") +
+      imagery +
+      "「」",
+    kaiti: DIMENSIONS.map((d) => tr(d.description)).join(""),
+  };
 }
 
 // ─── 结果 ─────────────────────────────────────────────────────────────────────

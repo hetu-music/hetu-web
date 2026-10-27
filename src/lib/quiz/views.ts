@@ -11,6 +11,13 @@ export type QuizQuestionView = {
   options: string[];
 };
 
+/** 结果页上固定几套里的字，按所用字体分好，供答题页预载字体分片 */
+export type QuizResultGlyphs = {
+  calligraphy: string;
+  serif: string;
+  kaiti: string;
+};
+
 export type QuizMatchView = {
   song: Song;
   percent: number;

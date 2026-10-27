@@ -3,7 +3,7 @@
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useRouter } from "@/i18n/navigation";
 import { encodeAnswers } from "@/lib/quiz/codec";
-import type { QuizQuestionView } from "@/lib/quiz/views";
+import type { QuizQuestionView, QuizResultGlyphs } from "@/lib/quiz/views";
 import { preloadFontText } from "@/lib/utils/font-preload";
 import { cn } from "@/lib/utils/utils";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,6 +13,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props {
   questions: QuizQuestionView[];
+  /** 结果页上固定几套里的字，一并预载 */
+  resultGlyphs: QuizResultGlyphs;
   poolSize: number;
 }
 
@@ -31,7 +33,11 @@ function shuffledIndices(n: number): number[] {
   return arr;
 }
 
-export default function QuizClient({ questions, poolSize }: Props) {
+export default function QuizClient({
+  questions,
+  resultGlyphs,
+  poolSize,
+}: Props) {
   const t = useTranslations("quiz");
   const router = useRouter();
 
@@ -52,7 +58,8 @@ export default function QuizClient({ questions, poolSize }: Props) {
     [],
   );
 
-  // 中文字体按字切了片，翻到新题才下载会一题一跳：在启程页就把整套题要用的分片下载好
+  // 中文字体按字切了片，字第一次出现才去下载，翻到新题、进结果页都会跳一下。
+  // 在启程页就把整套题要用的分片下载好，接着是结果页上除歌曲外的字（先题后结果，先用的先下）
   useEffect(() => {
     preloadFontText([
       {
@@ -68,8 +75,46 @@ export default function QuizClient({ questions, poolSize }: Props) {
           "0123456789",
       },
       { cssVar: "--font-kaiti", text: t("question.finishing") },
-    ]);
-  }, [questions, t]);
+    ]).then(() =>
+      preloadFontText([
+        { cssVar: "--font-calligraphy", text: resultGlyphs.calligraphy },
+        {
+          cssVar: "--font-serif",
+          text:
+            resultGlyphs.serif +
+            t("result.eyebrow") +
+            t("result.secondary", { motto: "" }) +
+            t("result.imagery") +
+            t("result.profile") +
+            t("result.matches") +
+            t("result.reasons", { reasons: "" }) +
+            t("result.retry") +
+            t("result.share") +
+            t("result.method"),
+        },
+        {
+          cssVar: "--font-kaiti",
+          text:
+            resultGlyphs.kaiti +
+            t("card.generating") +
+            t("card.failed") +
+            t("card.hint"),
+        },
+        // 歌曲卡片上的「契合」和分享面板的按钮用正文字体
+        {
+          cssVar: "--font-sans",
+          text:
+            t("result.match") +
+            "%" +
+            t("card.title") +
+            t("card.save") +
+            t("card.share") +
+            t("card.copyLink") +
+            t("result.copied"),
+        },
+      ]),
+    );
+  }, [questions, resultGlyphs, t]);
 
   const start = useCallback(() => {
     setOrder(questions.map((q) => shuffledIndices(q.options.length)));

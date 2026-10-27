@@ -21,12 +21,18 @@ vi.mock("next/cache", () => ({
 }));
 
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
-import { DIMENSIONS, QUESTIONS, encodeAnswers } from "@/lib/quiz";
+import {
+  DIMENSIONS,
+  QUESTIONS,
+  SIGNATURE_IMAGERY,
+  encodeAnswers,
+} from "@/lib/quiz";
 import { toTraditional } from "@/lib/utils/utils-convert";
 import {
   getQuizPoolSize,
   getQuizQuestions,
   getQuizResult,
+  getQuizResultGlyphs,
 } from "./service-quiz";
 
 // ─── 测试数据：每个维度一首「专精」歌曲，歌词与意象时间标签一一对应 ─────────
@@ -167,6 +173,27 @@ describe("getQuizQuestions", () => {
       QUESTIONS[0].options.map((o) => toTraditional(o.text)),
     );
     expect(first.options).not.toEqual(QUESTIONS[0].options.map((o) => o.text));
+  });
+});
+
+describe("getQuizResultGlyphs", () => {
+  it("气韵与招牌意象的字都在，按字体分好", () => {
+    const glyphs = getQuizResultGlyphs("zh-CN");
+    for (const d of DIMENSIONS) {
+      expect(glyphs.calligraphy).toContain(d.motto);
+      expect(glyphs.serif).toContain(d.label);
+      expect(glyphs.kaiti).toContain(d.description);
+    }
+    for (const s of SIGNATURE_IMAGERY) {
+      expect(glyphs.calligraphy).toContain(s.name);
+      expect(glyphs.serif).toContain(s.name);
+    }
+  });
+
+  it("繁体页给繁体字", () => {
+    const glyphs = getQuizResultGlyphs("zh-TW");
+    expect(glyphs.calligraphy).toContain(toTraditional(DIMENSIONS[0].motto));
+    expect(glyphs.kaiti).toContain(toTraditional(DIMENSIONS[0].description));
   });
 });
 

@@ -125,11 +125,11 @@ function LatestRecord({
 
   return (
     <article className="mt-8 lg:mt-12">
-      <div className="flex items-end justify-between gap-6">
+      <div className="flex items-start justify-between gap-6">
         <div className="min-w-0">
           <Link
             href={href}
-            className="font-calligraphy text-5xl text-slate-900 dark:text-white hover:text-(--tone) dark:hover:text-(--tone) transition-colors"
+            className="block w-fit font-calligraphy text-5xl leading-none text-slate-900 dark:text-white hover:text-(--tone) dark:hover:text-(--tone) transition-colors"
           >
             {result.persona.motto}
           </Link>
@@ -139,7 +139,7 @@ function LatestRecord({
             </p>
           )}
         </div>
-        {/* 日期在上、删除在下，与左侧的兼有一行对齐 */}
+        {/* 日期在上、删除在下，与左侧主气韵的上端对齐 */}
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <span className="text-xs tracking-wider text-slate-400 dark:text-slate-500">
             {t("savedAt", savedMonth(record.savedAt))}

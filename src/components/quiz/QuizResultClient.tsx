@@ -5,14 +5,16 @@ import EnqueueButton from "@/components/shared/EnqueueButton";
 import FavoriteButton from "@/components/shared/FavoriteButton";
 import PlayButton from "@/components/shared/PlayButton";
 import TopBar from "@/components/shared/topbar/TopBar";
+import { useUserContext } from "@/context/UserContext";
+import { useGoToLogin } from "@/hooks/ui/useGoToLogin";
 import { Link } from "@/i18n/navigation";
+import { savedMonth } from "@/lib/quiz/saved-month";
 import type { QuizResultView } from "@/lib/quiz/views";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { motion } from "framer-motion";
 import { ImageIcon, RotateCcw, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { savedMonth } from "@/lib/quiz/saved-month";
 import QuizSaveButton from "./QuizSaveButton";
 import QuizShareSheet from "./QuizShareSheet";
 
@@ -233,6 +235,9 @@ export default function QuizResultClient({ result }: Props) {
           </ol>
         </section>
 
+        {/* 访客：收藏、保存都要登录，在推荐列表下提一句 */}
+        {!result.savedAt && <LoginHint />}
+
         {/* ── 操作 ── */}
         <motion.div
           {...fadeUp(1)}
@@ -262,5 +267,32 @@ export default function QuizResultClient({ result }: Props) {
         result={result}
       />
     </div>
+  );
+}
+
+/** 只对访客显示；登录后回到这个结果页 */
+function LoginHint() {
+  const t = useTranslations("quiz.result");
+  const { user, loaded } = useUserContext();
+  const goToLogin = useGoToLogin();
+  if (!loaded || user) return null;
+
+  return (
+    <motion.p
+      {...fadeUp(0.9)}
+      className="mt-12 text-center font-serif text-sm tracking-wider text-slate-500 dark:text-slate-400"
+    >
+      {t.rich("loginHint", {
+        login: (chunks) => (
+          <button
+            type="button"
+            onClick={goToLogin}
+            className="text-[#9A6B2F] transition-opacity hover:opacity-75 dark:text-[#D4A259]"
+          >
+            {chunks}
+          </button>
+        ),
+      })}
+    </motion.p>
   );
 }

@@ -32,7 +32,8 @@
     "loginToSave": "登入後儲存",
     "replaceHint": "已存滿 {count} 次，再儲存將替換 {year} 年 {month} 月的那一次",
     "savedToast": "已儲存，可在個人中心的「我的氣韻」裡找到",
-    "saveFailed": "儲存失敗，請稍後重試"
+    "saveFailed": "儲存失敗，請稍後重試",
+    "loginHint": "<login>登入</login>，把這次的氣韻留在主頁"
   },
   "card": {
     "title": "分享圖",

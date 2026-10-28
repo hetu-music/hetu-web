@@ -28,11 +28,23 @@ export type QuizMatchView = {
 };
 
 export type QuizResultView = {
-  /** 结果页链接里的乱码 */
+  /** 结果页链接里的乱码：7 位是作答编码，10 位是保存的记录 */
   slug: string;
+  /** 保存时间（ISO）；未保存的结果为 null */
+  savedAt: string | null;
   persona: { motto: string; label: string; description: string };
   secondary: { motto: string; label: string } | null;
   profile: Array<{ key: DimensionKey; label: string; z: number }>;
   imagery: string[];
   matches: QuizMatchView[];
+};
+
+/** 保存的记录的摘要：结果页的保存按钮、个人主页的「往次」用 */
+export type QuizRecordSummary = {
+  /** 链接里的 10 位乱码 */
+  id: string;
+  /** 保存时间（ISO） */
+  savedAt: string;
+  persona: { motto: string; label: string };
+  secondary: { motto: string; label: string } | null;
 };

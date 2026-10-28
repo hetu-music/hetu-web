@@ -11,19 +11,31 @@ import {
   buildPool,
   decodeResultSlug,
   DIMENSIONS,
+  encodeAnswers,
   encodeResultSlug,
   evaluate,
   getDimension,
+  isDimensionKey,
+  isRecordId,
   POOL_VERSION,
   QUESTIONS,
+  QUIZ_VERSION,
+  rowToSnapshot,
   SIGNATURE_IMAGERY,
+  snapshotToRow,
+  toSnapshot,
+  type Answers,
+  type DimensionKey,
   type MatchReason,
   type PoolRows,
   type PoolSong,
   type QuizModel,
+  type QuizSnapshot,
+  type QuizSnapshotRow,
 } from "@/lib/quiz";
 import type {
   QuizQuestionView,
+  QuizRecordSummary,
   QuizResultGlyphs,
   QuizResultView,
 } from "@/lib/quiz/views";
@@ -32,6 +44,8 @@ import { processLyrics } from "@/lib/utils/utils-lyrics";
 import { toTraditional } from "@/lib/utils/utils-convert";
 import { applyCreditAliases } from "@/lib/utils/utils-credits";
 import { getCreditAliases } from "@/lib/server/service-credit-aliases";
+import { getSongsByIds } from "@/lib/server/service-songs";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ─── 候选池 ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +70,7 @@ function poolRows(index: ImageryIndex): PoolRows {
 }
 
 /**
- * 结果页按 ?a= 动态渲染，每次都从全库标注建候选池太浪费，
+ * 结果页按链接动态渲染，每次都从全库标注建候选池太浪费，
  * 建好的候选池跨请求缓存，2 小时刷新，与意象页 ISR 周期一致。
  */
 const loadQuizPool = unstable_cache(
@@ -195,65 +209,248 @@ function toSong(song: PoolSong): Song {
 
 const OPTION_COUNTS = QUESTIONS.map((q) => q.options.length);
 
+/** 7 位乱码 → 作答；不合法时返回 null */
+export function decodeQuizSlug(slug: string): Answers | null {
+  return decodeResultSlug(slug, OPTION_COUNTS);
+}
+
 /**
- * 根据结果页链接里的乱码计算结果；乱码不合法或候选池为空时返回 null。
+ * 作答 → 快照（只有键名和数值）；候选池为空时返回 null。
+ * 保存记录时也用它：客户端只交乱码，结果在服务端重算，不信任客户端
  */
-export async function getQuizResult(
-  slug: string | undefined,
-  locale: string,
-): Promise<QuizResultView | null> {
-  const answers = decodeResultSlug(slug, OPTION_COUNTS);
-  if (!answers) return null;
+export async function computeQuizResult(
+  answers: Answers,
+): Promise<QuizSnapshot | null> {
   const model = await getQuizModel();
   if (model.songs.length === 0) return null;
+  return toSnapshot(evaluate(model, answers));
+}
 
-  const result = evaluate(model, answers);
-  const songById = new Map(model.songs.map((s) => [s.id, s]));
-  const [lyrics, aliases] = await Promise.all([
-    getLyricsByIds(result.matches.map((m) => m.songId)),
+/**
+ * 快照 → 结果页的视图：按 locale 翻译，补上歌曲信息和印证的歌词。
+ * 歌曲信息先取候选池里的；保存后歌离开了候选池的，到曲库里查，曲库里也删了就略去。
+ * 歌词按候选池里的标注挑，歌不在候选池里时不挑
+ */
+export async function renderQuizResult(
+  snapshot: QuizSnapshot,
+  meta: Pick<QuizResultView, "slug" | "savedAt">,
+  locale: string,
+): Promise<QuizResultView> {
+  const ids = snapshot.matches.map((m) => m.songId);
+  const model = await getQuizModel();
+  const poolById = new Map(model.songs.map((s) => [s.id, s]));
+  const missing = ids.filter((id) => !poolById.has(id));
+  const [lyrics, aliases, fallback] = await Promise.all([
+    getLyricsByIds(ids),
     getCreditAliases(),
+    missing.length > 0 ? getSongsByIds(missing, locale) : [],
   ]);
+  const fallbackById = new Map(fallback.map((s) => [s.id, s]));
   const tr = localizer(locale);
   const reasonLabel = (r: MatchReason) =>
     tr(r.kind === "dimension" ? getDimension(r.key).label : `「${r.name}」`);
 
-  const [first, second] = result.profile;
-  const firstDim = getDimension(first.key);
-  const secondDim = second && second.z > 0 ? getDimension(second.key) : null;
+  const viewOf = (id: number): Song | null => {
+    const song = poolById.get(id);
+    if (!song) return fallbackById.get(id) ?? null;
+    const view = applyCreditAliases(toSong(song), aliases);
+    return {
+      ...view,
+      title: tr(view.title),
+      album: view.album ? tr(view.album) : null,
+      artist: view.artist?.map(tr) ?? null,
+    };
+  };
+
+  const personaDim = getDimension(snapshot.persona);
+  const secondaryDim = snapshot.secondary
+    ? getDimension(snapshot.secondary)
+    : null;
 
   return {
-    slug: encodeResultSlug(answers, OPTION_COUNTS),
+    ...meta,
     persona: {
-      motto: tr(firstDim.motto),
-      label: tr(firstDim.label),
-      description: tr(firstDim.description),
+      motto: tr(personaDim.motto),
+      label: tr(personaDim.label),
+      description: tr(personaDim.description),
     },
-    secondary: secondDim
-      ? { motto: tr(secondDim.motto), label: tr(secondDim.label) }
+    secondary: secondaryDim
+      ? { motto: tr(secondaryDim.motto), label: tr(secondaryDim.label) }
       : null,
-    profile: result.profile.map((p) => ({
+    profile: snapshot.profile.map((p) => ({
       key: p.key,
       label: tr(getDimension(p.key).label),
-      z: Math.round(p.z * 100) / 100,
+      z: p.z,
     })),
-    imagery: result.imagery.map(tr),
-    matches: result.matches.flatMap((m) => {
-      const song = songById.get(m.songId);
+    imagery: snapshot.imagery.map(tr),
+    matches: snapshot.matches.flatMap((m) => {
+      const song = viewOf(m.songId);
       if (!song) return [];
-      const view = applyCreditAliases(toSong(song), aliases);
+      const poolSong = poolById.get(m.songId);
       return [
         {
-          song: {
-            ...view,
-            title: tr(view.title),
-            album: view.album ? tr(view.album) : null,
-            artist: view.artist?.map(tr) ?? null,
-          },
+          song,
           percent: m.percent,
           reasons: m.reasons.map(reasonLabel),
-          lines: pickLines(song, m.reasons, lyrics.get(song.id), 2).map(tr),
+          lines: poolSong
+            ? pickLines(poolSong, m.reasons, lyrics.get(m.songId), 2).map(tr)
+            : [],
         },
       ];
     }),
   };
+}
+
+const RECORD_COLUMNS =
+  "id,created_at,persona,secondary,profile,imagery,song_ids,percents,reasons";
+
+/**
+ * 按 id 读保存的记录。看记录的不一定是记录的主人，所以用服务端密钥读：
+ * 表不对 anon 开放，否则整张表能被列出来
+ */
+async function getQuizRecord(
+  id: string,
+): Promise<{ snapshot: QuizSnapshot; createdAt: string } | null> {
+  const supabase = getServiceClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from(TABLES.QUIZ_RESULTS)
+    .select(RECORD_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    console.error("[getQuizRecord]", error);
+    return null;
+  }
+  if (!data) return null;
+  const snapshot = rowToSnapshot(data as QuizSnapshotRow);
+  return snapshot ? { snapshot, createdAt: data.created_at as string } : null;
+}
+
+/**
+ * 结果页链接里的乱码 → 结果。7 位是作答编码，按当前题目和曲库现算；
+ * 10 位是保存的记录，按快照渲染。解不出、查不到或候选池为空时返回 null。
+ * 元数据和页面各调一次，同一请求里只算一遍
+ */
+export const getQuizResult = cache(
+  async (
+    slug: string | undefined,
+    locale: string,
+  ): Promise<QuizResultView | null> => {
+    if (!slug) return null;
+    if (isRecordId(slug)) {
+      const record = await getQuizRecord(slug);
+      if (!record) return null;
+      return renderQuizResult(
+        record.snapshot,
+        { slug, savedAt: record.createdAt },
+        locale,
+      );
+    }
+    const answers = decodeQuizSlug(slug);
+    if (!answers) return null;
+    const snapshot = await computeQuizResult(answers);
+    if (!snapshot) return null;
+    return renderQuizResult(
+      snapshot,
+      { slug: encodeResultSlug(answers, OPTION_COUNTS), savedAt: null },
+      locale,
+    );
+  },
+);
+
+// ─── 保存的记录 ───────────────────────────────────────────────────────────────
+//
+// 以下都用用户会话的客户端，RLS 保证只碰得到自己的记录
+
+/** 自己保存的记录，新的在前；主气韵认不出的旧记录略去 */
+export async function listQuizRecords(
+  supabase: SupabaseClient,
+  userId: string,
+  locale: string,
+): Promise<QuizRecordSummary[]> {
+  const { data, error } = await supabase
+    .from(TABLES.QUIZ_RESULTS)
+    .select("id,created_at,persona,secondary")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const tr = localizer(locale);
+  const brief = (key: DimensionKey) => {
+    const dim = getDimension(key);
+    return { motto: tr(dim.motto), label: tr(dim.label) };
+  };
+  return (data ?? []).flatMap((r) =>
+    isDimensionKey(r.persona)
+      ? [
+          {
+            id: r.id,
+            savedAt: r.created_at,
+            persona: brief(r.persona),
+            secondary: isDimensionKey(r.secondary) ? brief(r.secondary) : null,
+          },
+        ]
+      : [],
+  );
+}
+
+/** 这份作答在当前题目版本下存过的那条记录的 id；没存过时为 null */
+export async function findQuizRecord(
+  supabase: SupabaseClient,
+  userId: string,
+  answers: Answers,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from(TABLES.QUIZ_RESULTS)
+    .select("id")
+    .eq("user_id", userId)
+    .eq("quiz_version", QUIZ_VERSION)
+    .eq("code", encodeAnswers(answers))
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
+/**
+ * 保存一份结果，返回记录的 id；候选池为空、算不出结果时返回 null。
+ * 同一份作答在同一题目版本下已存过的，不再新建，返回原来那条。
+ * 满 5 条时由数据库的触发器删掉最早的一条
+ */
+export async function saveQuizRecord(
+  supabase: SupabaseClient,
+  userId: string,
+  answers: Answers,
+): Promise<string | null> {
+  const snapshot = await computeQuizResult(answers);
+  if (!snapshot) return null;
+  const { data, error } = await supabase
+    .from(TABLES.QUIZ_RESULTS)
+    .insert({
+      user_id: userId,
+      quiz_version: QUIZ_VERSION,
+      code: encodeAnswers(answers),
+      ...snapshotToRow(snapshot),
+    })
+    .select("id")
+    .single();
+  if (!error) return data.id;
+  if (error.code === "23505") {
+    const existing = await findQuizRecord(supabase, userId, answers);
+    if (existing) return existing;
+  }
+  throw error;
+}
+
+/** 删除自己的一条记录；本就不存在时也算成功 */
+export async function deleteQuizRecord(
+  supabase: SupabaseClient,
+  userId: string,
+  id: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLES.QUIZ_RESULTS)
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", id);
+  if (error) throw error;
 }

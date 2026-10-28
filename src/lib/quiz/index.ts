@@ -4,3 +4,4 @@ export * from "./questions";
 export * from "./codec";
 export * from "./pool";
 export * from "./model";
+export * from "./snapshot";

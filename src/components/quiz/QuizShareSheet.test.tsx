@@ -53,6 +53,7 @@ vi.mock("@/lib/quiz/share-card", () => ({ renderShareCard: vi.fn() }));
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
 const result: QuizResultView = {
   slug: "3Kltpgo",
+  savedAt: null,
   persona: { motto: "仰观天象", label: "天象", description: "你看得见风月。" },
   secondary: null,
   profile: [{ key: "tianxiang", label: "天象", z: 2 }],

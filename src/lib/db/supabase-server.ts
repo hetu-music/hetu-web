@@ -41,6 +41,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   USERS              → getUserClient    (用户本人读写，RLS 隔离)
 //   COLLECTIONS        → getUserClient    (用户本人读写，RLS 隔离)
 //   COMMENTS / _LIKES  → 读：getServiceClient（需连带作者名）；写：用户会话（RLS + RPC）
+//   QUIZ_RESULTS       → 按 id 公开读：getServiceClient；本人的列表与增删：用户会话（RLS 隔离）
 export const TABLES = {
   // 核心业务表
   MUSIC: "music", // 正式歌曲库（全部已发布的歌）
@@ -64,6 +65,7 @@ export const TABLES = {
   COLLECTIONS: "collections",
   COMMENTS: "comments",
   COMMENT_LIKES: "comment_likes",
+  QUIZ_RESULTS: "quiz_results", // 寻曲结果的保存记录，每人最多 5 条
 
   // 故事页专用表
   STORY_QJTX: "story_qjtx",

@@ -21,12 +21,25 @@ vi.mock("next/cache", () => ({
 }));
 
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
-import { DIMENSIONS, QUESTIONS, encodeAnswers } from "@/lib/quiz";
+import {
+  DIMENSIONS,
+  QUESTIONS,
+  QUIZ_VERSION,
+  SIGNATURE_IMAGERY,
+  decodeResultSlug,
+  encodeAnswers,
+  encodeResultSlug,
+  snapshotToRow,
+  type QuizSnapshot,
+} from "@/lib/quiz";
 import { toTraditional } from "@/lib/utils/utils-convert";
 import {
   getQuizPoolSize,
   getQuizQuestions,
   getQuizResult,
+  getQuizResultGlyphs,
+  listQuizRecords,
+  saveQuizRecord,
 } from "./service-quiz";
 
 // ─── 测试数据：每个维度一首「专精」歌曲，歌词与意象时间标签一一对应 ─────────
@@ -105,7 +118,11 @@ function makeRows(): Rows {
 /**
  * 按表名分发查询：候选池读共用的意象索引，歌词按 id 读 music 表。
  */
-function mockClient(rows: Rows, lyricsResult?: MockResult) {
+function mockClient(
+  rows: Rows,
+  lyricsResult?: MockResult,
+  extra: Record<string, () => unknown> = {},
+) {
   const ok = (data: unknown): MockResult => ({ data, error: null });
   const byTable: Record<string, () => unknown> = {
     [TABLES.IMAGERY_CAT]: () => makeQueryBuilder(ok(rows.categories)),
@@ -115,6 +132,7 @@ function mockClient(rows: Rows, lyricsResult?: MockResult) {
     [TABLES.SONG_EMOTIONS]: () => makeQueryBuilder(ok([])),
     [TABLES.EMOTIONS]: () => makeQueryBuilder(ok([])),
     [TABLES.MUSIC]: () => makeQueryBuilder(lyricsResult ?? ok(rows.lyrics)),
+    ...extra,
   };
   const from = vi.fn((table: string) => byTable[table]());
   vi.mocked(getServiceClient).mockReturnValue({ from } as unknown as ReturnType<
@@ -123,9 +141,11 @@ function mockClient(rows: Rows, lyricsResult?: MockResult) {
   return from;
 }
 
+const OPTION_COUNTS = QUESTIONS.map((q) => q.options.length);
+
 /** 每题选该维度权重最大的选项，使该维度成为主导 */
 function answersFavoring(key: string): string {
-  return encodeAnswers(
+  return encodeResultSlug(
     QUESTIONS.map((q) => {
       let best = 0;
       q.options.forEach((o, i) => {
@@ -135,6 +155,7 @@ function answersFavoring(key: string): string {
       });
       return best;
     }),
+    OPTION_COUNTS,
   );
 }
 
@@ -167,6 +188,27 @@ describe("getQuizQuestions", () => {
       QUESTIONS[0].options.map((o) => toTraditional(o.text)),
     );
     expect(first.options).not.toEqual(QUESTIONS[0].options.map((o) => o.text));
+  });
+});
+
+describe("getQuizResultGlyphs", () => {
+  it("气韵与招牌意象的字都在，按字体分好", () => {
+    const glyphs = getQuizResultGlyphs("zh-CN");
+    for (const d of DIMENSIONS) {
+      expect(glyphs.calligraphy).toContain(d.motto);
+      expect(glyphs.serif).toContain(d.label);
+      expect(glyphs.kaiti).toContain(d.description);
+    }
+    for (const s of SIGNATURE_IMAGERY) {
+      expect(glyphs.calligraphy).toContain(s.name);
+      expect(glyphs.serif).toContain(s.name);
+    }
+  });
+
+  it("繁体页给繁体字", () => {
+    const glyphs = getQuizResultGlyphs("zh-TW");
+    expect(glyphs.calligraphy).toContain(toTraditional(DIMENSIONS[0].motto));
+    expect(glyphs.kaiti).toContain(toTraditional(DIMENSIONS[0].description));
   });
 });
 
@@ -204,7 +246,7 @@ describe("getQuizPoolSize", () => {
 });
 
 describe("getQuizResult", () => {
-  it("作答短串不合法时返回 null，不查询数据库", async () => {
+  it("乱码不合法时返回 null，不查询数据库", async () => {
     const from = mockClient(makeRows());
     expect(await getQuizResult(undefined, "zh-CN")).toBeNull();
     expect(await getQuizResult("AB", "zh-CN")).toBeNull();
@@ -220,11 +262,11 @@ describe("getQuizResult", () => {
 
   it("主导维度决定气韵，首选歌曲附带理由与印证歌词", async () => {
     mockClient(makeRows());
-    const code = answersFavoring("tianxiang");
-    const result = await getQuizResult(code.toLowerCase(), "zh-CN");
+    const slug = answersFavoring("tianxiang");
+    const result = await getQuizResult(slug, "zh-CN");
 
     expect(result).not.toBeNull();
-    expect(result?.code).toBe(code);
+    expect(result?.slug).toBe(slug);
     expect(result?.persona).toMatchObject({ label: "天象", motto: "仰观天象" });
     expect(result?.profile[0]).toMatchObject({
       key: "tianxiang",
@@ -249,7 +291,13 @@ describe("getQuizResult", () => {
   it("次要维度为正时给出「兼有」", async () => {
     mockClient(makeRows());
     // 全选第一项：各题第一项的主维度分散在多个维度，次要维度为正
-    const result = await getQuizResult("A".repeat(QUESTIONS.length), "zh-CN");
+    const result = await getQuizResult(
+      encodeResultSlug(
+        QUESTIONS.map(() => 0),
+        OPTION_COUNTS,
+      ),
+      "zh-CN",
+    );
     expect(result?.secondary).not.toBeNull();
     expect(result?.secondary?.label).not.toBe(result?.persona.label);
   });
@@ -282,5 +330,171 @@ describe("getQuizResult", () => {
     mockClient(rows);
     const result = await getQuizResult(answersFavoring("tianxiang"), "zh-CN");
     expect(result?.matches[0].lines).toEqual([]);
+  });
+});
+
+// ─── 保存的记录 ───────────────────────────────────────────────────────────────
+
+const RECORD_ID = "aB3dE6gH9k";
+const SAVED_AT = "2026-10-01T08:00:00+00:00";
+
+const saved: QuizSnapshot = {
+  persona: "shanhe",
+  secondary: null,
+  profile: [{ key: "shanhe", z: 2 }],
+  imagery: [],
+  matches: [
+    // 仍在候选池里
+    {
+      songId: 101,
+      percent: 90,
+      reasons: [{ kind: "dimension", key: "shanhe" }],
+    },
+    // 已离开候选池，但还在曲库里
+    { songId: 999, percent: 70, reasons: [] },
+    // 曲库里也删了
+    { songId: 998, percent: 60, reasons: [] },
+  ],
+};
+
+function recordBuilder(data: unknown) {
+  return () =>
+    makeQueryBuilder({
+      data: data && { id: RECORD_ID, created_at: SAVED_AT, ...data },
+      error: null,
+    });
+}
+
+describe("getQuizResult：10 位链接", () => {
+  it("按快照渲染，不重算；离开候选池的歌到曲库里查，删掉的略去", async () => {
+    const rows = makeRows();
+    const outOfPool = {
+      id: 999,
+      title: "已出池",
+      artist: ["河图"],
+      album: null,
+      hascover: false,
+      lyrics: null,
+    };
+    const from = mockClient(
+      rows,
+      { data: [...rows.lyrics, outOfPool], error: null },
+      { [TABLES.QUIZ_RESULTS]: recordBuilder(snapshotToRow(saved)) },
+    );
+    const result = await getQuizResult(RECORD_ID, "zh-CN");
+
+    expect(from).toHaveBeenCalledWith(TABLES.QUIZ_RESULTS);
+    expect(result?.slug).toBe(RECORD_ID);
+    expect(result?.savedAt).toBe(SAVED_AT);
+    expect(result?.persona.label).toBe("山河");
+    expect(result?.secondary).toBeNull();
+    expect(result?.matches.map((m) => m.song.id)).toEqual([101, 999]);
+    expect(result?.matches.map((m) => m.percent)).toEqual([90, 70]);
+    expect(result?.matches[0].reasons).toEqual(["山河"]);
+    expect(result?.matches[0].lines).toEqual(["山河1句0"]);
+    expect(result?.matches[1].song.title).toBe("已出池");
+    expect(result?.matches[1].lines).toEqual([]);
+  });
+
+  it("记录不存在或主气韵认不出时返回 null", async () => {
+    mockClient(makeRows(), undefined, {
+      [TABLES.QUIZ_RESULTS]: recordBuilder(null),
+    });
+    expect(await getQuizResult(RECORD_ID, "zh-CN")).toBeNull();
+
+    mockClient(makeRows(), undefined, {
+      [TABLES.QUIZ_RESULTS]: recordBuilder({
+        ...snapshotToRow(saved),
+        persona: "gone",
+      }),
+    });
+    expect(await getQuizResult(RECORD_ID, "zh-CN")).toBeNull();
+  });
+
+  it("7 位链接的结果没有保存时间", async () => {
+    mockClient(makeRows());
+    const result = await getQuizResult(answersFavoring("caomu"), "zh-CN");
+    expect(result?.savedAt).toBeNull();
+  });
+});
+
+describe("saveQuizRecord", () => {
+  const slug = answersFavoring("tianxiang");
+  const answers = decodeResultSlug(slug, OPTION_COUNTS) as number[];
+
+  it("服务端重算后写入快照，带上题目版本和作答", async () => {
+    mockClient(makeRows());
+    const insert = makeQueryBuilder({ data: { id: RECORD_ID }, error: null });
+    const supabase = { from: vi.fn(() => insert) };
+    const id = await saveQuizRecord(supabase as never, "u1", answers);
+
+    expect(id).toBe(RECORD_ID);
+    expect(supabase.from).toHaveBeenCalledWith(TABLES.QUIZ_RESULTS);
+    const row = insert.insert.mock.calls[0][0];
+    expect(row).toMatchObject({
+      user_id: "u1",
+      quiz_version: QUIZ_VERSION,
+      code: encodeAnswers(answers),
+      persona: "tianxiang",
+    });
+    expect(row.song_ids[0]).toBe(100);
+    expect(row.song_ids).toHaveLength(row.percents.length);
+    expect(row.reasons[0]).toContainEqual({ dim: "tianxiang" });
+  });
+
+  it("同一份作答已存过时返回原来那条", async () => {
+    mockClient(makeRows());
+    const conflict = makeQueryBuilder({ data: null, error: { code: "23505" } });
+    const existing = makeQueryBuilder({
+      data: { id: "oldOne0001" },
+      error: null,
+    });
+    const supabase = {
+      from: vi.fn().mockReturnValueOnce(conflict).mockReturnValueOnce(existing),
+    };
+    expect(await saveQuizRecord(supabase as never, "u1", answers)).toBe(
+      "oldOne0001",
+    );
+    expect(existing.eq).toHaveBeenCalledWith("quiz_version", QUIZ_VERSION);
+    expect(existing.eq).toHaveBeenCalledWith("code", encodeAnswers(answers));
+  });
+
+  it("其他写入错误照常抛出；候选池为空时返回 null", async () => {
+    mockClient(makeRows());
+    const failing = makeQueryBuilder({ data: null, error: { code: "42501" } });
+    await expect(
+      saveQuizRecord({ from: () => failing } as never, "u1", answers),
+    ).rejects.toMatchObject({ code: "42501" });
+
+    vi.mocked(getServiceClient).mockReturnValue(null);
+    expect(
+      await saveQuizRecord({ from: () => failing } as never, "u1", answers),
+    ).toBeNull();
+  });
+});
+
+describe("listQuizRecords", () => {
+  it("按语言给出气韵，认不出主气韵的记录略去", async () => {
+    const list = makeQueryBuilder({
+      data: [
+        { id: "a", created_at: SAVED_AT, persona: "loutai", secondary: "gone" },
+        { id: "b", created_at: SAVED_AT, persona: "gone", secondary: null },
+      ],
+      error: null,
+    });
+    const records = await listQuizRecords(
+      { from: () => list } as never,
+      "u1",
+      "zh-TW",
+    );
+    expect(records).toEqual([
+      {
+        id: "a",
+        savedAt: SAVED_AT,
+        persona: { motto: toTraditional(DIMENSIONS[4].motto), label: "樓臺" },
+        secondary: null,
+      },
+    ]);
+    expect(list.eq).toHaveBeenCalledWith("user_id", "u1");
   });
 });

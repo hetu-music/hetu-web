@@ -2,6 +2,7 @@
   "title": "個人中心",
   "tabs": {
     "favorites": "我的收藏",
+    "quiz": "我的氣韻",
     "annotations": "我的批評",
     "account": "帳戶設定",
     "feedback": "建議回饋"
@@ -156,5 +157,20 @@
       "reply": "管理員回覆"
     },
     "refresh": "重新整理"
+  },
+  "quiz": {
+    "retry": "重新尋曲",
+    "savedAt": "{year} 年 {month} 月尋得",
+    "secondary": "兼有 · {motto}",
+    "imagery": "偏愛的意象",
+    "profile": "意象傾向",
+    "matches": "契合的歌",
+    "reasons": "同好：{reasons}",
+    "past": "往次",
+    "delete": "刪除",
+    "confirmDelete": "確認刪除",
+    "deleteFailed": "刪除失敗",
+    "empty": "還沒有留下過尋曲的結果",
+    "emptyHint": "做完尋曲後，在結果頁點「儲存」，這一次的氣韻就會留在這裡"
   }
 }

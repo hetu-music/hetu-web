@@ -25,6 +25,11 @@
     "themeSystem": "跟隨系統",
     "script": "文字"
   },
+  "favorite": {
+    "add": "收藏",
+    "remove": "取消收藏",
+    "login": "登入後收藏"
+  },
   "error": {
     "title": "出錯了",
     "description": "抱歉，系統遇到了一些問題。請嘗試重新整理頁面或稍後再試。",

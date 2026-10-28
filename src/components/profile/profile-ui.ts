@@ -1,6 +1,7 @@
-/** 个人中心的四节，也是 ?tab= 的取值 */
+/** 个人中心的五节，也是 ?tab= 的取值 */
 export const PROFILE_TABS = [
   "favorites",
+  "quiz",
   "annotations",
   "account",
   "feedback",

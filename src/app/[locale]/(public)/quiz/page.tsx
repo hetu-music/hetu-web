@@ -1,5 +1,9 @@
 import QuizClient from "@/components/quiz/QuizClient";
-import { getQuizPoolSize, getQuizQuestions } from "@/lib/server/service-quiz";
+import {
+  getQuizPoolSize,
+  getQuizQuestions,
+  getQuizResultGlyphs,
+} from "@/lib/server/service-quiz";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/constants";
@@ -50,7 +54,13 @@ export default async function QuizPage({ params }: Props) {
   const questions = getQuizQuestions(locale);
   const poolSize = await getQuizPoolSize();
 
-  return <QuizClient questions={questions} poolSize={poolSize} />;
+  return (
+    <QuizClient
+      questions={questions}
+      resultGlyphs={getQuizResultGlyphs(locale)}
+      poolSize={poolSize}
+    />
+  );
 }
 
 export const revalidate = 7200;

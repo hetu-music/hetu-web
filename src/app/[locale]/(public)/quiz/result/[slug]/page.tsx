@@ -5,23 +5,14 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 
 type Props = {
-  params: Promise<{ locale: string }>;
-  searchParams: Promise<{ a?: string | string[] }>;
+  params: Promise<{ locale: string; slug: string }>;
 };
 
-function readCode(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-export async function generateMetadata({
-  params,
-  searchParams,
-}: Props): Promise<Metadata> {
-  const { locale } = await params;
-  const code = readCode((await searchParams).a);
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale, slug } = await params;
   const t = await getTranslations({ locale, namespace: "quiz" });
   const tSite = await getTranslations({ locale, namespace: "common" });
-  const result = await getQuizResult(code, locale);
+  const result = await getQuizResult(slug, locale);
   const title = result ? `${result.persona.motto} · ${t("title")}` : t("title");
   const description = result
     ? t("resultMetaDescription", { motto: result.persona.motto })
@@ -41,11 +32,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function QuizResultPage({ params, searchParams }: Props) {
-  const { locale } = await params;
+export default async function QuizResultPage({ params }: Props) {
+  const { locale, slug } = await params;
   setRequestLocale(locale);
-  const code = readCode((await searchParams).a);
-  const result = await getQuizResult(code, locale);
+  const result = await getQuizResult(slug, locale);
   if (!result) {
     redirect({ href: "/quiz", locale });
     return null;

@@ -2,6 +2,7 @@
 
 import CoverArt from "@/components/library/CoverArt";
 import EnqueueButton from "@/components/shared/EnqueueButton";
+import FavoriteButton from "@/components/shared/FavoriteButton";
 import PlayButton from "@/components/shared/PlayButton";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { Link } from "@/i18n/navigation";
@@ -11,6 +12,7 @@ import { motion } from "framer-motion";
 import { ImageIcon, RotateCcw, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import QuizSaveButton from "./QuizSaveButton";
 import QuizShareSheet from "./QuizShareSheet";
 
 interface Props {
@@ -18,6 +20,9 @@ interface Props {
 }
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+/** 页尾的再寻、分享、保存 */
+const ACTION_CLASS =
+  "flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259] disabled:opacity-40";
 /** 倾向条的满格对应的 z 分数 */
 const Z_RANGE = 2.5;
 
@@ -38,6 +43,9 @@ export default function QuizResultClient({ result }: Props) {
   // 顶栏的分享和页尾的按钮都打开分享图面板，链接复制也收在面板里
   const [sharing, setSharing] = useState(false);
   const share = () => setSharing(true);
+  // 在本页保存后，分享用记录的链接；保存按钮就地变成「已保存」
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const slug = savedId ?? result.slug;
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
@@ -208,6 +216,12 @@ export default function QuizResultClient({ result }: Props) {
                         hasAudio={song.has_audio}
                         className="rounded-full border border-slate-200 p-1.5 dark:border-slate-700"
                       />
+                      <FavoriteButton
+                        songId={song.id}
+                        variant="inline"
+                        showForGuest
+                        className="rounded-full border border-slate-200 p-1.5 dark:border-slate-700"
+                      />
                     </div>
                   </div>
                 </motion.li>
@@ -221,20 +235,21 @@ export default function QuizResultClient({ result }: Props) {
           {...fadeUp(1)}
           className="mt-16 flex flex-wrap items-center justify-center gap-4"
         >
-          <Link
-            href="/quiz"
-            className="flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
-          >
+          <Link href="/quiz" className={ACTION_CLASS}>
             <RotateCcw size={14} />
             {t("result.retry")}
           </Link>
-          <button
-            onClick={share}
-            className="flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
-          >
+          <button onClick={share} className={ACTION_CLASS}>
             <ImageIcon size={14} />
             {t("result.share")}
           </button>
+          {!result.savedAt && (
+            <QuizSaveButton
+              slug={result.slug}
+              className={ACTION_CLASS}
+              onSaved={setSavedId}
+            />
+          )}
         </motion.div>
 
         <p className="mt-10 text-center font-serif text-xs tracking-wider text-slate-400 dark:text-slate-600">
@@ -245,7 +260,7 @@ export default function QuizResultClient({ result }: Props) {
       <QuizShareSheet
         open={sharing}
         onOpenChange={setSharing}
-        result={result}
+        result={{ ...result, slug }}
       />
     </div>
   );

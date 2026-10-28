@@ -32,10 +32,11 @@ export type ShareCardInput = {
     lyric: string | null;
   }>;
   siteName: string;
-  scanHint: string;
+  /** 落款下的一句话 */
+  tagline: string;
   /** 二维码指向的地址 */
   qrUrl: string;
-  /** 印在二维码旁边给人看的地址，不带协议 */
+  /** 印在二维码旁边给人看的地址，只写域名 */
   displayUrl: string;
 };
 
@@ -94,7 +95,10 @@ const MAX_HEIGHT = 3200;
 const QR_SIZE = 140;
 /** 深色卡片上二维码浅底的留边 */
 const QR_TILE_PAD = 10;
-const COVER_SIZE = 148;
+/** 契合歌曲每行的高度：歌名、歌词与契合度都按它排 */
+const ROW_HEIGHT = 148;
+/** 封面比行高小一圈，与行的顶边对齐（同结果页） */
+const COVER_SIZE = 124;
 /** 字体或封面不可用时继续出图，避免分享面板一直等待网络。 */
 const ASSET_TIMEOUT_MS = 8_000;
 
@@ -146,7 +150,7 @@ async function loadFonts(fonts: Fonts, input: ShareCardInput): Promise<Fonts> {
     serif: serifText,
     kaiti:
       input.description +
-      input.scanHint +
+      input.tagline +
       input.matches.map((m) => m.lyric ?? "").join(""),
     calligraphy: input.motto + input.imagery.join(""),
     sans: sansText,
@@ -323,16 +327,17 @@ function drawDimensionBars(
   if (dims.length === 0) return top;
   const columnGap = 48;
   const columnW = (width - (columns - 1) * columnGap) / columns;
-  const labelW = 84;
+  const labelW = 72;
   const trackW = columnW - labelW;
   dims.forEach((d, i) => {
     const x = left + (i % columns) * (columnW + columnGap);
     const y = top + Math.floor(i / columns) * rowH + 16;
     ctx.textAlign = "left";
-    ctx.font = `400 32px ${fonts.serif}`;
+    // 维度名只是条的标签，与各栏小标题同一字号，不和条抢
+    ctx.font = `400 26px ${fonts.serif}`;
     ctx.fillStyle = colors.body;
     setSpacing(ctx, 4);
-    ctx.fillText(d.label, x, y + 11);
+    ctx.fillText(d.label, x, y + 9);
     setSpacing(ctx, 0);
     const trackLeft = x + labelW;
     const center = trackLeft + trackW / 2;
@@ -356,10 +361,6 @@ function drawDimensionBars(
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = colors.meta;
-    ctx.globalAlpha = 0.5;
-    ctx.fillRect(center - 0.5, y - 9, 1, 18);
-    ctx.globalAlpha = 1;
   });
   return top + (Math.ceil(dims.length / columns) - 1) * rowH + 32;
 }
@@ -451,7 +452,7 @@ function drawImageryRows(
   return top + rows.length * lineH;
 }
 
-/** 左侧留给意象题字，右侧九项一列；较高的一栏决定整节高度。 */
+/** 左侧意象题字，右侧九项一列，右栏略宽；较高的一栏决定整节高度。 */
 function drawSplitProfile(
   ctx: CanvasRenderingContext2D,
   input: ShareCardInput,
@@ -462,8 +463,9 @@ function drawSplitProfile(
   if (input.imagery.length === 0 || input.dimensions.length === 0) {
     return drawStackedProfile(ctx, input, top, colors, fonts, (base) => base);
   }
-  const leftW = 320;
   const columnGap = 64;
+  // 右栏只宽一点：宽太多，九道条连成一大块，压过左边的几个题字
+  const leftW = 372;
   const rightX = PAD + leftW + columnGap;
   const rightW = INNER - leftW - columnGap;
   // 九个起每行容纳三词；四个汉字加两处间距仍放得下「江河」所在的一行。
@@ -473,7 +475,7 @@ function drawSplitProfile(
   ctx.font = `400 ${size}px ${fonts.calligraphy}`;
   const rows = imageryRows(ctx, input.imagery, leftW, dense ? 3 : 2, gap);
   const imageryH = rows.length * (size + 24);
-  const rowH = 44;
+  const rowH = 40;
   const barsH = (input.dimensions.length - 1) * rowH + 32;
   const contentH = Math.max(imageryH, barsH);
 
@@ -671,7 +673,7 @@ function drawCard(
     // 行距每处单独取，量高度时每一处的权重才都算得上
     let top = y;
     input.matches.forEach((match, i) => {
-      if (i > 0) top += COVER_SIZE + flex(28, 0.5);
+      if (i > 0) top += ROW_HEIGHT + flex(28, 0.5);
       const cover = covers[i];
       ctx.save();
       ctx.beginPath();
@@ -722,7 +724,7 @@ function drawCard(
         ctx.fillText(truncate(ctx, match.meta, textMax), textLeft, top + 118);
       }
     });
-    y = top + COVER_SIZE;
+    y = top + ROW_HEIGHT;
   }
 
   // ── 落款与二维码 ──
@@ -741,7 +743,7 @@ function drawCard(
   setSpacing(ctx, 0);
   ctx.font = `400 26px ${fonts.kaiti}`;
   ctx.fillStyle = colors.body;
-  ctx.fillText(input.scanHint, PAD, y + 84);
+  ctx.fillText(input.tagline, PAD, y + 84);
   ctx.font = `400 20px ${fonts.sans}`;
   ctx.fillStyle = colors.meta;
   setSpacing(ctx, 2);

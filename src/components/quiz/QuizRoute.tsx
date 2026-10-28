@@ -16,12 +16,10 @@ interface Props {
   /** 画布（整页）尺寸 */
   width: number;
   height: number;
-  /** 启程页文字区域，路线绕着它走 */
+  /** 启程页文字区域：站点和站名避开它，线可以从文字后面穿过 */
   content: Box;
-  /** 已启程：路线收成顶部的进度线 */
+  /** 已启程：路线收进顶部进度条的位置，随后淡出 */
   departed: boolean;
-  /** 当前走到第几站（0 起） */
-  current: number;
   /** 悬停「启程」时，起点微微亮起 */
   ready: boolean;
 }
@@ -31,117 +29,210 @@ interface Point {
   y: number;
 }
 
+/** 路线的途经点，按画面比例给出；station 为站序，其余点只用来塑形 */
+interface Waypoint {
+  x: number;
+  y: number;
+  station?: number;
+}
+
 const EASE = [0.16, 1, 0.3, 1] as const;
-const NAV_H = 80;
-/** 与 main 的 max-w-2xl px-6 pt-32 对齐：进度线就画在原进度条的位置 */
+/** 与 main 的 max-w-2xl px-6 pt-32 对齐：收拢后正好落在进度条上 */
 const MAIN_MAX_W = 672;
 const MAIN_PAD_X = 24;
 const BAR_Y = 128.5;
+/** 相邻两站之间再细分几段三次曲线，变形成直线时才平滑 */
+const SUB = 4;
+
+/**
+ * 宽屏：从左下出发，沿左侧上行，到歧路后转向，从「寻曲」背后斜穿过去，
+ * 登上右上的山行，沿右侧下来，在回望处打一个圈，最后飘向下方的浮生。
+ */
+const WIDE: Waypoint[] = [
+  { x: 0.1, y: 0.86, station: 0 },
+  { x: 0.15, y: 0.68, station: 1 },
+  { x: 0.16, y: 0.48, station: 2 },
+  { x: 0.24, y: 0.28, station: 3 },
+  { x: 0.34, y: 0.23 },
+  { x: 0.45, y: 0.33 },
+  { x: 0.57, y: 0.47 },
+  { x: 0.68, y: 0.55, station: 4 },
+  { x: 0.76, y: 0.42, station: 5 },
+  { x: 0.8, y: 0.23, station: 6 },
+  { x: 0.87, y: 0.19 },
+  { x: 0.91, y: 0.33, station: 7 },
+  { x: 0.89, y: 0.5, station: 8 },
+  { x: 0.83, y: 0.64, station: 9 },
+  { x: 0.79, y: 0.73 },
+  { x: 0.745, y: 0.775 },
+  { x: 0.715, y: 0.73, station: 10 },
+  { x: 0.74, y: 0.695 },
+  { x: 0.765, y: 0.74 },
+  { x: 0.75, y: 0.82 },
+  { x: 0.71, y: 0.9, station: 11 },
+];
+
+/**
+ * 窄屏：沿左侧上行，从「寻曲」背后横穿到右侧，绕上顶部，
+ * 在顶上打一个圈回望，最后向左上飘去。
+ */
+const NARROW: Waypoint[] = [
+  { x: 0.16, y: 0.92, station: 0 },
+  { x: 0.07, y: 0.79, station: 1 },
+  { x: 0.05, y: 0.64, station: 2 },
+  { x: 0.08, y: 0.47, station: 3 },
+  { x: 0.3, y: 0.44 },
+  { x: 0.7, y: 0.39 },
+  { x: 0.94, y: 0.36, station: 4 },
+  { x: 0.92, y: 0.24, station: 5 },
+  { x: 0.8, y: 0.16, station: 6 },
+  { x: 0.64, y: 0.13, station: 7 },
+  { x: 0.52, y: 0.155, station: 8 },
+  { x: 0.46, y: 0.215, station: 9 },
+  { x: 0.39, y: 0.255 },
+  { x: 0.31, y: 0.25 },
+  { x: 0.275, y: 0.21, station: 10 },
+  { x: 0.31, y: 0.175 },
+  { x: 0.37, y: 0.195 },
+  { x: 0.36, y: 0.25 },
+  { x: 0.25, y: 0.285 },
+  { x: 0.09, y: 0.24, station: 11 },
+];
 
 const f = (n: number) => n.toFixed(1);
 
-/** 超椭圆上的一点；n 越大越方 */
-function superellipse(
-  cx: number,
-  cy: number,
-  rx: number,
-  ry: number,
-  n: number,
-  theta: number,
-): Point {
-  const c = Math.cos(theta);
-  const s = Math.sin(theta);
-  const e = 2 / n;
+/** 向心 Catmull-Rom：过每个途经点，转弯处不会打结 */
+function catmullRom(points: Point[], perSegment: number): Point[] {
+  const ext = [
+    {
+      x: 2 * points[0].x - points[1].x,
+      y: 2 * points[0].y - points[1].y,
+    },
+    ...points,
+    {
+      x: 2 * points[points.length - 1].x - points[points.length - 2].x,
+      y: 2 * points[points.length - 1].y - points[points.length - 2].y,
+    },
+  ];
+  const knot = (a: Point, b: Point) =>
+    Math.max(1e-4, Math.hypot(b.x - a.x, b.y - a.y) ** 0.5);
+  const lerp = (a: Point, b: Point, ta: number, tb: number, t: number) => {
+    const u = (t - ta) / (tb - ta);
+    return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+  };
+  const out: Point[] = [points[0]];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const [p0, p1, p2, p3] = ext.slice(i, i + 4);
+    const t0 = 0;
+    const t1 = t0 + knot(p0, p1);
+    const t2 = t1 + knot(p1, p2);
+    const t3 = t2 + knot(p2, p3);
+    for (let s = 1; s <= perSegment; s += 1) {
+      const t = t1 + ((t2 - t1) * s) / perSegment;
+      const a1 = lerp(p0, p1, t0, t1, t);
+      const a2 = lerp(p1, p2, t1, t2, t);
+      const a3 = lerp(p2, p3, t2, t3, t);
+      const b1 = lerp(a1, a2, t0, t2, t);
+      const b2 = lerp(a2, a3, t1, t3, t);
+      out.push(lerp(b1, b2, t1, t2, t));
+    }
+  }
+  return out;
+}
+
+interface Route {
+  /** 整条路线：SUB × 段数 条三次曲线 */
+  d: string;
+  stations: Point[];
+  /** 各站处的单位切向 */
+  tangents: Point[];
+}
+
+/** 按途经点画出路线，并在相邻两站之间等弧长细分成三次曲线 */
+function buildRoute(waypoints: Waypoint[], width: number, height: number) {
+  const span = Math.min(width, 1600);
+  const pts = waypoints.map((w) => ({
+    x: width / 2 + (w.x - 0.5) * span,
+    y: w.y * height,
+  }));
+  const PER = 24;
+  const dense = catmullRom(pts, PER);
+  const lengths = [0];
+  for (let i = 1; i < dense.length; i += 1) {
+    lengths.push(
+      lengths[i - 1] +
+        Math.hypot(dense[i].x - dense[i - 1].x, dense[i].y - dense[i - 1].y),
+    );
+  }
+  const at = (s: number) => {
+    let j = 0;
+    while (j < dense.length - 2 && lengths[j + 1] < s) j += 1;
+    const a = dense[j];
+    const b = dense[j + 1];
+    const len = lengths[j + 1] - lengths[j] || 1;
+    const u = Math.min(1, Math.max(0, (s - lengths[j]) / len));
+    return {
+      p: { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u },
+      t: { x: (b.x - a.x) / len, y: (b.y - a.y) / len },
+    };
+  };
+  const stationArcs = waypoints.flatMap((w, i) =>
+    w.station === undefined ? [] : [lengths[i * PER]],
+  );
+
+  const parts: string[] = [];
+  const stations: Point[] = [];
+  const tangents: Point[] = [];
+  for (let k = 0; k < stationArcs.length; k += 1) {
+    const here = at(stationArcs[k]);
+    stations.push(here.p);
+    tangents.push(here.t);
+    if (k === stationArcs.length - 1) break;
+    for (let q = 0; q < SUB; q += 1) {
+      const s0 =
+        stationArcs[k] + ((stationArcs[k + 1] - stationArcs[k]) * q) / SUB;
+      const s1 =
+        stationArcs[k] +
+        ((stationArcs[k + 1] - stationArcs[k]) * (q + 1)) / SUB;
+      const a = at(s0);
+      const b = at(s1);
+      const h = (s1 - s0) / 3;
+      if (parts.length === 0) parts.push(`M ${f(a.p.x)} ${f(a.p.y)}`);
+      parts.push(
+        `C ${f(a.p.x + a.t.x * h)} ${f(a.p.y + a.t.y * h)} ${f(b.p.x - b.t.x * h)} ${f(b.p.y - b.t.y * h)} ${f(b.p.x)} ${f(b.p.y)}`,
+      );
+    }
+  }
+  return { d: parts.join(" "), stations, tangents } satisfies Route;
+}
+
+/** 同样结构的直线：收拢时逐段变形到进度条上 */
+function buildBar(count: number, width: number) {
+  const mainW = Math.min(width, MAIN_MAX_W);
+  const barL = (width - mainW) / 2 + MAIN_PAD_X;
+  const barW = mainW - MAIN_PAD_X * 2;
+  const pieces = (count - 1) * SUB;
+  const x = (i: number) => barL + (barW * i) / pieces;
+  const parts = [`M ${f(x(0))} ${f(BAR_Y)}`];
+  for (let i = 0; i < pieces; i += 1) {
+    const a = x(i);
+    const b = x(i + 1);
+    const h = (b - a) / 3;
+    parts.push(
+      `C ${f(a + h)} ${f(BAR_Y)} ${f(b - h)} ${f(BAR_Y)} ${f(b)} ${f(BAR_Y)}`,
+    );
+  }
   return {
-    x: cx + rx * Math.sign(c) * Math.abs(c) ** e,
-    y: cy + ry * Math.sign(s) * Math.abs(s) ** e,
+    d: parts.join(" "),
+    stations: Array.from({ length: count }, (_, k) => ({
+      x: x(k * SUB),
+      y: BAR_Y,
+    })),
   };
 }
 
-/**
- * 启程页上的路线：从左下出发，绕过标题上方，到右下结束。
- * 站点按弧长等距取在一条超椭圆上，带一点不对称的起伏，免得像个画框。
- */
-function loopStations(
-  count: number,
-  width: number,
-  content: Box,
-): { points: Point[]; center: Point; radii: Point } {
-  const narrow = width < 640;
-  const mx = narrow ? 0 : Math.min(320, width * 0.18);
-  const edge = narrow ? 14 : 32;
-  const left = Math.max(edge, content.left - mx);
-  const right = Math.min(width - edge, content.right + mx);
-  const top = Math.max(NAV_H + (narrow ? 40 : 56), content.top - 90);
-  const cx = (left + right) / 2;
-  const rx = (right - left) / 2;
-  // 圆心放在文字中线略下，让两端落到按钮下方
-  const cy = content.top + (content.bottom - content.top) * 0.62;
-  const ry = cy - top;
-  const n = narrow ? 3.4 : 2.1;
-
-  // 起点在左下，终点停在右侧偏下：不对称，免得像一道门
-  const from = (136 * Math.PI) / 180;
-  const to = (392 * Math.PI) / 180;
-  const samples: Point[] = [];
-  const lengths: number[] = [0];
-  const steps = 600;
-  for (let i = 0; i <= steps; i += 1) {
-    const theta = from + ((to - from) * i) / steps;
-    const p = superellipse(cx, cy, rx, ry, n, theta);
-    // 缓缓的起伏，像远处的山脊
-    const wobble = 1 + (narrow ? 0.015 : 0.04) * Math.sin(3 * theta + 0.6);
-    const q = { x: cx + (p.x - cx) * wobble, y: cy + (p.y - cy) * wobble };
-    if (i > 0) {
-      const prev = samples[i - 1];
-      lengths.push(lengths[i - 1] + Math.hypot(q.x - prev.x, q.y - prev.y));
-    }
-    samples.push(q);
-  }
-  const total = lengths[steps];
-  const points: Point[] = [];
-  let j = 0;
-  for (let k = 0; k < count; k += 1) {
-    const target = (total * k) / (count - 1);
-    while (j < steps && lengths[j + 1] < target) j += 1;
-    const span = lengths[j + 1] - lengths[j] || 1;
-    const t = Math.min(1, (target - lengths[j]) / span);
-    const a = samples[j];
-    const b = samples[Math.min(steps, j + 1)];
-    points.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
-  }
-  return { points, center: { x: cx, y: cy }, radii: { x: rx, y: ry } };
-}
-
-/** 过各站的平滑曲线（Catmull-Rom 转三次贝塞尔），每段一条 path，方便逐段着色与变形 */
-function catmullSegments(points: Point[]): string[] {
-  const segs: string[] = [];
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(points.length - 1, i + 2)];
-    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
-    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
-    segs.push(
-      `M ${f(p1.x)} ${f(p1.y)} C ${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(p2.x)} ${f(p2.y)}`,
-    );
-  }
-  return segs;
-}
-
-function lineSegments(points: Point[]): string[] {
-  const segs: string[] = [];
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const a = points[i];
-    const b = points[i + 1];
-    const dx = (b.x - a.x) / 3;
-    segs.push(
-      `M ${f(a.x)} ${f(a.y)} C ${f(a.x + dx)} ${f(a.y)} ${f(b.x - dx)} ${f(b.y)} ${f(b.x)} ${f(b.y)}`,
-    );
-  }
-  return segs;
-}
+const intersects = (a: Box, b: Box) =>
+  a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
 export default function QuizRoute({
   stations,
@@ -149,71 +240,67 @@ export default function QuizRoute({
   height,
   content,
   departed,
-  current,
   ready,
 }: Props) {
   const reduce = useReducedMotion();
   const count = stations.length;
-
-  const loop = useMemo(
-    () => loopStations(count, width, content),
-    [count, width, content],
-  );
-  const loopSegs = useMemo(() => catmullSegments(loop.points), [loop]);
-
-  const line = useMemo(() => {
-    const mainW = Math.min(width, MAIN_MAX_W);
-    const barL = (width - mainW) / 2 + MAIN_PAD_X;
-    const barW = mainW - MAIN_PAD_X * 2;
-    return Array.from({ length: count }, (_, k) => ({
-      x: barL + (barW * k) / (count - 1),
-      y: BAR_Y,
-    }));
-  }, [count, width]);
-  const lineSegs = useMemo(() => lineSegments(line), [line]);
-
   const narrow = width < 640;
-  // 站名放在路线外侧；窄屏两侧没有余地，只标首尾和顶上几站
-  const labels = loop.points.map((p, k) => {
-    const nx = (p.x - loop.center.x) / loop.radii.x ** 2;
-    const ny = (p.y - loop.center.y) / loop.radii.y ** 2;
-    const len = Math.hypot(nx, ny) || 1;
-    const ux = nx / len;
-    const uy = ny / len;
-    const sideways = Math.abs(ux) > 0.4;
-    if (narrow && sideways) {
-      // 窄屏首尾站名放在点的正下方，其余侧边站不标
-      return {
-        x: p.x,
-        y: p.y + 10,
-        anchor: "middle" as const,
-        baseline: "hanging" as const,
-        hidden: k !== 0 && k !== count - 1,
-      };
-    }
-    const gap = 14;
-    return {
-      x: p.x + ux * gap,
-      y: p.y + uy * gap,
-      anchor:
-        ux > 0.4
-          ? ("start" as const)
-          : ux < -0.4
-            ? ("end" as const)
-            : ("middle" as const),
-      baseline:
-        uy < -0.4
-          ? ("auto" as const)
-          : uy > 0.4
-            ? ("hanging" as const)
-            : ("central" as const),
-      hidden: false,
-    };
-  });
 
-  const segs = departed ? lineSegs : loopSegs;
-  const points = departed ? line : loop.points;
+  const route = useMemo(
+    () => buildRoute(narrow ? NARROW : WIDE, width, height),
+    [narrow, width, height],
+  );
+  const bar = useMemo(() => buildBar(count, width), [count, width]);
+
+  // 站名放在切线的法向一侧，朝远离文字中心的方向；和文字区域重叠的站名不显示
+  const labels = useMemo(() => {
+    const cx = (content.left + content.right) / 2;
+    const cy = (content.top + content.bottom) / 2;
+    const guard: Box = {
+      left: content.left - 8,
+      top: content.top - 8,
+      right: content.right + 8,
+      bottom: content.bottom + 8,
+    };
+    return route.stations.map((p, k) => {
+      const t = route.tangents[k];
+      let nx = -t.y;
+      let ny = t.x;
+      if (nx * (p.x - cx) + ny * (p.y - cy) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      const gap = 12;
+      const x = p.x + nx * gap;
+      const y = p.y + ny * gap;
+      const anchor =
+        nx > 0.45
+          ? ("start" as const)
+          : nx < -0.45
+            ? ("end" as const)
+            : ("middle" as const);
+      const baseline =
+        ny < -0.45
+          ? ("auto" as const)
+          : ny > 0.45
+            ? ("hanging" as const)
+            : ("central" as const);
+      const w = stations[k].length * 16;
+      const left =
+        anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      const top =
+        baseline === "auto" ? y - 14 : baseline === "hanging" ? y : y - 7;
+      const rect = { left, top, right: left + w, bottom: top + 14 };
+      const hidden =
+        intersects(rect, guard) || rect.left < 4 || rect.right > width - 4;
+      return { x, y, anchor, baseline, hidden };
+    });
+  }, [route, content, stations, width]);
+
+  const points = departed ? bar.stations : route.stations;
   const morph = { duration: reduce ? 0 : 0.9, ease: EASE };
+  /** 整条线画完所需时间 */
+  const drawDuration = 2.4;
 
   return (
     <svg
@@ -222,113 +309,142 @@ export default function QuizRoute({
       height={height}
       className="pointer-events-none absolute inset-0 overflow-visible"
     >
-      {segs.map((d, k) => {
-        const reached = departed && k < current;
-        return (
+      <motion.g
+        initial={false}
+        animate={{ opacity: departed ? 0 : 1 }}
+        transition={{
+          duration: departed ? 0.3 : 0.2,
+          delay: departed && !reduce ? 0.75 : 0,
+        }}
+      >
+        <motion.path
+          fill="none"
+          strokeWidth={1}
+          strokeLinecap="round"
+          className={
+            departed
+              ? "stroke-slate-200 dark:stroke-slate-800"
+              : "stroke-[#9A6B2F]/35 dark:stroke-[#D4A259]/30"
+          }
+          initial={reduce ? false : { pathLength: 0, d: route.d }}
+          animate={{ pathLength: 1, d: departed ? bar.d : route.d }}
+          transition={{
+            pathLength: {
+              duration: drawDuration,
+              delay: 0.4,
+              ease: "easeInOut",
+            },
+            d: morph,
+          }}
+        />
+
+        {/* 一点光沿路线缓缓走过 */}
+        {!departed && !reduce && (
           <motion.path
-            key={k}
+            d={route.d}
             fill="none"
-            strokeWidth={1}
+            strokeWidth={1.5}
             strokeLinecap="round"
-            className={
-              reached
-                ? "stroke-[#9A6B2F] dark:stroke-[#D4A259]"
-                : departed
-                  ? "stroke-slate-200 dark:stroke-slate-800"
-                  : "stroke-[#9A6B2F]/35 dark:stroke-[#D4A259]/30"
-            }
-            initial={reduce ? false : { pathLength: 0, d }}
-            animate={{ pathLength: 1, d }}
+            pathLength={1}
+            strokeDasharray="0.04 1"
+            className="stroke-[#9A6B2F] dark:stroke-[#D4A259]"
+            initial={{ strokeDashoffset: 0.04, opacity: 0 }}
+            animate={{ strokeDashoffset: -1, opacity: [0, 0.9, 0.9, 0] }}
             transition={{
-              pathLength: {
-                duration: 0.32,
-                delay: 0.5 + k * 0.16,
-                ease: "linear",
+              duration: 10,
+              delay: drawDuration + 0.8,
+              repeat: Infinity,
+              repeatDelay: 3,
+              ease: "easeInOut",
+              opacity: {
+                duration: 10,
+                delay: drawDuration + 0.8,
+                repeat: Infinity,
+                repeatDelay: 3,
+                times: [0, 0.08, 0.92, 1],
               },
-              d: morph,
             }}
           />
-        );
-      })}
+        )}
 
-      {points.map((p, k) => {
-        const lit = departed ? k <= current : k === 0;
-        return (
+        {points.map((p, k) => (
           <motion.circle
             key={k}
             strokeWidth={1}
             className={
-              lit
+              k === 0
                 ? "fill-[#9A6B2F] stroke-[#9A6B2F] dark:fill-[#D4A259] dark:stroke-[#D4A259]"
-                : departed
-                  ? "fill-[#FAFAFA] stroke-slate-300 dark:fill-[#0B0F19] dark:stroke-slate-700"
-                  : "fill-[#FAFAFA] stroke-[#9A6B2F]/45 dark:fill-[#0B0F19] dark:stroke-[#D4A259]/40"
+                : "fill-[#FAFAFA] stroke-[#9A6B2F]/45 dark:fill-[#0B0F19] dark:stroke-[#D4A259]/40"
             }
             initial={reduce ? false : { opacity: 0, cx: p.x, cy: p.y, r: 2.5 }}
-            animate={{
-              opacity: 1,
-              cx: p.x,
-              cy: p.y,
-              r: departed ? (k === current ? 2.5 : 1.5) : 2.5,
-            }}
+            animate={{ opacity: 1, cx: p.x, cy: p.y, r: departed ? 0 : 2.5 }}
             transition={{
-              opacity: { duration: 0.4, delay: 0.5 + k * 0.16 },
+              opacity: {
+                duration: 0.4,
+                delay: 0.4 + (drawDuration * k) / (count - 1),
+              },
               cx: morph,
               cy: morph,
               r: morph,
             }}
           />
-        );
-      })}
+        ))}
 
-      {/* 起点的呼吸光晕：悬停「启程」时更明显 */}
-      {!departed && (
-        <motion.circle
-          cx={loop.points[0].x}
-          cy={loop.points[0].y}
-          className="fill-none stroke-[#9A6B2F] dark:stroke-[#D4A259]"
-          strokeWidth={1}
-          initial={{ r: 2.5, opacity: 0 }}
-          animate={
-            reduce
-              ? { r: 6, opacity: ready ? 0.6 : 0.25 }
-              : { r: [2.5, ready ? 11 : 8], opacity: [ready ? 0.8 : 0.45, 0] }
-          }
-          transition={{
-            duration: ready ? 1.2 : 2.4,
-            repeat: reduce ? 0 : Infinity,
-            ease: "easeOut",
-            delay: reduce ? 0 : 0.6,
-          }}
-        />
-      )}
-
-      {stations.map((name, k) => {
-        const l = labels[k];
-        if (l.hidden) return null;
-        return (
-          <motion.text
-            key={name}
-            x={l.x}
-            y={l.y}
-            textAnchor={l.anchor}
-            dominantBaseline={l.baseline}
-            className={
-              k === 0
-                ? "fill-[#9A6B2F] font-serif text-[11px] tracking-[0.2em] md:text-xs dark:fill-[#D4A259]"
-                : "fill-slate-400 font-serif text-[11px] tracking-[0.2em] md:text-xs dark:fill-slate-600"
+        {/* 起点的呼吸光晕：悬停「启程」时更明显 */}
+        {!departed && (
+          <motion.circle
+            cx={route.stations[0].x}
+            cy={route.stations[0].y}
+            className="fill-none stroke-[#9A6B2F] dark:stroke-[#D4A259]"
+            strokeWidth={1}
+            initial={{ r: 2.5, opacity: 0 }}
+            animate={
+              reduce
+                ? { r: 6, opacity: ready ? 0.6 : 0.25 }
+                : {
+                    r: [2.5, ready ? 11 : 8],
+                    opacity: [ready ? 0.8 : 0.45, 0],
+                  }
             }
-            initial={reduce ? false : { opacity: 0 }}
-            animate={{ opacity: departed ? 0 : 1 }}
             transition={{
-              duration: departed ? 0.25 : 0.6,
-              delay: departed || reduce ? 0 : 0.6 + k * 0.16,
+              duration: ready ? 1.2 : 2.4,
+              repeat: reduce ? 0 : Infinity,
+              ease: "easeOut",
+              delay: reduce ? 0 : 0.6,
             }}
-          >
-            {name}
-          </motion.text>
-        );
-      })}
+          />
+        )}
+
+        {stations.map((name, k) => {
+          const l = labels[k];
+          if (l.hidden) return null;
+          return (
+            <motion.text
+              key={name}
+              x={l.x}
+              y={l.y}
+              textAnchor={l.anchor}
+              dominantBaseline={l.baseline}
+              className={
+                k === 0
+                  ? "fill-[#9A6B2F] font-serif text-[11px] tracking-[0.2em] md:text-xs dark:fill-[#D4A259]"
+                  : "fill-slate-400 font-serif text-[11px] tracking-[0.2em] md:text-xs dark:fill-slate-600"
+              }
+              initial={reduce ? false : { opacity: 0 }}
+              animate={{ opacity: departed ? 0 : 1 }}
+              transition={{
+                duration: departed ? 0.25 : 0.6,
+                delay:
+                  departed || reduce
+                    ? 0
+                    : 0.5 + (drawDuration * k) / (count - 1),
+              }}
+            >
+              {name}
+            </motion.text>
+          );
+        })}
+      </motion.g>
     </svg>
   );
 }

@@ -27,6 +27,9 @@ vi.mock("@/components/shared/topbar/TopBar", () => ({
 vi.mock("./QuizRoute", () => ({
   default: () => null,
 }));
+vi.mock("./QuizItinerary", () => ({
+  default: () => null,
+}));
 vi.stubGlobal(
   "ResizeObserver",
   class {

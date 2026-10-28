@@ -4,13 +4,20 @@ import TopBar from "@/components/shared/topbar/TopBar";
 import { useRouter } from "@/i18n/navigation";
 import { encodeResultSlug } from "@/lib/quiz/codec";
 import type { QuizQuestionView, QuizResultGlyphs } from "@/lib/quiz/views";
+import QuizItinerary from "./QuizItinerary";
 import QuizRoute, { type Box } from "./QuizRoute";
 import { preloadFontText } from "@/lib/utils/font-preload";
 import { cn } from "@/lib/utils/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 interface Props {
   questions: QuizQuestionView[];
@@ -20,6 +27,8 @@ interface Props {
 }
 
 type Stage = "intro" | "quiz" | "finishing";
+
+const noopSubscribe = () => () => undefined;
 
 /** 选中后停留多久再翻到下一问，让用户看清自己的选择 */
 const ADVANCE_DELAY_MS = 360;
@@ -52,33 +61,62 @@ export default function QuizClient({
   const [direction, setDirection] = useState(1);
   const advanceTimer = useRef<number | null>(null);
 
-  // 背景路线按整页尺寸和启程页文字区域布局
+  // 启程页背景：默认行程表，?bg=route 为穿过文字的路线（原型对比用）
+  const variant = useSyncExternalStore(
+    noopSubscribe,
+    () =>
+      new URLSearchParams(window.location.search).get("bg") === "route"
+        ? "route"
+        : "itinerary",
+    () => "itinerary",
+  );
+
+  // 背景按整页尺寸和启程页文字区域布局
   const pageRef = useRef<HTMLDivElement>(null);
   const [introEl, setIntroEl] = useState<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<{
     width: number;
     height: number;
     content: Box | null;
+    anchor: Box | null;
   } | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const page = pageRef.current;
     if (!page) return;
+    // 用 offset 而不是 getBoundingClientRect：入场动画的 transform 不影响测量
+    const boxOf = (el: HTMLElement): Box => {
+      let left = 0;
+      let top = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== page) {
+        left += node.offsetLeft;
+        top += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+      }
+      return {
+        left,
+        top,
+        right: left + el.offsetWidth,
+        bottom: top + el.offsetHeight,
+      };
+    };
     const measure = () => {
-      const pr = page.getBoundingClientRect();
       setLayout((prev) => {
         let content = prev?.content ?? null;
+        let anchor = prev?.anchor ?? null;
         if (introEl) {
-          const r = introEl.getBoundingClientRect();
-          content = {
-            left: r.left - pr.left,
-            top: r.top - pr.top,
-            right: r.right - pr.left,
-            bottom: r.bottom - pr.top,
-          };
+          content = boxOf(introEl);
+          const a = introEl.querySelector<HTMLElement>("[data-itinerary]");
+          if (a) anchor = boxOf(a);
         }
-        return { width: pr.width, height: pr.height, content };
+        return {
+          width: page.offsetWidth,
+          height: page.offsetHeight,
+          content,
+          anchor,
+        };
       });
     };
     measure();
@@ -86,7 +124,7 @@ export default function QuizClient({
     ro.observe(page);
     if (introEl) ro.observe(introEl);
     return () => ro.disconnect();
-  }, [introEl]);
+  }, [introEl, variant]);
 
   useEffect(
     () => () => {
@@ -217,14 +255,23 @@ export default function QuizClient({
     >
       <TopBar exit={{ kind: "logo" }} />
 
-      {layout?.content && (
+      {variant === "itinerary" && layout?.anchor && (
+        <QuizItinerary
+          stations={questions.map((q) => q.title)}
+          width={layout.width}
+          height={layout.height}
+          anchor={layout.anchor}
+          departed={stage !== "intro"}
+          ready={ready}
+        />
+      )}
+      {variant === "route" && layout?.content && (
         <QuizRoute
           stations={questions.map((q) => q.title)}
           width={layout.width}
           height={layout.height}
           content={layout.content}
           departed={stage !== "intro"}
-          current={index}
           ready={ready}
         />
       )}
@@ -260,6 +307,12 @@ export default function QuizClient({
                 <p className="mt-4 font-kaiti text-sm text-slate-400 dark:text-slate-500">
                   {t("intro.note")}
                 </p>
+                {variant === "itinerary" && (
+                  <div
+                    data-itinerary
+                    className="mt-14 h-16 w-[calc(100vw-3rem)] max-w-[39rem]"
+                  />
+                )}
                 <button
                   onClick={start}
                   onPointerEnter={() => setReady(true)}
@@ -267,7 +320,10 @@ export default function QuizClient({
                   onFocus={() => setReady(true)}
                   onBlur={() => setReady(false)}
                   disabled={poolSize === 0}
-                  className="group relative mt-16 border border-slate-300 px-12 py-3 pl-[calc(3rem+0.6em)] font-serif text-lg tracking-[0.6em] text-slate-700 transition-all duration-500 hover:border-[#9A6B2F] hover:text-[#9A6B2F] disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
+                  className={cn(
+                    "group relative border border-slate-300 px-12 py-3 pl-[calc(3rem+0.6em)] font-serif text-lg tracking-[0.6em] text-slate-700 transition-all duration-500 hover:border-[#9A6B2F] hover:text-[#9A6B2F] disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]",
+                    variant === "itinerary" ? "mt-10" : "mt-16",
+                  )}
                 >
                   {t("intro.start")}
                 </button>
@@ -283,9 +339,18 @@ export default function QuizClient({
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
               className="flex flex-1 flex-col"
             >
-              {/* 进度：线由背景路线收拢而成，这里只占位 */}
+              {/* 进度 */}
               <div className="mb-12">
-                <div className="h-px w-full" />
+                <div className="h-px w-full bg-slate-200 dark:bg-slate-800">
+                  <motion.div
+                    className="h-px bg-[#9A6B2F] dark:bg-[#D4A259]"
+                    initial={false}
+                    animate={{
+                      width: `${((index + 1) / questions.length) * 100}%`,
+                    }}
+                    transition={{ duration: 0.6, ease: EASE }}
+                  />
+                </div>
                 <p className="mt-3 font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
                   {t("question.progress", {
                     current: index + 1,

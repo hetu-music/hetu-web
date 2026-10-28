@@ -195,19 +195,22 @@ function LatestRecord({
           </h3>
           <ol className="mt-6 space-y-7">
             {result.matches.map(({ song, percent, reasons, lines }) => (
-              <li key={song.id} className="group flex items-start gap-4">
+              <li
+                key={song.id}
+                className="group flex items-start gap-4 sm:gap-5"
+              >
                 <Link
                   href={`/song/${song.id}`}
                   onClick={bumpNavDepth}
                   tabIndex={-1}
                   aria-hidden
-                  className="shrink-0 size-12 overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10"
+                  className="shrink-0 size-16 sm:size-20 overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10"
                 >
                   <Image
                     src={getCoverUrl(song)}
                     alt=""
-                    width={48}
-                    height={48}
+                    width={80}
+                    height={80}
                     className="w-full h-full object-cover grayscale-35 transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
                   />
                 </Link>

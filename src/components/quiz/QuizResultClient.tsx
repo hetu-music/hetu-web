@@ -43,10 +43,9 @@ export default function QuizResultClient({ result }: Props) {
   // 顶栏的分享和页尾的按钮都打开分享图面板，链接复制也收在面板里
   const [sharing, setSharing] = useState(false);
   const share = () => setSharing(true);
-  // 在本页保存后就地换成记录：分享用记录的链接，不再显示保存按钮
+  // 在本页保存后，分享用记录的链接；保存按钮就地变成「已保存」
   const [savedId, setSavedId] = useState<string | null>(null);
   const slug = savedId ?? result.slug;
-  const saved = savedId !== null || result.savedAt !== null;
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
@@ -244,7 +243,7 @@ export default function QuizResultClient({ result }: Props) {
             <ImageIcon size={14} />
             {t("result.share")}
           </button>
-          {!saved && (
+          {!result.savedAt && (
             <QuizSaveButton
               slug={result.slug}
               className={ACTION_CLASS}

@@ -115,6 +115,9 @@ describe("QuizSaveButton", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith("aB3dE6gH9k"));
     expect(window.location.pathname).toBe("/zh-CN/quiz/result/aB3dE6gH9k");
     expect(replace).not.toHaveBeenCalled();
+    // 就地变成「已保存」，不是链接
+    expect(screen.getByText("已保存").closest("a")).toBeNull();
+    expect(screen.queryByRole("button", { name: "保存" })).toBeNull();
     expect(push).not.toHaveBeenCalled();
     expect(apiRequest).toHaveBeenCalledWith(
       "/api/public/quiz-results",

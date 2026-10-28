@@ -7,6 +7,7 @@ import { Link } from "@/i18n/navigation";
 import { apiRequest } from "@/lib/api/request";
 import { savedMonth } from "@/lib/quiz/saved-month";
 import type { QuizRecordSummary } from "@/lib/quiz/views";
+import { cn } from "@/lib/utils/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -34,6 +35,8 @@ export default function QuizSaveButton({ slug, className, onSaved }: Props) {
   const goToLogin = useGoToLogin();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
+  // 在本页刚存下：就地变成「已保存」。地址栏已是这条记录，不再链到它
+  const [justSaved, setJustSaved] = useState(false);
 
   const { data, isPending } = useQuery({
     queryKey: ["quiz-records", user?.id ?? null, slug],
@@ -50,6 +53,15 @@ export default function QuizSaveButton({ slug, className, onSaved }: Props) {
   });
 
   if (!loaded) return null;
+
+  if (justSaved) {
+    return (
+      <span className={cn(className, "pointer-events-none")}>
+        <BookmarkCheck size={14} />
+        {t("saved")}
+      </span>
+    );
+  }
 
   if (!user) {
     return (
@@ -90,6 +102,7 @@ export default function QuizSaveButton({ slug, className, onSaved }: Props) {
         "",
         window.location.pathname.replace(/[^/]+$/, id),
       );
+      setJustSaved(true);
       onSaved(id);
     } catch (e) {
       addToast("error", e instanceof Error ? e.message : t("saveFailed"));

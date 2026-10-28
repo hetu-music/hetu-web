@@ -32,8 +32,7 @@
     "loginToSave": "登录后保存",
     "replaceHint": "已存满 {count} 次，再保存将替换 {year} 年 {month} 月的那一次",
     "savedToast": "已保存，可在个人中心的「我的气韵」里找到",
-    "saveFailed": "保存失败，请稍后重试",
-    "loginHint": "<login>登录</login>，把这次的气韵留在主页"
+    "saveFailed": "保存失败，请稍后重试"
   },
   "card": {
     "title": "分享图",

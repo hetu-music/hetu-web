@@ -125,23 +125,27 @@ function LatestRecord({
 
   return (
     <article className="mt-8 lg:mt-12">
-      <Link
-        href={href}
-        className="font-calligraphy text-5xl text-slate-900 dark:text-white hover:text-(--tone) dark:hover:text-(--tone) transition-colors"
-      >
-        {result.persona.motto}
-      </Link>
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        {result.secondary && (
-          <span className="font-serif tracking-[0.2em] text-(--tone)">
-            {t("secondary", { motto: result.secondary.motto })}
+      <div className="flex items-end justify-between gap-6">
+        <div className="min-w-0">
+          <Link
+            href={href}
+            className="font-calligraphy text-5xl text-slate-900 dark:text-white hover:text-(--tone) dark:hover:text-(--tone) transition-colors"
+          >
+            {result.persona.motto}
+          </Link>
+          {result.secondary && (
+            <p className="mt-4 font-serif text-xs tracking-[0.2em] text-(--tone)">
+              {t("secondary", { motto: result.secondary.motto })}
+            </p>
+          )}
+        </div>
+        {/* 日期在上、删除在下，与左侧的兼有一行对齐 */}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <span className="text-xs tracking-wider text-slate-400 dark:text-slate-500">
+            {t("savedAt", savedMonth(record.savedAt))}
           </span>
-        )}
-        <span className="tracking-wider text-slate-400 dark:text-slate-500">
-          {t("savedAt", savedMonth(record.savedAt))}
-        </span>
-        <span className="flex-1" />
-        <DeleteButton onDelete={onDelete} />
+          <DeleteButton onDelete={onDelete} />
+        </div>
       </div>
       <p className="mt-6 max-w-xl font-kaiti text-[15px] leading-[1.85] text-slate-600 dark:text-slate-400">
         {result.persona.description}
@@ -200,30 +204,55 @@ function LatestRecord({
           <h3 className="font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
             {t("matches")}
           </h3>
-          <ol className="mt-5 space-y-4">
-            {result.matches.map(({ song, percent }) => (
-              <li key={song.id}>
+          <ol className="mt-6 space-y-7">
+            {result.matches.map(({ song, percent, reasons, lines }) => (
+              <li key={song.id} className="group flex items-start gap-4">
                 <Link
                   href={`/song/${song.id}`}
                   onClick={bumpNavDepth}
-                  className="group flex items-center gap-4"
+                  tabIndex={-1}
+                  aria-hidden
+                  className="shrink-0 size-12 overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10"
                 >
-                  <span className="shrink-0 size-10 overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10">
-                    <Image
-                      src={getCoverUrl(song)}
-                      alt=""
-                      width={40}
-                      height={40}
-                      className="w-full h-full object-cover grayscale-35 transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
-                    />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-serif text-base text-slate-900 dark:text-slate-100 group-hover:text-(--tone) transition-colors">
-                    {song.title}
-                  </span>
-                  <span className="shrink-0 font-serif text-sm tabular-nums text-slate-400 dark:text-slate-500">
-                    {percent}%
-                  </span>
+                  <Image
+                    src={getCoverUrl(song)}
+                    alt=""
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-cover grayscale-35 transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
+                  />
                 </Link>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-4">
+                    <Link
+                      href={`/song/${song.id}`}
+                      onClick={bumpNavDepth}
+                      className="min-w-0 flex-1 truncate font-serif text-base text-slate-900 dark:text-slate-100 hover:text-(--tone) transition-colors"
+                    >
+                      {song.title}
+                    </Link>
+                    <span className="shrink-0 font-serif text-sm tabular-nums text-slate-400 dark:text-slate-500">
+                      {percent}%
+                    </span>
+                  </div>
+                  {reasons.length > 0 && (
+                    <p className="mt-1 font-serif text-xs tracking-wider text-slate-500 dark:text-slate-400">
+                      {t("reasons", { reasons: reasons.join(" · ") })}
+                    </p>
+                  )}
+                  {lines.length > 0 && (
+                    <div className="mt-2.5 space-y-1 border-l-2 border-(--tone)/30 pl-3">
+                      {lines.map((line) => (
+                        <p
+                          key={line}
+                          className="font-kaiti text-[15px] leading-relaxed text-slate-600 dark:text-slate-300"
+                        >
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </li>
             ))}
           </ol>

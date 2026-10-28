@@ -31,7 +31,7 @@ export const GET = withAuth(
     const withLatest = request.nextUrl.searchParams.get("latest") === "1";
     try {
       const supabase = await createSupabaseServerClient();
-      const [records, savedId] = await Promise.all([
+      const [records, saved] = await Promise.all([
         listQuizRecords(supabase, user.id, locale),
         answers ? findQuizRecord(supabase, user.id, answers) : null,
       ]);
@@ -40,7 +40,7 @@ export const GET = withAuth(
           ? await getQuizResult(records[0].id, locale)
           : null;
       return NextResponse.json(
-        { records, savedId, latest },
+        { records, savedId: saved?.id ?? null, latest },
         { headers: { "Cache-Control": PRIVATE_NO_STORE } },
       );
     } catch (error) {
@@ -49,7 +49,7 @@ export const GET = withAuth(
   },
 );
 
-// POST /api/public/quiz-results — 保存结果页上的这份结果。
+// POST /api/public/quiz-results — 保存结果页上的这份结果，返回 { id, savedAt }。
 // 只收 7 位乱码，结果在服务端重算
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
@@ -65,14 +65,14 @@ export const POST = withAuth(
 
     try {
       const supabase = await createSupabaseServerClient();
-      const id = await saveQuizRecord(supabase, user.id, answers);
-      if (!id) {
+      const saved = await saveQuizRecord(supabase, user.id, answers);
+      if (!saved) {
         return NextResponse.json(
           { error: "暂时算不出结果，请稍后重试" },
           { status: 503 },
         );
       }
-      return NextResponse.json({ id });
+      return NextResponse.json(saved);
     } catch (error) {
       return serverErrorResponse("POST /api/public/quiz-results", error);
     }

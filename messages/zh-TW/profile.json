@@ -165,6 +165,7 @@
     "imagery": "偏愛的意象",
     "profile": "意象傾向",
     "matches": "當時契合的歌",
+    "reasons": "同好：{reasons}",
     "past": "往次",
     "delete": "刪除",
     "confirmDelete": "確認刪除",

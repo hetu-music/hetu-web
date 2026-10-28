@@ -5,8 +5,6 @@ import EnqueueButton from "@/components/shared/EnqueueButton";
 import FavoriteButton from "@/components/shared/FavoriteButton";
 import PlayButton from "@/components/shared/PlayButton";
 import TopBar from "@/components/shared/topbar/TopBar";
-import { useUserContext } from "@/context/UserContext";
-import { useGoToLogin } from "@/hooks/ui/useGoToLogin";
 import { Link } from "@/i18n/navigation";
 import { savedMonth } from "@/lib/quiz/saved-month";
 import type { QuizResultView } from "@/lib/quiz/views";
@@ -15,7 +13,7 @@ import { motion } from "framer-motion";
 import { ImageIcon, RotateCcw, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import QuizSaveButton from "./QuizSaveButton";
+import QuizSaveButton, { type SavedRecord } from "./QuizSaveButton";
 import QuizShareSheet from "./QuizShareSheet";
 
 interface Props {
@@ -46,6 +44,10 @@ export default function QuizResultClient({ result }: Props) {
   // 顶栏的分享和页尾的按钮都打开分享图面板，链接复制也收在面板里
   const [sharing, setSharing] = useState(false);
   const share = () => setSharing(true);
+  // 在本页保存后就地换成记录：链接与保存时间以它为准
+  const [saved, setSaved] = useState<SavedRecord | null>(null);
+  const slug = saved?.id ?? result.slug;
+  const savedAt = saved?.savedAt ?? result.savedAt;
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
@@ -73,10 +75,13 @@ export default function QuizResultClient({ result }: Props) {
           <p className="mx-auto mt-8 max-w-md font-kaiti text-lg leading-loose text-balance text-slate-600 md:max-w-xl dark:text-slate-400">
             {result.persona.description}
           </p>
-          {result.savedAt && (
-            <p className="mt-6 pl-[0.3em] font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
-              {t("result.savedAt", savedMonth(result.savedAt))}
-            </p>
+          {savedAt && (
+            <motion.p
+              {...fadeUp(0)}
+              className="mt-6 pl-[0.3em] font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500"
+            >
+              {t("result.savedAt", savedMonth(savedAt))}
+            </motion.p>
           )}
         </motion.header>
 
@@ -235,9 +240,6 @@ export default function QuizResultClient({ result }: Props) {
           </ol>
         </section>
 
-        {/* 访客：收藏、保存都要登录，在推荐列表下提一句 */}
-        {!result.savedAt && <LoginHint />}
-
         {/* ── 操作 ── */}
         <motion.div
           {...fadeUp(1)}
@@ -251,8 +253,12 @@ export default function QuizResultClient({ result }: Props) {
             <ImageIcon size={14} />
             {t("result.share")}
           </button>
-          {!result.savedAt && (
-            <QuizSaveButton slug={result.slug} className={ACTION_CLASS} />
+          {!savedAt && (
+            <QuizSaveButton
+              slug={result.slug}
+              className={ACTION_CLASS}
+              onSaved={setSaved}
+            />
           )}
         </motion.div>
 
@@ -264,35 +270,8 @@ export default function QuizResultClient({ result }: Props) {
       <QuizShareSheet
         open={sharing}
         onOpenChange={setSharing}
-        result={result}
+        result={{ ...result, slug, savedAt }}
       />
     </div>
-  );
-}
-
-/** 只对访客显示；登录后回到这个结果页 */
-function LoginHint() {
-  const t = useTranslations("quiz.result");
-  const { user, loaded } = useUserContext();
-  const goToLogin = useGoToLogin();
-  if (!loaded || user) return null;
-
-  return (
-    <motion.p
-      {...fadeUp(0.9)}
-      className="mt-12 text-center font-serif text-sm tracking-wider text-slate-500 dark:text-slate-400"
-    >
-      {t.rich("loginHint", {
-        login: (chunks) => (
-          <button
-            type="button"
-            onClick={goToLogin}
-            className="text-[#9A6B2F] transition-opacity hover:opacity-75 dark:text-[#D4A259]"
-          >
-            {chunks}
-          </button>
-        ),
-      })}
-    </motion.p>
   );
 }

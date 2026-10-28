@@ -15,6 +15,7 @@ import QuizSaveButton from "./QuizSaveButton";
 
 const push = vi.fn();
 const replace = vi.fn();
+const onSaved = vi.fn();
 const apiRequest = vi.fn();
 const user: { current: { id: string } | null } = { current: { id: "u1" } };
 
@@ -60,7 +61,7 @@ function renderButton() {
   return render(
     <QueryClientProvider client={client}>
       <NextIntlClientProvider locale="zh-CN" messages={messages}>
-        <QuizSaveButton slug="3Kltpgo" className="" />
+        <QuizSaveButton slug="3Kltpgo" className="" onSaved={onSaved} />
       </NextIntlClientProvider>
     </QueryClientProvider>,
   );
@@ -69,6 +70,7 @@ function renderButton() {
 beforeEach(() => {
   push.mockReset();
   replace.mockReset();
+  onSaved.mockReset();
   apiRequest.mockReset();
   user.current = { id: "u1" };
 });
@@ -101,19 +103,20 @@ describe("QuizSaveButton", () => {
     );
   });
 
-  it("保存后换成记录的链接", async () => {
+  it("保存后只换地址栏里的链接，不走路由跳转", async () => {
+    window.history.pushState(null, "", "/zh-CN/quiz/result/3Kltpgo");
+    const saved = { id: "aB3dE6gH9k", savedAt: "2026-10-28T00:00:00Z" };
     stubRecords({ records: [], savedId: null });
-    apiRequest.mockResolvedValue({ id: "aB3dE6gH9k" });
+    apiRequest.mockResolvedValue(saved);
     renderButton();
     const button = await screen.findByRole("button", { name: "保存" });
     await waitFor(() => expect(button).toHaveProperty("disabled", false));
     fireEvent.click(button);
 
-    await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith("/quiz/result/aB3dE6gH9k", {
-        scroll: false,
-      }),
-    );
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
+    expect(window.location.pathname).toBe("/zh-CN/quiz/result/aB3dE6gH9k");
+    expect(replace).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
     expect(apiRequest).toHaveBeenCalledWith(
       "/api/public/quiz-results",
       expect.objectContaining({ method: "POST", body: { slug: "3Kltpgo" } }),

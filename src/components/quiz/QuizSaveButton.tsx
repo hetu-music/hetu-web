@@ -3,7 +3,7 @@
 import { addToast } from "@/components/ui/toast";
 import { useUserContext } from "@/context/UserContext";
 import { useGoToLogin } from "@/hooks/ui/useGoToLogin";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { apiRequest } from "@/lib/api/request";
 import { savedMonth } from "@/lib/quiz/saved-month";
 import type { QuizRecordSummary } from "@/lib/quiz/views";
@@ -15,10 +15,15 @@ import { useState } from "react";
 /** 每人最多保留的记录数，与数据库里的触发器一致 */
 const MAX_RECORDS = 5;
 
+/** 保存后的记录：id 是链接里的 10 位乱码 */
+export type SavedRecord = { id: string; savedAt: string };
+
 interface Props {
   /** 7 位乱码：只有未保存的结果才有保存按钮 */
   slug: string;
   className: string;
+  /** 保存成功后，结果页就地换成记录的样子 */
+  onSaved: (record: SavedRecord) => void;
 }
 
 /**
@@ -26,11 +31,10 @@ interface Props {
  * 访客点击去登录，回来后仍在这个结果页，由用户再点一次，不自动保存。
  * 这份作答在当前题目版本下存过的，显示「已保存」并链到那条记录
  */
-export default function QuizSaveButton({ slug, className }: Props) {
+export default function QuizSaveButton({ slug, className, onSaved }: Props) {
   const t = useTranslations("quiz.result");
   const { user, loaded } = useUserContext();
   const goToLogin = useGoToLogin();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
 
@@ -71,14 +75,22 @@ export default function QuizSaveButton({ slug, className }: Props) {
   const save = async () => {
     setSaving(true);
     try {
-      const { id } = await apiRequest<{ id: string }>(
-        "/api/public/quiz-results",
-        { method: "POST", body: { slug }, fallback: t("saveFailed") },
-      );
+      const record = await apiRequest<SavedRecord>("/api/public/quiz-results", {
+        method: "POST",
+        body: { slug },
+        fallback: t("saveFailed"),
+      });
       void queryClient.invalidateQueries({ queryKey: ["quiz-records"] });
       addToast("success", t("savedToast"));
-      // 换成记录的链接：地址栏里的就是分享出去的，此后看到的是保存那一刻的结果
-      router.replace(`/quiz/result/${id}`, { scroll: false });
+      // 地址栏换成记录的链接，分享出去的就是保存那一刻的结果。
+      // 不走路由跳转：那会重新渲染整页，动画从头再播一遍，像是刷新了。
+      // 刚存下的快照与眼前的结果是同一次计算，页面不用重画
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname.replace(/[^/]+$/, record.id),
+      );
+      onSaved(record);
     } catch (e) {
       addToast("error", e instanceof Error ? e.message : t("saveFailed"));
       setSaving(false);

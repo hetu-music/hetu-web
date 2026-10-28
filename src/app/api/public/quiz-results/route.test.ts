@@ -3,6 +3,10 @@ import { NextRequest } from "next/server";
 import { QUESTIONS, encodeResultSlug } from "@/lib/quiz";
 
 let mockUser: { id: string } | null = null;
+// vi.mock 会提升到文件顶部，里面引用的值要用 vi.hoisted 定义
+const { SAVED } = vi.hoisted(() => ({
+  SAVED: { id: "aB3dE6gH9k", savedAt: "2026-10-28T00:00:00Z" },
+}));
 
 vi.mock("@/lib/db/supabase-auth", () => ({
   createSupabaseServerClient: vi.fn(async () => ({
@@ -25,9 +29,9 @@ vi.mock("@/lib/server/server-utils", async (importOriginal) => {
 vi.mock("@/lib/server/service-quiz", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/service-quiz")>()),
   listQuizRecords: vi.fn(async () => []),
-  findQuizRecord: vi.fn(async () => "aB3dE6gH9k"),
+  findQuizRecord: vi.fn(async () => SAVED),
   getQuizResult: vi.fn(async () => ({ slug: "aB3dE6gH9k" })),
-  saveQuizRecord: vi.fn(async () => "aB3dE6gH9k"),
+  saveQuizRecord: vi.fn(async () => SAVED),
   deleteQuizRecord: vi.fn(async () => undefined),
 }));
 
@@ -109,7 +113,7 @@ describe("/api/public/quiz-results", () => {
   it("POST 解码乱码后保存，返回记录 id", async () => {
     const res = await POST(request("POST", { slug }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: "aB3dE6gH9k" });
+    expect(await res.json()).toEqual(SAVED);
     expect(vi.mocked(saveQuizRecord).mock.calls[0].slice(1)).toEqual([
       "u1",
       answers,

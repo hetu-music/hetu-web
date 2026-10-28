@@ -41,8 +41,8 @@ const latest = {
     {
       song: { id: 7, title: "倾尽天下", hascover: false },
       percent: 92,
-      reasons: [],
-      lines: [],
+      reasons: ["天象", "「月」"],
+      lines: ["月色照天下"],
     },
   ],
 };
@@ -103,6 +103,8 @@ describe("QuizSection", () => {
     expect(screen.getByText("2026 年 10 月寻得")).toBeTruthy();
     expect(screen.getByText("你看得见风月。")).toBeTruthy();
     expect(screen.getByText("92%")).toBeTruthy();
+    expect(screen.getByText("同好：天象 · 「月」")).toBeTruthy();
+    expect(screen.getByText("月色照天下")).toBeTruthy();
 
     expect(screen.getByText("往次")).toBeTruthy();
     const past = screen.getByRole("link", { name: "倚遍楼台" });

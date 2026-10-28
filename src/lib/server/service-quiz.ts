@@ -395,24 +395,27 @@ export async function listQuizRecords(
 }
 
 /** 这份作答在当前题目版本下存过的那条记录的 id；没存过时为 null */
+/** 一条记录的 id 与保存时间 */
+export type SavedQuizRecord = { id: string; savedAt: string };
+
 export async function findQuizRecord(
   supabase: SupabaseClient,
   userId: string,
   answers: Answers,
-): Promise<string | null> {
+): Promise<SavedQuizRecord | null> {
   const { data, error } = await supabase
     .from(TABLES.QUIZ_RESULTS)
-    .select("id")
+    .select("id,created_at")
     .eq("user_id", userId)
     .eq("quiz_version", QUIZ_VERSION)
     .eq("code", encodeAnswers(answers))
     .maybeSingle();
   if (error) throw error;
-  return data?.id ?? null;
+  return data ? { id: data.id, savedAt: data.created_at } : null;
 }
 
 /**
- * 保存一份结果，返回记录的 id；候选池为空、算不出结果时返回 null。
+ * 保存一份结果，返回记录的 id 与保存时间；候选池为空、算不出结果时返回 null。
  * 同一份作答在同一题目版本下已存过的，不再新建，返回原来那条。
  * 满 5 条时由数据库的触发器删掉最早的一条
  */
@@ -420,7 +423,7 @@ export async function saveQuizRecord(
   supabase: SupabaseClient,
   userId: string,
   answers: Answers,
-): Promise<string | null> {
+): Promise<SavedQuizRecord | null> {
   const snapshot = await computeQuizResult(answers);
   if (!snapshot) return null;
   const { data, error } = await supabase
@@ -431,9 +434,9 @@ export async function saveQuizRecord(
       code: encodeAnswers(answers),
       ...snapshotToRow(snapshot),
     })
-    .select("id")
+    .select("id,created_at")
     .single();
-  if (!error) return data.id;
+  if (!error) return { id: data.id, savedAt: data.created_at };
   if (error.code === "23505") {
     const existing = await findQuizRecord(supabase, userId, answers);
     if (existing) return existing;

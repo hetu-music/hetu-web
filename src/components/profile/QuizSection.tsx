@@ -23,6 +23,12 @@ import { useState } from "react";
 /** 倾向条的满格对应的 z 分数，与结果页一致 */
 const Z_RANGE = 2.5;
 
+/**
+ * 记录沿用结果页的金色，不随个人中心的墨色：这里展示的是那一次寻得的结果，
+ * 与结果页、分享图看起来应是同一件东西。题头与目录仍用个人中心的强调色
+ */
+const QUIZ_TONE_CLASS = "[--tone:#9A6B2F] dark:[--tone:#D4A259]";
+
 type QuizRecords = {
   records: QuizRecordSummary[];
   latest: QuizResultView | null;
@@ -83,7 +89,7 @@ export default function QuizSection() {
           <p>{t("quiz.emptyHint")}</p>
         </div>
       ) : (
-        <>
+        <div className={QUIZ_TONE_CLASS}>
           {latest && (
             <LatestRecord
               record={records[0]}
@@ -105,7 +111,7 @@ export default function QuizSection() {
               </ul>
             </div>
           )}
-        </>
+        </div>
       )}
     </section>
   );
@@ -223,7 +229,7 @@ function LatestRecord({
                     >
                       {song.title}
                     </Link>
-                    <span className="shrink-0 font-serif text-sm tabular-nums text-slate-400 dark:text-slate-500">
+                    <span className="shrink-0 font-serif text-sm tabular-nums text-(--tone)">
                       {percent}%
                     </span>
                   </div>

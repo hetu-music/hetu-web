@@ -26,6 +26,7 @@ vi.mock("@/lib/server/service-quiz", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/service-quiz")>()),
   listQuizRecords: vi.fn(async () => []),
   findQuizRecord: vi.fn(async () => "aB3dE6gH9k"),
+  getQuizResult: vi.fn(async () => ({ slug: "aB3dE6gH9k" })),
   saveQuizRecord: vi.fn(async () => "aB3dE6gH9k"),
   deleteQuizRecord: vi.fn(async () => undefined),
 }));
@@ -33,6 +34,8 @@ vi.mock("@/lib/server/service-quiz", async (importOriginal) => ({
 import {
   deleteQuizRecord,
   findQuizRecord,
+  getQuizResult,
+  listQuizRecords,
   saveQuizRecord,
 } from "@/lib/server/service-quiz";
 import { DELETE, GET, POST } from "./route";
@@ -68,7 +71,11 @@ describe("/api/public/quiz-results", () => {
 
   it("GET 带乱码时查这份作答存过的记录", async () => {
     const res = await GET(request("GET", undefined, `?slug=${slug}`));
-    expect(await res.json()).toEqual({ records: [], savedId: "aB3dE6gH9k" });
+    expect(await res.json()).toEqual({
+      records: [],
+      savedId: "aB3dE6gH9k",
+      latest: null,
+    });
     expect(vi.mocked(findQuizRecord).mock.calls[0].slice(1)).toEqual([
       "u1",
       answers,
@@ -77,8 +84,26 @@ describe("/api/public/quiz-results", () => {
 
   it("GET 不带或带坏的乱码时不查", async () => {
     const res = await GET(request("GET", undefined, "?slug=zzzzzzz"));
-    expect(await res.json()).toEqual({ records: [], savedId: null });
+    expect(await res.json()).toEqual({
+      records: [],
+      savedId: null,
+      latest: null,
+    });
     expect(findQuizRecord).not.toHaveBeenCalled();
+  });
+
+  it("GET ?latest=1 给出最近一条的完整结果", async () => {
+    vi.mocked(listQuizRecords).mockResolvedValueOnce([
+      {
+        id: "aB3dE6gH9k",
+        savedAt: "2026-10-01T00:00:00Z",
+        persona: { motto: "仰观天象", label: "天象" },
+        secondary: null,
+      },
+    ]);
+    const res = await GET(request("GET", undefined, "?latest=1"));
+    expect((await res.json()).latest).toEqual({ slug: "aB3dE6gH9k" });
+    expect(getQuizResult).toHaveBeenCalledWith("aB3dE6gH9k", "zh-CN");
   });
 
   it("POST 解码乱码后保存，返回记录 id", async () => {

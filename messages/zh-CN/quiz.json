@@ -24,7 +24,15 @@
     "retry": "再寻一次",
     "share": "生成分享图",
     "copied": "已复制",
-    "method": "根据河图作品中的意象标注计算，仅供娱乐。"
+    "method": "根据河图作品中的意象标注计算，仅供娱乐。",
+    "savedAt": "{year} 年 {month} 月寻得",
+    "save": "保存",
+    "saving": "保存中……",
+    "saved": "已保存",
+    "loginToSave": "登录后保存",
+    "replaceHint": "已存满 {count} 次，再保存将替换 {year} 年 {month} 月的那一次",
+    "savedToast": "已保存，可在个人中心的「我的气韵」里找到",
+    "saveFailed": "保存失败，请稍后重试"
   },
   "card": {
     "title": "分享图",

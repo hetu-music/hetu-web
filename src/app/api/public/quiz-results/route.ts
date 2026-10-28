@@ -10,6 +10,7 @@ import {
   decodeQuizSlug,
   deleteQuizRecord,
   findQuizRecord,
+  getQuizResult,
   listQuizRecords,
   saveQuizRecord,
 } from "@/lib/server/service-quiz";
@@ -19,21 +20,27 @@ const IdSchema = z.object({
   id: z.string().refine(isRecordId, "记录 ID 无效"),
 });
 
-// GET /api/public/quiz-results[?slug=<7 位乱码>] — 自己保存的记录，新的在前；
-// 带上结果页的乱码时，另给出这份作答已存过的那条记录（savedId）
+// GET /api/public/quiz-results — 自己保存的记录，新的在前。
+//   ?slug=<7 位乱码>  另给出这份作答已存过的那条记录（savedId），结果页的保存按钮用
+//   ?latest=1         另给出最近一条的完整结果（latest），个人中心展开显示用
 export const GET = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
     const locale = request.cookies.get("NEXT_LOCALE")?.value || "zh-CN";
     const slug = request.nextUrl.searchParams.get("slug");
     const answers = slug ? decodeQuizSlug(slug) : null;
+    const withLatest = request.nextUrl.searchParams.get("latest") === "1";
     try {
       const supabase = await createSupabaseServerClient();
       const [records, savedId] = await Promise.all([
         listQuizRecords(supabase, user.id, locale),
         answers ? findQuizRecord(supabase, user.id, answers) : null,
       ]);
+      const latest =
+        withLatest && records.length > 0
+          ? await getQuizResult(records[0].id, locale)
+          : null;
       return NextResponse.json(
-        { records, savedId },
+        { records, savedId, latest },
         { headers: { "Cache-Control": PRIVATE_NO_STORE } },
       );
     } catch (error) {

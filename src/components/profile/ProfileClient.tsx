@@ -4,6 +4,7 @@ import AccountSection from "@/components/profile/AccountSection";
 import AnnotationsSection from "@/components/profile/AnnotationsSection";
 import FavoritesSection from "@/components/profile/FavoritesSection";
 import FeedbackSection from "@/components/profile/FeedbackSection";
+import QuizSection from "@/components/profile/QuizSection";
 import ProfileHero from "@/components/profile/ProfileHero";
 import { PROFILE_TABS, type ProfileTab } from "@/components/profile/profile-ui";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
@@ -71,6 +72,7 @@ export default function ProfileClient() {
               className="animate-in fade-in slide-in-from-bottom-2 duration-500"
             >
               {activeTab === "favorites" && <FavoritesSection />}
+              {activeTab === "quiz" && <QuizSection />}
               {activeTab === "annotations" && <AnnotationsSection />}
               {activeTab === "feedback" && <FeedbackSection />}
               {activeTab === "account" && <AccountSection />}
@@ -88,7 +90,7 @@ export default function ProfileClient() {
 }
 
 /**
- * 四节的目录：宽屏在左栏竖排，当前项左侧一道强调色短线（同歌曲页目录）；
+ * 五节的目录：宽屏在左栏竖排，当前项左侧一道强调色短线（同歌曲页目录）；
  * 窄屏在正文上方横排，当前项下方一道短线。
  */
 function Catalog({

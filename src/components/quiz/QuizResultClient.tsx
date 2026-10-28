@@ -12,6 +12,8 @@ import { motion } from "framer-motion";
 import { ImageIcon, RotateCcw, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { savedMonth } from "@/lib/quiz/saved-month";
+import QuizSaveButton from "./QuizSaveButton";
 import QuizShareSheet from "./QuizShareSheet";
 
 interface Props {
@@ -19,6 +21,9 @@ interface Props {
 }
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+/** 页尾的再寻、分享、保存 */
+const ACTION_CLASS =
+  "flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259] disabled:opacity-40";
 /** 倾向条的满格对应的 z 分数 */
 const Z_RANGE = 2.5;
 
@@ -66,6 +71,11 @@ export default function QuizResultClient({ result }: Props) {
           <p className="mx-auto mt-8 max-w-md font-kaiti text-lg leading-loose text-balance text-slate-600 md:max-w-xl dark:text-slate-400">
             {result.persona.description}
           </p>
+          {result.savedAt && (
+            <p className="mt-6 pl-[0.3em] font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+              {t("result.savedAt", savedMonth(result.savedAt))}
+            </p>
+          )}
         </motion.header>
 
         {/* ── 意象与倾向 ── */}
@@ -228,20 +238,17 @@ export default function QuizResultClient({ result }: Props) {
           {...fadeUp(1)}
           className="mt-16 flex flex-wrap items-center justify-center gap-4"
         >
-          <Link
-            href="/quiz"
-            className="flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
-          >
+          <Link href="/quiz" className={ACTION_CLASS}>
             <RotateCcw size={14} />
             {t("result.retry")}
           </Link>
-          <button
-            onClick={share}
-            className="flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
-          >
+          <button onClick={share} className={ACTION_CLASS}>
             <ImageIcon size={14} />
             {t("result.share")}
           </button>
+          {!result.savedAt && (
+            <QuizSaveButton slug={result.slug} className={ACTION_CLASS} />
+          )}
         </motion.div>
 
         <p className="mt-10 text-center font-serif text-xs tracking-wider text-slate-400 dark:text-slate-600">

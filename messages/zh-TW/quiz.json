@@ -24,7 +24,15 @@
     "retry": "再尋一次",
     "share": "生成分享圖",
     "copied": "已複製",
-    "method": "根據河圖作品中的意象標註計算，僅供娛樂。"
+    "method": "根據河圖作品中的意象標註計算，僅供娛樂。",
+    "savedAt": "{year} 年 {month} 月尋得",
+    "save": "儲存",
+    "saving": "儲存中……",
+    "saved": "已儲存",
+    "loginToSave": "登入後儲存",
+    "replaceHint": "已存滿 {count} 次，再儲存將替換 {year} 年 {month} 月的那一次",
+    "savedToast": "已儲存，可在個人中心的「我的氣韻」裡找到",
+    "saveFailed": "儲存失敗，請稍後重試"
   },
   "card": {
     "title": "分享圖",

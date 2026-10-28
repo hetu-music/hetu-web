@@ -2,6 +2,7 @@
   "title": "个人中心",
   "tabs": {
     "favorites": "我的收藏",
+    "quiz": "我的气韵",
     "annotations": "我的批评",
     "account": "账户设置",
     "feedback": "建议反馈"
@@ -156,5 +157,19 @@
       "reply": "管理员回复"
     },
     "refresh": "刷新"
+  },
+  "quiz": {
+    "retry": "重新寻曲",
+    "savedAt": "{year} 年 {month} 月寻得",
+    "secondary": "兼有 · {motto}",
+    "imagery": "偏爱的意象",
+    "profile": "意象倾向",
+    "matches": "当时契合的歌",
+    "past": "往次",
+    "delete": "删除",
+    "confirmDelete": "确认删除",
+    "deleteFailed": "删除失败",
+    "empty": "还没有留下过寻曲的结果",
+    "emptyHint": "做完寻曲后，在结果页点「保存」，这一次的气韵就会留在这里"
   }
 }

@@ -231,9 +231,10 @@ describe("renderShareCard complete layout", () => {
       if (!call) throw new Error(`没有绘制文字: ${text}`);
       return call;
     };
-    for (const word of imagery) expect(last(word)[1]).toBeLessThan(416);
+    // 左栏止于 96 + 372，右栏从 96 + 372 + 64 起
+    for (const word of imagery) expect(last(word)[1]).toBeLessThan(468);
     for (const dimension of dimensions)
-      expect(last(dimension.label)[1]).toBe(480);
+      expect(last(dimension.label)[1]).toBe(532);
     expect(last("天象")[2]).toBeLessThan(last("典故")[2]);
     expect(last("典故")[2]).toBeLessThan(last("光阴")[2]);
     expect(last("光阴")[2]).toBeLessThan(last("明月如霜")[2]);
@@ -243,8 +244,8 @@ describe("renderShareCard complete layout", () => {
     await renderShareCard(fullInput, "light");
     const rounded = contexts[0].roundRect;
     if (!rounded) throw new Error("测试环境缺少 roundRect mock");
-    const trackLeft = 564;
-    const trackWidth = 420;
+    const trackLeft = 604;
+    const trackWidth = 380;
     const center = trackLeft + trackWidth / 2;
     const tracks = rounded.mock.calls.filter(
       ([x, , width, height]) =>

@@ -7,6 +7,7 @@ import {
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import { getPathname } from "@/i18n/navigation";
+import { SITE_URL } from "@/lib/constants";
 import {
   renderShareCard,
   type ShareCardInput,
@@ -100,7 +101,6 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
     let size: { width: number; height: number } | undefined;
 
     const path = getPathname({ href: "/quiz", locale });
-    const host = window.location.host.replace(/^www\./, "");
     const input: ShareCardInput = {
       eyebrow: t("result.eyebrow"),
       motto: result.persona.motto,
@@ -124,9 +124,10 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
         lyric: m.lines[0] ?? null,
       })),
       siteName: tSite("name"),
-      scanHint: t("card.scan"),
+      tagline: t("card.tagline"),
+      // 二维码直达测验页；给人看的只写域名，好记
       qrUrl: `${window.location.origin}${path}`,
-      displayUrl: `${host}${path}`,
+      displayUrl: new URL(SITE_URL).host.replace(/^www\./, ""),
     };
 
     renderShareCard(input, theme)

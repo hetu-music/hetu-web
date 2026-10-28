@@ -26,9 +26,9 @@ const input: ShareCardInput = {
     },
   ],
   siteName: "河图作品勘鉴",
-  scanHint: "扫码寻曲",
+  tagline: "一段旅程，寻一首懂你的歌",
   qrUrl: "https://hetu-music.com/zh-CN/quiz",
-  displayUrl: "hetu-music.com/zh-CN/quiz",
+  displayUrl: "hetu-music.com",
 };
 
 let nativeRoundRect: boolean;

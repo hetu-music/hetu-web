@@ -32,10 +32,11 @@ export type ShareCardInput = {
     lyric: string | null;
   }>;
   siteName: string;
-  scanHint: string;
+  /** 落款下的一句话 */
+  tagline: string;
   /** 二维码指向的地址 */
   qrUrl: string;
-  /** 印在二维码旁边给人看的地址，不带协议 */
+  /** 印在二维码旁边给人看的地址，只写域名 */
   displayUrl: string;
 };
 
@@ -146,7 +147,7 @@ async function loadFonts(fonts: Fonts, input: ShareCardInput): Promise<Fonts> {
     serif: serifText,
     kaiti:
       input.description +
-      input.scanHint +
+      input.tagline +
       input.matches.map((m) => m.lyric ?? "").join(""),
     calligraphy: input.motto + input.imagery.join(""),
     sans: sansText,
@@ -741,7 +742,7 @@ function drawCard(
   setSpacing(ctx, 0);
   ctx.font = `400 26px ${fonts.kaiti}`;
   ctx.fillStyle = colors.body;
-  ctx.fillText(input.scanHint, PAD, y + 84);
+  ctx.fillText(input.tagline, PAD, y + 84);
   ctx.font = `400 20px ${fonts.sans}`;
   ctx.fillStyle = colors.meta;
   setSpacing(ctx, 2);

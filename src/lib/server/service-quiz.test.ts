@@ -424,14 +424,11 @@ describe("saveQuizRecord", () => {
 
   it("服务端重算后写入快照，带上题目版本和作答", async () => {
     mockClient(makeRows());
-    const insert = makeQueryBuilder({
-      data: { id: RECORD_ID, created_at: SAVED_AT },
-      error: null,
-    });
+    const insert = makeQueryBuilder({ data: { id: RECORD_ID }, error: null });
     const supabase = { from: vi.fn(() => insert) };
-    const saved = await saveQuizRecord(supabase as never, "u1", answers);
+    const id = await saveQuizRecord(supabase as never, "u1", answers);
 
-    expect(saved).toEqual({ id: RECORD_ID, savedAt: SAVED_AT });
+    expect(id).toBe(RECORD_ID);
     expect(supabase.from).toHaveBeenCalledWith(TABLES.QUIZ_RESULTS);
     const row = insert.insert.mock.calls[0][0];
     expect(row).toMatchObject({
@@ -449,16 +446,15 @@ describe("saveQuizRecord", () => {
     mockClient(makeRows());
     const conflict = makeQueryBuilder({ data: null, error: { code: "23505" } });
     const existing = makeQueryBuilder({
-      data: { id: "oldOne0001", created_at: SAVED_AT },
+      data: { id: "oldOne0001" },
       error: null,
     });
     const supabase = {
       from: vi.fn().mockReturnValueOnce(conflict).mockReturnValueOnce(existing),
     };
-    expect(await saveQuizRecord(supabase as never, "u1", answers)).toEqual({
-      id: "oldOne0001",
-      savedAt: SAVED_AT,
-    });
+    expect(await saveQuizRecord(supabase as never, "u1", answers)).toBe(
+      "oldOne0001",
+    );
     expect(existing.eq).toHaveBeenCalledWith("quiz_version", QUIZ_VERSION);
     expect(existing.eq).toHaveBeenCalledWith("code", encodeAnswers(answers));
   });

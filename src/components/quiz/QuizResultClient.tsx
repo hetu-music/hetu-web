@@ -6,14 +6,13 @@ import FavoriteButton from "@/components/shared/FavoriteButton";
 import PlayButton from "@/components/shared/PlayButton";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { Link } from "@/i18n/navigation";
-import { savedMonth } from "@/lib/quiz/saved-month";
 import type { QuizResultView } from "@/lib/quiz/views";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { motion } from "framer-motion";
 import { ImageIcon, RotateCcw, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import QuizSaveButton, { type SavedRecord } from "./QuizSaveButton";
+import QuizSaveButton from "./QuizSaveButton";
 import QuizShareSheet from "./QuizShareSheet";
 
 interface Props {
@@ -44,10 +43,10 @@ export default function QuizResultClient({ result }: Props) {
   // 顶栏的分享和页尾的按钮都打开分享图面板，链接复制也收在面板里
   const [sharing, setSharing] = useState(false);
   const share = () => setSharing(true);
-  // 在本页保存后就地换成记录：链接与保存时间以它为准
-  const [saved, setSaved] = useState<SavedRecord | null>(null);
-  const slug = saved?.id ?? result.slug;
-  const savedAt = saved?.savedAt ?? result.savedAt;
+  // 在本页保存后就地换成记录：分享用记录的链接，不再显示保存按钮
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const slug = savedId ?? result.slug;
+  const saved = savedId !== null || result.savedAt !== null;
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
@@ -75,14 +74,6 @@ export default function QuizResultClient({ result }: Props) {
           <p className="mx-auto mt-8 max-w-md font-kaiti text-lg leading-loose text-balance text-slate-600 md:max-w-xl dark:text-slate-400">
             {result.persona.description}
           </p>
-          {savedAt && (
-            <motion.p
-              {...fadeUp(0)}
-              className="mt-6 pl-[0.3em] font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500"
-            >
-              {t("result.savedAt", savedMonth(savedAt))}
-            </motion.p>
-          )}
         </motion.header>
 
         {/* ── 意象与倾向 ── */}
@@ -253,11 +244,11 @@ export default function QuizResultClient({ result }: Props) {
             <ImageIcon size={14} />
             {t("result.share")}
           </button>
-          {!savedAt && (
+          {!saved && (
             <QuizSaveButton
               slug={result.slug}
               className={ACTION_CLASS}
-              onSaved={setSaved}
+              onSaved={setSavedId}
             />
           )}
         </motion.div>
@@ -270,7 +261,7 @@ export default function QuizResultClient({ result }: Props) {
       <QuizShareSheet
         open={sharing}
         onOpenChange={setSharing}
-        result={{ ...result, slug, savedAt }}
+        result={{ ...result, slug }}
       />
     </div>
   );

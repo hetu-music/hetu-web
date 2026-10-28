@@ -105,15 +105,14 @@ describe("QuizSaveButton", () => {
 
   it("保存后只换地址栏里的链接，不走路由跳转", async () => {
     window.history.pushState(null, "", "/zh-CN/quiz/result/3Kltpgo");
-    const saved = { id: "aB3dE6gH9k", savedAt: "2026-10-28T00:00:00Z" };
     stubRecords({ records: [], savedId: null });
-    apiRequest.mockResolvedValue(saved);
+    apiRequest.mockResolvedValue({ id: "aB3dE6gH9k" });
     renderButton();
     const button = await screen.findByRole("button", { name: "保存" });
     await waitFor(() => expect(button).toHaveProperty("disabled", false));
     fireEvent.click(button);
 
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith("aB3dE6gH9k"));
     expect(window.location.pathname).toBe("/zh-CN/quiz/result/aB3dE6gH9k");
     expect(replace).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();

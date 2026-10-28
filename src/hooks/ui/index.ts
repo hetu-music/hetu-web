@@ -8,3 +8,4 @@ export { useAutoGrow } from "./useAutoGrow";
 export { useMounted } from "./useMounted";
 export { useDebouncedValue } from "./useDebouncedValue";
 export { useIntersection } from "./useIntersection";
+export { useGoToLogin } from "./useGoToLogin";

@@ -2,6 +2,7 @@
 
 import CoverArt from "@/components/library/CoverArt";
 import EnqueueButton from "@/components/shared/EnqueueButton";
+import FavoriteButton from "@/components/shared/FavoriteButton";
 import PlayButton from "@/components/shared/PlayButton";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { Link } from "@/i18n/navigation";
@@ -206,6 +207,12 @@ export default function QuizResultClient({ result }: Props) {
                         artist={artist}
                         coverUrl={getCoverUrl(song)}
                         hasAudio={song.has_audio}
+                        className="rounded-full border border-slate-200 p-1.5 dark:border-slate-700"
+                      />
+                      <FavoriteButton
+                        songId={song.id}
+                        variant="inline"
+                        showForGuest
                         className="rounded-full border border-slate-200 p-1.5 dark:border-slate-700"
                       />
                     </div>

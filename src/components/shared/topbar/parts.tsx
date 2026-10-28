@@ -2,13 +2,13 @@
 
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import { useUserContext } from "@/context/UserContext";
-import { usePathname, useRouter } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/utils";
 import { ArrowLeft, ChevronDown, Home, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ResponsivePanel } from "@/components/ui/responsive-panel";
 import { useCallback, useState } from "react";
-import { loginPathFor } from "@/lib/utils/safe-next";
+import { useGoToLogin } from "@/hooks/ui/useGoToLogin";
 import { MenuList, type MenuItem } from "./menu";
 
 /** 站内导航深度：进入内页前递增，返回时据此判断有没有站内历史可退 */
@@ -104,7 +104,7 @@ export function BackHome() {
 /** 用户：未登录去登录页并带上回跳地址，已登录去个人中心 */
 export function UserButton() {
   const router = useRouter();
-  const pathname = usePathname();
+  const goToLogin = useGoToLogin();
   const { user, loaded } = useUserContext();
   const tNav = useTranslations("common.nav");
 
@@ -112,12 +112,12 @@ export function UserButton() {
     // 登录状态尚未同步完成，忽略点击，避免误跳转到登录页
     if (!loaded) return;
     if (!user) {
-      router.push(loginPathFor(pathname + window.location.search));
+      goToLogin();
       return;
     }
     sessionStorage.setItem(NAV_DEPTH_KEY, String(readDepth() + 1));
     router.push("/profile?tab=favorites");
-  }, [router, pathname, user, loaded]);
+  }, [router, goToLogin, user, loaded]);
 
   const label = !loaded ? tNav("loading") : user ? user.name : tNav("login");
   return (

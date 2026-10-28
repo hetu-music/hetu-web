@@ -23,6 +23,17 @@ vi.mock("next-intl", () => ({
 vi.mock("@/components/shared/topbar/TopBar", () => ({
   default: () => null,
 }));
+// 背景路线只是装饰，测试里不画；jsdom 没有 ResizeObserver
+vi.mock("./QuizRoute", () => ({
+  default: () => null,
+}));
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe = vi.fn();
+    disconnect = vi.fn();
+  },
+);
 // 去掉动画，让 AnimatePresence 立即切换
 vi.mock("framer-motion", () => {
   const strip = ({
@@ -33,13 +44,20 @@ vi.mock("framer-motion", () => {
     custom: _c,
     ...rest
   }: Record<string, unknown>) => rest;
+  // 每个标签只建一次组件，和真实的 motion.xxx 一样保持稳定，否则每次渲染都会重新挂载
+  const cache = new Map<string, React.FC<{ children?: React.ReactNode }>>();
   const motion = new Proxy(
     {},
     {
-      get:
-        (_, tag: string) =>
-        ({ children, ...props }: { children?: React.ReactNode }) =>
-          React.createElement(tag, strip(props), children),
+      get: (_, tag: string) => {
+        let component = cache.get(tag);
+        if (!component) {
+          component = ({ children, ...props }) =>
+            React.createElement(tag, strip(props), children);
+          cache.set(tag, component);
+        }
+        return component;
+      },
     },
   );
   return {

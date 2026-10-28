@@ -4,6 +4,7 @@ import TopBar from "@/components/shared/topbar/TopBar";
 import { useRouter } from "@/i18n/navigation";
 import { encodeResultSlug } from "@/lib/quiz/codec";
 import type { QuizQuestionView, QuizResultGlyphs } from "@/lib/quiz/views";
+import QuizRoute, { type Box } from "./QuizRoute";
 import { preloadFontText } from "@/lib/utils/font-preload";
 import { cn } from "@/lib/utils/utils";
 import { AnimatePresence, motion } from "framer-motion";
@@ -51,6 +52,42 @@ export default function QuizClient({
   const [direction, setDirection] = useState(1);
   const advanceTimer = useRef<number | null>(null);
 
+  // 背景路线按整页尺寸和启程页文字区域布局
+  const pageRef = useRef<HTMLDivElement>(null);
+  const [introEl, setIntroEl] = useState<HTMLDivElement | null>(null);
+  const [layout, setLayout] = useState<{
+    width: number;
+    height: number;
+    content: Box | null;
+  } | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    const measure = () => {
+      const pr = page.getBoundingClientRect();
+      setLayout((prev) => {
+        let content = prev?.content ?? null;
+        if (introEl) {
+          const r = introEl.getBoundingClientRect();
+          content = {
+            left: r.left - pr.left,
+            top: r.top - pr.top,
+            right: r.right - pr.left,
+            bottom: r.bottom - pr.top,
+          };
+        }
+        return { width: pr.width, height: pr.height, content };
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(page);
+    if (introEl) ro.observe(introEl);
+    return () => ro.disconnect();
+  }, [introEl]);
+
   useEffect(
     () => () => {
       if (advanceTimer.current) window.clearTimeout(advanceTimer.current);
@@ -69,7 +106,7 @@ export default function QuizClient({
       {
         cssVar: "--font-serif",
         text:
-          questions.map((q) => q.stem + q.options.join("")).join("") +
+          questions.map((q) => q.title + q.stem + q.options.join("")).join("") +
           t("question.progress", { current: 0, total: questions.length }) +
           t("question.prev") +
           "0123456789",
@@ -174,10 +211,25 @@ export default function QuizClient({
   const question = questions[index];
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
+    <div
+      ref={pageRef}
+      className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200"
+    >
       <TopBar exit={{ kind: "logo" }} />
 
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 pb-24 pt-32">
+      {layout?.content && (
+        <QuizRoute
+          stations={questions.map((q) => q.title)}
+          width={layout.width}
+          height={layout.height}
+          content={layout.content}
+          departed={stage !== "intro"}
+          current={index}
+          ready={ready}
+        />
+      )}
+
+      <main className="relative mx-auto flex min-h-screen max-w-2xl flex-col px-6 pb-24 pt-32">
         <AnimatePresence mode="wait">
           {stage === "intro" && (
             <motion.section
@@ -195,25 +247,31 @@ export default function QuizClient({
               }}
               className="flex flex-1 flex-col items-center justify-center text-center"
             >
-              <p className="pl-[0.5em] font-serif text-sm tracking-[0.5em] text-slate-400 dark:text-slate-500">
-                {t("intro.eyebrow")}
-              </p>
-              <h1 className="my-8 font-calligraphy text-8xl text-slate-900 md:text-9xl dark:text-white">
-                {t("title")}
-              </h1>
-              <p className="pl-[0.3em] font-serif text-base tracking-[0.3em] text-slate-600 md:text-lg dark:text-slate-300">
-                {t("intro.subtitle")}
-              </p>
-              <p className="mt-4 font-kaiti text-sm text-slate-400 dark:text-slate-500">
-                {t("intro.note")}
-              </p>
-              <button
-                onClick={start}
-                disabled={poolSize === 0}
-                className="group relative mt-16 border border-slate-300 px-12 py-3 pl-[calc(3rem+0.6em)] font-serif text-lg tracking-[0.6em] text-slate-700 transition-all duration-500 hover:border-[#9A6B2F] hover:text-[#9A6B2F] disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
-              >
-                {t("intro.start")}
-              </button>
+              <div ref={setIntroEl} className="flex flex-col items-center">
+                <p className="pl-[0.5em] font-serif text-sm tracking-[0.5em] text-slate-400 dark:text-slate-500">
+                  {t("intro.eyebrow")}
+                </p>
+                <h1 className="my-8 font-calligraphy text-8xl text-slate-900 md:text-9xl dark:text-white">
+                  {t("title")}
+                </h1>
+                <p className="pl-[0.3em] font-serif text-base tracking-[0.3em] text-slate-600 md:text-lg dark:text-slate-300">
+                  {t("intro.subtitle")}
+                </p>
+                <p className="mt-4 font-kaiti text-sm text-slate-400 dark:text-slate-500">
+                  {t("intro.note")}
+                </p>
+                <button
+                  onClick={start}
+                  onPointerEnter={() => setReady(true)}
+                  onPointerLeave={() => setReady(false)}
+                  onFocus={() => setReady(true)}
+                  onBlur={() => setReady(false)}
+                  disabled={poolSize === 0}
+                  className="group relative mt-16 border border-slate-300 px-12 py-3 pl-[calc(3rem+0.6em)] font-serif text-lg tracking-[0.6em] text-slate-700 transition-all duration-500 hover:border-[#9A6B2F] hover:text-[#9A6B2F] disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
+                >
+                  {t("intro.start")}
+                </button>
+              </div>
             </motion.section>
           )}
 
@@ -225,17 +283,9 @@ export default function QuizClient({
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
               className="flex flex-1 flex-col"
             >
-              {/* 进度 */}
+              {/* 进度：线由背景路线收拢而成，这里只占位 */}
               <div className="mb-12">
-                <div className="h-px w-full bg-slate-200 dark:bg-slate-800">
-                  <motion.div
-                    className="h-px bg-[#9A6B2F] dark:bg-[#D4A259]"
-                    animate={{
-                      width: `${((index + 1) / questions.length) * 100}%`,
-                    }}
-                    transition={{ duration: 0.6, ease: EASE }}
-                  />
-                </div>
+                <div className="h-px w-full" />
                 <p className="mt-3 font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
                   {t("question.progress", {
                     current: index + 1,

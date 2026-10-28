@@ -28,7 +28,8 @@ export type QuizMatchView = {
 };
 
 export type QuizResultView = {
-  code: string;
+  /** 结果页链接里的乱码 */
+  slug: string;
   persona: { motto: string; label: string; description: string };
   secondary: { motto: string; label: string } | null;
   profile: Array<{ key: DimensionKey; label: string; z: number }>;

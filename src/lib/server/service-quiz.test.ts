@@ -25,7 +25,7 @@ import {
   DIMENSIONS,
   QUESTIONS,
   SIGNATURE_IMAGERY,
-  encodeAnswers,
+  encodeResultSlug,
 } from "@/lib/quiz";
 import { toTraditional } from "@/lib/utils/utils-convert";
 import {
@@ -129,9 +129,11 @@ function mockClient(rows: Rows, lyricsResult?: MockResult) {
   return from;
 }
 
+const OPTION_COUNTS = QUESTIONS.map((q) => q.options.length);
+
 /** 每题选该维度权重最大的选项，使该维度成为主导 */
 function answersFavoring(key: string): string {
-  return encodeAnswers(
+  return encodeResultSlug(
     QUESTIONS.map((q) => {
       let best = 0;
       q.options.forEach((o, i) => {
@@ -141,6 +143,7 @@ function answersFavoring(key: string): string {
       });
       return best;
     }),
+    OPTION_COUNTS,
   );
 }
 
@@ -231,7 +234,7 @@ describe("getQuizPoolSize", () => {
 });
 
 describe("getQuizResult", () => {
-  it("作答短串不合法时返回 null，不查询数据库", async () => {
+  it("乱码不合法时返回 null，不查询数据库", async () => {
     const from = mockClient(makeRows());
     expect(await getQuizResult(undefined, "zh-CN")).toBeNull();
     expect(await getQuizResult("AB", "zh-CN")).toBeNull();
@@ -247,11 +250,11 @@ describe("getQuizResult", () => {
 
   it("主导维度决定气韵，首选歌曲附带理由与印证歌词", async () => {
     mockClient(makeRows());
-    const code = answersFavoring("tianxiang");
-    const result = await getQuizResult(code.toLowerCase(), "zh-CN");
+    const slug = answersFavoring("tianxiang");
+    const result = await getQuizResult(slug, "zh-CN");
 
     expect(result).not.toBeNull();
-    expect(result?.code).toBe(code);
+    expect(result?.slug).toBe(slug);
     expect(result?.persona).toMatchObject({ label: "天象", motto: "仰观天象" });
     expect(result?.profile[0]).toMatchObject({
       key: "tianxiang",
@@ -276,7 +279,13 @@ describe("getQuizResult", () => {
   it("次要维度为正时给出「兼有」", async () => {
     mockClient(makeRows());
     // 全选第一项：各题第一项的主维度分散在多个维度，次要维度为正
-    const result = await getQuizResult("A".repeat(QUESTIONS.length), "zh-CN");
+    const result = await getQuizResult(
+      encodeResultSlug(
+        QUESTIONS.map(() => 0),
+        OPTION_COUNTS,
+      ),
+      "zh-CN",
+    );
     expect(result?.secondary).not.toBeNull();
     expect(result?.secondary?.label).not.toBe(result?.persona.label);
   });

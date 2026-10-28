@@ -135,7 +135,7 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
         size = { width: canvas.width, height: canvas.height };
         try {
           if (cancelled) return null;
-          return exportCard(canvas, `hetu-quiz-${result.code}.png`);
+          return exportCard(canvas, `hetu-quiz-${result.slug}.png`);
         } finally {
           canvas.width = 0;
           canvas.height = 0;

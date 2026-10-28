@@ -9,9 +9,9 @@ import {
 import {
   buildModel,
   buildPool,
-  decodeAnswers,
+  decodeResultSlug,
   DIMENSIONS,
-  encodeAnswers,
+  encodeResultSlug,
   evaluate,
   getDimension,
   POOL_VERSION,
@@ -193,14 +193,16 @@ function toSong(song: PoolSong): Song {
   };
 }
 
+const OPTION_COUNTS = QUESTIONS.map((q) => q.options.length);
+
 /**
- * 根据作答短串计算结果；短串不合法或候选池为空时返回 null。
+ * 根据结果页链接里的乱码计算结果；乱码不合法或候选池为空时返回 null。
  */
 export async function getQuizResult(
-  code: string | undefined,
+  slug: string | undefined,
   locale: string,
 ): Promise<QuizResultView | null> {
-  const answers = decodeAnswers(code, QUESTIONS);
+  const answers = decodeResultSlug(slug, OPTION_COUNTS);
   if (!answers) return null;
   const model = await getQuizModel();
   if (model.songs.length === 0) return null;
@@ -220,7 +222,7 @@ export async function getQuizResult(
   const secondDim = second && second.z > 0 ? getDimension(second.key) : null;
 
   return {
-    code: encodeAnswers(answers),
+    slug: encodeResultSlug(answers, OPTION_COUNTS),
     persona: {
       motto: tr(firstDim.motto),
       label: tr(firstDim.label),

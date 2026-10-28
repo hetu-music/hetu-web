@@ -52,7 +52,7 @@ vi.mock("@/lib/quiz/share-card", () => ({ renderShareCard: vi.fn() }));
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
 const result: QuizResultView = {
-  code: "AAAAAAAAAAAA",
+  slug: "3Kltpgo",
   persona: { motto: "仰观天象", label: "天象", description: "你看得见风月。" },
   secondary: null,
   profile: [{ key: "tianxiang", label: "天象", z: 2 }],
@@ -231,7 +231,7 @@ describe("QuizShareSheet compatibility", () => {
     await screen.findByRole("img");
     const changed = {
       ...result,
-      code: "BBBBBBBBBBBB",
+      slug: "F7yqEME",
       persona: { ...result.persona, motto: "行遍山河" },
     };
     rerender(
@@ -277,7 +277,7 @@ describe("QuizShareSheet compatibility", () => {
       {
         connected: true,
         href: "blob:quiz-download",
-        filename: "hetu-quiz-AAAAAAAAAAAA.png",
+        filename: "hetu-quiz-3Kltpgo.png",
       },
     ]);
     expect(revoke).not.toHaveBeenCalled();
@@ -312,7 +312,7 @@ describe("QuizShareSheet compatibility", () => {
     expect(share).toHaveBeenCalledWith({
       files: [
         expect.objectContaining({
-          name: "hetu-quiz-AAAAAAAAAAAA.png",
+          name: "hetu-quiz-3Kltpgo.png",
           type: "image/png",
         }),
       ],

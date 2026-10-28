@@ -2,7 +2,7 @@
 
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useRouter } from "@/i18n/navigation";
-import { encodeAnswers } from "@/lib/quiz/codec";
+import { encodeResultSlug } from "@/lib/quiz/codec";
 import type { QuizQuestionView, QuizResultGlyphs } from "@/lib/quiz/views";
 import { preloadFontText } from "@/lib/utils/font-preload";
 import { cn } from "@/lib/utils/utils";
@@ -139,10 +139,14 @@ export default function QuizClient({
           return;
         }
         setStage("finishing");
-        router.push(`/quiz/result?a=${encodeAnswers(next as number[])}`);
+        const slug = encodeResultSlug(
+          next as number[],
+          questions.map((q) => q.options.length),
+        );
+        router.push(`/quiz/result/${slug}`);
       }, ADVANCE_DELAY_MS);
     },
-    [answers, index, questions.length, router],
+    [answers, index, questions, router],
   );
 
   const goBack = useCallback(() => {

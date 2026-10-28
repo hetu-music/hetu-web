@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { decodeResultSlug, encodeResultSlug } from "@/lib/quiz/codec";
 import type { QuizQuestionView, QuizResultGlyphs } from "@/lib/quiz/views";
 import QuizClient from "./QuizClient";
 
@@ -52,6 +53,9 @@ const questions: QuizQuestionView[] = [
   { title: "乙", stem: "第二问", options: ["二A", "二B", "二C", "二D"] },
   { title: "丙", stem: "第三问", options: ["三A", "三B", "三C", "三D"] },
 ];
+
+const resultPath = (answers: number[]) =>
+  `/quiz/result/${encodeResultSlug(answers, [4, 4, 4])}`;
 const glyphs: QuizResultGlyphs = {
   calligraphy: "仰观天象",
   serif: "天象",
@@ -87,7 +91,7 @@ describe("QuizClient", () => {
     answer("二D");
     answer("三A");
 
-    expect(push).toHaveBeenCalledWith("/quiz/result?a=BDA");
+    expect(push).toHaveBeenCalledWith(resultPath([1, 3, 0]));
     expect(screen.getByText("question.finishing")).toBeTruthy();
   });
 
@@ -104,7 +108,7 @@ describe("QuizClient", () => {
     answer("二B");
     answer("三D");
 
-    expect(push).toHaveBeenCalledWith("/quiz/result?a=CBD");
+    expect(push).toHaveBeenCalledWith(resultPath([2, 1, 3]));
   });
 
   it("翻页动画期间忽略连点", () => {
@@ -121,7 +125,7 @@ describe("QuizClient", () => {
     answer("二A");
     answer("三A");
 
-    expect(push).toHaveBeenCalledWith("/quiz/result?a=AAA");
+    expect(push).toHaveBeenCalledWith(resultPath([0, 0, 0]));
   });
 
   it("数字键按展示顺序作答", () => {
@@ -138,6 +142,7 @@ describe("QuizClient", () => {
     }
 
     expect(push).toHaveBeenCalledTimes(1);
-    expect(push.mock.calls[0][0]).toMatch(/^\/quiz\/result\?a=[A-D]{3}$/);
+    const slug = String(push.mock.calls[0][0]).replace("/quiz/result/", "");
+    expect(decodeResultSlug(slug, [4, 4, 4])).toHaveLength(3);
   });
 });

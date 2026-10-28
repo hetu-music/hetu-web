@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { decodeAnswers, encodeAnswers } from "./codec";
+import {
+  decodeAnswers,
+  decodeResultSlug,
+  encodeAnswers,
+  encodeResultSlug,
+  resultSlugLength,
+} from "./codec";
 import { DIMENSIONS, DIMENSION_KEYS } from "./dimensions";
 import {
   ENSEMBLE_PENALTY,
@@ -133,6 +139,49 @@ describe("codec", () => {
     expect(decodeAnswers(null, QUESTIONS)).toBeNull();
     expect(decodeAnswers("AB", QUESTIONS)).toBeNull();
     expect(decodeAnswers("Z".repeat(QUESTIONS.length), QUESTIONS)).toBeNull();
+  });
+});
+
+describe("result slug", () => {
+  const counts = QUESTIONS.map((q) => q.options.length);
+
+  it("作答与乱码互转，长度固定且不是保存记录用的 10 位", () => {
+    const length = resultSlugLength(counts);
+    expect(length).not.toBe(10);
+    for (const answers of [
+      QUESTIONS.map(() => 0),
+      QUESTIONS.map((_, i) => i % 4),
+      QUESTIONS.map(() => 3),
+    ]) {
+      const slug = encodeResultSlug(answers, counts);
+      expect(slug).toMatch(/^[0-9A-Za-z]+$/);
+      expect(slug).toHaveLength(length);
+      expect(decodeResultSlug(slug, counts)).toEqual(answers);
+    }
+  });
+
+  it("只差一题的两个结果，乱码大半不同", () => {
+    const a = QUESTIONS.map(() => 0);
+    const b = [...a];
+    b[b.length - 1] = 1;
+    const sa = encodeResultSlug(a, counts);
+    const sb = encodeResultSlug(b, counts);
+    const same = [...sa].filter((ch, i) => ch === sb[i]).length;
+    expect(same).toBeLessThan(sa.length / 2);
+  });
+
+  it("拒绝长度、字符或校验不对的乱码", () => {
+    const slug = encodeResultSlug(
+      QUESTIONS.map(() => 1),
+      counts,
+    );
+    expect(decodeResultSlug(null, counts)).toBeNull();
+    expect(decodeResultSlug(slug.slice(1), counts)).toBeNull();
+    expect(decodeResultSlug(`${slug.slice(1)}-`, counts)).toBeNull();
+    const flipped = slug.slice(0, -1) + (slug.at(-1) === "a" ? "b" : "a");
+    expect(decodeResultSlug(flipped, counts)).toBeNull();
+    // 题目数变了，旧链接作废
+    expect(decodeResultSlug(slug, [...counts, 4])).toBeNull();
   });
 });
 

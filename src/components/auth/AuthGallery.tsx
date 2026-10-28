@@ -170,7 +170,7 @@ export function GalleryQuote({
           >
             <blockquote
               className={cn(
-                "font-serif text-slate-800 dark:text-slate-100",
+                "font-kaiti text-slate-800 dark:text-slate-100",
                 size === "lg"
                   ? "text-3xl xl:text-4xl leading-[1.45] tracking-wide"
                   : "text-xl leading-normal tracking-wide",

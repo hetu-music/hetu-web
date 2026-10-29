@@ -65,7 +65,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["柳"],
       },
       {
-        text: "幼时玩伴送的小陶埙，若有缘再见也好起个话头",
+        text: "幼时玩伴送的小陶埙，若有缘再见，也好起个话头",
         dims: { guangyin: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
@@ -162,7 +162,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "赠别",
-    stem: "盘桓几日，又要上路。送你出城的人，临别给了你——",
+    stem: "盘桓几日，又到了启程之时。送你出城的人，临别给了你——",
     options: [
       {
         text: "画着你们登楼远眺的长卷，气韵生动，看得出费了不少心思",
@@ -190,20 +190,20 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "山行",
-    stem: "出城入山，峰回路转。最触动你心境的一幕是——",
+    stem: "出城入山，景色多变。最让你难忘的一幕是——",
     options: [
       {
-        text: "千年古树上挂满祈愿的红绸，在日光里翻飞",
+        text: "日光下翻飞的红绸。因传山神有灵，至今已几乎看不到绸下的古树了",
         dims: { diangu: 2, caomu: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "坐在清溪边的两个人，静听水声潺潺",
+        text: "隔谷相望的两座青峰，明明相距甚远，倒影却在谷底清潭里轻轻叠在了一处",
         dims: { shanhe: 2, qingsi: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "山寺里那盏长明灯，有人守了它三十年",
+        text: "山寺中的独建一室的长明灯，据说乃是一人所奉，三十年来昼夜未熄",
         dims: { qiyong: 2, renjian: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["灯"],

@@ -209,7 +209,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["灯"],
       },
       {
-        text: "幽深的裂谷。虽处晴日，仍在淅淅沥沥地落着不知积了多久的冷雨",
+        text: "山背的裂谷。虽处晴日，仍在淅淅沥沥地下着不知积了多久的冷雨",
         dims: { guangyin: 2, tianxiang: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雨"],

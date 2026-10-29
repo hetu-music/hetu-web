@@ -198,7 +198,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "隔谷相望的两座青峰，明明相距甚远，倒影却在谷底清潭里轻轻叠在了一处",
+        text: "隔谷相望的两座青峰，明明相距甚远，倒影却在谷底清潭里叠在了一处",
         dims: { shanhe: 2, qingsi: 1 },
         mood: { tone: 1, energy: -1 },
       },

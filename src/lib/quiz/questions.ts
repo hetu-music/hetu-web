@@ -86,18 +86,18 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "躲进路边古寺，借机品读前人的碑刻",
+        text: "去古寺避雨，听说那里有很多碑刻，正好借机品读",
         dims: { loutai: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "在野店要一坛酒，与鬓已微霜的行客对饮",
+        text: "到野店要一坛酒，听同来避雨的南北行客，闲谈各自的漂泊",
         dims: { renjian: 2, qiyong: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["酒"],
       },
       {
-        text: "停在荒野枯林边，看雨渐渐化雪，埋了来时的路",
+        text: "找棵大树暂避一下，看雨渐渐化成雪，埋了来时的路",
         dims: { tianxiang: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雪"],

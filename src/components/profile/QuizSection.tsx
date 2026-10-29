@@ -91,7 +91,9 @@ export default function QuizSection() {
       ) : (
         <div className={QUIZ_TONE_CLASS}>
           {latest && (
+            // 按 id 挂载：删掉最近一条后，下一条顶上来是新的实例，不沿用删除中的状态
             <LatestRecord
+              key={records[0].id}
               record={records[0]}
               result={latest}
               onDelete={() => remove(records[0].id)}
@@ -312,6 +314,8 @@ function DeleteButton({ onDelete }: { onDelete: () => Promise<void> }) {
     try {
       await onDelete();
     } catch {
+      // 错误已在 onDelete 里提示
+    } finally {
       setDeleting(false);
     }
   };

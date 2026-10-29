@@ -17,7 +17,7 @@ import type { QuizQuestion } from "./types";
  * 修改题目或权重会改变测验结果，需同步更新 QUIZ_VERSION 与测试快照。
  * 作答短串按题目顺序逐位编码，调整顺序后旧的分享链接会对应到别的题。
  */
-export const QUIZ_VERSION = "0.4.4";
+export const QUIZ_VERSION = "0.4.5";
 
 export const QUESTIONS: readonly QuizQuestion[] = [
   {
@@ -272,26 +272,26 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "留名",
-    stem: "旅途将尽，你想把自己的名字写在哪里？",
+    title: "抵达",
+    stem: "天明出驿，又走了半日，终于到了此行要去的地方。你先——",
     options: [
       {
-        text: "写进志怪传奇里，与天上星宿并列",
+        text: "登上传说里仙人飞升的那座高台，等一场云海日出",
         dims: { diangu: 2, tianxiang: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "隐刻在古琴腹底，借每一次拨弦，无声呼应心意",
+        text: "取出行囊里那只小陶埙，吹一支幼时玩伴教的曲子，竟还记得调子",
         dims: { qingsi: 2, qiyong: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "留在一路相逢的行客心中，纵使终会被遗忘",
+        text: "照着旧信上的地址去寻故人，街坊说，那人多年前就搬走了",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "留在荒山绝壁上，任青苔荒草掩没，与山同寂",
+        text: "在野坡上坐下，望着来时翻过的群山，荒草一直漫到天边",
         dims: { shanhe: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["山"],
@@ -299,29 +299,29 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "回望",
-    stem: "回望来路，若为这一程写一句收尾——",
+    title: "久居",
+    stem: "你在这里住了下来。日子久了，你常常——",
     options: [
       {
-        text: "「六朝烟水一舟轻，江声吞赤壁，帆影过金陵」",
+        text: "去江边看潮，听老船工讲这条江上的旧事，一讲就是一下午",
         dims: { shanhe: 2, diangu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "「收旧剑，挂桃枝，春林深处好栖迟」",
+        text: "那柄剑挂在窗前，你在窗下种了架青藤，看它慢慢爬上剑鞘",
         dims: { qiyong: 2, caomu: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["剑"],
       },
       {
-        text: "「朝也留，暮也留，留到阶前草几秋，有人犹倚楼」",
+        text: "帮着修城里那座百年老楼，这边才补好，那边又朽了",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["楼"],
       },
       {
-        text: "「梦里旧时同路。回顾，回顾，唯有来途如故」",
+        text: "梦见一路上萍水相逢的人，醒来却怎么也想不起名字",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],
@@ -329,28 +329,28 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "浮生",
-    stem: "千帆过尽。如果能选一种活法，你想成为——",
+    title: "又行",
+    stem: "又一年春深，你又动了远行的念头。这一回，你想去——",
     options: [
       {
-        text: "走遍天南地北、处处有人共饮的人",
+        text: "南来北往的商路上，跟着商队走一程，结识天南地北的人",
         dims: { renjian: 2, shanhe: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "一灯一卷，把日子慢慢过旧的人",
+        text: "一座藏书万卷的书院，在灯下安安静静读上几年书",
         dims: { qiyong: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["灯"],
       },
       {
-        text: "扫去一春落花，在残瓣上题写前人旧句的人",
+        text: "古书里那片传说中的花海，哪怕早已不在，也要亲眼去看看",
         dims: { caomu: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["花"],
       },
       {
-        text: "夜对空庭，等一轮清月照亮瓦檐的人",
+        text: "荒原尽头那座废弃的观星台，独自看月亮升起又落下",
         dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["月"],

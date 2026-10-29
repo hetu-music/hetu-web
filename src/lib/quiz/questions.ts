@@ -190,7 +190,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "山行",
-    stem: "出城入山，景色多变。最让你难忘的一幕是——",
+    stem: "出城入山，景物多变。最让你难忘的一幕是——",
     options: [
       {
         text: "日光下翻飞的红绸。因传山神有灵，至今已几乎看不到绸下的古树了",
@@ -203,13 +203,13 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "山寺中的独建一室的长明灯，据说乃是一人所奉，三十年来昼夜未熄",
+        text: "山寺中独建一室的长明灯，据说乃是一人所奉，三十年来昼夜未熄",
         dims: { qiyong: 2, renjian: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["灯"],
       },
       {
-        text: "暮色里的一场山雨，下了很久，一直没停",
+        text: "幽深的裂谷。虽处晴日，仍在淅淅沥沥地落着不知积了多久的冷雨",
         dims: { guangyin: 2, tianxiang: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雨"],
@@ -218,7 +218,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "题壁",
-    stem: "暂宿荒驿，墙上满是前人的诗。你也提笔，写下——",
+    stem: "借宿荒驿，墙上满是前人的诗。你也提笔，写下——",
     options: [
       {
         text: "「长风浩荡排云去，笑语喧阗逐客来」",

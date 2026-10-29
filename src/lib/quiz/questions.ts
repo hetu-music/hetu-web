@@ -245,16 +245,16 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "旧梦",
-    stem: "夜深人静，合眼沉睡。梦里，你又回到——",
+    stem: "夜深人静，听着风声缓缓睡去。恍惚间，你梦见——",
     options: [
       {
-        text: "落满繁花的庭院，嬉闹追逐，笑声不绝",
+        text: "院里那株象征好运的树花满枝头，落英飞舞，你正满心欢喜地仰头去接",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["花"],
       },
       {
-        text: "儿时的屋檐下，晒着太阳，听檐铃轻响",
+        text: "午后的阳光晒得人昏昏欲睡，叮铃一声，睁眼便看到屋下随风摇动的檐铃",
         dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: 1, energy: -1 },
       },

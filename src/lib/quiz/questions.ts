@@ -135,26 +135,26 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "古城",
-    stem: "弃舟登岸，你走进一座古城。最先去——",
+    stem: "弃舟登岸，你走进一座古城。略作休息之后，你会想——",
     options: [
       {
-        text: "夜市踏雪，买一盏精巧的花灯",
+        text: "趁着雪后去逛下此处有名的灯会，买些有趣的小物件留念",
         dims: { tianxiang: 2, qiyong: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["雪"],
       },
       {
-        text: "庙前书摊，翻看那些泛黄的书",
+        text: "找一间书屋，这座城历史悠久，应当有一些少见的典志",
         dims: { guangyin: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "城角旧园，探寻草木掩映的旧誓",
+        text: "去那座草木深处的祠堂，它的传说你早有耳闻，当去一见",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "临街客栈，隔窗看陌生的过客",
+        text: "找家临街的客栈住下，倚在窗边静静地看街上的人来来往往",
         dims: { renjian: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
       },

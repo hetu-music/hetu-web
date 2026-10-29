@@ -22,27 +22,27 @@ export const QUIZ_VERSION = "0.4.4";
 export const QUESTIONS: readonly QuizQuestion[] = [
   {
     title: "临行",
-    stem: "明日便要远行。今夜，你要——",
+    stem: "明日便要远行。今夜，你会——",
     options: [
       {
-        text: "远望山峦与群星，只等天亮出发",
+        text: "望着远方山峦上的繁星，想象一路上会遇到的人和事",
         dims: { shanhe: 2, tianxiang: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["山"],
       },
       {
-        text: "漫步熟悉的街巷，与亲友共叙旧事",
+        text: "再逛一逛这座熟悉的小城，记下它的来历，和它灯火点点的样子",
         dims: { diangu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "抚过相伴多年的老马，约定未知的归期",
+        text: "为陪伴自己长大的老马准备草料，让它好好等自己回来",
         dims: { guangyin: 2, caomu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["马"],
       },
       {
-        text: "独倚栏杆，想一个不会来送行的人",
+        text: "什么也不做，坐在院子里盯着老屋的檐角发呆",
         dims: { loutai: 2, qingsi: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -53,24 +53,24 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "出门前，你往行囊里多放了一样东西——",
     options: [
       {
-        text: "一柄挂在堂上多年的剑，今日终于取下",
+        text: "挂在堂上多年的剑，说不定可以用来扮演侠客",
         dims: { qiyong: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["剑"],
       },
       {
-        text: "一截带着晨露的柳枝",
+        text: "一截带着晨露的柳枝，所谓灞陵别柳，这样就够了",
         dims: { caomu: 2, tianxiang: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["柳"],
       },
       {
-        text: "一封珍藏多年却未拆的信",
+        text: "幼时玩伴送的小陶埙，万一有缘再见也好起个话头",
         dims: { guangyin: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "一本来自前朝的游记，所记半不可寻",
+        text: "一本前朝的游记，时移事易，也不知能看到几处旧时风景",
         dims: { diangu: 2, shanhe: 1 },
         mood: { tone: -1, energy: -1 },
       },

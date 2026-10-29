@@ -264,7 +264,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "炉上的残酒早已散尽了热气，抬头不见四壁，只见暮色里苍茫的远水",
+        text: "炉上的残酒早已散尽了热气，抬头不见四壁，只剩暮色里苍茫的远水",
         dims: { qiyong: 2, shanhe: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["酒"],

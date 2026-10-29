@@ -65,7 +65,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["柳"],
       },
       {
-        text: "幼时玩伴送的小陶埙，万一有缘再见也好起个话头",
+        text: "幼时玩伴送的小陶埙，若有缘再见也好起个话头",
         dims: { guangyin: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },

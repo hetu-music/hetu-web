@@ -86,7 +86,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "去古寺避雨，听说那里有很多碑刻，正好借机品读",
+        text: "去古寺避雨，听说那里有很多前人碑刻，正好借机品读",
         dims: { loutai: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
@@ -97,7 +97,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["酒"],
       },
       {
-        text: "找棵大树暂避一下，看雨渐渐化成雪，埋了来时的路",
+        text: "找棵大树暂避一时，看雨渐渐化成雪，埋了来时的路",
         dims: { tianxiang: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雪"],
@@ -138,7 +138,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "弃舟登岸，你走进一座古城。略作休息之后，你会想——",
     options: [
       {
-        text: "趁着雪后去逛下此处有名的灯会，买些有趣的小物件留念",
+        text: "趁着雪后去逛下此地有名的灯会，买些有趣的小物件留念",
         dims: { tianxiang: 2, qiyong: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["雪"],
@@ -162,27 +162,27 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "赠别",
-    stem: "倏忽几日，又要上路。送你出城的人，临别给了你——",
+    stem: "盘桓几日，又要上路。送你出城的人，临别给了你——",
     options: [
       {
-        text: "一幅手绘长卷，画着你们登城远眺",
+        text: "画着你们登楼远眺的长卷，气韵生动，看得出费了不少心思",
         dims: { qingsi: 2, loutai: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "一匹温驯的瘦马，缰绳尚带掌心温热",
+        text: "一匹温驯的瘦马，说旅途漫长，有个生灵作伴总不至于太孤单",
         dims: { caomu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["马"],
       },
       {
-        text: "一首诗，月冷路远，但行莫回头",
+        text: "字迹瘦削的一首诗，写着前路月冷山遥，但只管前行、不必回头",
         dims: { tianxiang: 2, shanhe: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["月"],
       },
       {
-        text: "一方古砚，虽残了一角，墨痕犹沉",
+        text: "一方古砚，造型精美，但来历已不可考，只在凹处沉着化不开的旧墨痕",
         dims: { diangu: 2, qiyong: 1 },
         mood: { tone: -1, energy: -1 },
       },

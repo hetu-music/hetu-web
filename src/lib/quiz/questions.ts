@@ -91,7 +91,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "到野店要一坛酒，听同来避雨的南北行客，闲谈各自的漂泊",
+        text: "到野店要一坛酒，听同来避雨的南北行客闲谈各自的漂泊",
         dims: { renjian: 2, qiyong: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["酒"],
@@ -105,28 +105,28 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "歧路",
-    stem: "前面分出几条路。你选择——",
+    title: "渡口",
+    stem: "雨势渐微，前方是一处水陆交汇的津渡。候船间隙，你的目光落在——",
     options: [
       {
-        text: "尽头似有绿柳朱楼的那条，远远望去颇具气象",
+        text: "远处的朱楼，在花柳的掩映下颇具气象",
         dims: { loutai: 2, caomu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["楼"],
       },
       {
-        text: "通向渡口集市的那条，或可一睹渔舟唱晚",
+        text: "路旁的集市。正值归棹，那里人来人往很是嘈杂，满是市井气息",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "沿着江水那条，去那座被攻破过的城关",
+        text: "江对岸的一座城楼，看起来废弃很久了，不过仍然非常雄伟",
         dims: { shanhe: 2, loutai: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "雨幕无人那条，远方皆是一片模糊",
+        text: "水天相接的地方，烟雨迷蒙，什么都看不太清楚",
         dims: { qingsi: 2, tianxiang: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雨"],
@@ -135,7 +135,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "古城",
-    stem: "黄昏时分，你走进一座古城。最先去——",
+    stem: "弃舟登岸，你走进一座古城。最先去——",
     options: [
       {
         text: "夜市踏雪，买一盏精巧的花灯",

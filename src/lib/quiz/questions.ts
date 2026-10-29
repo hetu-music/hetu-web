@@ -31,12 +31,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["山"],
       },
       {
-        text: "再逛一逛这座熟悉的小城，记下它的来历，和它灯火点点的样子",
+        text: "再逛一逛这座熟悉的小城，记住它的来历，和它灯火点点的样子",
         dims: { diangu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "为陪伴自己长大的老马准备草料，让它好好等自己回来",
+        text: "为陪伴自己长大的老马再准备一次草料，让它好好等自己回来",
         dims: { guangyin: 2, caomu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["马"],
@@ -244,11 +244,11 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "旧梦",
+    title: "入梦",
     stem: "夜深人静，听着风声缓缓睡去。恍惚间，你梦见——",
     options: [
       {
-        text: "院里那株象征好运的树花满枝头，落英飞舞，你正满心欢喜地仰头去接",
+        text: "院里那株象征好运的树花满枝头，你正满心欢喜地仰头去接飞舞的落英",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["花"],
@@ -259,12 +259,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "千年前的一座城，城破那夜，鼓声响了一整晚",
+        text: "山寺的那面斑驳壁画在梦里渐渐清晰，你竟成了故事的主角，正要为旧怨做个了断",
         dims: { diangu: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "渡口边一张旧桌，两杯冷酒，只有你一个人",
+        text: "炉上的残酒早已散尽了热气，驿站不知所踪，抬头只见暮色里苍茫的远水",
         dims: { qiyong: 2, shanhe: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["酒"],

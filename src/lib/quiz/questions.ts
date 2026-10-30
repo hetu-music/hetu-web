@@ -348,7 +348,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["花"],
       },
       {
-        text: "走入沙漠寻找被掩埋的断壁残垣，去看看这清月照旧城透出的罕见荒凉",
+        text: "去茫茫沙漠寻找被掩埋的断壁残垣，去看看那清月照旧城透出的罕见荒凉",
         dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["月"],

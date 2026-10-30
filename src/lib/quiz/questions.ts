@@ -303,25 +303,25 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "于是你在这里住了下来。日子久了，你常常——",
     options: [
       {
-        text: "去大江边看潮起潮落，对照着地方旧志，寻访沿岸那些流传已久的奇闻旧事",
+        text: "沿着江边走村串巷，兴起时呼喝两句船家口口相传的古老水调",
         dims: { shanhe: 2, diangu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "在院里种了一架青藤，搬把竹椅坐在廊下，看翠绿的藤蔓一天天爬上壁间挂着的旧剑鞘",
+        text: "拿着旧剑进林子采摘山果草药，拨枝斩蛇，倒比赶路时用得更勤",
         dims: { qiyong: 2, caomu: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["剑"],
       },
       {
-        text: "在黄昏时登上那座历经百年风雨的古楼，虽已朱漆剥落，看飞檐刺破暮色却依然豪气不减",
+        text: "在深夜一边听着城中谯楼传来的报更声，一边写一些无关紧要的往事",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["楼"],
       },
       {
-        text: "在夜里梦见一路上擦肩而过的那些面孔，可每次醒来，却连一个名字也想不起来",
+        text: "与街坊邻里早已熟稔如同故交，却在某个失神的瞬间觉得眼下安稳像一场大梦",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],

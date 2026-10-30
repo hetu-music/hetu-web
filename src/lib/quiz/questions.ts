@@ -31,7 +31,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["山"],
       },
       {
-        text: "再逛一逛这座熟悉的小城，记住它的来历，和它灯火点点的样子",
+        text: "再逛一逛这座熟悉的小城，记下它的来历，和它灯火点点的样子",
         dims: { diangu: 2, renjian: 1 },
         mood: { tone: 1, energy: -1 },
       },
@@ -144,17 +144,17 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["雪"],
       },
       {
-        text: "找一间书屋，这座城历史悠久，应当有一些少见的典志",
+        text: "找家书肆，这座城历史悠久，应当有一些少见的典志",
         dims: { guangyin: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "去那座草木深处的祠堂，它的传说你早有耳闻，当去一见",
+        text: "城角有座草木繁茂的祠堂，它的传说你早有耳闻，当去一见",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "找家临街的客栈住下，倚在窗边静静地看街上的人来来往往",
+        text: "找家临街的客栈住下，倚在窗边静静地看街上来来往往的行人",
         dims: { renjian: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -182,7 +182,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["月"],
       },
       {
-        text: "一方古砚，造型精美，但来历已不可考，只在凹处沉着化不开的旧墨痕",
+        text: "一方造型精美的古砚，但来历已不可考，只在凹处沉着化不开的旧墨痕",
         dims: { diangu: 2, qiyong: 1 },
         mood: { tone: -1, energy: -1 },
       },
@@ -209,7 +209,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["灯"],
       },
       {
-        text: "山背的裂谷。虽处晴日，仍在淅淅沥沥地下着不知积了多久的冷雨",
+        text: "山背的幽谷。虽处晴日，仍在淅淅沥沥地下着不知积了多久的冷雨",
         dims: { guangyin: 2, tianxiang: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["雨"],
@@ -259,7 +259,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "山寺的那面斑驳壁画在梦里渐渐清晰，你竟成了故事的主角，正要为旧怨做个了断",
+        text: "山寺的那面斑驳壁画在梦里渐渐清晰，你是故事的主角，正要为旧怨做个了断",
         dims: { diangu: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
@@ -273,7 +273,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "抵达",
-    stem: "天明出驿，又走了半日，终于到了此行要去的地方。你先——",
+    stem: "天明出驿，又走了几日，终于到了此行的终点。你先——",
     options: [
       {
         text: "登上传说里仙人飞升的那座高台，等一场云海日出",

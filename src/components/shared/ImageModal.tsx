@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -20,7 +26,15 @@ interface ImageModalProps {
   src: string;
   alt: string;
   title?: string;
+  /**
+   * fit：整张缩进一屏，放大后拖动（封面）；
+   * scroll：按适读宽度排开、上下滚动（乐谱，有的是几页拼成的长图，缩进一屏就看不清了）
+   */
+  layout?: "fit" | "scroll";
 }
+
+/** scroll 布局下图片的基准宽度：比详情页那栏宽，又不至于铺满大屏、翻动太多 */
+const SCROLL_WIDTH = "min(100vw - 2rem, 56rem)";
 
 const ImageModal: React.FC<ImageModalProps> = ({
   isOpen,
@@ -28,19 +42,24 @@ const ImageModal: React.FC<ImageModalProps> = ({
   src,
   alt,
   title,
+  layout = "fit",
 }) => {
   const t = useTranslations("common.imageViewer");
 
   // 关闭时调用方会立刻把 src 清空，面板却还在放退场动画；留着上一张图，
-  // 否则 <img> 拿到空 src 会报错
-  const [shown, setShown] = useState({ src, alt, title });
+  // 否则 <img> 拿到空 src 会报错。布局也一并留着，免得退场时换回 fit 跳一下
+  const [shown, setShown] = useState({ src, alt, title, layout });
   if (
     isOpen &&
     src &&
-    (src !== shown.src || alt !== shown.alt || title !== shown.title)
+    (src !== shown.src ||
+      alt !== shown.alt ||
+      title !== shown.title ||
+      layout !== shown.layout)
   ) {
-    setShown({ src, alt, title });
+    setShown({ src, alt, title, layout });
   }
+  const scrolling = shown.layout === "scroll";
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -52,6 +71,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
   const [touchCount, setTouchCount] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
+  // 滚动布局下滚动的那一层
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // 重置状态
   const resetTransform = useCallback(() => {
@@ -132,6 +153,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
       } else if (event.key === "0") {
         event.preventDefault();
         resetTransform();
+      } else if (scrolling) {
+        // 滚动布局不旋转，方向键、空格留给滚动
+        return;
       } else if (event.key === "r" || event.key === "R") {
         event.preventDefault();
         rotateClockwise();
@@ -150,6 +174,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
     };
   }, [
     isOpen,
+    scrolling,
     zoomIn,
     zoomOut,
     resetTransform,
@@ -295,10 +320,12 @@ const ImageModal: React.FC<ImageModalProps> = ({
     }
   }, []);
 
-  // 滚轮缩放处理
+  // 滚轮缩放处理。滚动布局下滚轮用来翻，按住 Ctrl（触控板双指捏合也是）才缩放
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      if (isOpen && imageRef.current?.contains(e.target as Node)) {
+      if (scrolling && !e.ctrlKey && !e.metaKey) return;
+      const area = scrolling ? scrollRef.current : imageRef.current;
+      if (isOpen && area?.contains(e.target as Node)) {
         e.preventDefault();
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         setScale((prev) => Math.min(Math.max(prev * delta, 0.5), 5));
@@ -313,7 +340,25 @@ const ImageModal: React.FC<ImageModalProps> = ({
     return () => {
       document.removeEventListener("wheel", handleWheel);
     };
-  }, [isOpen]);
+  }, [isOpen, scrolling]);
+
+  // 滚动布局缩放时，让视口中心仍对着谱子的同一处，不然一放大就跳回开头
+  const centerRef = useRef({ x: 0.5, y: 0 });
+  const recordCenter = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    centerRef.current = {
+      x: (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth,
+      y: (el.scrollTop + el.clientHeight / 2) / el.scrollHeight,
+    };
+  }, []);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { x, y } = centerRef.current;
+    el.scrollLeft = x * el.scrollWidth - el.clientWidth / 2;
+    el.scrollTop = y * el.scrollHeight - el.clientHeight / 2;
+  }, [scale]);
 
   // 全局触摸事件处理 - 防止浏览器默认行为
   useEffect(() => {
@@ -377,6 +422,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
         if (!open) {
           resetTransform();
           setShowHint(false);
+          centerRef.current = { x: 0.5, y: 0 };
         }
       }}
     >
@@ -430,10 +476,21 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 <h3 className="text-lg font-semibold">{t("help")}</h3>
               </div>
               <div className="space-y-2 text-sm text-white/90">
-                <div>• {t("hintZoom")}</div>
+                {scrolling ? (
+                  <>
+                    <div>• {t("hintScroll")}</div>
+                    <div>• {t("hintZoomScroll")}</div>
+                  </>
+                ) : (
+                  <div>• {t("hintZoom")}</div>
+                )}
                 <div>• {t("hintDoubleClick")}</div>
-                <div>• {t("hintDrag")}</div>
-                <div>• {t("hintRotate")}</div>
+                {!scrolling && (
+                  <>
+                    <div>• {t("hintDrag")}</div>
+                    <div>• {t("hintRotate")}</div>
+                  </>
+                )}
                 <div>• {t("hintReset")}</div>
                 <div>• {t("hintClose")}</div>
               </div>
@@ -442,31 +499,13 @@ const ImageModal: React.FC<ImageModalProps> = ({
         )}
 
         {/* 图片容器 - 占满整个屏幕。开合时只有图片微微缩放，周围的标题和工具栏只淡入淡出 */}
-        <div
-          className="absolute inset-0 flex items-center justify-center overflow-hidden transition-[scale] duration-300 ease-page group-data-starting-style:scale-95 group-data-ending-style:scale-95 group-data-ending-style:duration-200"
-          style={{ touchAction: "none" }}
-        >
+        {scrolling ? (
+          // 上下留出标题和工具栏的位置，滚到两头时不被挡住
           <div
-            ref={imageRef}
-            className="relative select-none flex items-center justify-center w-full h-full"
-            style={{
-              transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px) rotate(${rotation}deg)`,
-              transition: isDragging ? "none" : "transform 0.2s ease-out",
-              cursor:
-                scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
-              touchAction: "none",
-              userSelect: "none",
-              WebkitUserSelect: "none",
-              WebkitTouchCallout: "none",
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onDoubleClick={handleDoubleClick}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            ref={scrollRef}
+            onScroll={recordCenter}
+            className="absolute inset-0 overflow-auto overscroll-contain px-4 pt-20 pb-28 transition-[scale] duration-300 ease-page group-data-starting-style:scale-95 group-data-ending-style:scale-95 group-data-ending-style:duration-200"
+            style={{ touchAction: "pan-x pan-y" }}
           >
             {shown.src && (
               <Image
@@ -474,18 +513,65 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 alt={shown.alt}
                 width={1200}
                 height={800}
-                // 加载完再淡入，不在面板淡入之后突然冒出来
+                // 只在整数倍时换更大的图，Ctrl + 滚轮连续缩放时不至于一路重新请求
+                sizes={`(max-width: 928px) calc((100vw - 2rem) * ${Math.max(1, Math.ceil(scale))}), ${56 * Math.max(1, Math.ceil(scale))}rem`}
                 onLoad={() => setLoadedSrc(shown.src)}
-                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ease-page ${
+                onDoubleClick={handleDoubleClick}
+                className={`mx-auto block h-auto max-w-none select-none transition-opacity duration-300 ease-page ${
                   loadedSrc === shown.src ? "opacity-100" : "opacity-0"
                 }`}
-                style={{ objectFit: "contain" }}
+                style={{ width: `calc(${SCROLL_WIDTH} * ${scale})` }}
                 priority
                 draggable={false}
               />
             )}
           </div>
-        </div>
+        ) : (
+          <div
+            className="absolute inset-0 flex items-center justify-center overflow-hidden transition-[scale] duration-300 ease-page group-data-starting-style:scale-95 group-data-ending-style:scale-95 group-data-ending-style:duration-200"
+            style={{ touchAction: "none" }}
+          >
+            <div
+              ref={imageRef}
+              className="relative select-none flex items-center justify-center w-full h-full"
+              style={{
+                transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px) rotate(${rotation}deg)`,
+                transition: isDragging ? "none" : "transform 0.2s ease-out",
+                cursor:
+                  scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+                touchAction: "none",
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+              }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onDoubleClick={handleDoubleClick}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              {shown.src && (
+                <Image
+                  src={shown.src}
+                  alt={shown.alt}
+                  width={1200}
+                  height={800}
+                  // 加载完再淡入，不在面板淡入之后突然冒出来
+                  onLoad={() => setLoadedSrc(shown.src)}
+                  className={`max-w-full max-h-full object-contain transition-opacity duration-300 ease-page ${
+                    loadedSrc === shown.src ? "opacity-100" : "opacity-0"
+                  }`}
+                  style={{ objectFit: "contain" }}
+                  priority
+                  draggable={false}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 控制按钮组 - 小屏居中，大屏右下角 */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 sm:left-auto sm:right-4 sm:translate-x-0 z-10 max-w-[calc(100vw-1rem)] sm:max-w-none px-2 sm:px-0">
@@ -514,25 +600,29 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
             <div className="w-px h-5 sm:h-6 bg-white/20 mx-1 shrink-0"></div>
 
-            <button
-              onClick={rotateCounterClockwise}
-              className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
-              aria-label={t("rotateLeft")}
-              title={`${t("rotateLeft")} (L)`}
-            >
-              <RotateCcw size={16} />
-            </button>
+            {!scrolling && (
+              <>
+                <button
+                  onClick={rotateCounterClockwise}
+                  className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
+                  aria-label={t("rotateLeft")}
+                  title={`${t("rotateLeft")} (L)`}
+                >
+                  <RotateCcw size={16} />
+                </button>
 
-            <button
-              onClick={rotateClockwise}
-              className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
-              aria-label={t("rotateRight")}
-              title={`${t("rotateRight")} (R)`}
-            >
-              <RotateCw size={16} />
-            </button>
+                <button
+                  onClick={rotateClockwise}
+                  className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 shrink-0"
+                  aria-label={t("rotateRight")}
+                  title={`${t("rotateRight")} (R)`}
+                >
+                  <RotateCw size={16} />
+                </button>
 
-            <div className="w-px h-5 sm:h-6 bg-white/20 mx-1 shrink-0"></div>
+                <div className="w-px h-5 sm:h-6 bg-white/20 mx-1 shrink-0"></div>
+              </>
+            )}
 
             <button
               onClick={resetTransform}

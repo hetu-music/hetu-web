@@ -175,6 +175,8 @@
     "rotateRight": "順時針旋轉",
     "reset": "重置",
     "hintZoom": "滾輪或雙指縮放圖片",
+    "hintScroll": "上下捲動查看全譜",
+    "hintZoomScroll": "Ctrl + 滾輪、+ - 鍵或按鈕縮放",
     "hintDoubleClick": "雙擊放大或復原",
     "hintDrag": "放大後拖動檢視",
     "hintRotate": "R、L 鍵旋轉圖片",

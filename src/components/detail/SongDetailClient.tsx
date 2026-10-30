@@ -60,6 +60,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     src: string;
     alt: string;
     title: string;
+    layout?: "fit" | "scroll";
   } | null>(null);
 
   // ── 正文与意象 ──────────────────────────────────────────────────────────
@@ -283,6 +284,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
                   src: getNmnUrl(song),
                   alt: t("scoreTitle", { title: song.title }),
                   title: t("scoreTitle", { title: song.title }),
+                  layout: "scroll",
                 })
               }
             />
@@ -313,6 +315,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         src={imageModal?.src ?? ""}
         alt={imageModal?.alt ?? ""}
         title={imageModal?.title ?? ""}
+        layout={imageModal?.layout}
       />
     </div>
   );

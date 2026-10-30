@@ -62,6 +62,8 @@
     "lrc": "LRC"
   },
   "zoomScore": "点击放大",
+  "expandScore": "展开全谱",
+  "collapseScore": "收起",
   "scoreLoadError": "乐谱加载失败",
   "copySuccess": "链接已复制到剪贴板",
   "copyError": "复制失败",

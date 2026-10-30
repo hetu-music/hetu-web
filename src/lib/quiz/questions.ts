@@ -3,8 +3,6 @@ import type { QuizQuestion } from "./types";
 /**
  * 寻曲测验题目（简体原文，繁体由服务端转换）。
  *
- * 十二题是一段旅程：临行、上路、进城、出城、入山、夜宿，再回望与收束。
- *
  * 出题约定：
  * - 维度：主维度 2、副维度 1。每题四个选项的主维度各不相同；
  *   各维度出现频次不必严格均衡——匹配前会按均匀作答的解析分布做标准化。
@@ -321,7 +319,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["楼"],
       },
       {
-        text: "与街坊邻里早已熟稔如同故交，却在某个失神的瞬间觉得眼下安稳像一场大梦",
+        text: "与街坊邻里早已熟稔如同故交，却在某个失神的瞬间觉得眼下的安稳像一场大梦",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],
@@ -330,27 +328,27 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "又行",
-    stem: "又一年春深，你又动了远行的念头。这一回，你想去——",
+    stem: "又一年春深，你又动了远行的念头。这一回，你打算——",
     options: [
       {
-        text: "南来北往的商道上，跟着浩浩荡荡的驼队走一程，去见识天南地北的风土与豪客",
+        text: "搭上南下出海的远洋商船，与操着各色口音的行商一道，去见识更辽阔的世外",
         dims: { renjian: 2, shanhe: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "深山里一座藏书万卷的古老书院，在青灯下安安静静读上几年闲书",
+        text: "寻访一位封炉已久的师傅，学着灯下看火候、试釉色，亲手烧几件称心的瓷器",
         dims: { qiyong: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["灯"],
       },
       {
-        text: "古籍里提过的那片绝域花海，哪怕前人说它早已湮灭，也要亲自去印证一回",
+        text: "深入西南密林，尝试移栽培育几种药书中记载过、却罕见于世的奇花异草",
         dims: { caomu: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["花"],
       },
       {
-        text: "荒原尽头那座废弃已久的观星台，在空旷的高处，独自看一轮清月升起又落下",
+        text: "走入沙漠寻找被掩埋的断壁残垣，去看看这清月照旧城透出的罕见荒凉",
         dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["月"],

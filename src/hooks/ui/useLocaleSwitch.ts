@@ -2,7 +2,8 @@
 
 import { useCallback, useTransition } from "react";
 import { useLocale } from "next-intl";
-import { useRouter, usePathname } from "@/i18n/navigation";
+import { useRouter as useNextRouter } from "next/navigation";
+import { getPathname, useRouter, usePathname } from "@/i18n/navigation";
 
 // 语言配置项，未来如需添加英语（en）、日语（ja）等，只需在此追加配置即可。
 // 名称各用自己的字形写，不随当前语系翻译：找自己能读的那一项最快
@@ -18,17 +19,20 @@ export const LANGUAGES = [
 export function useLocaleSwitch() {
   const locale = useLocale();
   const router = useRouter();
+  const nextRouter = useNextRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
 
-  // 鼠标悬停时预加载非当前语系，保证流畅度
+  // 鼠标悬停时预加载非当前语系，保证流畅度。
+  // 不用 next-intl 的 router.prefetch：带 locale 时它会顺手把 NEXT_LOCALE
+  // cookie 改成目标语系，人还没切，cookie 已经变了
   const prefetchAll = useCallback(() => {
     LANGUAGES.forEach((lang) => {
       if (lang.code !== locale) {
-        router.prefetch(pathname, { locale: lang.code });
+        nextRouter.prefetch(getPathname({ href: pathname, locale: lang.code }));
       }
     });
-  }, [router, pathname, locale]);
+  }, [nextRouter, pathname, locale]);
 
   const switchTo = useCallback(
     (targetLocale: string) => {

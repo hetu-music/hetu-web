@@ -98,7 +98,9 @@ describe("QuizSection", () => {
 
     const motto = await screen.findByRole("link", { name: "仰观天象" });
     expect(motto.getAttribute("href")).toBe("/quiz/result/latest0001");
-    expect(fetchMock).toHaveBeenCalledWith("/api/public/quiz-results?latest=1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/public/quiz-results?latest=1&locale=zh-CN",
+    );
     expect(screen.getByText("兼有 · 行遍山河")).toBeTruthy();
     expect(screen.getByText("2026 年 10 月寻得")).toBeTruthy();
     expect(screen.getByText("你看得见风月。")).toBeTruthy();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PUBLIC_AGGREGATE_CACHE } from "@/lib/server/cache-headers";
+import { localeFromRequest } from "@/lib/server/request-locale";
 import { getMotifDetail } from "@/lib/server/service-imagery-cloud";
 
 /** 意象词云的面板：一个母题的写法与作品。?locale=zh-TW 时转繁体 */
@@ -12,8 +13,7 @@ export async function GET(
   if (isNaN(id)) {
     return NextResponse.json({ motif: null }, { status: 400 });
   }
-  const locale =
-    req.nextUrl.searchParams.get("locale") === "zh-TW" ? "zh-TW" : "zh-CN";
+  const locale = localeFromRequest(req);
 
   try {
     const motif = await getMotifDetail(id, locale);

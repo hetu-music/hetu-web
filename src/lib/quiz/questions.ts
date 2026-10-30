@@ -257,7 +257,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "山寺的那面斑驳壁画在梦里渐渐清晰，你化身故事的主角，正要为旧怨做个了断",
+        text: "山寺的那面斑驳壁画渐渐清晰，你化身故事的主角，正要为旧怨做个了断",
         dims: { diangu: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
@@ -279,7 +279,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "漏窗里临水摆放的旧木案与粗瓷茶具，样式寻常，却莫名像极了你曾向往的某处旧居",
+        text: "漏窗里摆着旧木案与粗瓷茶具，样式寻常，却莫名像极了你曾向往的某处旧居",
         dims: { qingsi: 2, qiyong: 1 },
         mood: { tone: 1, energy: -1 },
       },
@@ -319,7 +319,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["楼"],
       },
       {
-        text: "与街坊邻里早已熟稔如同故交，却在某个失神的瞬间觉得眼下的安稳像一场大梦",
+        text: "与街坊邻里闲谈琐事时突然失神，觉得眼下的安稳像一场大梦",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],

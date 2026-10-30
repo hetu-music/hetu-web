@@ -286,7 +286,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "溪水倒映出略显疲惫的脸庞，原来光阴已在脚下走尽，走与不走，于你已不再重要",
+        text: "人们对你的称呼渐渐改变，原来光阴已在脚下走尽，走与不走，于你已不再重要",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },

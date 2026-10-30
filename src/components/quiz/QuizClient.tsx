@@ -177,7 +177,7 @@ export default function QuizClient({
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
       <TopBar exit={{ kind: "logo" }} />
 
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 md:max-w-188 pb-24 pt-32">
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 md:max-w-190 pb-24 pt-32">
         <AnimatePresence mode="wait">
           {stage === "intro" && (
             <motion.section

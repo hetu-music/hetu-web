@@ -272,26 +272,26 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     ],
   },
   {
-    title: "抵达",
-    stem: "天明出驿，又走了几日，终于到了此行的终点。你先——",
+    title: "驻足",
+    stem: "不知走了多久，你忽然觉得不必再前行了。留住你脚步的是——",
     options: [
       {
-        text: "登上传说里仙人飞升的那座高台，等一场云海日出",
+        text: "古卷里记载过的那片奇异天光，漫天云霞终日不散，真如传说中的世外仙境一般",
         dims: { diangu: 2, tianxiang: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "取出行囊里那只小陶埙，吹一支幼时玩伴教的曲子，竟还记得调子",
+        text: "临水小院里一方干净的旧木案与粗瓷茶具，让人一见便觉安心，只想坐下来安放一路的心事",
         dims: { qingsi: 2, qiyong: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "照着旧信上的地址去寻故人，街坊说，那人多年前就搬走了",
+        text: "溪水里映出的自己那双略显疲惫却依然明亮的眼睛，走了这么多个寒暑，是时候歇一歇了",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "在野坡上坐下，望着来时翻过的群山，荒草一直漫到天边",
+        text: "四面静默合拢的苍茫群山，漫山遍野的荒草隔绝了尘世，安静得像是大地真正的尽头",
         dims: { shanhe: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["山"],
@@ -300,28 +300,28 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   },
   {
     title: "久居",
-    stem: "你在这里住了下来。日子久了，你常常——",
+    stem: "于是你在这里住了下来。日子久了，你常常——",
     options: [
       {
-        text: "去江边看潮，听老船工讲这条江上的旧事，一讲就是一下午",
+        text: "去大江边看潮起潮落，对照着地方旧志，寻访沿岸那些流传已久的奇闻旧事",
         dims: { shanhe: 2, diangu: 1 },
         mood: { tone: 1, energy: 1 },
         imagery: ["江河"],
       },
       {
-        text: "那柄剑挂在窗前，你在窗下种了架青藤，看它慢慢爬上剑鞘",
+        text: "在院里种了一架青藤，搬把竹椅坐在廊下，看翠绿的藤蔓一天天爬上壁间挂着的旧剑鞘",
         dims: { qiyong: 2, caomu: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["剑"],
       },
       {
-        text: "帮着修城里那座百年老楼，这边才补好，那边又朽了",
+        text: "在黄昏时登上那座历经百年风雨的古楼，虽已朱漆剥落，看飞檐刺破暮色却依然豪气不减",
         dims: { loutai: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["楼"],
       },
       {
-        text: "梦见一路上萍水相逢的人，醒来却怎么也想不起名字",
+        text: "在夜里梦见一路上擦肩而过的那些面孔，可每次醒来，却连一个名字也想不起来",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],
@@ -333,24 +333,24 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "又一年春深，你又动了远行的念头。这一回，你想去——",
     options: [
       {
-        text: "南来北往的商路上，跟着商队走一程，结识天南地北的人",
+        text: "南来北往的商道上，跟着浩浩荡荡的驼队走一程，去见识天南地北的风土与豪客",
         dims: { renjian: 2, shanhe: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "一座藏书万卷的书院，在灯下安安静静读上几年书",
+        text: "深山里一座藏书万卷的古老书院，在青灯下安安静静读上几年闲书",
         dims: { qiyong: 2, guangyin: 1 },
         mood: { tone: 1, energy: -1 },
         imagery: ["灯"],
       },
       {
-        text: "古书里那片传说中的花海，哪怕早已不在，也要亲眼去看看",
+        text: "古籍里提过的那片绝域花海，哪怕前人说它早已湮灭，也要亲自去印证一回",
         dims: { caomu: 2, diangu: 1 },
         mood: { tone: -1, energy: 1 },
         imagery: ["花"],
       },
       {
-        text: "荒原尽头那座废弃的观星台，独自看月亮升起又落下",
+        text: "荒原尽头那座废弃已久的观星台，在空旷的高处，独自看一轮清月升起又落下",
         dims: { tianxiang: 2, loutai: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["月"],

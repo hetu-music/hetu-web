@@ -259,12 +259,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "山寺的那面斑驳壁画在梦里渐渐清晰，你是故事的主角，正要为旧怨做个了断",
+        text: "山寺的那面斑驳壁画在梦里渐渐清晰，你化身故事的主角，正要为旧怨做个了断",
         dims: { diangu: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "炉上的残酒早已散尽了热气，抬头不见四壁，只剩暮色里苍茫的远水",
+        text: "炉上的残酒早已散尽了热气，抬头驿馆已不知何处，只剩暮色里苍茫的远水",
         dims: { qiyong: 2, shanhe: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["酒"],
@@ -286,12 +286,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "溪水里映出的自己那双略显疲惫却依然明亮的眼睛，走了这么多个寒暑，是时候歇一歇了",
+        text: "溪水倒映出略显疲惫的脸庞，原来光阴已在脚下走尽，走与不走，于你已不再重要",
         dims: { renjian: 2, guangyin: 1 },
         mood: { tone: -1, energy: 1 },
       },
       {
-        text: "四面静默合拢的苍茫群山，漫山遍野的荒草隔绝了尘世，安静得像是大地真正的尽头",
+        text: "所见山川草木日渐相似，或许继续前行也只是昨日的重复，不如就此停下",
         dims: { shanhe: 2, caomu: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["山"],

@@ -2,7 +2,7 @@
 
 import { Link } from "@/i18n/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Scroll, Sparkles } from "lucide-react";
+import { Compass, Scroll, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useSyncExternalStore } from "react";
 
@@ -12,6 +12,16 @@ interface HeroSectionProps {
 
 // 模板化入口配置区：未来添加新功能入口只需在此处添加配置即可
 const FEATURE_ENTRANCES = [
+  {
+    id: "quiz",
+    href: "/quiz",
+    icon: Compass,
+    textBase: "text-[#9A6B2F] dark:text-[#D4A259]",
+    textHover: "group-hover:text-[#6E4A1C] dark:group-hover:text-[#EACB94]",
+    haloBg: "bg-[#9A6B2F]/25 dark:bg-[#D4A259]/25",
+    glow: "rgba(154,107,47,0.15)",
+    offsetClass: "relative",
+  },
   {
     id: "qjtx",
     href: "/story/qjtx",
@@ -32,17 +42,6 @@ const FEATURE_ENTRANCES = [
     glow: "rgba(46,117,108,0.15)",
     offsetClass: "relative -left-[0.5px]",
   },
-  // 寻曲测验内测中，暂不开放入口；上线时取消注释并在上方引入 Compass 图标
-  // {
-  //   id: "quiz",
-  //   href: "/quiz",
-  //   icon: Compass,
-  //   textBase: "text-[#9A6B2F] dark:text-[#D4A259]",
-  //   textHover: "group-hover:text-[#6E4A1C] dark:group-hover:text-[#EACB94]",
-  //   haloBg: "bg-[#9A6B2F]/25 dark:bg-[#D4A259]/25",
-  //   glow: "rgba(154,107,47,0.15)",
-  //   offsetClass: "relative",
-  // },
 ];
 
 export default function HeroSection({ songCount }: HeroSectionProps) {
@@ -262,7 +261,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
         </div>
 
         {/* -- 移动端入口 (Mobile) - 极简横向排列 -- */}
-        <div className="flex md:hidden flex-row gap-8 w-full mt-1 flex-wrap justify-center">
+        <div className="flex md:hidden flex-row flex-wrap gap-y-8 w-full mt-1 justify-between">
           {/* 主副标题与入口间的分界线 - 古典编排风格的高级分界线 */}
           <div className="flex items-center w-full mt-2 mb-1 opacity-80">
             <div className="flex-1 h-px bg-linear-to-r from-transparent to-slate-300 dark:to-slate-700" />
@@ -282,9 +281,9 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
                 onMouseEnter={() => setHoveredId(feature.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 onTouchStart={() => setHoveredId(feature.id)}
-                className="group flex items-center justify-between outline-none py-1.5 -translate-x-8"
+                className="group flex items-center justify-between outline-none py-1.5"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   {/* 菱形小印章指示点 - 加上与桌面端统一的无边界高斯模糊光晕 */}
                   <div className="relative flex items-center justify-center h-3 w-3">
                     {/* concentric ripples */}
@@ -307,7 +306,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
                   </div>
                   {/* 标题 */}
                   <div
-                    className={`flex items-center text-[16px] font-calligraphy font-medium tracking-[0.5em] leading-none transition-all duration-500 ${
+                    className={`flex items-center text-[16px] font-calligraphy font-medium tracking-[0.4em] -mr-[0.4em] leading-none transition-all duration-500 ${
                       hoveredId === feature.id
                         ? `${feature.textHover.replace(/group-hover:/g, "")}`
                         : `${feature.textBase} ${feature.textHover}`

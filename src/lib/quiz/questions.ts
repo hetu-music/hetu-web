@@ -276,12 +276,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
     stem: "不知走了多久，你忽然觉得不必再前行了。留住你脚步的是——",
     options: [
       {
-        text: "古卷里记载过的那片奇异天光，漫天云霞终日不散，真如传说中的世外仙境一般",
+        text: "亲眼看到了古书中记载过的奇异天光，漫天云霞终日不散，好似世外仙境一般",
         dims: { diangu: 2, tianxiang: 1 },
         mood: { tone: 1, energy: 1 },
       },
       {
-        text: "临水小院里一方干净的旧木案与粗瓷茶具，让人一见便觉安心，只想坐下来安放一路的心事",
+        text: "漏窗里临水摆放的旧木案与粗瓷茶具，样式寻常，却莫名像极了你曾向往的某处旧居",
         dims: { qingsi: 2, qiyong: 1 },
         mood: { tone: 1, energy: -1 },
       },

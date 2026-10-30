@@ -134,6 +134,7 @@ src/lib/search/
   normalize.ts     归一化与位置表
   t2s.json         逐字繁转简表（脚本生成）
   pinyin.ts        对 pinyin-match 的封装
+  corpus.ts        构建 LyricsCorpus（第 10 条）
   rank.ts          分档匹配、多词、兜底、排序
   snippet.ts       片段截取与高亮区间
 src/hooks/library/
@@ -142,6 +143,37 @@ src/hooks/library/
 ```
 
 `searchAndFilterSongs` 里的筛选部分（类型、年份、人名、曲风）保持不变，只把搜索那一步换掉。
+
+### 10. 客户端的数据结构与缓存
+
+**下载格式不做专门设计。** 去重复句、二进制或按列存储，收益都很小：副歌这类重复文本本来就会被 brotli/gzip 压掉，一两 MB 的 `JSON.parse` 也只要十几毫秒。阶段 0 量出来的大小如果远超预期，再回头考虑。
+
+**内存结构：一整串文本，不存句子数组。** 索引到达后构建：
+
+```ts
+type LyricsCorpus = {
+  corpus: string;          // 全部句子归一化后拼接，句间用 \u0001 隔开
+  lineStart: Int32Array;   // 每句在 corpus 里的起点
+  lineSong: Int32Array;    // 每句属于哪首歌（歌曲 id）
+  lines: string[];         // 原文，按句号索引，显示片段时用
+};
+```
+
+- 每个搜索词只在 `corpus` 上反复调用 `indexOf`，再用二分查找从命中位置定位到句子和歌。不遍历上万个短字符串，也不为每句建对象，低端手机上省内存。
+- 分隔符保证命中不会跨句。归一化会去掉所有符号，`\u0001` 不会出现在正文里。
+- 「归一化位置 → 原文位置」的位置表**按需计算**：只给当前页要显示片段的那十几句算，不在载入时全部算一遍。
+- 兜底的相邻两字片段匹配也在 `corpus` 上做，只在精确命中太少时执行。
+
+**缓存：带版本号的地址。**
+
+- 首页的页面数据里带一个歌词版本号：全部歌曲最近一次更新时间的短哈希。
+- 客户端请求 `lyrics-lines?locale=…&v=<版本号>`。版本号不变，地址就不变，这份数据按「不会再变」缓存：Service Worker 对这个接口改用 `CacheFirst`，CDN 设长缓存（`immutable`）。
+- 歌词更新后版本号随之变化，客户端自然请求新地址；旧地址的缓存交给 Service Worker 的过期清理。
+- 效果：用户第二次打开曲库页时，索引直接从本地读出，「歌词检索准备中」只会在第一次出现。
+
+**接口忽略 `v`，始终返回当前数据。** 首页是 ISR 页面，它带出去的版本号可能比接口实际的数据新，也可能更旧。`v` 只用来区分缓存地址，最坏的情况是某个地址缓存了略新或略旧的数据，下一次歌词更新、版本号变化时自然纠正。歌词更新很少，这可以接受。
+
+也因此，`server-revalidate.ts` 不必再清这个接口的 CDN 缓存。
 
 ## 四、依赖变化
 
@@ -168,13 +200,14 @@ src/hooks/library/
 
 ### 阶段 1：搜索内核
 
-实现 `src/lib/search/` 下的模块和 `t2s.json` 生成脚本，配单元测试：归一化与位置表、每一档的判定、多词、兜底、拼音、片段截取。评测集作为测试的一部分，防止以后改坏。
+实现 `src/lib/search/` 下的模块和 `t2s.json` 生成脚本，歌词按第三节第 10 条的 `LyricsCorpus` 结构存放。配单元测试：归一化与位置表、corpus 的构建与定位（命中不跨句）、每一档的判定、多词、兜底、拼音、片段截取。评测集作为测试的一部分，防止以后改坏。
 
 ### 阶段 2：新接口与缓存链路
 
-1. 新增 `lyrics-lines` 接口，用 `localeFromRequest` 取字形（见 `src/lib/server/request-locale.ts`），设 `revalidate` 和 `PUBLIC_API_CACHE`。
-2. `server-revalidate.ts` 里 `refreshSongs` 和 `refreshPublicPages` 的路径列表加上新接口的两个字形：`/api/public/songs/lyrics-lines` 和 `?locale=zh-TW`（参照意象母题接口的写法）。
-3. `sw.ts` 的 `PUBLIC_CACHEABLE_API` 加上新路径。这个正则只匹配路径部分，带 `?locale=` 的请求也能匹配上；Cache Storage 按完整 URL 存，简繁两份不会混。
+1. 新增 `lyrics-lines` 接口，用 `localeFromRequest` 取字形（见 `src/lib/server/request-locale.ts`），忽略 `v` 参数，响应头设长缓存（`immutable`）。
+2. 首页的服务端数据里算出歌词版本号（全部歌曲最近更新时间的短哈希），传给 `MusicLibraryClient`。
+3. `sw.ts` 为新接口单独加一条 `CacheFirst` 规则，配 `ExpirationPlugin` 限制条数（简繁各留最近两三个版本即可）。不要放进现有的 `PUBLIC_CACHEABLE_API`，那条规则是 `NetworkFirst`。Cache Storage 按完整 URL 存，简繁、新旧版本互不相混。
+4. `server-revalidate.ts` 不需要为新接口加路径：版本号变化即换地址。
 
 ### 阶段 3：接入曲库页
 

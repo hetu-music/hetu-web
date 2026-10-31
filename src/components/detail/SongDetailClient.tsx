@@ -3,6 +3,7 @@
 import { CommentsProvider } from "@/components/detail/comments/CommentsContext";
 import CommentSheet from "@/components/detail/comments/CommentSheet";
 import CommentsSection from "@/components/detail/comments/CommentsSection";
+import { CollationsSection } from "@/components/detail/Collations";
 import CreatorNotes from "@/components/detail/CreatorNotes";
 import DisputeNotice from "@/components/detail/DisputeNotice";
 import ImageryCaption from "@/components/detail/ImageryCaption";
@@ -83,7 +84,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     () => resolveCollations(collations, anchorCtx),
     [collations, anchorCtx],
   );
-  const hasNotesSection = !!notes || collationEntries.length > 0;
   const marked = useMemo(
     () => markLines(folio.lines, imagery.marks),
     [folio.lines, imagery.marks],
@@ -169,11 +169,9 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
   const tocItems = useMemo<NavItem[]>(() => {
     const items: NavItem[] = [{ id: "info", label: t("folio.sections.cover") }];
-    if (hasNotesSection)
-      items.push({
-        id: "notes",
-        label: t(notes ? "folio.sections.notes" : "folio.sections.collations"),
-      });
+    if (notes) items.push({ id: "notes", label: t("folio.sections.notes") });
+    if (collationEntries.length > 0)
+      items.push({ id: "collations", label: t("folio.sections.collations") });
     items.push({ id: "lyrics", label: t("folio.sections.text") });
     if (song.nmn_status)
       items.push({ id: "score", label: t("sections.score") });
@@ -182,7 +180,13 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     if (imagery.related.length > 0)
       items.push({ id: "related", label: t("folio.sections.related") });
     return items;
-  }, [song.nmn_status, imagery.related.length, notes, hasNotesSection, t]);
+  }, [
+    song.nmn_status,
+    imagery.related.length,
+    notes,
+    collationEntries.length,
+    t,
+  ]);
 
   const activeSection = useActiveSection(tocItems);
   // 窄屏放不下歌名：卷首时显示「目录」，滚过题名后显示当前章节
@@ -275,8 +279,10 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
             }
           />
 
-          {hasNotesSection && (
-            <CreatorNotes notes={notes} collations={collationEntries} />
+          {notes && <CreatorNotes notes={notes} />}
+
+          {collationEntries.length > 0 && (
+            <CollationsSection entries={collationEntries} />
           )}
 
           <LyricsFolio

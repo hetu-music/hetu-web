@@ -118,8 +118,6 @@
       "collator": "{name}校",
       "reviser": "{name}訂",
       "anonymous": "佚名",
-      "marker": "校",
-      "markerLabel": "看這一句的校記",
       "jump": "回到原句",
       "orphan": "原句已改動"
     },

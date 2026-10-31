@@ -1,13 +1,13 @@
 "use client";
 
-import { CollationMarker } from "@/components/detail/Collations";
+import { LineCollations } from "@/components/detail/Collations";
 import CommentGutter from "@/components/detail/comments/CommentGutter";
 import { useComments } from "@/components/detail/comments/CommentsContext";
 import SlotMarker from "@/components/detail/comments/SlotMarker";
 import SectionHeading from "@/components/detail/SectionHeading";
 import { usePlayerTime } from "@/hooks/player/usePlayerTime";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
-import type { SongImageryMark } from "@/lib/types";
+import type { SongCollation, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import {
   type CommentSlot,
@@ -43,8 +43,8 @@ interface LyricsFolioProps {
   markById: Map<number, SongImageryMark>;
   activeImagery: number | null;
   onSelectImagery: (id: number | null) => void;
-  /** 有校记的行 → 该行第一条校记 */
-  collationByLine: Map<number, number>;
+  /** 有校记的行 → 写在句下的校记 */
+  collationByLine: Map<number, SongCollation[]>;
 }
 
 export default function LyricsFolio({
@@ -228,7 +228,7 @@ export default function LyricsFolio({
               }
               markById={markById}
               activeImagery={activeImagery}
-              collationId={collationByLine.get(i)}
+              collations={collationByLine.get(i)}
               isCurrent={isCurrentTrack && currentIndex === i}
               seekable={seekable && line.time !== null}
               seekHint={t("folio.seekHint")}
@@ -259,8 +259,8 @@ interface FolioRowProps {
   numeralMuted: boolean;
   markById: Map<number, SongImageryMark>;
   activeImagery: number | null;
-  /** 这一句的校记，句末挂「校」 */
-  collationId: number | undefined;
+  /** 这一句的校记，小字写在句下 */
+  collations: SongCollation[] | undefined;
   isCurrent: boolean;
   seekable: boolean;
   seekHint: string;
@@ -284,7 +284,7 @@ const FolioRow = memo(function FolioRow({
   numeralMuted,
   markById,
   activeImagery,
-  collationId,
+  collations,
   isCurrent,
   seekable,
   seekHint,
@@ -390,9 +390,18 @@ const FolioRow = memo(function FolioRow({
               </button>
             );
           })}
-          {collationId !== undefined && <CollationMarker id={collationId} />}
           {!inlineThreads && <SlotMarker slot={slot} />}
         </p>
+
+        {collations && (
+          <LineCollations
+            collations={collations}
+            className={cn(
+              "transition-opacity duration-500",
+              focused && !carriesActive && "opacity-[0.18]",
+            )}
+          />
+        )}
 
         {selected && (
           <div className="lg:hidden flex items-center gap-5 pb-2 text-xs tracking-widest text-(--tone)">

@@ -102,14 +102,11 @@ export default function SongCollationTab({
   );
   const collations = useMemo(() => query.data?.collations ?? [], [query.data]);
   const { byLine, orphans } = useMemo(() => {
-    const byLine = new Map<number, SongCollation[]>();
-    const orphans: SongCollation[] = [];
-    for (const { collation, line } of resolveCollations(collations, ctx)
-      .entries) {
-      if (line === null) orphans.push(collation);
-      else byLine.set(line, [...(byLine.get(line) ?? []), collation]);
-    }
-    return { byLine, orphans };
+    const { entries, byLine } = resolveCollations(collations, ctx);
+    return {
+      byLine,
+      orphans: entries.filter((e) => e.line === null).map((e) => e.collation),
+    };
   }, [collations, ctx]);
 
   if (query.isError) {
@@ -143,7 +140,7 @@ export default function SongCollationTab({
   return (
     <div className="space-y-6">
       <p className={META_CLASS}>
-        校记署名为你的用户名，在详情页句末挂「校」，并列入创作手记一节的校勘记。
+        校记署名为你的用户名，在详情页用小字写在所校那一句下面，并列入校勘记一节。
         歌词按官方歌词稿，实际唱的写在校记里。
       </p>
 

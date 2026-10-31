@@ -62,10 +62,12 @@ describe("resolveCollations", () => {
       [4, 3],
       [5, null],
     ]);
-    // 一行有两条时，句旁的「校」指向第一条
-    expect([...byLine]).toEqual([
-      [1, 2],
-      [3, 4],
+    // 找不回原句的不写到句下
+    expect(
+      [...byLine].map(([line, list]) => [line, list.map((c) => c.id)]),
+    ).toEqual([
+      [1, [2, 3]],
+      [3, [4]],
     ]);
   });
 

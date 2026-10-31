@@ -8,7 +8,7 @@ import { z } from "zod";
 
 /**
  * 校记：管理员写在某句歌词上的勘误。位置与批注同一套存法，
- * 歌词改动后按原句找回那一行；找不回的仍列在校勘记里，只是不再挂到句旁。
+ * 歌词改动后按原句找回那一行；找不回的仍列在校勘记里，只是不再写到句下。
  */
 
 /** 显示顺序；名字在文案 song.folio.collations.kinds 里 */
@@ -65,12 +65,15 @@ export interface ResolvedCollation {
 
 /**
  * 把校记归到歌词的各行：按行排，同一行按录入先后；找不回的排在最后。
- * byLine 给句旁的标记用，一行有几条时指向第一条。
+ * byLine 给正文用：每行写在句下的校记，顺序同上。
  */
 export function resolveCollations(
   collations: SongCollation[],
   ctx: AnchorContext,
-): { entries: ResolvedCollation[]; byLine: Map<number, number> } {
+): {
+  entries: ResolvedCollation[];
+  byLine: Map<number, SongCollation[]>;
+} {
   const entries = collations.map((collation) => {
     const { slot, orphan } = resolveSlot(collation, ctx);
     return {
@@ -83,9 +86,10 @@ export function resolveCollations(
       (a.line ?? Infinity) - (b.line ?? Infinity) ||
       a.collation.id - b.collation.id,
   );
-  const byLine = new Map<number, number>();
+  const byLine = new Map<number, SongCollation[]>();
   for (const { collation, line } of entries) {
-    if (line !== null && !byLine.has(line)) byLine.set(line, collation.id);
+    if (line === null) continue;
+    byLine.set(line, [...(byLine.get(line) ?? []), collation]);
   }
   return { entries, byLine };
 }

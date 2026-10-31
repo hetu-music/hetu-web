@@ -1,11 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { ImageryCategory } from "@/lib/types";
 import { EmptyState } from "../kit/parts";
-import { SOLID_BUTTON_CLASS, TEXT_BUTTON_CLASS } from "../kit/styles";
+import {
+  OUTLINE_BUTTON_CLASS,
+  SOLID_BUTTON_CLASS,
+  TEXT_BUTTON_CLASS,
+} from "../kit/styles";
 import { showToast } from "../kit/toast";
 import { CategoryTreeNode } from "./CategoryTree";
+import { CleanupMotifsDialog } from "./CleanupMotifsDialog";
 import { CategoryFormDialog } from "./ImageryDialogs";
 import ImageryShell from "./ImageryShell";
 import { useCategoriesTab } from "./useCategoriesTab";
@@ -21,6 +26,7 @@ export default function ImageryCategoriesClient({
   // 只用来数每个分类下有多少意象
   const imagery = useImageryTab(showToast);
   const list = categories.categories;
+  const [cleaning, setCleaning] = useState(false);
 
   const countByCategory = useMemo(() => {
     const parentOf = new Map(list.map((c) => [c.id, c.parent_id]));
@@ -53,13 +59,22 @@ export default function ImageryCategoriesClient({
         { label: "叶子", value: leafCount },
       ]}
       actions={
-        <button
-          type="button"
-          onClick={() => categories.openAdd()}
-          className={SOLID_BUTTON_CLASS}
-        >
-          新增顶级分类
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => setCleaning(true)}
+            className={OUTLINE_BUTTON_CLASS}
+          >
+            整理
+          </button>
+          <button
+            type="button"
+            onClick={() => categories.openAdd()}
+            className={SOLID_BUTTON_CLASS}
+          >
+            新增顶级分类
+          </button>
+        </>
       }
     >
       {categories.categoryTree.length === 0 ? (
@@ -117,6 +132,13 @@ export default function ImageryCategoriesClient({
         onClose={categories.closeModal}
         onAdd={categories.handleAdd}
         onEdit={categories.handleEdit}
+      />
+
+      <CleanupMotifsDialog
+        open={cleaning}
+        onClose={() => setCleaning(false)}
+        getCategoryPath={categories.getCategoryPathFn}
+        onDeleted={categories.removeCategories}
       />
     </ImageryShell>
   );

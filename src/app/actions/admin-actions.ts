@@ -4,10 +4,7 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient } from "@/lib/db/supabase-server";
 import { assertAdmin } from "@/lib/server/server-auth";
 import { resyncSongTimetags } from "@/lib/server/service-imagery";
-import {
-  refreshImagery,
-  refreshSongs,
-} from "@/lib/server/server-revalidate";
+import { refreshImagery, refreshSongs } from "@/lib/server/server-revalidate";
 
 /**
  * 发布后按新歌词重算意象时间标签。发布已经成功，这里出错只提示、不回滚；

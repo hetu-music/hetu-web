@@ -29,6 +29,8 @@ import {
   updateOccurrence,
   getImageryLastModified,
   resyncSongTimetags,
+  getUnusedMotifs,
+  deleteUnusedMotifs,
 } from "./service-imagery";
 
 beforeEach(() => {
@@ -764,5 +766,48 @@ describe("resyncSongTimetags（发布新歌词后重算）", () => {
       notFound: [],
     });
     expect(client.from).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("整理空母题", () => {
+  const categories = [
+    { id: 1, name: "自然", parent_id: null, level: 1, description: null },
+    { id: 2, name: "天象", parent_id: 1, level: 2, description: null },
+    { id: 3, name: "空类", parent_id: 1, level: 2, description: null },
+    { id: 10, name: "月", parent_id: 2, level: 3, description: null },
+    { id: 11, name: "星", parent_id: 2, level: 3, description: null },
+    { id: 12, name: "虹", parent_id: 2, level: 3, description: null },
+    { id: 13, name: "霓", parent_id: 2, level: 3, description: null },
+  ];
+  // 月有词登记，星只有标注，虹、霓都空着；空着的二级分类不动
+  const lookups = () => [
+    makeQueryBuilder({ data: categories, error: null }),
+    makeQueryBuilder({ data: [{ category_id: 10 }], error: null }),
+    makeQueryBuilder({ data: [{ category_id: 11 }], error: null }),
+  ];
+
+  it("只列第三级里没有词登记、也没有标注的", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient(lookups()),
+    );
+    const result = await getUnusedMotifs("token");
+    expect(result.map((c) => c.id)).toEqual([12, 13]);
+  });
+
+  it("删除前重查：已经用上的不删，返回实际删掉的 id", async () => {
+    const deleteBuilder = makeQueryBuilder({ data: [{ id: 12 }], error: null });
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([...lookups(), deleteBuilder]),
+    );
+    const deleted = await deleteUnusedMotifs([10, 12], "token");
+    expect(deleteBuilder.in).toHaveBeenCalledWith("id", [12]);
+    expect(deleted).toEqual([12]);
+  });
+
+  it("选中的都已用上时不发删除", async () => {
+    const client = createMockSupabaseClient(lookups());
+    vi.mocked(getUserClient).mockReturnValue(client);
+    expect(await deleteUnusedMotifs([10, 11], "token")).toEqual([]);
+    expect(client.from).toHaveBeenCalledTimes(3);
   });
 });

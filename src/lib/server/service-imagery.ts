@@ -301,6 +301,70 @@ async function getOccurrenceWithRelationsById(id: number, accessToken: string) {
   return mapOccurrenceRow(data as Record<string, unknown>);
 }
 
+// ─── 整理：删掉没挂词的母题 ───────────────────────────────────────────────────
+
+/**
+ * 没用上的母题：第三级、没有子分类、imagery_motifs 里没有词登记、也没有标注指向它。
+ * 第一、二级是门类与类别，增减要先讨论（见 IMAGERY.md），不在整理范围内。
+ */
+async function findUnusedMotifs(
+  supabase: UserClient,
+): Promise<ImageryCategory[]> {
+  const [categories, motifs, occurrences] = await Promise.all([
+    fetchAll<ImageryCategory>(
+      supabase,
+      TABLES.IMAGERY_CAT,
+      "id,name,parent_id,level,description",
+    ),
+    fetchAll<{ category_id: number }>(
+      supabase,
+      TABLES.IMAGERY_MOTIFS,
+      "category_id",
+    ),
+    fetchAll<{ category_id: number }>(
+      supabase,
+      TABLES.IMAGERY_OCC,
+      "category_id",
+    ),
+  ]);
+  const used = new Set([
+    ...motifs.map((m) => m.category_id),
+    ...occurrences.map((o) => o.category_id),
+    ...categories.map((c) => c.parent_id),
+  ]);
+  return categories.filter((c) => c.level === 3 && !used.has(c.id));
+}
+
+export async function getUnusedMotifs(
+  accessToken: string,
+): Promise<ImageryCategory[]> {
+  const supabase = getUserClient(accessToken);
+  if (!supabase) throw new Error("Supabase client unavailable");
+  return findUnusedMotifs(supabase);
+}
+
+/**
+ * 删掉选中的空母题。删之前按当前数据重查一遍：列表打开后又挂上词的母题不删。
+ * 返回实际删掉的 id（权限不够时 RLS 会静默不删，这里能看出来）。
+ */
+export async function deleteUnusedMotifs(
+  ids: readonly number[],
+  accessToken: string,
+): Promise<number[]> {
+  const supabase = getUserClient(accessToken);
+  if (!supabase) throw new Error("Supabase client unavailable");
+  const unused = new Set((await findUnusedMotifs(supabase)).map((c) => c.id));
+  const targets = ids.filter((id) => unused.has(id));
+  if (targets.length === 0) return [];
+  const { data, error } = await supabase
+    .from(TABLES.IMAGERY_CAT)
+    .delete()
+    .in("id", targets)
+    .select("id");
+  if (error) throw error;
+  return ((data ?? []) as { id: number }[]).map((r) => r.id);
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 /**

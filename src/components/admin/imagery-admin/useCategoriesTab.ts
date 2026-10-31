@@ -80,6 +80,15 @@ export function useCategoriesTab(
     }
   };
 
+  /** 整理删掉的母题从缓存里拿掉 */
+  const removeCategories = useCallback(
+    (ids: number[]) => {
+      const gone = new Set(ids);
+      setCategories((current) => current.filter((c) => !gone.has(c.id)));
+    },
+    [setCategories],
+  );
+
   const getCategoryPathFn = useCallback(
     (id: number) => getCategoryPath(id, categories),
     [categories],
@@ -95,6 +104,7 @@ export function useCategoriesTab(
     closeModal,
     handleAdd,
     handleEdit,
+    removeCategories,
     getCategoryPathFn,
   };
 }

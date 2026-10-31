@@ -3,6 +3,7 @@ import { apiRequest } from "@/lib/api/request";
 import type {
   CreateRequestPayload,
   Emotion,
+  ImageryCategory,
   ReplyRequestPayload,
   Song,
   SongCollation,
@@ -134,6 +135,21 @@ export function apiUpdateImageryCategory(
     body: data,
     fallback: "更新分类失败",
   });
+}
+
+/** 整理分类：没挂词也没有标注的母题 */
+export function apiGetUnusedMotifs() {
+  return apiRequest<ImageryCategory[]>("/api/admin/imagery/categories/unused", {
+    fallback: "查找空母题失败",
+  });
+}
+
+/** 只删服务端重查后仍然没用上的，返回实际删掉的 id */
+export function apiDeleteUnusedMotifs(ids: number[]) {
+  return apiRequest<{ deleted: number[] }>(
+    "/api/admin/imagery/categories/unused",
+    { method: "DELETE", body: { ids }, fallback: "删除空母题失败" },
+  );
 }
 
 // ─── Occurrences API ───────────────────────────────────────────────────────────

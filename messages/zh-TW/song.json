@@ -115,8 +115,8 @@
         "note": "附記"
       },
       "sungAs": "「{quote}」唱作「{sung}」。",
-      "collator": "{name} <v>校</v>",
-      "reviser": "{name} <v>訂</v>",
+      "collator": "{name} 校",
+      "reviser": "{name} 訂",
       "anonymous": "佚名"
     },
     "supplements": {
@@ -125,7 +125,7 @@
         "draft": "舊稿",
         "note": "附記"
       },
-      "compiler": "{name} <v>輯</v>"
+      "compiler": "{name} 輯"
     },
     "comments": {
       "intro": "批註寫在字句旁；這裡是對整首歌的評點。",

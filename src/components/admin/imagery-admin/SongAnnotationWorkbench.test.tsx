@@ -336,7 +336,8 @@ describe("SongAnnotationWorkbench", () => {
     // 已有标注与勾选的候选在同一行里各自高亮
     const marks = [...line(container, "00:10.00").querySelectorAll("mark")];
     expect(marks.map((m) => m.textContent)).toEqual(["明月", "天涯"]);
-    expect(marks[1].className).toContain("decoration-dashed");
+    expect(marks[0].className).toContain("underline"); // 已存
+    expect(marks[1].className).toContain("bg-amber-200"); // 候选
 
     fireEvent.click(screen.getByRole("button", { name: "保存选中" }));
     await vi.waitFor(() => expect(onReload).toHaveBeenCalled());

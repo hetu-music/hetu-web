@@ -45,15 +45,15 @@ type Tone = "draft" | "hover" | "candidate" | "saved";
 
 type View = "annotations" | "suggestions";
 
-// 歌词里的标记。已存的要在正文的灰字里一眼认出来：墨蓝字加浅墨蓝底；
-// 正在编辑的铺实色反白，和已存的分开；悬停定位用琥珀；候选只画加粗的虚线
+// 歌词里的标记：已存的画下划线；正在编辑、悬停定位、勾选的候选都铺淡琥珀，
+// 同一时间只关心一处，不必再分颜色
+const ACTIVE_CLASS =
+  "rounded-sm bg-amber-200/80 text-amber-900 dark:bg-amber-500/30 dark:text-amber-100";
 const TONE_CLASS: Record<Tone, string> = {
-  draft: "rounded-sm bg-(--tone) text-white dark:text-slate-900",
-  hover:
-    "rounded-sm bg-amber-300 text-amber-950 dark:bg-amber-400/70 dark:text-amber-50",
-  candidate:
-    "bg-transparent text-slate-900 underline decoration-(--tone) decoration-dashed decoration-2 underline-offset-4 dark:text-slate-50",
-  saved: "rounded-sm bg-(--tone)/15 font-medium text-(--tone)",
+  draft: ACTIVE_CLASS,
+  hover: ACTIVE_CLASS,
+  candidate: ACTIVE_CLASS,
+  saved: "underline decoration-(--tone) decoration-2 underline-offset-4",
 };
 const TONE_PRIORITY: Record<Tone, number> = {
   hover: 4,
@@ -465,7 +465,7 @@ export default function SongAnnotationWorkbench({
           </span>
           <span className="ml-auto text-slate-400">
             {view === "suggestions"
-              ? "虚线为已勾选的候选，悬停候选可定位"
+              ? "淡黄底为已勾选的候选，下划线为已存的标注"
               : editor
                 ? "出现位置按歌词自动确定"
                 : "点击行查看该行意象，划选词语可新建标注"}

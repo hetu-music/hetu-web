@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildGalleryPool,
   GALLERY_SIZE,
+  groupMarks,
   pickGallery,
   type GallerySong,
 } from "./auth-gallery";
@@ -33,6 +34,41 @@ describe("buildGalleryPool", () => {
       "zh-CN",
     );
     expect(pool).toEqual([]);
+  });
+
+  it("picks the line with the most imagery, like the song page", () => {
+    const marks = groupMarks(
+      [
+        { song_id: 1, imagery_id: 7, lyric_timetag: ["00:14.00"] },
+        { song_id: 2, imagery_id: 7, lyric_timetag: ["00:10.00"] },
+      ],
+      [{ id: 7, name: "灯火" }],
+    );
+    const [song] = buildGalleryPool(
+      [{ id: 1, title: "测试", lyrics: LRC }],
+      "zh-CN",
+      marks,
+    );
+    expect(song.excerpt.replace(/ /g, "")).toBe("灯火阑珊处");
+    const [plain] = buildGalleryPool(
+      [{ id: 1, title: "测试", lyrics: LRC }],
+      "zh-CN",
+    );
+    expect(plain.excerpt.replace(/ /g, "")).toBe("一曲终了人未散");
+  });
+
+  it("matches traditional imagery names for zh-TW", () => {
+    // 没有时间标签时按意象名搜全文，名字也得转成繁体才对得上
+    const marks = groupMarks(
+      [{ song_id: 1, imagery_id: 7, lyric_timetag: null }],
+      [{ id: 7, name: "灯火" }],
+    );
+    const [song] = buildGalleryPool(
+      [{ id: 1, title: "测试", lyrics: LRC }],
+      "zh-TW",
+      marks,
+    );
+    expect(song.excerpt.replace(/ /g, "")).toBe("燈火闌珊處");
   });
 
   it("converts title and excerpt for zh-TW", () => {

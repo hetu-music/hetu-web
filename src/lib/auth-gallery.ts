@@ -2,8 +2,13 @@
  * 登录、注册页的封面墙与摘句：从曲库里挑有封面、有歌词的歌，
  * 每首取一句适合展示的歌词。纯函数，查询与缓存在 service-auth-gallery。
  */
-import { buildFolio, markLines, pickExcerpt } from "@/lib/utils/utils-folio";
-import { toTraditional } from "@/lib/utils/utils-convert";
+import {
+  buildFolio,
+  markLines,
+  pickExcerpt,
+  type MarkInput,
+} from "@/lib/utils/utils-folio";
+import { toTraditional, toTraditionalLrc } from "@/lib/utils/utils-convert";
 
 export interface GallerySong {
   id: number;
@@ -24,27 +29,68 @@ export const GALLERY_SIZE = 36;
 /** 轮换展示摘句的歌数 */
 export const GALLERY_QUOTES = 8;
 
-/** 把查到的歌整理成候选池：取不出摘句的歌不要 */
+export interface GalleryOccurrence {
+  song_id: number;
+  imagery_id: number;
+  lyric_timetag: string[] | null;
+}
+
+/**
+ * 每首歌的意象标注，整理成 markLines 要的样子：一个词一条，时间标签取并集。
+ * 与详情页（getSongImagery）的 marks 同一规则，摘句才挑得出同一句。
+ */
+export function groupMarks(
+  occurrences: GalleryOccurrence[],
+  imagery: Array<{ id: number; name: string }>,
+): Map<number, MarkInput[]> {
+  const nameById = new Map(imagery.map((i) => [i.id, i.name]));
+  const bySong = new Map<number, Map<number, MarkInput>>();
+  for (const occ of occurrences) {
+    const name = nameById.get(occ.imagery_id);
+    if (!name) continue;
+    let marks = bySong.get(occ.song_id);
+    if (!marks) bySong.set(occ.song_id, (marks = new Map()));
+    let mark = marks.get(occ.imagery_id);
+    if (!mark) {
+      marks.set(
+        occ.imagery_id,
+        (mark = { id: occ.imagery_id, name, timetags: [] }),
+      );
+    }
+    for (const tag of occ.lyric_timetag ?? []) {
+      if (!mark.timetags.includes(tag)) mark.timetags.push(tag);
+    }
+  }
+  return new Map([...bySong].map(([id, marks]) => [id, [...marks.values()]]));
+}
+
+/**
+ * 把查到的歌整理成候选池：取不出摘句的歌不要。
+ * 摘句与歌曲页卷首一致：按意象标注挑，繁体先转歌词再挑（详情页也是先转再折句）。
+ */
 export function buildGalleryPool(
   rows: GalleryRow[],
   locale: string,
+  marksBySong: Map<number, MarkInput[]> = new Map(),
 ): GallerySong[] {
   const tw = locale === "zh-TW";
+  const tr = (s: string) => (tw ? (toTraditional(s) ?? s) : s);
   return rows.flatMap((row) => {
     if (!row.title || !row.lyrics) return [];
-    const { lines } = buildFolio(row.lyrics, {
-      title: row.title,
+    const title = tr(row.title);
+    const lyrics =
+      (tw ? toTraditionalLrc(row.lyrics) : row.lyrics) ?? row.lyrics;
+    const marks = (marksBySong.get(row.id) ?? []).map((m) => ({
+      ...m,
+      name: tr(m.name),
+    }));
+    const { lines } = buildFolio(lyrics, {
+      title,
       lyricsStart: row.lyrics_start,
     });
-    const excerpt = pickExcerpt(lines, markLines(lines, []));
+    const excerpt = pickExcerpt(lines, markLines(lines, marks));
     if (!excerpt) return [];
-    return [
-      {
-        id: row.id,
-        title: (tw ? toTraditional(row.title) : row.title) ?? row.title,
-        excerpt: (tw ? toTraditional(excerpt) : excerpt) ?? excerpt,
-      },
-    ];
+    return [{ id: row.id, title, excerpt }];
   });
 }
 

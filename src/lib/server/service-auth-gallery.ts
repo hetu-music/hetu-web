@@ -1,11 +1,14 @@
 import { unstable_cache } from "next/cache";
 import {
   buildGalleryPool,
+  groupMarks,
   pickGallery,
   type GalleryRow,
   type GallerySong,
 } from "@/lib/auth-gallery";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
+import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
+import { loadImageryIndex } from "@/lib/server/imagery-index";
 
 /**
  * 候选池要读全库的歌词再逐首取摘句，登录页又是动态渲染的，
@@ -19,23 +22,28 @@ const loadGalleryPool = unstable_cache(
     if (!supabase) throw new Error("Supabase 未配置");
     // 只取资料无争议的歌（同 music_catalog 的规则）；视图是 select * 建的，
     // 未必带 lyrics_start 这类后加的列，所以直接查主表
-    const rows = await fetchAll<GalleryRow>(
-      supabase,
-      TABLES.MUSIC,
-      "id,title,lyrics,lyrics_start",
-      (q) =>
-        q
-          .is("dispute_note", null)
-          .eq("hascover", true)
-          .not("lyrics", "is", null)
-          .order("id", { ascending: true }),
-    );
-    const pool = buildGalleryPool(rows, locale);
+    const [rows, index] = await Promise.all([
+      fetchAll<GalleryRow>(
+        supabase,
+        TABLES.MUSIC,
+        "id,title,lyrics,lyrics_start",
+        (q) =>
+          q
+            .is("dispute_note", null)
+            .eq("hascover", true)
+            .not("lyrics", "is", null)
+            .order("id", { ascending: true }),
+      ),
+      // 摘句按意象标注挑，与歌曲页卷首同一句
+      loadImageryIndex(),
+    ]);
+    const marks = groupMarks(index.occurrences, index.imagery);
+    const pool = buildGalleryPool(rows, locale, marks);
     if (pool.length === 0) throw new Error("封面墙候选池为空");
     return pool;
   },
-  ["auth-gallery-v1"],
-  { revalidate: 7200 },
+  ["auth-gallery-v2", IMAGERY_INDEX_TAG],
+  { revalidate: 7200, tags: [IMAGERY_INDEX_TAG] },
 );
 
 /** 登录、注册页用：取不到就返回空数组，页面退回没有封面墙的样子 */

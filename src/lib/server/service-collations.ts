@@ -3,19 +3,27 @@ import {
   getUserClient,
   TABLES,
 } from "@/lib/db/supabase-server";
-import type { CollationKind, CommentAnchor, SongCollation } from "@/lib/types";
-import type { CollationInput } from "@/lib/utils/utils-collations";
+import type {
+  CollationKind,
+  CommentAnchor,
+  SongCollation,
+  SupplementKind,
+} from "@/lib/types";
+import type {
+  CollationInput,
+  SupplementInput,
+} from "@/lib/utils/utils-collations";
 import { toTraditional } from "@/lib/utils/utils-convert";
 
 /**
- * 校记的读写。
+ * 校记与补遗的读写（同存 song_collations，补遗的 anchor 为 song）。
  *
  * 读取走高权限客户端：要连带取校者、订者的名字，而 users 表对他人不可读。
  * 写入用管理员会话的客户端，由 RLS 把关；校者、订者由数据库触发器按会话写入。
  */
 
 const FIELDS =
-  "id, song_id, anchor, anchor_index, anchor_time, anchor_quote, kind, quote, sung, body, created_by, updated_by";
+  "id, song_id, anchor, anchor_index, anchor_time, anchor_quote, kind, date, quote, sung, body, created_by, updated_by";
 
 interface CollationRow {
   id: number;
@@ -24,7 +32,8 @@ interface CollationRow {
   anchor_index: number | null;
   anchor_time: number | string | null;
   anchor_quote: string | null;
-  kind: CollationKind;
+  kind: CollationKind | SupplementKind;
+  date: string | null;
   quote: string | null;
   sung: string | null;
   body: string;
@@ -44,7 +53,7 @@ export class CollationError extends Error {
 }
 
 /**
- * 一首歌的全部校记。繁体页把原文、实唱、说明转成繁体：
+ * 一首歌的全部校记与补遗。繁体页把原文、实唱、说明转成繁体：
  * 繁体页的歌词本就是库里简体转繁而来，原句转繁后才对得上那一行。
  * 出错时返回空：详情页不该因为校记读不出来就整页失败。
  */
@@ -77,6 +86,7 @@ export async function getSongCollations(
     anchorTime: r.anchor_time === null ? null : Number(r.anchor_time),
     anchorQuote: tr(r.anchor_quote),
     kind: r.kind,
+    date: r.date,
     quote: tr(r.quote),
     sung: tr(r.sung),
     body: tr(r.body) ?? "",
@@ -95,24 +105,39 @@ function userClient(accessToken: string) {
   return db;
 }
 
-function toRow(input: CollationInput) {
-  return { anchor: "lyrics" as const, ...input };
+/** 写库的一行：歌词校记挂在某一句上，补遗记在整首歌上、位置几列都空着 */
+export type EntryRow = ReturnType<typeof lyricRow> | ReturnType<typeof songRow>;
+
+export function lyricRow(input: CollationInput) {
+  return { anchor: "lyrics" as const, date: null, ...input };
+}
+
+export function songRow(input: SupplementInput) {
+  return {
+    anchor: "song" as const,
+    anchor_index: null,
+    anchor_time: null,
+    anchor_quote: null,
+    quote: null,
+    sung: null,
+    ...input,
+  };
 }
 
 /** 新增一条，返回 id */
 export async function createCollation(
   songId: number,
-  input: CollationInput,
+  row: EntryRow,
   accessToken: string,
 ): Promise<number> {
   const { data, error } = await userClient(accessToken)
     .from(TABLES.SONG_COLLATIONS)
-    .insert({ song_id: songId, ...toRow(input) })
+    .insert({ song_id: songId, ...row })
     .select("id")
     .single();
   // 外键失败：歌不在正式曲库
   if (error?.code === "23503") {
-    throw new CollationError("歌曲尚未发布，发布后才能写校记", 400);
+    throw new CollationError("歌曲尚未发布，发布后才能录入", 400);
   }
   if (error) throw error;
   return (data as { id: number }).id;
@@ -121,13 +146,15 @@ export async function createCollation(
 /** 修改一条，返回所在的歌，好刷新那一页 */
 export async function updateCollation(
   id: number,
-  input: CollationInput,
+  row: EntryRow,
   accessToken: string,
 ): Promise<number> {
+  // 只改同一种：校记不能经补遗的接口改成补遗，反之亦然
   const { data, error } = await userClient(accessToken)
     .from(TABLES.SONG_COLLATIONS)
-    .update(toRow(input))
+    .update(row)
     .eq("id", id)
+    .eq("anchor", row.anchor)
     .select("song_id")
     .maybeSingle();
   if (error) throw error;

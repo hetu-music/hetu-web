@@ -84,7 +84,7 @@
       "related": "同有此意",
       "notes": "創作手記",
       "comments": "評點",
-      "collations": "校勘記"
+      "supplements": "補遺"
     },
     "imageryTotal": "本曲共 {count} 個意象",
     "imageryMore": "等",
@@ -117,9 +117,15 @@
       "sungAs": "「{quote}」唱作「{sung}」。",
       "collator": "{name}校",
       "reviser": "{name}訂",
-      "anonymous": "佚名",
-      "jump": "回到原句",
-      "orphan": "原句已改動"
+      "anonymous": "佚名"
+    },
+    "supplements": {
+      "kinds": {
+        "release": "版本",
+        "draft": "舊稿",
+        "note": "附記"
+      },
+      "compiler": "{name}輯"
     },
     "comments": {
       "intro": "批註寫在字句旁；這裡是對整首歌的評點。",

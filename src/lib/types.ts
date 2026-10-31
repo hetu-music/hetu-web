@@ -214,18 +214,23 @@ export interface SongComment {
   editedAt: string | null;
 }
 
-// 校记：管理员写在某句歌词上的勘误，署校者之名
-/** slip 口误 / sung 异唱 / version 异本 / note 附记 */
+// 校记与补遗：管理员写的勘误与资料，署录者之名。同存一表，按位置区分：
+// 挂在某句歌词上的是校记，记在整首歌上的是补遗
+/** 校记：slip 口误 / sung 异唱 / version 异本 / note 附记 */
 export type CollationKind = "slip" | "sung" | "version" | "note";
+/** 补遗：release 版本 / draft 旧稿 / note 附记 */
+export type SupplementKind = "release" | "draft" | "note";
 
 export interface SongCollation {
   id: number;
-  /** 位置的存法与批注相同，歌词改动后按原句找回 */
+  /** 位置的存法与批注相同，歌词改动后按原句找回；补遗为 song */
   anchor: CommentAnchor;
   anchorIndex: number | null;
   anchorTime: number | null;
   anchorQuote: string | null;
-  kind: CollationKind;
+  kind: CollationKind | SupplementKind;
+  /** 补遗的日期：2019、2019-08 或 2019-08-15 */
+  date: string | null;
   /** 句中的哪几个字，实际唱成什么 */
   quote: string | null;
   sung: string | null;

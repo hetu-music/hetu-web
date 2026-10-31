@@ -30,6 +30,7 @@ import SongAudioTab from "./SongAudioTab";
 import SongFormField from "./SongFormFields";
 import SongCollationTab from "./SongCollationTab";
 import SongEmotionTab from "./SongEmotionTab";
+import SongSupplementTab from "./SongSupplementTab";
 import SongImageryTab from "./SongImageryTab";
 import UsageNotesButton from "./UsageNotes";
 import { type SongWorkspaceState, useSongWorkspace } from "./useSongWorkspace";
@@ -51,6 +52,7 @@ const TABS = [
   "imagery",
   "emotions",
   "collations",
+  "supplements",
   "audio",
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -61,6 +63,7 @@ const TAB_LABEL: Record<Tab, string> = {
   imagery: "意象",
   emotions: "基调",
   collations: "校勘",
+  supplements: "补遗",
   audio: "音频",
 };
 
@@ -88,7 +91,7 @@ const PROVIDERS: { provider: MusicProviderType; label: string }[] = [
 ];
 
 /**
- * 一首歌的工作台：资料、封面与乐谱、意象、基调、校勘、音频都在这里，暂存与发布在吸顶栏右侧。
+ * 一首歌的工作台：资料、封面与乐谱、意象、基调、校勘、补遗、音频都在这里，暂存与发布在吸顶栏右侧。
  * 原先资料在歌曲列表的弹窗里改，意象要去意象管理找这首歌，音频在另一页。
  */
 export default function SongWorkspace({
@@ -206,6 +209,11 @@ export default function SongWorkspace({
           {song && (
             <TabsContent value="collations" variant="inline">
               <SongCollationTab song={song} />
+            </TabsContent>
+          )}
+          {song && (
+            <TabsContent value="supplements" variant="inline">
+              <SongSupplementTab songId={song.id} />
             </TabsContent>
           )}
           {song && user?.isSuper && (

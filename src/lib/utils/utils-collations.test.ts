@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { SongCollation } from "@/lib/types";
-import { collationInputSchema, resolveCollations } from "./utils-collations";
+import {
+  collationInputSchema,
+  resolveCollations,
+  sortSupplements,
+  supplementInputSchema,
+} from "./utils-collations";
 import { buildFolio } from "./utils-folio";
 
 const { lines } = buildFolio(
@@ -21,6 +26,7 @@ function collation(overrides: Partial<SongCollation>): SongCollation {
     anchorTime: 10,
     anchorQuote: "我搁苍山一柄剑",
     kind: "slip",
+    date: null,
     quote: "苍山",
     sung: "沧山",
     body: "",
@@ -116,5 +122,47 @@ describe("collationInputSchema", () => {
       body: "",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("supplementInputSchema", () => {
+  it("日期可只到年或年月，空的存成 null", () => {
+    for (const date of ["2019", "2019-08", "2019-08-15"]) {
+      expect(
+        supplementInputSchema.parse({ kind: "release", date, body: "现场版" })
+          .date,
+      ).toBe(date);
+    }
+    expect(
+      supplementInputSchema.parse({ kind: "draft", date: " ", body: "旧文案" })
+        .date,
+    ).toBeNull();
+  });
+
+  it("日期格式不对、内容为空都不收", () => {
+    expect(
+      supplementInputSchema.safeParse({
+        kind: "release",
+        date: "2019/08",
+        body: "现场版",
+      }).success,
+    ).toBe(false);
+    expect(
+      supplementInputSchema.safeParse({ kind: "note", date: null, body: "  " })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("sortSupplements", () => {
+  it("按日期排，只到年的在该年最前，没有日期的排最后", () => {
+    const sorted = sortSupplements([
+      collation({ id: 1, anchor: "song", kind: "note", date: null }),
+      collation({ id: 2, anchor: "song", kind: "release", date: "2020-03" }),
+      collation({ id: 3, anchor: "song", kind: "release", date: "2019-08-15" }),
+      collation({ id: 4, anchor: "song", kind: "draft", date: "2019" }),
+      collation({ id: 5, anchor: "song", kind: "note", date: null }),
+    ]);
+    expect(sorted.map((c) => c.id)).toEqual([4, 3, 2, 1, 5]);
   });
 });

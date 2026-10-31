@@ -3,7 +3,7 @@
 import { CommentsProvider } from "@/components/detail/comments/CommentsContext";
 import CommentSheet from "@/components/detail/comments/CommentSheet";
 import CommentsSection from "@/components/detail/comments/CommentsSection";
-import { CollationsSection } from "@/components/detail/Collations";
+import { SupplementsSection } from "@/components/detail/Collations";
 import CreatorNotes from "@/components/detail/CreatorNotes";
 import DisputeNotice from "@/components/detail/DisputeNotice";
 import ImageryCaption from "@/components/detail/ImageryCaption";
@@ -29,7 +29,10 @@ import { useUserContext } from "@/context/UserContext";
 import { useIntersection } from "@/hooks/ui/useIntersection";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
-import { resolveCollations } from "@/lib/utils/utils-collations";
+import {
+  resolveCollations,
+  sortSupplements,
+} from "@/lib/utils/utils-collations";
 import { buildFolio, markLines, parseNotes } from "@/lib/utils/utils-folio";
 import { sharePage } from "@/lib/utils/share";
 import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
@@ -80,9 +83,18 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     () => ({ lines: folio.lines, paragraphs: notes?.paragraphs ?? [] }),
     [folio.lines, notes],
   );
-  const { entries: collationEntries, byLine: collationByLine } = useMemo(
-    () => resolveCollations(collations, anchorCtx),
+  // 同一张表里，挂在歌词上的是校记，记在整首歌上的是补遗
+  const collationByLine = useMemo(
+    () =>
+      resolveCollations(
+        collations.filter((c) => c.anchor === "lyrics"),
+        anchorCtx,
+      ).byLine,
     [collations, anchorCtx],
+  );
+  const supplements = useMemo(
+    () => sortSupplements(collations.filter((c) => c.anchor === "song")),
+    [collations],
   );
   const marked = useMemo(
     () => markLines(folio.lines, imagery.marks),
@@ -170,8 +182,8 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const tocItems = useMemo<NavItem[]>(() => {
     const items: NavItem[] = [{ id: "info", label: t("folio.sections.cover") }];
     if (notes) items.push({ id: "notes", label: t("folio.sections.notes") });
-    if (collationEntries.length > 0)
-      items.push({ id: "collations", label: t("folio.sections.collations") });
+    if (supplements.length > 0)
+      items.push({ id: "supplements", label: t("folio.sections.supplements") });
     items.push({ id: "lyrics", label: t("folio.sections.text") });
     if (song.nmn_status)
       items.push({ id: "score", label: t("sections.score") });
@@ -180,13 +192,7 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     if (imagery.related.length > 0)
       items.push({ id: "related", label: t("folio.sections.related") });
     return items;
-  }, [
-    song.nmn_status,
-    imagery.related.length,
-    notes,
-    collationEntries.length,
-    t,
-  ]);
+  }, [song.nmn_status, imagery.related.length, notes, supplements.length, t]);
 
   const activeSection = useActiveSection(tocItems);
   // 窄屏放不下歌名：卷首时显示「目录」，滚过题名后显示当前章节
@@ -281,8 +287,8 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
           {notes && <CreatorNotes notes={notes} />}
 
-          {collationEntries.length > 0 && (
-            <CollationsSection entries={collationEntries} />
+          {supplements.length > 0 && (
+            <SupplementsSection supplements={supplements} />
           )}
 
           <LyricsFolio

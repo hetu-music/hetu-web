@@ -18,7 +18,10 @@ import type { ApplyResult } from "@/lib/navidrome/store";
 import type { NavSong } from "@/lib/navidrome/sync";
 import type { CreditAliasRow } from "@/lib/server/service-credit-aliases";
 import type { CreditNameUsage } from "@/lib/utils/utils-credits";
-import type { CollationPayload } from "@/lib/utils/utils-collations";
+import type {
+  CollationPayload,
+  SupplementPayload,
+} from "@/lib/utils/utils-collations";
 
 /**
  * 没标返回类型的接口沿用原来 res.json() 的 any，调用方按各自的形状取用。
@@ -272,7 +275,7 @@ export function apiCreateCollation(
 ) {
   return apiRequest<{ id: number }>("/api/admin/collations", {
     method: "POST",
-    body: { song_id: songId, collation },
+    body: { song_id: songId, entry: collation },
     fallback: "保存校记失败",
     serverMessage: [400],
   });
@@ -281,12 +284,34 @@ export function apiCreateCollation(
 export function apiUpdateCollation(id: number, collation: CollationPayload) {
   return apiRequest<{ success: true }>("/api/admin/collations", {
     method: "PUT",
-    body: { id, collation },
+    body: { id, entry: collation },
     fallback: "保存校记失败",
     serverMessage: [400, 404],
   });
 }
 
+export function apiCreateSupplement(
+  songId: number,
+  supplement: SupplementPayload,
+) {
+  return apiRequest<{ id: number }>("/api/admin/supplements", {
+    method: "POST",
+    body: { song_id: songId, entry: supplement },
+    fallback: "保存补遗失败",
+    serverMessage: [400],
+  });
+}
+
+export function apiUpdateSupplement(id: number, supplement: SupplementPayload) {
+  return apiRequest<{ success: true }>("/api/admin/supplements", {
+    method: "PUT",
+    body: { id, entry: supplement },
+    fallback: "保存补遗失败",
+    serverMessage: [400, 404],
+  });
+}
+
+/** 校记与补遗同表，删除共用 */
 export function apiDeleteCollation(id: number) {
   return apiRequest<{ success: true }>("/api/admin/collations", {
     method: "DELETE",

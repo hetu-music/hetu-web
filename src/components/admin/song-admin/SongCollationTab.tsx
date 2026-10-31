@@ -45,12 +45,14 @@ import {
 } from "../kit/styles";
 import { notify, notifyError } from "../kit/toast";
 
-/** 与前台文案 song.folio.collations.kinds 一致；后台只有简体 */
-const KIND_LABEL: Record<CollationKind, string> = {
+/** 与前台文案 song.folio.collations / supplements 的 kinds 一致；后台只有简体 */
+export const KIND_LABEL: Record<SongCollation["kind"], string> = {
   slip: "口误",
   sung: "异唱",
   version: "异本",
   note: "附记",
+  release: "版本",
+  draft: "旧稿",
 };
 
 const KIND_HINT: Record<CollationKind, string> = {
@@ -60,7 +62,8 @@ const KIND_HINT: Record<CollationKind, string> = {
   note: "以上都不算的补充说明",
 };
 
-const collationsKey = (songId: number) =>
+/** 校记与补遗同一个接口，两个标签页共用这份缓存 */
+export const collationsKey = (songId: number) =>
   ["admin", "collations", songId] as const;
 
 /** 正在编辑的一条：id 为 null 是新写；line 是要挂到的那一句 */
@@ -100,7 +103,11 @@ export default function SongCollationTab({
     }),
     [song.lyrics, song.title, song.lyrics_start],
   );
-  const collations = useMemo(() => query.data?.collations ?? [], [query.data]);
+  // 同一接口也带着补遗，这里只要挂在歌词上的
+  const collations = useMemo(
+    () => (query.data?.collations ?? []).filter((c) => c.anchor === "lyrics"),
+    [query.data],
+  );
   const { byLine, orphans } = useMemo(() => {
     const { entries, byLine } = resolveCollations(collations, ctx);
     return {
@@ -140,7 +147,7 @@ export default function SongCollationTab({
   return (
     <div className="space-y-6">
       <p className={META_CLASS}>
-        校记署名为你的用户名，在详情页用小字写在所校那一句下面，并列入校勘记一节。
+        校记署名为你的用户名，在详情页用小字写在所校那一句下面。
         歌词按官方歌词稿，实际唱的写在校记里。
       </p>
 
@@ -304,7 +311,9 @@ function CollationForm({
   onDone: (saved: boolean) => Promise<void>;
 }) {
   const { user } = useUserContext();
-  const [kind, setKind] = useState<CollationKind>(initial?.kind ?? "slip");
+  const [kind, setKind] = useState<CollationKind>(
+    (initial?.kind as CollationKind | undefined) ?? "slip",
+  );
   const [quote, setQuote] = useState(initial?.quote ?? "");
   const [sung, setSung] = useState(initial?.sung ?? "");
   const [body, setBody] = useState(initial?.body ?? "");

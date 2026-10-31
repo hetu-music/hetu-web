@@ -29,8 +29,9 @@ const song = {
 };
 
 const items: ImageryItem[] = [
-  { id: 1, name: "明月", count: 44, categoryIds: [100] },
-  { id: 2, name: "天涯", count: 27, categoryIds: [200] },
+  { id: 1, name: "明月", count: 44, categoryIds: [100], motifIds: [] },
+  // 多义：标注里用过区域和星相，登记的默认母题是星相
+  { id: 2, name: "天涯", count: 27, categoryIds: [100, 200], motifIds: [200] },
 ];
 const leafCategories: ImageryCategory[] = [
   { id: 100, name: "星相", parent_id: 10, level: 3, description: null },
@@ -135,6 +136,35 @@ describe("SongRelationWorkbench", () => {
       imageryName: "天涯",
       categoryId: 200,
     });
+  });
+
+  it("新增关系：默认选登记的默认母题，不取标注里 id 最小的；候选排在下拉框最前", () => {
+    renderWorkbench();
+    fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
+    fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
+      target: { value: "天涯" },
+    });
+    const select = screen.getByRole("combobox", {
+      name: "母题",
+    }) as HTMLSelectElement;
+    expect(select.value).toBe("200");
+    const groups = select.querySelectorAll("optgroup");
+    expect(groups[0].label).toBe("这个词登记的母题");
+    expect(groups[0].textContent).toBe("自然事物 / 地理 / 区域（默认）");
+    expect(groups[1].textContent).toBe("自然事物 / 天象 / 星相");
+  });
+
+  it("没登记母题的词退回标注里用过的，下拉框不分组", () => {
+    renderWorkbench();
+    fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
+    fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
+      target: { value: "明月" },
+    });
+    const select = screen.getByRole("combobox", {
+      name: "母题",
+    }) as HTMLSelectElement;
+    expect(select.value).toBe("100");
+    expect(select.querySelector("optgroup")).toBeNull();
   });
 
   it("歌词里没有的词不能保存", () => {

@@ -300,7 +300,10 @@ export type ImageryItem = {
   id: number;
   name: string;
   count: number;
+  /** 标注里用过的母题（按 id 排，不分主次） */
   categoryIds: number[];
+  /** imagery_motifs 登记的候选：默认母题在前，其后是多义候选，不含并列组成 */
+  motifIds: number[];
 };
 
 export type ImageryOccurrence = {

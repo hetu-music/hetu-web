@@ -50,7 +50,7 @@ export function useImageryTab(
       const created = await apiCreateImagery(name.trim());
       setItems((current) => [
         ...current,
-        { ...created, count: 0, categoryIds: [] },
+        { ...created, count: 0, categoryIds: [], motifIds: [] },
       ]);
       showToast("success", `意象「${created.name}」已创建`);
       closeModal();

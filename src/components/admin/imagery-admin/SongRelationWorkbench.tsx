@@ -180,6 +180,10 @@ export default function SongRelationWorkbench({
     [getCategoryPath, leafCategories],
   );
 
+  /** 新建关系时默认选的母题：登记的默认母题；没登记过的词退回标注里用过的 */
+  const defaultMotif = (item: ImageryItem | undefined) =>
+    item?.motifIds[0] ?? item?.categoryIds[0] ?? null;
+
   const [editorState, setEditor] = useState<EditorState | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [focusTag, setFocusTag] = useState<string | null>(null);
@@ -234,6 +238,12 @@ export default function SongRelationWorkbench({
   const resolvedItem = editor
     ? (itemByName.get(editor.imageryName.trim().toLowerCase()) ?? null)
     : null;
+  // 下拉框里把这个词登记的母题排在最前，默认母题打头
+  const candidateIds = new Set(resolvedItem?.motifIds ?? []);
+  const candidateOptions = (resolvedItem?.motifIds ?? []).flatMap((id) => {
+    const option = categoryOptions.find((c) => c.id === id);
+    return option ? [option] : [];
+  });
   const duplicate =
     editor && resolvedItem
       ? occurrences.find(
@@ -283,7 +293,7 @@ export default function SongRelationWorkbench({
     setEditor({
       occurrenceId: null,
       imageryName: name,
-      categoryId: item?.categoryIds[0] ?? null,
+      categoryId: defaultMotif(item),
     });
   };
 
@@ -293,10 +303,10 @@ export default function SongRelationWorkbench({
     setEditor({
       ...editor,
       imageryName: name,
-      // 新建时跟随意象的常用分类；编辑已有关系时不擅自改分类
+      // 新建时跟随意象的默认母题；编辑已有关系时不擅自改母题
       categoryId:
-        editor.occurrenceId === null && item?.categoryIds[0]
-          ? item.categoryIds[0]
+        editor.occurrenceId === null && defaultMotif(item) !== null
+          ? defaultMotif(item)
           : editor.categoryId,
     });
   };
@@ -602,11 +612,33 @@ export default function SongRelationWorkbench({
                   className={SELECT_CLASS}
                 >
                   <option value="">— 选择母题 —</option>
-                  {categoryOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
+                  {candidateOptions.length > 0 ? (
+                    <>
+                      <optgroup label="这个词登记的母题">
+                        {candidateOptions.map((c, i) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label}
+                            {i === 0 ? "（默认）" : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="其他母题">
+                        {categoryOptions
+                          .filter((c) => !candidateIds.has(c.id))
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </>
+                  ) : (
+                    categoryOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))
+                  )}
                 </select>
               </label>
 

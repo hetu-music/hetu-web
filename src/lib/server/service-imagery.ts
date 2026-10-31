@@ -6,6 +6,7 @@ import {
   TABLES,
 } from "@/lib/db/supabase-server";
 import { songTimetags } from "@/lib/imagery/consistency";
+import { motifCandidates, type MotifEntry } from "@/lib/imagery/suggest";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
 
 export type OccurrenceWithSong = {
@@ -63,16 +64,26 @@ export const getImageryWithCounts = cache(
     const supabase = getServiceClient();
     if (!supabase) return [];
     try {
-      const rows = (await fetchAll(
-        supabase,
-        TABLES.IMAGERY_SUMMARY_ALL,
-        'id,name,count,"categoryIds"',
-      )) as Array<{
-        id: number;
-        name: string;
-        count: number | null;
-        categoryIds: Array<number | string> | null;
-      }>;
+      const [rows, motifs] = await Promise.all([
+        fetchAll(
+          supabase,
+          TABLES.IMAGERY_SUMMARY_ALL,
+          'id,name,count,"categoryIds"',
+        ) as Promise<
+          Array<{
+            id: number;
+            name: string;
+            count: number | null;
+            categoryIds: Array<number | string> | null;
+          }>
+        >,
+        fetchAll<MotifEntry>(
+          supabase,
+          TABLES.IMAGERY_MOTIFS,
+          "imagery_id,category_id,role",
+        ),
+      ]);
+      const candidates = motifCandidates(motifs);
 
       return rows.map((item) => ({
         id: item.id,
@@ -81,6 +92,7 @@ export const getImageryWithCounts = cache(
         categoryIds: (item.categoryIds ?? [])
           .map((value) => Number(value))
           .filter(Number.isFinite),
+        motifIds: candidates.get(item.id) ?? [],
       }));
     } catch (e) {
       console.error("[getImageryWithCounts]", e);

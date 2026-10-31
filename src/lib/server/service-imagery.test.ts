@@ -62,7 +62,32 @@ describe("getImageryWithCounts", () => {
     await getImageryWithCounts();
     expect(client.from.mock.calls.map((c: unknown[]) => c[0])).toEqual([
       "imagery_summary_all",
+      "imagery_motifs",
     ]);
+  });
+
+  it("motifIds 取登记的候选：默认母题在前，多义候选在后，不含并列组成", async () => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: [
+            { id: 1, name: "烟花", count: 3, categoryIds: [5, 9] },
+            { id: 2, name: "新词", count: 0, categoryIds: [] },
+          ],
+          error: null,
+        }),
+        makeQueryBuilder({
+          data: [
+            { imagery_id: 1, category_id: 5, role: "alternative" },
+            { imagery_id: 1, category_id: 9, role: "primary" },
+            { imagery_id: 1, category_id: 7, role: "part" },
+          ],
+          error: null,
+        }),
+      ]),
+    );
+    const result = await getImageryWithCounts();
+    expect(result.map((r) => r.motifIds)).toEqual([[9, 5], []]);
   });
 
   it("categoryIds 里的 null 会被 Number(null) 转成 0 而不是被过滤（现有行为，非本次改动范围）", async () => {

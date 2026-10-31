@@ -153,12 +153,7 @@ export function GalleryQuote({
   size: "lg" | "sm";
 }) {
   return (
-    <div
-      className={cn(
-        "relative",
-        size === "lg" ? "min-h-40" : "min-h-22",
-      )}
-    >
+    <div className={cn("relative", size === "lg" ? "min-h-40" : "min-h-22")}>
       <AnimatePresence mode="wait">
         {song && (
           <motion.figure

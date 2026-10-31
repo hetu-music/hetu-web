@@ -410,6 +410,7 @@ type SongWords = {
   rows: Array<{
     id: number;
     imagery_id: number;
+    category_id: number;
     name: string;
     lyric_timetag: string[];
   }>;
@@ -423,7 +424,7 @@ async function loadSongWords(
     supabase.from(TABLES.MUSIC).select("lyrics").eq("id", songId).maybeSingle(),
     supabase
       .from(TABLES.IMAGERY_OCC)
-      .select("id,imagery_id,lyric_timetag,imagery(name)")
+      .select("id,imagery_id,category_id,lyric_timetag,imagery(name)")
       .eq("song_id", songId),
   ]);
   if (song.error) throw song.error;
@@ -433,6 +434,7 @@ async function loadSongWords(
     rows: ((occurrences.data ?? []) as Record<string, unknown>[]).map((r) => ({
       id: r.id as number,
       imagery_id: r.imagery_id as number,
+      category_id: r.category_id as number,
       name: (r.imagery as { name?: string } | null)?.name ?? "",
       lyric_timetag: (r.lyric_timetag as string[] | null) ?? [],
     })),
@@ -477,14 +479,17 @@ async function assertInLyrics(
  * 按歌词重算一首歌全部标注的时间标签：恰好是词字面出现的行。
  * 增删一个词会改变同曲短词被覆盖的行（加了「岁月」，「月」就让出那几行），所以整首重算。
  * 歌词没有时间轴时不动。
+ *
+ * 返回标签有变动的标注所挂的母题，以及在歌词里一处都找不到的词（标签被清空，标注要人工处理）。
  */
 async function syncSongTimetags(
   supabase: UserClient,
   songId: number,
-): Promise<void> {
+): Promise<TimetagSyncResult> {
   const { lyrics, rows } = await loadSongWords(supabase, songId);
   const expected = songTimetags(lyrics, [...new Set(rows.map((r) => r.name))]);
-  if (!expected) return;
+  if (!expected) return { motifIds: [], notFound: [] };
+  const motifIds = new Set<number>();
   for (const row of rows) {
     const tags = expected.get(row.name) ?? [];
     if (tags.join() === row.lyric_timetag.join()) continue;
@@ -493,7 +498,27 @@ async function syncSongTimetags(
       .update({ lyric_timetag: tags })
       .eq("id", row.id);
     if (error) throw error;
+    motifIds.add(row.category_id);
   }
+  const notFound = [...expected]
+    .filter(([, tags]) => tags.length === 0)
+    .map(([name]) => name);
+  return { motifIds: [...motifIds], notFound };
+}
+
+export type TimetagSyncResult = { motifIds: number[]; notFound: string[] };
+
+/**
+ * 歌词发布到正式表后调用：按新歌词重算这首歌全部标注的时间标签。
+ * 标注只挂在正式表的歌上，暂存表里改歌词不影响，所以在发布而不是暂存时同步。
+ */
+export async function resyncSongTimetags(
+  songId: number,
+  accessToken: string,
+): Promise<TimetagSyncResult> {
+  const supabase = getUserClient(accessToken);
+  if (!supabase) throw new Error("Supabase client unavailable");
+  return syncSongTimetags(supabase, songId);
 }
 
 /** 时间标签不由调用方给出：写入后按歌词重算（syncSongTimetags） */

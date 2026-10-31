@@ -28,6 +28,7 @@ import {
   updateImageryCategory,
   updateOccurrence,
   getImageryLastModified,
+  resyncSongTimetags,
 } from "./service-imagery";
 
 beforeEach(() => {
@@ -692,5 +693,76 @@ describe("getImageryLastModified", () => {
       ]),
     );
     expect(await getImageryLastModified()).toBeNull();
+  });
+});
+
+describe("resyncSongTimetags（发布新歌词后重算）", () => {
+  it("时间轴变了：改写标签，返回变动的母题；歌词里没有的词清空标签并报出", async () => {
+    const updateBuilder = makeQueryBuilder({ data: null, error: null });
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: { lyrics: "[00:03.00]明月几时有\n[00:05.00]把酒问青天" },
+          error: null,
+        }),
+        makeQueryBuilder({
+          data: [
+            {
+              id: 1,
+              imagery_id: 7,
+              category_id: 70,
+              lyric_timetag: ["00:01.00"],
+              imagery: { name: "明月" },
+            },
+            {
+              id: 2,
+              imagery_id: 8,
+              category_id: 80,
+              lyric_timetag: ["00:05.00"],
+              imagery: { name: "青天" },
+            },
+            {
+              id: 3,
+              imagery_id: 9,
+              category_id: 90,
+              lyric_timetag: ["00:02.00"],
+              imagery: { name: "流水" },
+            },
+          ],
+          error: null,
+        }),
+        updateBuilder,
+      ]),
+    );
+    const result = await resyncSongTimetags(1, "token");
+    expect(updateBuilder.update.mock.calls).toEqual([
+      [{ lyric_timetag: ["00:03.00"] }],
+      [{ lyric_timetag: [] }],
+    ]);
+    expect(result).toEqual({ motifIds: [70, 90], notFound: ["流水"] });
+  });
+
+  it("歌词没有时间轴时不动", async () => {
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: { lyrics: "明月几时有" }, error: null }),
+      makeQueryBuilder({
+        data: [
+          {
+            id: 1,
+            imagery_id: 7,
+            category_id: 70,
+            lyric_timetag: ["00:01.00"],
+            imagery: { name: "明月" },
+          },
+        ],
+        error: null,
+      }),
+    ]);
+    vi.mocked(getUserClient).mockReturnValue(client);
+    expect(await resyncSongTimetags(1, "token")).toEqual({
+      motifIds: [],
+      notFound: [],
+    });
+    expect(client.from).toHaveBeenCalledTimes(2);
   });
 });

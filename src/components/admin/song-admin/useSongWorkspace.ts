@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { handleApprove } from "@/app/actions/admin-actions";
@@ -26,6 +27,7 @@ import type { SongDetail } from "@/lib/types";
 import { convertEmptyStringToNull } from "@/lib/utils/utils-common";
 import { diffSongFields, publishStatusOf } from "@/lib/utils/utils-song-diff";
 import { notify, notifyError } from "../kit/toast";
+import { songOccurrencesKey } from "./SongImageryTab";
 
 type Published = Record<string, unknown> | null;
 
@@ -40,6 +42,7 @@ export function useSongWorkspace(
   initialPublished: Published,
 ) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [song, setSong] = useState(initialSong);
   const [published, setPublished] = useState(initialPublished);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -142,12 +145,27 @@ export function useSongWorkspace(
       } else {
         notify({ type: "success", text: "已发布" });
       }
+      void queryClient.invalidateQueries({
+        queryKey: songOccurrencesKey(saved.id),
+      });
+      // 意象时间标签随歌词重算；歌词里已找不到的词，标注要到意象页签里删掉或改标
+      if (res.imagerySyncFailed) {
+        notify({
+          type: "error",
+          text: "意象时间标签没同步成功，可在意象页签改动任一标注触发重算",
+        });
+      } else if (res.imageryNotFound?.length) {
+        notify({
+          type: "error",
+          text: `新歌词里找不到意象「${res.imageryNotFound.join("」「")}」，请到意象页签删掉或改标`,
+        });
+      }
     } catch (err) {
       notifyError(err, "发布失败");
     } finally {
       setIsPublishing(false);
     }
-  }, [form, persist, song]);
+  }, [form, persist, queryClient, song]);
 
   /** 放弃没暂存的改动 */
   const discard = useCallback(() => {

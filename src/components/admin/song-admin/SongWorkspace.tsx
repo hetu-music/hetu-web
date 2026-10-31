@@ -52,7 +52,6 @@ const TABS = [
   "imagery",
   "emotions",
   "collations",
-  "supplements",
   "audio",
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -63,7 +62,6 @@ const TAB_LABEL: Record<Tab, string> = {
   imagery: "意象",
   emotions: "基调",
   collations: "校勘",
-  supplements: "补遗",
   audio: "音频",
 };
 
@@ -78,7 +76,8 @@ const FIELD_GROUPS: { label: string; keys: SongFormFieldKey[] }[] = [
     keys: ["lyricist", "composer", "arranger", "artist", "albumartist"],
   },
   { label: "歌词", keys: ["lyrics_start", "lyrics"] },
-  { label: "说明", keys: ["comment", "dispute_note"] },
+  // 资料争议在「校勘」一栏，与补遗、校记放在一起
+  { label: "说明", keys: ["comment"] },
   { label: "碟片", keys: ["track", "tracktotal", "discnumber", "disctotal"] },
   { label: "链接", keys: ["nelink", "kugolink", "qmlink"] },
 ];
@@ -91,7 +90,7 @@ const PROVIDERS: { provider: MusicProviderType; label: string }[] = [
 ];
 
 /**
- * 一首歌的工作台：资料、封面与乐谱、意象、基调、校勘、补遗、音频都在这里，暂存与发布在吸顶栏右侧。
+ * 一首歌的工作台：资料、封面与乐谱、意象、基调、校勘（校记、补遗、争议）、音频都在这里，暂存与发布在吸顶栏右侧。
  * 原先资料在歌曲列表的弹窗里改，意象要去意象管理找这首歌，音频在另一页。
  */
 export default function SongWorkspace({
@@ -208,12 +207,7 @@ export default function SongWorkspace({
           )}
           {song && (
             <TabsContent value="collations" variant="inline">
-              <SongCollationTab song={song} />
-            </TabsContent>
-          )}
-          {song && (
-            <TabsContent value="supplements" variant="inline">
-              <SongSupplementTab songId={song.id} />
+              <CollationsTab ws={ws} song={song} />
             </TabsContent>
           )}
           {song && user?.isSuper && (
@@ -318,6 +312,58 @@ function FieldGrid({
           />
         );
       })}
+    </div>
+  );
+}
+
+/** 标为争议后，站上哪些地方跟着变；改了相关逻辑要同步这里 */
+const DISPUTE_EFFECTS = [
+  "详情页顶部显示「资料存疑」提示块，内容就是这里写的说明",
+  "曲库照常列出、能搜到，封面带「存疑」角标，但不计入首页和寻曲页的收录总数",
+  "不算进曲库口径（music_catalog）：意象词云、母题页的次数和寻曲测验的候选池都不含它，别的歌的「同有此意」也不会推荐它；它自己的详情页仍有意象标注和相关作品",
+  "登录页的封面墙不用它",
+];
+
+/**
+ * 校勘：管理员对这首歌的考订，分校记、补遗、争议三块：
+ * 校记写在歌词里，补遗在创作手记之后，争议在详情页页首。
+ * 争议是资料表单的字段，随资料一起暂存、发布；补遗和校记保存即上线。
+ */
+function CollationsTab({
+  ws,
+  song,
+}: {
+  ws: SongWorkspaceState;
+  song: SongDetail;
+}) {
+  return (
+    <div className="space-y-16">
+      <section>
+        <SectionHeading label="校记" />
+        <div className="mt-6">
+          <SongCollationTab song={song} />
+        </div>
+      </section>
+      <section>
+        <SectionHeading label="补遗" />
+        <div className="mt-6">
+          <SongSupplementTab songId={song.id} />
+        </div>
+      </section>
+      <section>
+        <SectionHeading label="争议" />
+        <div className="mt-4 space-y-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          <p>
+            填了就算标为争议，清空即取消。和资料一样要先暂存，发布后才生效。标为争议后：
+          </p>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {DISPUTE_EFFECTS.map((effect) => (
+              <li key={effect}>{effect}</li>
+            ))}
+          </ul>
+        </div>
+        <FieldGrid keys={["dispute_note"]} changed={ws.changedFields} />
+      </section>
     </div>
   );
 }

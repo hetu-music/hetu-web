@@ -1,12 +1,12 @@
 import { unstable_cache } from "next/cache";
 import {
   buildGalleryPool,
-  groupMarks,
   pickGallery,
   type GalleryRow,
   type GallerySong,
 } from "@/lib/auth-gallery";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
+import { groupMarks } from "@/lib/utils/utils-excerpt";
 import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
 import { loadImageryIndex } from "@/lib/server/imagery-index";
 

@@ -6,7 +6,7 @@ import { getSongById } from "@/lib/server/service-songs";
 import { getSongImagery } from "@/lib/server/service-song-imagery";
 import { getSongCollations } from "@/lib/server/service-collations";
 import { TABLES } from "@/lib/db/supabase-server";
-import { buildFolio, markLines, pickExcerpt } from "@/lib/utils/utils-folio";
+import { songExcerpt } from "@/lib/utils/utils-excerpt";
 import { SITE_URL } from "@/lib/constants";
 
 type PageProps = {
@@ -109,11 +109,11 @@ export default async function SongDetailPage({
   }
 
   // 摘句在服务端挑定：折长句用到的分词随运行环境而异，前后端各算一遍可能不一致
-  const { lines } = buildFolio(song.lyrics, {
+  const excerpt = songExcerpt(song.lyrics, {
     title: song.title,
     lyricsStart: song.lyrics_start,
+    marks: imagery.marks,
   });
-  const excerpt = pickExcerpt(lines, markLines(lines, imagery.marks));
 
   return (
     <SongDetailClient

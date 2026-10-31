@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildGalleryPool,
   GALLERY_SIZE,
-  groupMarks,
   pickGallery,
   type GallerySong,
 } from "./auth-gallery";
+import { groupMarks } from "@/lib/utils/utils-excerpt";
 
 const LRC = `[00:01.00]河图 - 测试
 [00:03.00]词：某人

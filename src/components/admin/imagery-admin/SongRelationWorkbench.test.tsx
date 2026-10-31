@@ -138,23 +138,34 @@ describe("SongRelationWorkbench", () => {
     });
   });
 
-  it("新增关系：默认选登记的默认母题，不取标注里 id 最小的；候选排在下拉框最前", () => {
+  it("新增关系：默认选登记的默认母题，下拉框只列登记的母题，「其他母题…」展开全部", () => {
     renderWorkbench();
     fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
       target: { value: "天涯" },
     });
-    const select = screen.getByRole("combobox", {
-      name: "母题",
-    }) as HTMLSelectElement;
-    expect(select.value).toBe("200");
-    const groups = select.querySelectorAll("optgroup");
-    expect(groups[0].label).toBe("这个词登记的母题");
-    expect(groups[0].textContent).toBe("自然事物 / 地理 / 区域（默认）");
-    expect(groups[1].textContent).toBe("自然事物 / 天象 / 星相");
+    const select = () =>
+      screen.getByRole("combobox", { name: "母题" }) as HTMLSelectElement;
+    const labels = () => [...select().options].map((o) => o.textContent);
+    expect(select().value).toBe("200");
+    expect(labels()).toEqual([
+      "— 选择母题 —",
+      "自然事物 / 地理 / 区域（默认）",
+      "其他母题…",
+    ]);
+
+    fireEvent.change(select(), { target: { value: "__all" } });
+    expect(select().value).toBe("200");
+    expect(labels()).toEqual([
+      "— 选择母题 —",
+      "自然事物 / 地理 / 区域",
+      "自然事物 / 天象 / 星相",
+    ]);
+    fireEvent.change(select(), { target: { value: "100" } });
+    expect(screen.getByText(/保存后登记为它的多义候选/)).toBeTruthy();
   });
 
-  it("没登记母题的词退回标注里用过的，下拉框不分组", () => {
+  it("没登记母题的词退回标注里用过的，下拉框直接列全部", () => {
     renderWorkbench();
     fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
@@ -164,7 +175,7 @@ describe("SongRelationWorkbench", () => {
       name: "母题",
     }) as HTMLSelectElement;
     expect(select.value).toBe("100");
-    expect(select.querySelector("optgroup")).toBeNull();
+    expect([...select.options].map((o) => o.value)).toEqual(["", "200", "100"]);
   });
 
   it("歌词里没有的词不能保存", () => {

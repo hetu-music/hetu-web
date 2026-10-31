@@ -33,6 +33,8 @@ interface EditorState {
   occurrenceId: number | null;
   imageryName: string;
   categoryId: number | null;
+  /** 点了「其他母题…」：下拉框改列全部母题。换词或重开编辑时收回 */
+  allMotifs?: boolean;
 }
 
 type Tone = "draft" | "hover" | "candidate" | "saved";
@@ -238,12 +240,28 @@ export default function SongRelationWorkbench({
   const resolvedItem = editor
     ? (itemByName.get(editor.imageryName.trim().toLowerCase()) ?? null)
     : null;
-  // 下拉框里把这个词登记的母题排在最前，默认母题打头
-  const candidateIds = new Set(resolvedItem?.motifIds ?? []);
-  const candidateOptions = (resolvedItem?.motifIds ?? []).flatMap((id) => {
-    const option = categoryOptions.find((c) => c.id === id);
-    return option ? [option] : [];
-  });
+  // 下拉框默认只列这个词登记的母题（默认母题打头）与当前值，与预标注审核一致；
+  // 「其他母题…」展开全部，选了登记之外的，保存时登记为多义候选。没登记过的词直接列全部
+  const motifIds = resolvedItem?.motifIds ?? [];
+  const showAllMotifs = Boolean(editor?.allMotifs) || motifIds.length === 0;
+  const motifOptions = showAllMotifs
+    ? categoryOptions
+    : [
+        ...new Set([
+          ...motifIds,
+          ...(editor?.categoryId != null ? [editor.categoryId] : []),
+        ]),
+      ].map((id) => ({
+        id,
+        label:
+          (categoryOptions.find((c) => c.id === id)?.label ??
+            getCategoryPath(id)) +
+          (id === motifIds[0]
+            ? "（默认）"
+            : motifIds.includes(id)
+              ? ""
+              : "（未登记）"),
+      }));
   const duplicate =
     editor && resolvedItem
       ? occurrences.find(
@@ -303,6 +321,7 @@ export default function SongRelationWorkbench({
     setEditor({
       ...editor,
       imageryName: name,
+      allMotifs: false,
       // 新建时跟随意象的默认母题；编辑已有关系时不擅自改母题
       categoryId:
         editor.occurrenceId === null && defaultMotif(item) !== null
@@ -602,44 +621,34 @@ export default function SongRelationWorkbench({
                 <select
                   value={editor.categoryId ?? ""}
                   onChange={(e) =>
-                    setEditor({
-                      ...editor,
-                      categoryId: e.target.value
-                        ? Number(e.target.value)
-                        : null,
-                    })
+                    setEditor(
+                      e.target.value === "__all"
+                        ? { ...editor, allMotifs: true }
+                        : {
+                            ...editor,
+                            categoryId: e.target.value
+                              ? Number(e.target.value)
+                              : null,
+                          },
+                    )
                   }
                   className={SELECT_CLASS}
                 >
                   <option value="">— 选择母题 —</option>
-                  {candidateOptions.length > 0 ? (
-                    <>
-                      <optgroup label="这个词登记的母题">
-                        {candidateOptions.map((c, i) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                            {i === 0 ? "（默认）" : ""}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="其他母题">
-                        {categoryOptions
-                          .filter((c) => !candidateIds.has(c.id))
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.label}
-                            </option>
-                          ))}
-                      </optgroup>
-                    </>
-                  ) : (
-                    categoryOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))
-                  )}
+                  {motifOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                  {!showAllMotifs && <option value="__all">其他母题…</option>}
                 </select>
+                {motifIds.length > 0 &&
+                  editor.categoryId !== null &&
+                  !motifIds.includes(editor.categoryId) && (
+                    <span className="block text-xs text-slate-400 dark:text-slate-500">
+                      不是这个词登记的母题，保存后登记为它的多义候选
+                    </span>
+                  )}
               </label>
 
               <div className="space-y-1">

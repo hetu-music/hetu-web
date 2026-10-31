@@ -1,7 +1,7 @@
 "use client";
 
-import { GALLERY_QUOTES, type GallerySong } from "@/lib/auth-gallery";
 import { Link } from "@/i18n/navigation";
+import { GALLERY_QUOTES, type GallerySong } from "@/lib/auth-gallery-shared";
 import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { AnimatePresence, motion } from "framer-motion";
@@ -46,7 +46,7 @@ function Cover({
         "shrink-0 aspect-square overflow-hidden rounded-md bg-slate-200 dark:bg-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10 transition duration-1000",
         active
           ? "opacity-100 grayscale-0"
-          : "opacity-55 grayscale-[70%] dark:opacity-35",
+          : "opacity-55 grayscale-70 dark:opacity-35",
         className,
       )}
     >
@@ -120,7 +120,7 @@ export function CoverStrip({
   return (
     <div
       aria-hidden
-      className="space-y-3 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
+      className="space-y-3 overflow-hidden mask-[linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
     >
       {rows.map((row, r) => (
         <div
@@ -156,7 +156,7 @@ export function GalleryQuote({
     <div
       className={cn(
         "relative",
-        size === "lg" ? "min-h-[10rem]" : "min-h-[5.5rem]",
+        size === "lg" ? "min-h-40" : "min-h-22",
       )}
     >
       <AnimatePresence mode="wait">

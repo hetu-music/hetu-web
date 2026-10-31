@@ -3,21 +3,9 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import {
   getOccurrencesForImagery,
   getOccurrencesForSong,
-  createOccurrence,
 } from "@/lib/server/service-imagery";
-import {
-  refreshImagery,
-  withPurgeStatus,
-} from "@/lib/server/server-revalidate";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { z } from "zod";
-import { parseJsonBody } from "@/lib/server/parse-body";
 
-const CreateOccurrenceSchema = z.object({
-  song_id: z.number().int().positive(),
-  imagery_id: z.number().int().positive(),
-  category_id: z.number().int().positive(),
-});
+// 新增标注（手动一条或审核后多条）统一走 POST /api/admin/occurrences/batch
 
 export const GET = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
@@ -58,43 +46,4 @@ export const GET = withAuth(
     }
   },
   { requireAdmin: true },
-);
-
-export const POST = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
-    try {
-      const { data: input, response: invalid } = await parseJsonBody(
-        request,
-        CreateOccurrenceSchema,
-      );
-      if (invalid) return invalid;
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token)
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      const created = await createOccurrence(input, session.access_token);
-      const purge = await refreshImagery({
-        songIds: [created.song_id],
-        motifIds: [created.category_id],
-      });
-      return withPurgeStatus(NextResponse.json(created), purge);
-    } catch (e) {
-      if (
-        e instanceof Error &&
-        ["NOT_LEAF_CATEGORY", "IMAGERY_NOT_IN_LYRICS"].includes(
-          (e as Error & { code?: string }).code ?? "",
-        )
-      ) {
-        return NextResponse.json({ error: e.message }, { status: 400 });
-      }
-      console.error("[POST /api/admin/occurrences]", e);
-      return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 },
-      );
-    }
-  },
-  { requireCSRF: true, requireAdmin: true },
 );

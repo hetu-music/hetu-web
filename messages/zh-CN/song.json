@@ -83,7 +83,8 @@
       "colophon": "版记",
       "related": "同有此意",
       "notes": "创作手记",
-      "comments": "评点"
+      "comments": "评点",
+      "supplements": "补遗"
     },
     "imageryTotal": "本曲共 {count} 个意象",
     "imageryMore": "等",
@@ -106,6 +107,26 @@
     "nowPlaying": "正在播放",
     "expand": "展开全文",
     "collapse": "收起",
+    "collations": {
+      "kinds": {
+        "slip": "口误",
+        "sung": "异唱",
+        "version": "异本",
+        "note": "附记"
+      },
+      "sungAs": "「{quote}」唱作「{sung}」。",
+      "collator": "{name} 校",
+      "reviser": "{name} 订",
+      "anonymous": "佚名"
+    },
+    "supplements": {
+      "kinds": {
+        "release": "版本",
+        "draft": "旧稿",
+        "note": "附记"
+      },
+      "compiler": "{name} 辑"
+    },
     "comments": {
       "intro": "批注写在字句旁；这里是对整首歌的评点。",
       "count": "共 {count} 则批评",

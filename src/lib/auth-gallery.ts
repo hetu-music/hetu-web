@@ -1,16 +1,13 @@
 /**
  * 登录、注册页的封面墙与摘句：从曲库里挑有封面、有歌词的歌，
  * 每首取一句适合展示的歌词。纯函数，查询与缓存在 service-auth-gallery。
+ * 挑摘句只能在服务端做（见 utils-excerpt）；客户端要的类型与常量在 auth-gallery-shared。
  */
-import { buildFolio, markLines, pickExcerpt } from "@/lib/utils/utils-folio";
-import { toTraditional } from "@/lib/utils/utils-convert";
-
-export interface GallerySong {
-  id: number;
-  title: string;
-  /** 摘句：按空格分成若干短语，与歌曲页卷首的竖排摘句同一规则 */
-  excerpt: string;
-}
+import "server-only";
+import { GALLERY_SIZE, type GallerySong } from "@/lib/auth-gallery-shared";
+import type { MarkInput } from "@/lib/utils/utils-folio";
+import { songExcerpt } from "@/lib/utils/utils-excerpt";
+import { toTraditional, toTraditionalLrc } from "@/lib/utils/utils-convert";
 
 export interface GalleryRow {
   id: number;
@@ -19,32 +16,33 @@ export interface GalleryRow {
   lyrics_start?: string | null;
 }
 
-/** 墙上的封面数：宽屏四列、每列九张 */
-export const GALLERY_SIZE = 36;
-/** 轮换展示摘句的歌数 */
-export const GALLERY_QUOTES = 8;
-
-/** 把查到的歌整理成候选池：取不出摘句的歌不要 */
+/**
+ * 把查到的歌整理成候选池：取不出摘句的歌不要。
+ * 摘句与歌曲页卷首一致：按意象标注挑，繁体先转歌词再挑（详情页也是先转再折句）。
+ */
 export function buildGalleryPool(
   rows: GalleryRow[],
   locale: string,
+  marksBySong: Map<number, MarkInput[]> = new Map(),
 ): GallerySong[] {
   const tw = locale === "zh-TW";
+  const tr = (s: string) => (tw ? (toTraditional(s) ?? s) : s);
   return rows.flatMap((row) => {
     if (!row.title || !row.lyrics) return [];
-    const { lines } = buildFolio(row.lyrics, {
-      title: row.title,
+    const title = tr(row.title);
+    const lyrics =
+      (tw ? toTraditionalLrc(row.lyrics) : row.lyrics) ?? row.lyrics;
+    const marks = (marksBySong.get(row.id) ?? []).map((m) => ({
+      ...m,
+      name: tr(m.name),
+    }));
+    const excerpt = songExcerpt(lyrics, {
+      title,
       lyricsStart: row.lyrics_start,
+      marks,
     });
-    const excerpt = pickExcerpt(lines, markLines(lines, []));
     if (!excerpt) return [];
-    return [
-      {
-        id: row.id,
-        title: (tw ? toTraditional(row.title) : row.title) ?? row.title,
-        excerpt: (tw ? toTraditional(excerpt) : excerpt) ?? excerpt,
-      },
-    ];
+    return [{ id: row.id, title, excerpt }];
   });
 }
 

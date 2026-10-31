@@ -3,23 +3,22 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import {
-  apiCreateImagery,
-  apiCreateOccurrence,
+  apiCreateOccurrencesBatch,
   apiDeleteOccurrence,
   apiGetOccurrencesForSong,
   apiUpdateOccurrence,
 } from "@/lib/api/client-api";
 import { MIN_OCCURRENCES } from "@/lib/quiz/pool";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import SongRelationWorkbench, {
-  type RelationDraft,
-} from "../imagery-admin/SongRelationWorkbench";
+import { categoryPath, motifOptions } from "@/lib/imagery/word-motifs";
+import SongAnnotationWorkbench, {
+  type AnnotationDraft,
+} from "../imagery-admin/SongAnnotationWorkbench";
 import {
   IMAGERY_KEYS,
   useImageryCategoriesQuery,
   useImageryItemsQuery,
 } from "../imagery-admin/queries";
-import { getCategoryPath } from "../imagery-admin/utils";
 import { EmptyState, ErrorState, LoadingState } from "../kit/parts";
 import { WARN_TEXT_CLASS } from "../kit/styles";
 import { notify, notifyError } from "../kit/toast";
@@ -28,8 +27,8 @@ export const songOccurrencesKey = (songId: number) =>
   ["admin", "occurrences", songId] as const;
 
 /**
- * 一首歌的意象标注：左边整首歌词、右边这首歌的意象关系与候选审核。
- * 原先放在意象管理的「关系管理」里，要先在列表里找到这首歌再展开。
+ * 一首歌的意象标注：左边整首歌词、右边这首歌的标注与候选审核。
+ * 新增标注与预标注审核走同一个接口，词典里没有的词在保存时随之创建。
  */
 export default function SongImageryTab({
   song,
@@ -52,16 +51,14 @@ export default function SongImageryTab({
   });
 
   const categoryList = useMemo(() => categories.data ?? [], [categories.data]);
-  const leafCategories = useMemo(() => {
-    const parentIds = new Set(categoryList.map((c) => c.parent_id));
-    return categoryList.filter((c) => !parentIds.has(c.id));
-  }, [categoryList]);
+  const motifs = useMemo(() => motifOptions(categoryList), [categoryList]);
   const pathOf = useCallback(
-    (id: number) => getCategoryPath(id, categoryList),
+    (id: number) =>
+      categoryPath(id, new Map(categoryList.map((c) => [c.id, c]))),
     [categoryList],
   );
 
-  /** 关系变了，这首歌的关系与词典里各意象的用量都要重取 */
+  /** 标注变了，这首歌的标注与词典（用量、登记的母题）都要重取 */
   const reload = useCallback(
     () =>
       Promise.all([
@@ -73,43 +70,49 @@ export default function SongImageryTab({
     [queryClient, song.id],
   );
 
-  /** 新建（occurrenceId 为 null）或更新一条关系；意象名不在词典里时先建意象 */
+  /**
+   * 新建（occurrenceId 为 null）或更新一条标注。词典里没有的词随标注一起保存，
+   * 服务端先核对歌词再建词，不会留下没有标注的词
+   */
   const save = async (
     occurrenceId: number | null,
-    draft: RelationDraft,
+    draft: AnnotationDraft,
   ): Promise<boolean> => {
     if (submitting) return false;
     setSubmitting(true);
     try {
-      let imageryId = draft.imageryId;
-      if (imageryId === null) {
-        const created = (await apiCreateImagery(draft.imageryName)) as {
-          id: number;
-        };
-        imageryId = created.id;
-      }
-      const payload = {
-        imagery_id: imageryId,
-        category_id: draft.categoryId,
-      };
+      const word =
+        draft.imageryId === null
+          ? { imagery_name: draft.imageryName.trim() }
+          : { imagery_id: draft.imageryId };
       if (occurrenceId === null) {
-        await apiCreateOccurrence({ song_id: song.id, ...payload });
+        const { created } = await apiCreateOccurrencesBatch(song.id, [
+          { ...word, category_id: draft.categoryId },
+        ]);
+        if (created === 0) {
+          notify({ type: "error", text: "这首歌已经标过这个词" });
+          await reload();
+          return false;
+        }
       } else {
-        await apiUpdateOccurrence(occurrenceId, payload);
+        await apiUpdateOccurrence(occurrenceId, {
+          ...word,
+          category_id: draft.categoryId,
+        });
       }
       await reload();
       notify({
         type: "success",
         text:
           draft.imageryId === null
-            ? `已新建意象「${draft.imageryName}」并保存关系`
+            ? `已新建词「${draft.imageryName.trim()}」并保存标注`
             : occurrenceId === null
-              ? "关系已创建"
-              : "关系已更新",
+              ? "标注已保存"
+              : "标注已更新",
       });
       return true;
     } catch (error) {
-      notifyError(error, "保存关系失败");
+      notifyError(error, "保存标注失败");
       return false;
     } finally {
       setSubmitting(false);
@@ -124,7 +127,7 @@ export default function SongImageryTab({
       await reload();
       notify({ type: "success", text: `已删除「${label}」` });
     } catch (error) {
-      notifyError(error, "删除关系失败");
+      notifyError(error, "删除标注失败");
     } finally {
       setSubmitting(false);
     }
@@ -157,12 +160,12 @@ export default function SongImageryTab({
           已标注 {count} 个，少于 {MIN_OCCURRENCES} 个不会进入寻曲测验
         </p>
       )}
-      <SongRelationWorkbench
+      <SongAnnotationWorkbench
         song={song}
         occurrences={occurrences.data ?? []}
         loading={occurrences.isPending}
         items={items.data ?? []}
-        leafCategories={leafCategories}
+        motifs={motifs}
         submitting={submitting}
         getCategoryPath={pathOf}
         onReload={reload}

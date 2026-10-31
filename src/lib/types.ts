@@ -74,6 +74,7 @@ export interface SongDetailClientProps {
   imagery: SongImageryView;
   /** 卷首竖排摘句，按空格分列；在服务端挑好，见 pickExcerpt */
   excerpt: string | null;
+  collations: SongCollation[];
 }
 
 // 歌曲详情页的意象视图
@@ -213,6 +214,33 @@ export interface SongComment {
   editedAt: string | null;
 }
 
+// 校记与补遗：管理员写的勘误与资料，署录者之名。同存一表，按位置区分：
+// 挂在某句歌词上的是校记，记在整首歌上的是补遗
+/** 校记：slip 口误 / sung 异唱 / version 异本 / note 附记 */
+export type CollationKind = "slip" | "sung" | "version" | "note";
+/** 补遗：release 版本 / draft 旧稿 / note 附记 */
+export type SupplementKind = "release" | "draft" | "note";
+
+export interface SongCollation {
+  id: number;
+  /** 位置的存法与批注相同，歌词改动后按原句找回；补遗为 song */
+  anchor: CommentAnchor;
+  anchorIndex: number | null;
+  anchorTime: number | null;
+  anchorQuote: string | null;
+  kind: CollationKind | SupplementKind;
+  /** 补遗的日期：2019、2019-08 或 2019-08-15 */
+  date: string | null;
+  /** 句中的哪几个字，实际唱成什么 */
+  quote: string | null;
+  sung: string | null;
+  body: string;
+  /** 校者；账号已删为 null */
+  collator: string | null;
+  /** 订者：别人改过时才有 */
+  reviser: string | null;
+}
+
 // 个人页「我的批评」：按歌分组
 export interface MyComment {
   id: number;
@@ -271,8 +299,14 @@ export type ImageryCategory = {
 export type ImageryItem = {
   id: number;
   name: string;
+  /** 标注条数，含争议歌曲 */
   count: number;
-  categoryIds: number[];
+  /** imagery_motifs 登记的母题（见 IMAGERY.md）：默认母题，没登记过为 null */
+  primary: number | null;
+  /** 多义词的其他候选，标注时按语境与默认母题二选一 */
+  alternatives: number[];
+  /** 并列词的其余组成（「风雨」的雨），标注默认母题时一并写入 */
+  parts: number[];
 };
 
 export type ImageryOccurrence = {

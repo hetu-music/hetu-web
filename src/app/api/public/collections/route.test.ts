@@ -42,12 +42,16 @@ function makeRequest(
   method: string,
   body?: unknown,
   cookies?: Record<string, string>,
+  query = "",
 ) {
-  const req = new NextRequest("http://localhost/api/public/collections", {
-    method,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    headers: { "content-type": "application/json" },
-  });
+  const req = new NextRequest(
+    `http://localhost/api/public/collections${query}`,
+    {
+      method,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: { "content-type": "application/json" },
+    },
+  );
   if (cookies) {
     for (const [name, value] of Object.entries(cookies)) {
       req.cookies.set(name, value);
@@ -100,6 +104,18 @@ describe("GET /api/public/collections", () => {
       id: 1,
       collectionInfo: { created_at: "2024-01-01" },
     });
+  });
+
+  it("歌曲信息按 ?locale= 转字形，不看 NEXT_LOCALE cookie", async () => {
+    const rows = [{ song_id: 1, created_at: "2024-01-01" }];
+    mockFromBuilders = [makeQueryBuilder({ data: rows, error: null })];
+    await GET(makeRequest("GET", undefined, undefined, "?locale=zh-TW"));
+    expect(getSongsByIds).toHaveBeenLastCalledWith([1], "zh-TW");
+
+    fromCallIndex = 0;
+    mockFromBuilders = [makeQueryBuilder({ data: rows, error: null })];
+    await GET(makeRequest("GET", undefined, { NEXT_LOCALE: "zh-TW" }));
+    expect(getSongsByIds).toHaveBeenLastCalledWith([1], "zh-CN");
   });
 });
 

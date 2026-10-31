@@ -106,6 +106,20 @@ describe("/api/public/quiz-results", () => {
     expect(getQuizResult).toHaveBeenCalledWith("aB3dE6gH9k", "zh-CN");
   });
 
+  it("GET 按 ?locale= 给出对应字形", async () => {
+    vi.mocked(listQuizRecords).mockResolvedValueOnce([
+      {
+        id: "aB3dE6gH9k",
+        savedAt: "2026-10-01T00:00:00Z",
+        persona: { motto: "仰观天象", label: "天象" },
+        secondary: null,
+      },
+    ]);
+    await GET(request("GET", undefined, "?latest=1&locale=zh-TW"));
+    expect(vi.mocked(listQuizRecords).mock.calls[0][2]).toBe("zh-TW");
+    expect(getQuizResult).toHaveBeenCalledWith("aB3dE6gH9k", "zh-TW");
+  });
+
   it("POST 解码乱码后保存，返回记录 id", async () => {
     const res = await POST(request("POST", { slug }));
     expect(res.status).toBe(200);

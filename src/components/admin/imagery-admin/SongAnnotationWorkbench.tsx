@@ -3,12 +3,18 @@
 import { linesForWord } from "@/lib/imagery/consistency";
 import { parseLrcLines, type LrcLine } from "@/lib/imagery/suggest";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import type { ImageryItem } from "@/lib/types";
+import {
+  type MotifOption,
+  WORD_ROLE,
+  wordMotifIds,
+} from "@/lib/imagery/word-motifs";
 import { AlertCircle, Plus, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SuggestionReview from "../imagery-suggest/SuggestionReview";
 import { useImagerySuggestions } from "../imagery-suggest/useImagerySuggestions";
+import MotifSelect from "./MotifSelect";
 import { ConfirmButton } from "../kit/parts";
 import {
   INPUT_CLASS,
@@ -21,14 +27,14 @@ import {
 import { cn } from "@/lib/utils/utils";
 import type { SongOption } from "./types";
 
-/** 对照编辑提交的一条关系；imageryId 为 null 表示词典里还没有，保存时新建 */
-export interface RelationDraft {
+/** 对照编辑提交的一条标注；imageryId 为 null 表示词典里还没有，保存时随标注创建 */
+export interface AnnotationDraft {
   imageryId: number | null;
   imageryName: string;
   categoryId: number;
 }
 
-/** 正在编辑的关系；occurrenceId 为 null 表示新建。出现位置由歌词算出，不在这里 */
+/** 正在编辑的标注；occurrenceId 为 null 表示新建。出现位置由歌词算出，不在这里 */
 interface EditorState {
   occurrenceId: number | null;
   imageryName: string;
@@ -37,17 +43,19 @@ interface EditorState {
 
 type Tone = "draft" | "hover" | "candidate" | "saved";
 
-type View = "relations" | "suggestions";
+type View = "annotations" | "suggestions";
 
-// 歌词里的标记：正在编辑的用强调色，悬停定位用 amber，候选只画虚线，已存的铺浅灰
+// 歌词里的标记：已存的画下划线；正在编辑、悬停定位、勾选的候选都铺淡琥珀，
+// 同一时间只关心一处，不必再分颜色
+const ACTIVE_CLASS =
+  "rounded-sm bg-amber-200/80 text-amber-900 dark:bg-amber-500/30 dark:text-amber-100";
 const TONE_CLASS: Record<Tone, string> = {
-  draft: "bg-(--tone)/20 text-slate-900 dark:text-slate-50 rounded-sm",
-  hover:
-    "bg-amber-200/80 text-amber-900 dark:bg-amber-500/30 dark:text-amber-100 rounded-sm",
-  candidate:
-    "bg-transparent text-inherit underline decoration-(--tone) decoration-dashed underline-offset-4",
+  draft: ACTIVE_CLASS,
+  hover: ACTIVE_CLASS,
+  candidate: ACTIVE_CLASS,
+  // <mark> 自带浏览器的亮黄底和黑字，只画下划线时要显式清掉
   saved:
-    "bg-slate-200/80 text-slate-900 dark:bg-slate-700/60 dark:text-slate-100 rounded-sm",
+    "bg-transparent text-inherit underline decoration-(--tone) decoration-2 underline-offset-4",
 };
 const TONE_PRIORITY: Record<Tone, number> = {
   hover: 4,
@@ -106,16 +114,31 @@ function shortPath(path: string): string {
 }
 
 /**
- * 关系管理的对照编辑：左侧整首歌词，右侧该歌的意象关系。
- * 出现位置按歌词自动确定（词字面出现的行），划选词语可直接新建关系。
+ * 一个词在这首歌里的标注。挂「通常算作」的词会补写「同时算进」的各条（「风雨」写风、雨两条），
+ * 它们是一次标注写出来的：界面上合成一行，编辑、删除都按主条
+ */
+interface WordAnnotation {
+  main: OccurrenceWithSong;
+  parts: OccurrenceWithSong[];
+}
+
+function firstSecond(o: OccurrenceWithSong): number {
+  return o.lyric_timetag.length > 0
+    ? Math.min(...o.lyric_timetag.map(tagToSeconds))
+    : Infinity;
+}
+
+/**
+ * 一首歌的标注对照编辑：左侧整首歌词，右侧这首歌的标注。
+ * 出现位置按歌词自动确定（词字面出现的行），划选词语可直接新建标注。
  * 右侧可切换到「候选审核」：词典匹配 + AI 校验生成候选，勾选的候选在歌词中就地标出。
  */
-export default function SongRelationWorkbench({
+export default function SongAnnotationWorkbench({
   song,
   occurrences,
   loading,
   items,
-  leafCategories,
+  motifs,
   submitting,
   getCategoryPath,
   onSave,
@@ -126,15 +149,16 @@ export default function SongRelationWorkbench({
   occurrences: OccurrenceWithSong[];
   loading: boolean;
   items: ImageryItem[];
-  leafCategories: ImageryCategory[];
+  /** 全部母题，已排好序 */
+  motifs: MotifOption[];
   submitting: boolean;
   getCategoryPath: (categoryId: number) => string;
   onSave: (
     occurrenceId: number | null,
-    draft: RelationDraft,
+    draft: AnnotationDraft,
   ) => Promise<boolean>;
   onDelete: (occurrenceId: number, label: string) => void;
-  /** 候选批量保存后刷新该歌的关系与意象列表 */
+  /** 候选批量保存后刷新该歌的标注与词典 */
   onReload: () => Promise<unknown>;
 }) {
   const lines = useMemo(
@@ -152,33 +176,35 @@ export default function SongRelationWorkbench({
     () => new Map(items.map((i) => [i.name.toLowerCase(), i])),
     [items],
   );
-  const sortedOccurrences = useMemo(
-    () =>
-      [...occurrences].sort((a, b) => {
-        const first = (o: OccurrenceWithSong) =>
-          o.lyric_timetag.length > 0
-            ? Math.min(...o.lyric_timetag.map(tagToSeconds))
-            : Infinity;
-        return first(a) - first(b);
-      }),
-    [occurrences],
-  );
+  /** 按词合并的标注，主条是不在这个词「同时算进」里的那条，按首次出现排 */
+  const annotations = useMemo(() => {
+    const partsOf = new Map(items.map((i) => [i.id, new Set(i.parts)]));
+    const byWord = new Map<number, OccurrenceWithSong[]>();
+    for (const o of occurrences) {
+      byWord.set(o.imagery_id, [...(byWord.get(o.imagery_id) ?? []), o]);
+    }
+    return [...byWord.values()]
+      .map((rows): WordAnnotation => {
+        const parts = partsOf.get(rows[0].imagery_id) ?? new Set<number>();
+        const main = rows.find((r) => !parts.has(r.category_id)) ?? rows[0];
+        return { main, parts: rows.filter((r) => r !== main) };
+      })
+      .sort((a, b) => firstSecond(a.main) - firstSecond(b.main));
+  }, [items, occurrences]);
+  /** 歌词行上的标注，一个词只算一次 */
   const occurrencesByTag = useMemo(() => {
     const map = new Map<string, OccurrenceWithSong[]>();
-    for (const o of occurrences) {
-      for (const tag of o.lyric_timetag) {
-        map.set(tag, [...(map.get(tag) ?? []), o]);
+    for (const { main } of annotations) {
+      for (const tag of main.lyric_timetag) {
+        map.set(tag, [...(map.get(tag) ?? []), main]);
       }
     }
     return map;
-  }, [occurrences]);
-  const categoryOptions = useMemo(
-    () =>
-      leafCategories
-        .map((c) => ({ id: c.id, label: getCategoryPath(c.id) }))
-        .sort((a, b) => a.label.localeCompare(b.label, "zh-CN")),
-    [getCategoryPath, leafCategories],
-  );
+  }, [annotations]);
+
+  /** 新建标注时默认选的母题：这个词登记的默认母题 */
+  const defaultMotif = (item: ImageryItem | undefined) =>
+    (item && wordMotifIds(item)[0]) ?? null;
 
   const [editorState, setEditor] = useState<EditorState | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
@@ -189,12 +215,13 @@ export default function SongRelationWorkbench({
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const lineRefs = useRef(new Map<string, HTMLDivElement>());
-  const [view, setView] = useState<View>("relations");
+  const [view, setView] = useState<View>("annotations");
   const [hoverSuggestionId, setHoverSuggestionId] = useState<number | null>(
     null,
   );
   const suggest = useImagerySuggestions(song.id, {
     existing: occurrences,
+    items,
     onSaved: onReload,
   });
 
@@ -215,7 +242,7 @@ export default function SongRelationWorkbench({
     return map;
   }, [hoverSuggestionId, suggest.drafts, suggest.result, view]);
 
-  // 正在编辑的关系被删除（或列表刷新后不存在）时视为已关闭
+  // 正在编辑的标注被删除（或列表刷新后不存在）时视为已关闭
   const editor =
     editorState &&
     (editorState.occurrenceId === null ||
@@ -236,11 +263,17 @@ export default function SongRelationWorkbench({
     : null;
   const duplicate =
     editor && resolvedItem
-      ? occurrences.find(
-          (o) =>
-            o.imagery_id === resolvedItem.id && o.id !== editor.occurrenceId,
-        )
+      ? annotations.find(
+          ({ main }) =>
+            main.imagery_id === resolvedItem.id &&
+            main.id !== editor.occurrenceId,
+        )?.main
       : undefined;
+  // 挂「通常算作」时会一并算进的母题，编辑时说一声
+  const willAlsoCount =
+    editor && resolvedItem && editor.categoryId === resolvedItem.primary
+      ? resolvedItem.parts
+      : [];
 
   /** 词在本曲应有的出现位置：字面出现的行，被同曲其他更长标注词覆盖的除外（见 IMAGERY.md） */
   const linesFor = (name: string, exceptOccurrenceId: number | null = null) =>
@@ -272,18 +305,18 @@ export default function SongRelationWorkbench({
   const startNew = (name = "") => {
     const item = itemByName.get(name.trim().toLowerCase());
     const existing = item
-      ? occurrences.find((o) => o.imagery_id === item.id)
+      ? annotations.find(({ main }) => main.imagery_id === item.id)?.main
       : undefined;
     if (existing) {
       openExisting(existing);
-      setNotice(`这首歌已有「${existing.imagery_name}」，已打开这条关系`);
+      setNotice(`这首歌已有「${existing.imagery_name}」，已打开这条标注`);
       return;
     }
     setNotice(null);
     setEditor({
       occurrenceId: null,
       imageryName: name,
-      categoryId: item?.categoryIds[0] ?? null,
+      categoryId: defaultMotif(item),
     });
   };
 
@@ -293,10 +326,10 @@ export default function SongRelationWorkbench({
     setEditor({
       ...editor,
       imageryName: name,
-      // 新建时跟随意象的常用分类；编辑已有关系时不擅自改分类
+      // 新建时跟随词的默认母题；编辑已有标注时不擅自改母题
       categoryId:
-        editor.occurrenceId === null && item?.categoryIds[0]
-          ? item.categoryIds[0]
+        editor.occurrenceId === null && defaultMotif(item) !== null
+          ? defaultMotif(item)
           : editor.categoryId,
     });
   };
@@ -336,9 +369,9 @@ export default function SongRelationWorkbench({
     : !editor.imageryName.trim()
       ? "请填写意象"
       : editor.imageryName.trim().length > 50
-        ? "意象名不能超过 50 个字"
+        ? "意象不能超过 50 个字"
         : duplicate
-          ? "这首歌已有这个意象"
+          ? "这首歌已经标过这个词"
           : null;
   const canSave =
     editor !== null &&
@@ -371,7 +404,7 @@ export default function SongRelationWorkbench({
       });
     }
     const hoveredCandidate = candidates.some((c) => c.id === hoverSuggestionId);
-    // 意象名不在这一行字面出现时，在行尾列出，避免关系「隐身」
+    // 意象名不在这一行字面出现时，在行尾列出，避免标注「隐身」
     const hidden = onLine.filter(
       (o) =>
         o.imagery_name &&
@@ -434,10 +467,10 @@ export default function SongRelationWorkbench({
           </span>
           <span className="ml-auto text-slate-400">
             {view === "suggestions"
-              ? "虚线为已勾选的候选，悬停候选可定位"
+              ? "淡黄底为已勾选的候选，下划线为已存的标注"
               : editor
                 ? "出现位置按歌词自动确定"
-                : "点击行查看该行意象，划选词语可新建关系"}
+                : "点击行查看该行意象，划选词语可新建标注"}
           </span>
         </header>
         {selection && (
@@ -450,11 +483,11 @@ export default function SongRelationWorkbench({
               onClick={() => {
                 startNew(selection.text);
                 setSelection(null);
-                setView("relations");
+                setView("annotations");
               }}
               className="text-xs tracking-wider text-(--tone) hover:opacity-75"
             >
-              新建关系（出现在 {linesFor(selection.text).length} 行）
+              新建标注（出现在 {linesFor(selection.text).length} 行）
             </button>
             {editor && (
               <button
@@ -465,7 +498,7 @@ export default function SongRelationWorkbench({
                 }}
                 className={TEXT_BUTTON_CLASS}
               >
-                用作当前意象名
+                用作当前意象
               </button>
             )}
             <button
@@ -492,7 +525,7 @@ export default function SongRelationWorkbench({
         </div>
       </section>
 
-      {/* ── 右：关系 ── */}
+      {/* ── 右：标注 ── */}
       <Tabs
         value={view}
         onValueChange={(next: View) => setView(next)}
@@ -500,9 +533,9 @@ export default function SongRelationWorkbench({
         className="flex min-h-0 flex-col gap-3"
       >
         <div className="flex items-center gap-2">
-          <TabsList variant="inline" aria-label="关系与候选">
-            <TabsTrigger value="relations" variant="inline">
-              关系 {occurrences.length}
+          <TabsList variant="inline" aria-label="标注与候选">
+            <TabsTrigger value="annotations" variant="inline">
+              标注 {annotations.length}
             </TabsTrigger>
             <TabsTrigger value="suggestions" variant="inline">
               {suggest.result
@@ -510,14 +543,14 @@ export default function SongRelationWorkbench({
                 : "候选审核"}
             </TabsTrigger>
           </TabsList>
-          {view === "relations" && (
+          {view === "annotations" && (
             <button
               type="button"
               onClick={() => startNew()}
               className={cn(SOLID_BUTTON_CLASS, "ml-auto")}
             >
               <Plus size={12} />
-              新增关系
+              新增标注
             </button>
           )}
         </div>
@@ -530,10 +563,12 @@ export default function SongRelationWorkbench({
           <SuggestionReview
             imagery={suggest}
             songId={song.id}
+            items={items}
+            motifs={motifs}
             onHoverSuggestion={setHoverSuggestionId}
           />
         </TabsContent>
-        <TabsContent value="relations" variant="inline" className="space-y-3">
+        <TabsContent value="annotations" variant="inline" className="space-y-3">
           {notice && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
               {notice}
@@ -544,8 +579,8 @@ export default function SongRelationWorkbench({
             <div className="space-y-3 rounded-lg border border-(--tone)/40 p-4">
               <p className="text-xs tracking-[0.2em] text-(--tone)">
                 {editor.occurrenceId === null
-                  ? "新增关系"
-                  : `编辑关系 #${editor.occurrenceId}`}
+                  ? "新增标注"
+                  : `编辑标注 #${editor.occurrenceId}`}
               </p>
 
               <label className="block space-y-1">
@@ -568,11 +603,11 @@ export default function SongRelationWorkbench({
                     <span className="text-rose-500">{nameError}</span>
                   ) : resolvedItem ? (
                     <span className="text-slate-400">
-                      已有意象 · 用于 {resolvedItem.count} 首
+                      词典里已有 · 标注 {resolvedItem.count} 处
                     </span>
                   ) : (
                     <span className="text-amber-600 dark:text-amber-400">
-                      新意象，保存时创建
+                      词典里没有，保存时随标注创建
                     </span>
                   )}
                   {duplicate && (
@@ -589,25 +624,26 @@ export default function SongRelationWorkbench({
 
               <label className="block space-y-1">
                 <span className={LABEL_CLASS}>母题</span>
-                <select
-                  value={editor.categoryId ?? ""}
-                  onChange={(e) =>
-                    setEditor({
-                      ...editor,
-                      categoryId: e.target.value
-                        ? Number(e.target.value)
-                        : null,
-                    })
+                <MotifSelect
+                  key={resolvedItem?.id ?? "new"}
+                  candidateIds={resolvedItem ? wordMotifIds(resolvedItem) : []}
+                  value={editor.categoryId}
+                  motifs={motifs}
+                  onChange={(categoryId) =>
+                    setEditor({ ...editor, categoryId })
                   }
+                  placeholder="— 选择母题 —"
+                  hint
                   className={SELECT_CLASS}
-                >
-                  <option value="">— 选择母题 —</option>
-                  {categoryOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                />
+                {willAlsoCount.length > 0 && (
+                  <span className="block text-xs text-slate-400 dark:text-slate-500">
+                    保存时{WORD_ROLE.part.label}：
+                    {willAlsoCount
+                      .map((id) => getCategoryPath(id).split(" / ").pop())
+                      .join("、")}
+                  </span>
+                )}
               </label>
 
               <div className="space-y-1">
@@ -669,14 +705,14 @@ export default function SongRelationWorkbench({
           <div className="max-h-[70vh] space-y-2 overflow-y-auto">
             {loading ? (
               <p className="py-6 text-center text-sm text-slate-400">
-                加载关系中…
+                加载标注中…
               </p>
-            ) : sortedOccurrences.length === 0 ? (
+            ) : annotations.length === 0 ? (
               <p className="py-8 text-center font-kaiti text-base text-slate-400">
-                暂无关系。在左侧划选词语，或点「新增关系」开始。
+                还没有标注。在左侧划选词语，或点「新增标注」开始。
               </p>
             ) : (
-              sortedOccurrences.map((o) => {
+              annotations.map(({ main: o, parts }) => {
                 const orphans = o.lyric_timetag.filter(
                   (t) => !lyricTags.has(t),
                 );
@@ -706,6 +742,14 @@ export default function SongRelationWorkbench({
                         </span>
                         <span className="text-[11px] text-slate-400">
                           {shortPath(getCategoryPath(o.category_id))}
+                          {parts.length > 0 &&
+                            ` · ${WORD_ROLE.part.label} ${parts
+                              .map((p) =>
+                                getCategoryPath(p.category_id)
+                                  .split(" / ")
+                                  .pop(),
+                              )
+                              .join("、")}`}
                         </span>
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">

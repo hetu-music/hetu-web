@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { PRIVATE_NO_STORE } from "@/lib/server/cache-headers";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { localeFromRequest } from "@/lib/server/request-locale";
 import { listMyComments } from "@/lib/server/service-comments";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 
-// GET /api/public/comments/mine — 自己写过的批注与回复，按歌分组
+// GET /api/public/comments/mine?locale= — 自己写过的批注与回复，按歌分组
 export const GET = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    const locale = request.cookies.get("NEXT_LOCALE")?.value || "zh-CN";
+    const locale = localeFromRequest(request);
     try {
       const supabase = await createSupabaseServerClient();
       const groups = await listMyComments(supabase, user.id, locale);

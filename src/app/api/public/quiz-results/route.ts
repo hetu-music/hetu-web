@@ -4,6 +4,7 @@ import { PRIVATE_NO_STORE } from "@/lib/server/cache-headers";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { parseJsonBody } from "@/lib/server/parse-body";
+import { localeFromRequest } from "@/lib/server/request-locale";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { isRecordId } from "@/lib/quiz";
 import {
@@ -20,12 +21,12 @@ const IdSchema = z.object({
   id: z.string().refine(isRecordId, "记录 ID 无效"),
 });
 
-// GET /api/public/quiz-results — 自己保存的记录，新的在前。
+// GET /api/public/quiz-results?locale= — 自己保存的记录，新的在前。
 //   ?slug=<7 位乱码>  另给出这份作答已存过的那条记录（savedId），结果页的保存按钮用
 //   ?latest=1         另给出最近一条的完整结果（latest），个人中心展开显示用
 export const GET = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    const locale = request.cookies.get("NEXT_LOCALE")?.value || "zh-CN";
+    const locale = localeFromRequest(request);
     const slug = request.nextUrl.searchParams.get("slug");
     const answers = slug ? decodeQuizSlug(slug) : null;
     const withLatest = request.nextUrl.searchParams.get("latest") === "1";

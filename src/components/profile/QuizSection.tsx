@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -38,13 +38,16 @@ type QuizRecords = {
 export default function QuizSection() {
   const t = useTranslations("profile");
   const { user } = useUserContext();
+  const locale = useLocale();
   const queryClient = useQueryClient();
 
   const { data, isPending } = useQuery({
-    queryKey: ["quiz-records", user?.id ?? null, "latest"],
+    queryKey: ["quiz-records", user?.id ?? null, "latest", locale],
     enabled: !!user,
     queryFn: async (): Promise<QuizRecords> => {
-      const res = await fetch("/api/public/quiz-results?latest=1");
+      const res = await fetch(
+        `/api/public/quiz-results?latest=1&locale=${encodeURIComponent(locale)}`,
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },

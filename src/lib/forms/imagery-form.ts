@@ -1,66 +1,42 @@
 import { z } from "zod";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import type { ImageryCategory } from "@/lib/types";
 
 const normalizeString = (value: unknown) =>
   typeof value === "string" ? value : value == null ? "" : String(value);
 
-export const imageryFormSchema = z.object({
+/**
+ * 母题表单。后台只增改母题（第三级）：挂在某个类别下，说明必填（见 IMAGERY.md）。
+ * 门类与类别固定，词在标注时按歌词原文创建，都没有表单。
+ */
+export const motifFormSchema = z.object({
   name: z.preprocess(
     normalizeString,
     z
       .string()
       .trim()
-      .min(1, "意象名称不能为空")
-      .max(50, "意象名称不能超过50个字符"),
+      .min(1, "母题名称不能为空")
+      .max(50, "母题名称不能超过 50 个字"),
   ),
-});
-
-export const categoryFormSchema = z.object({
-  name: z.preprocess(
-    normalizeString,
-    z.string().trim().min(1, "分类名称不能为空"),
-  ),
-  parent_id: z.number().int().positive().nullable(),
+  parent_id: z.number({ error: "选择所属类别" }).int().positive(),
   description: z.preprocess(
     normalizeString,
-    z.string().max(500, "描述不能超过500个字符"),
+    z
+      .string()
+      .trim()
+      .min(1, "写一句这个母题指什么")
+      .max(500, "说明不能超过 500 个字"),
   ),
 });
 
-export type ImageryFormValues = z.infer<typeof imageryFormSchema>;
-export type CategoryFormValues = z.infer<typeof categoryFormSchema>;
+export type MotifFormValues = z.input<typeof motifFormSchema>;
+export type MotifPayload = z.output<typeof motifFormSchema>;
 
-export function createImageryFormValues(
-  item?: Pick<ImageryItem, "name">,
-): ImageryFormValues {
+export function createMotifFormValues(
+  motif?: Partial<ImageryCategory>,
+): MotifFormValues {
   return {
-    name: item?.name ?? "",
-  };
-}
-
-export function createCategoryFormValues(
-  category?: Partial<ImageryCategory>,
-): CategoryFormValues {
-  return {
-    name: category?.name ?? "",
-    parent_id:
-      typeof category?.parent_id === "number" ? category.parent_id : null,
-    description: category?.description ?? "",
-  };
-}
-
-export function toCategoryPayload(
-  values: CategoryFormValues,
-  categories: ImageryCategory[],
-) {
-  const parent = values.parent_id
-    ? categories.find((category) => category.id === values.parent_id)
-    : null;
-
-  return {
-    name: values.name.trim(),
-    parent_id: values.parent_id,
-    level: parent ? (parent.level ?? 1) + 1 : 1,
-    description: values.description.trim() || null,
+    name: motif?.name ?? "",
+    parent_id: typeof motif?.parent_id === "number" ? motif.parent_id : 0,
+    description: motif?.description ?? "",
   };
 }

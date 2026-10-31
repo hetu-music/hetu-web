@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PRIVATE_NO_STORE } from "@/lib/server/cache-headers";
+import { localeFromRequest } from "@/lib/server/request-locale";
 import { getUserFromRequest } from "@/lib/server/server-auth";
 import {
   listSongComments,
@@ -23,7 +24,7 @@ export const GET = async (
   const viewer = await getUserFromRequest(request).catch(() => null);
 
   try {
-    const locale = request.nextUrl.searchParams.get("locale") ?? "zh-CN";
+    const locale = localeFromRequest(request);
     const comments = await localizeQuotes(
       await listSongComments(songId, viewer?.id ?? null),
       songId,

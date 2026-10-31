@@ -1,22 +1,11 @@
-import type { Metadata } from "next";
-import ImageryCategoriesClient from "@/components/admin/imagery-admin/ImageryCategoriesClient";
-import { requireAdminPage } from "@/lib/server/admin-page";
-import { getImageryCategories } from "@/lib/server/service-imagery";
-
-export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "意象分类 - 河图作品勘鉴",
-  description: "管理意象分类树",
-};
+import { redirect } from "@/i18n/navigation";
 
 type Props = {
   params: Promise<{ locale: string }>;
 };
 
+/** 原先的「分类」子页已并入意象库首页（门类 › 类别 › 母题） */
 export default async function ImageryCategoriesPage({ params }: Props) {
   const { locale } = await params;
-  await requireAdminPage(locale, "/admin/imagery/categories");
-  const categories = await getImageryCategories().catch(() => []);
-  return <ImageryCategoriesClient initialCategories={categories} />;
+  redirect({ href: "/admin/imagery", locale });
 }

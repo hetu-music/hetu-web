@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocale } from "next-intl";
 import { useUserContext } from "@/context/UserContext";
 import { sendRequest } from "@/lib/api/request";
 import type { Song } from "@/lib/types";
@@ -32,11 +33,19 @@ interface FavoritesData {
 
 const EMPTY: FavoritesData = { favorites: [], favoriteSongs: [] };
 
-/** 按用户分开缓存：换账号时直接落到新 key 上，不会残留上一个用户的收藏 */
-const favoritesKey = (userId: string | null) => ["favorites", userId] as const;
+/**
+ * 按用户分开缓存：换账号时直接落到新 key 上，不会残留上一个用户的收藏。
+ * 歌曲信息随字形不同，简繁各存一份；收藏变动后两份一起作废
+ */
+const userFavoritesKey = (userId: string | null) =>
+  ["favorites", userId] as const;
+const favoritesKey = (userId: string | null, locale: string) =>
+  [...userFavoritesKey(userId), locale] as const;
 
-async function fetchFavorites(): Promise<FavoritesData> {
-  const res = await fetch("/api/public/collections");
+async function fetchFavorites(locale: string): Promise<FavoritesData> {
+  const res = await fetch(
+    `/api/public/collections?locale=${encodeURIComponent(locale)}`,
+  );
   // 接口失败视为没有收藏，而不是卡在加载中
   if (!res.ok) return EMPTY;
   const data = await res.json();
@@ -57,13 +66,14 @@ const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const { user, loaded: userLoaded } = useUserContext();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const currentUserId = user?.id ?? null;
-  const queryKey = favoritesKey(currentUserId);
+  const queryKey = favoritesKey(currentUserId, locale);
 
   const { data = EMPTY, isPending } = useQuery({
     queryKey,
-    queryFn: fetchFavorites,
+    queryFn: () => fetchFavorites(locale),
     enabled: userLoaded && currentUserId !== null,
     // 只在收藏变动后主动失效，不按时间重新拉取
     staleTime: Infinity,
@@ -79,14 +89,16 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
   const refreshFavorites = useCallback(
     () =>
-      queryClient.invalidateQueries({ queryKey: favoritesKey(currentUserId) }),
+      queryClient.invalidateQueries({
+        queryKey: userFavoritesKey(currentUserId),
+      }),
     [queryClient, currentUserId],
   );
 
   const toggleFavorite = useCallback(
     async (id: number) => {
       if (!currentUserId) return;
-      const key = favoritesKey(currentUserId);
+      const key = favoritesKey(currentUserId, locale);
 
       // 从缓存读当前状态，避免闭包里的旧值
       const isCurrentlyFav =
@@ -124,15 +136,17 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // 加收藏成功后重拉，个人页才有完整的歌曲信息
-        if (!isCurrentlyFav) {
-          void queryClient.invalidateQueries({ queryKey: key });
-        }
+        // 加收藏成功后重拉，个人页才有完整的歌曲信息；取消收藏时当前这份
+        // 已乐观更新，不必重拉。另一种字形的那份一律作废，切过去时再拉
+        void queryClient.invalidateQueries({
+          queryKey: userFavoritesKey(currentUserId),
+          refetchType: isCurrentlyFav ? "none" : "active",
+        });
       } catch {
         rollback();
       }
     },
-    [queryClient, currentUserId],
+    [queryClient, currentUserId, locale],
   );
 
   const isFavorite = useCallback(
@@ -142,9 +156,12 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
   const clearFavorites = useCallback(async () => {
     if (!currentUserId || favorites.length === 0) return;
-    const key = favoritesKey(currentUserId);
+    const key = favoritesKey(currentUserId, locale);
     const previous = queryClient.getQueryData<FavoritesData>(key);
-    queryClient.setQueryData<FavoritesData>(key, EMPTY);
+    queryClient.setQueriesData<FavoritesData>(
+      { queryKey: userFavoritesKey(currentUserId) },
+      EMPTY,
+    );
 
     try {
       await Promise.all(
@@ -152,8 +169,13 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       );
     } catch {
       queryClient.setQueryData(key, previous);
+      // 另一种字形的那份已被清空，作废掉，切过去时重拉
+      void queryClient.invalidateQueries({
+        queryKey: userFavoritesKey(currentUserId),
+        refetchType: "none",
+      });
     }
-  }, [queryClient, currentUserId, favorites]);
+  }, [queryClient, currentUserId, locale, favorites]);
 
   return (
     <FavoritesContext.Provider

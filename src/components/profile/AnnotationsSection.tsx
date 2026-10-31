@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useMemo, useState } from "react";
 
@@ -32,14 +32,17 @@ export default function AnnotationsSection() {
   const t = useTranslations("profile");
   const router = useRouter();
   const { user } = useUserContext();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
 
   const { data: groups, isPending } = useQuery({
-    queryKey: ["my-comments", user?.id ?? null],
+    queryKey: ["my-comments", user?.id ?? null, locale],
     enabled: !!user,
     queryFn: async (): Promise<MyCommentGroup[]> => {
-      const res = await fetch("/api/public/comments/mine");
+      const res = await fetch(
+        `/api/public/comments/mine?locale=${encodeURIComponent(locale)}`,
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return (await res.json()).groups;
     },

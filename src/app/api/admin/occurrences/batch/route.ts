@@ -21,7 +21,7 @@ const BatchSchema = z.object({
           imagery_id: z.number().int().positive(),
           category_id: z.number().int().positive(),
         }),
-        // 审核时改成了词典里没有的意象，保存时创建
+        // 词典里没有的词（歌词原文），保存时创建
         z.object({
           imagery_name: z.string().trim().min(1).max(50),
           category_id: z.number().int().positive(),
@@ -32,7 +32,7 @@ const BatchSchema = z.object({
     .max(200),
 });
 
-/** 批量新增一首歌的意象标注：POST /api/admin/occurrences/batch */
+/** 新增一首歌的意象标注（手动添加一条或审核后多条）：POST /api/admin/occurrences/batch */
 export const POST = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
@@ -64,7 +64,7 @@ export const POST = withAuth(
       const code = (e as { code?: string }).code;
       if (
         e instanceof Error &&
-        (code === "NOT_LEAF_CATEGORY" ||
+        (code === "NOT_MOTIF" ||
           code === "SONG_NOT_PUBLISHED" ||
           code === "IMAGERY_NOT_IN_LYRICS")
       ) {

@@ -4,15 +4,16 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getSongsByIds } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
 import { parseJsonBody } from "@/lib/server/parse-body";
+import { localeFromRequest } from "@/lib/server/request-locale";
 import { z } from "zod";
 
 const SongIdSchema = z.object({
   songId: z.coerce.number().int().min(1, "歌曲 ID 无效"),
 });
 
-// GET /api/public/collections — 获取当前用户的收藏，返回 songIds 和完整 songs 数据
+// GET /api/public/collections?locale= — 获取当前用户的收藏，返回 songIds 和完整 songs 数据
 export const GET = withAuth(
-  async (_request: NextRequest, user: AuthenticatedUser) => {
+  async (request: NextRequest, user: AuthenticatedUser) => {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from(TABLES.COLLECTIONS)
@@ -33,8 +34,10 @@ export const GET = withAuth(
 
     // 服务端直接查歌曲数据，避免客户端二次请求。
     // 只查收藏涉及的这几首，不再拉全表——songIds 通常是个位数到几十。
-    const locale = _request.cookies.get("NEXT_LOCALE")?.value || "zh-CN";
-    const favoriteSongs = await getSongsByIds(songIds, locale);
+    const favoriteSongs = await getSongsByIds(
+      songIds,
+      localeFromRequest(request),
+    );
 
     // 从数据行转为映射
     const idToCol = Object.fromEntries(

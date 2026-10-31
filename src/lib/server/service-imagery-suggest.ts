@@ -11,7 +11,6 @@ import {
   REVIEW_OUTPUT_SCHEMA,
   REVIEW_SYSTEM_PROMPT,
   type ReviewCandidate,
-  type ReviewCategory,
   type ReviewResult,
 } from "@/lib/imagery/review";
 import {
@@ -23,24 +22,12 @@ import {
 } from "@/lib/imagery/suggest";
 import { chatJson, isLlmConfigured, LlmError } from "@/lib/server/llm";
 
-export type { ReviewCategory as CategoryOption } from "@/lib/imagery/review";
-
-/** 词典条目，供审核时把候选改成另一个意象 */
-export interface DictionaryOption {
-  id: number;
-  name: string;
-  /** 可选母题，第一个为默认 */
-  categoryIds: number[];
-}
-
 export interface ImagerySuggestionsResult {
   /** 歌曲是否已发布到正式曲库；未发布时标注无法保存 */
   published: boolean;
   hasLyrics: boolean;
+  /** 词典与母题不随结果返回：审核时用后台共用的那一份（含各词登记的母题） */
   suggestions: ImagerySuggestion[];
-  /** 全部母题（叶子分类），用于把候选改挂到登记之外的母题 */
-  categories: ReviewCategory[];
-  dictionary: DictionaryOption[];
   /** 是否配置了 LLM，决定界面是否提供 AI 校验 */
   llmEnabled: boolean;
 }
@@ -77,30 +64,24 @@ export async function getImagerySuggestions(
   if (songError) throw songError;
   if (!song) return null;
 
-  const [dictionary, occurrences, songs, categories, motifs] =
-    await Promise.all([
-      fetchAll<{ id: number; name: string }>(
-        service,
-        TABLES.IMAGERY,
-        "id,name",
-      ),
-      fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
-        service,
-        TABLES.IMAGERY_OCC,
-        "song_id,imagery_id,category_id",
-      ),
-      fetchAll<{ id: number; lyrics: string | null }>(
-        service,
-        TABLES.MUSIC,
-        "id,lyrics",
-      ),
-      fetchAll<CategoryRow>(service, TABLES.IMAGERY_CAT, "id,name,parent_id"),
-      fetchAll<MotifEntry>(
-        service,
-        TABLES.IMAGERY_MOTIFS,
-        "imagery_id,category_id,role",
-      ),
-    ]);
+  const [dictionary, occurrences, songs, motifs] = await Promise.all([
+    fetchAll<{ id: number; name: string }>(service, TABLES.IMAGERY, "id,name"),
+    fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
+      service,
+      TABLES.IMAGERY_OCC,
+      "song_id,imagery_id,category_id",
+    ),
+    fetchAll<{ id: number; lyrics: string | null }>(
+      service,
+      TABLES.MUSIC,
+      "id,lyrics",
+    ),
+    fetchAll<MotifEntry>(
+      service,
+      TABLES.IMAGERY_MOTIFS,
+      "imagery_id,category_id,role",
+    ),
+  ]);
   // fetchAll 出错时只记日志并返回部分数据；词典为空时生成的候选毫无意义
   if (dictionary.length === 0) throw new Error("意象词典为空");
 
@@ -125,12 +106,6 @@ export async function getImagerySuggestions(
       priors,
       existingImageryIds,
     }),
-    categories: toLeafCategories(categories),
-    dictionary: dictionary.map((d) => ({
-      id: d.id,
-      name: d.name,
-      categoryIds: priors.get(d.id)?.categoryIds ?? [],
-    })),
     llmEnabled: isLlmConfigured(),
   };
 }

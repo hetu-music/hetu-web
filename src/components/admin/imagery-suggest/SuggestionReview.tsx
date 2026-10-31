@@ -1,69 +1,21 @@
 "use client";
 
 import { Bot, Loader2, Pencil, Sparkles, Undo2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   type ImagerySuggestion,
   RECOMMEND_THRESHOLD,
 } from "@/lib/imagery/suggest";
-import type {
-  CategoryOption,
-  DictionaryOption,
-} from "@/lib/server/service-imagery-suggest";
+import { type MotifOption, wordMotifIds } from "@/lib/imagery/word-motifs";
+import type { ImageryItem } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
+import MotifSelect from "../imagery-admin/MotifSelect";
 import { OUTLINE_BUTTON_CLASS, SOLID_BUTTON_CLASS } from "../kit/styles";
 import type {
   AiNote,
   ImagerySuggestionsState,
   SuggestionDraft,
 } from "./useImagerySuggestions";
-
-function CategorySelect({
-  categoryIds,
-  value,
-  categories,
-  labelById,
-  onChange,
-}: {
-  /** 该词可选的母题，第一个为默认 */
-  categoryIds: number[];
-  value: number | null;
-  categories: CategoryOption[];
-  labelById: Map<number, string>;
-  onChange: (id: number | null) => void;
-}) {
-  // 全部母题有数百项，逐行渲染会拖慢列表；默认只列该词登记的母题和当前值。
-  // 选了登记之外的母题，保存时会登记为该词的多义候选
-  const [expanded, setExpanded] = useState(false);
-  const showAll = expanded || (categoryIds.length === 0 && value === null);
-  const options = showAll
-    ? categories
-    : [...new Set([...categoryIds, ...(value === null ? [] : [value])])].map(
-        (id) => ({ id, label: labelById.get(id) ?? `母题 #${id}` }),
-      );
-
-  return (
-    <select
-      value={value ?? ""}
-      onChange={(e) => {
-        if (e.target.value === "__all") {
-          setExpanded(true);
-          return;
-        }
-        onChange(e.target.value ? Number(e.target.value) : null);
-      }}
-      className="max-w-full rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-700 outline-none focus:border-(--tone) dark:border-slate-700 dark:text-slate-200 [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]"
-    >
-      {value === null && <option value="">选择母题…</option>}
-      {options.map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.label}
-        </option>
-      ))}
-      {!showAll && <option value="__all">其他母题…</option>}
-    </select>
-  );
-}
 
 function NameEditor({
   name,
@@ -167,8 +119,7 @@ function SuggestionRow({
   resolved,
   alreadyAnnotated,
   aiNote,
-  categories,
-  labelById,
+  motifs,
   dictionaryListId,
   onUpdate,
   onRename,
@@ -176,21 +127,20 @@ function SuggestionRow({
   suggestion: ImagerySuggestion;
   draft: SuggestionDraft;
   /** 当前意象名对应的词典条目；为 null 表示保存时新建 */
-  resolved: DictionaryOption | null;
+  resolved: ImageryItem | null;
   /** 当前意象该歌已经标注过，保存时会被跳过 */
   alreadyAnnotated: boolean;
   aiNote: AiNote | undefined;
-  categories: CategoryOption[];
-  labelById: Map<number, string>;
+  motifs: MotifOption[];
   dictionaryListId: string;
   onUpdate: (patch: Partial<SuggestionDraft>) => void;
   onRename: (name: string) => void;
 }) {
   const renamed = draft.name !== suggestion.name;
-  const categoryIds =
-    renamed && resolved?.categoryIds.length
-      ? resolved.categoryIds
-      : suggestion.categoryIds;
+  // 词典里有的词用它登记的母题（与手动标注同一份）；AI 补充的新词只有模型挑的那个
+  const candidateIds = resolved
+    ? wordMotifIds(resolved)
+    : suggestion.categoryIds;
 
   return (
     <div
@@ -229,9 +179,9 @@ function SuggestionRow({
           {!resolved && (
             <span
               className="text-[11px] text-amber-600 dark:text-amber-400"
-              title="词典中没有这个意象，保存时会新建"
+              title="词典里没有这个词，保存时随标注创建"
             >
-              新意象
+              新词
             </span>
           )}
           {alreadyAnnotated && (
@@ -243,12 +193,13 @@ function SuggestionRow({
             </span>
           )}
           {aiNote && <AiChip note={aiNote} />}
-          <CategorySelect
-            categoryIds={categoryIds}
+          <MotifSelect
+            key={resolved?.id ?? draft.name}
+            candidateIds={candidateIds}
             value={draft.categoryId}
-            categories={categories}
-            labelById={labelById}
+            motifs={motifs}
             onChange={(categoryId) => onUpdate({ categoryId })}
+            className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-700 outline-none focus:border-(--tone) dark:border-slate-700 dark:text-slate-200 [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]"
           />
           {/* 统计的是原候选词；改名后不再适用 */}
           {!renamed && <HistoryBadge suggestion={suggestion} />}
@@ -274,25 +225,27 @@ function SuggestionRow({
 
 /**
  * 预标注候选的审核区：生成候选 / AI 校验按钮、候选列表、批量保存。
- * 歌曲管理的意象面板与关系管理的对照编辑共用。
+ * 放在歌曲工作台「意象」一栏的标注对照编辑里。
  */
 export default function SuggestionReview({
   imagery,
   songId,
+  items,
+  motifs,
   onHoverSuggestion,
 }: {
   imagery: ImagerySuggestionsState;
   songId: number;
+  /** 后台共用的词典，供改名时补全 */
+  items: ImageryItem[];
+  /** 全部母题，已排好序 */
+  motifs: MotifOption[];
   /** 鼠标移入 / 移出某个候选，供对照编辑在歌词中高亮 */
   onHoverSuggestion?: (imageryId: number | null) => void;
 }) {
   const { result, drafts } = imagery;
   const [othersOpen, setOthersOpen] = useState(false);
 
-  const labelById = useMemo(
-    () => new Map((result?.categories ?? []).map((c) => [c.id, c.label])),
-    [result],
-  );
   const suggestions = result?.suggestions ?? [];
   const recommended = suggestions.filter((s) => s.recommended);
   const others = suggestions.filter((s) => !s.recommended);
@@ -318,8 +271,7 @@ export default function SuggestionReview({
               resolved !== null && imagery.existingImageryIds.has(resolved.id)
             }
             aiNote={imagery.aiNotes[s.imageryId]}
-            categories={result?.categories ?? []}
-            labelById={labelById}
+            motifs={motifs}
             dictionaryListId={dictionaryListId}
             onUpdate={(patch) => imagery.updateDraft(s.imageryId, patch)}
             onRename={(name) => imagery.rename(s.imageryId, name)}
@@ -382,7 +334,7 @@ export default function SuggestionReview({
         <div className="space-y-3">
           {/* 改意象时的自动补全，整个审核区共用一份 */}
           <datalist id={dictionaryListId}>
-            {result.dictionary.map((d) => (
+            {items.map((d) => (
               <option key={d.id} value={d.name} />
             ))}
           </datalist>

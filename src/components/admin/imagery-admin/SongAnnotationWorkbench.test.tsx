@@ -7,8 +7,9 @@ import {
   apiGetImagerySuggestions,
 } from "@/lib/api/client-api";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
-import SongRelationWorkbench from "./SongRelationWorkbench";
+import type { MotifOption } from "@/lib/imagery/word-motifs";
+import type { ImageryItem } from "@/lib/types";
+import SongAnnotationWorkbench from "./SongAnnotationWorkbench";
 
 vi.mock("@/lib/api/client-api", () => ({
   apiGetImagerySuggestions: vi.fn(),
@@ -29,12 +30,20 @@ const song = {
 };
 
 const items: ImageryItem[] = [
-  { id: 1, name: "明月", count: 44, categoryIds: [100] },
-  { id: 2, name: "天涯", count: 27, categoryIds: [200] },
+  // 词典里有、但还没登记母题（数据不一致时会出现）
+  {
+    id: 1,
+    name: "明月",
+    count: 44,
+    primary: null,
+    alternatives: [],
+    parts: [],
+  },
+  { id: 2, name: "天涯", count: 27, primary: 200, alternatives: [], parts: [] },
 ];
-const leafCategories: ImageryCategory[] = [
-  { id: 100, name: "星相", parent_id: 10, level: 3, description: null },
-  { id: 200, name: "区域", parent_id: 20, level: 3, description: null },
+const motifs: MotifOption[] = [
+  { id: 200, label: "自然事物 / 地理 / 区域" },
+  { id: 100, label: "自然事物 / 天象 / 星相" },
 ];
 const paths: Record<number, string> = {
   100: "自然事物 / 天象 / 星相",
@@ -62,12 +71,12 @@ const onReload = vi.fn();
 
 function renderWorkbench(occurrences: OccurrenceWithSong[] = []) {
   return render(
-    <SongRelationWorkbench
+    <SongAnnotationWorkbench
       song={song}
       occurrences={occurrences}
       loading={false}
       items={items}
-      leafCategories={leafCategories}
+      motifs={motifs}
       submitting={false}
       getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
       onSave={onSave}
@@ -90,7 +99,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("SongRelationWorkbench", () => {
+describe("SongAnnotationWorkbench", () => {
   it("左侧展示完整歌词（含制作名单行），已标注的意象就地高亮", () => {
     const { container } = renderWorkbench([
       occurrence({ id: 1, lyric_timetag: ["00:10.00", "01:10.00"] }),
@@ -102,12 +111,12 @@ describe("SongRelationWorkbench", () => {
     expect(screen.getByText("4 行 · 已标注 2 行")).toBeTruthy();
   });
 
-  it("编辑已有关系：出现位置按歌词自动确定，点击歌词行不改动", async () => {
+  it("编辑已有标注：出现位置按歌词自动确定，点击歌词行不改动", async () => {
     const { container } = renderWorkbench([
       occurrence({ id: 1, lyric_timetag: ["00:10.00"] }),
     ]);
     fireEvent.click(screen.getByText("明月", { selector: "span" }));
-    expect(screen.getByText("编辑关系 #1")).toBeTruthy();
+    expect(screen.getByText("编辑标注 #1")).toBeTruthy();
     expect(screen.getByText(/出现位置 2 处/)).toBeTruthy();
 
     fireEvent.click(line(container, "00:10.00"));
@@ -121,9 +130,9 @@ describe("SongRelationWorkbench", () => {
     });
   });
 
-  it("新增关系：填已有意象时带出常用分类，列出它出现的行", () => {
+  it("新增标注：填已有的词时带出它的默认母题，列出它出现的行", () => {
     renderWorkbench();
-    fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
+    fireEvent.click(screen.getByRole("button", { name: /新增标注/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
       target: { value: "天涯" },
     });
@@ -137,9 +146,44 @@ describe("SongRelationWorkbench", () => {
     });
   });
 
+  it("新增标注：默认选登记的默认母题，下拉框只列登记的母题，「其他母题…」展开全部", () => {
+    renderWorkbench();
+    fireEvent.click(screen.getByRole("button", { name: /新增标注/ }));
+    fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
+      target: { value: "天涯" },
+    });
+    const select = () =>
+      screen.getByRole("combobox", { name: "母题" }) as HTMLSelectElement;
+    const labels = () => [...select().options].map((o) => o.textContent);
+    expect(select().value).toBe("200");
+    expect(labels()).toEqual(["自然事物 / 地理 / 区域（通常）", "其他母题…"]);
+
+    fireEvent.change(select(), { target: { value: "__all" } });
+    expect(select().value).toBe("200");
+    expect(labels()).toEqual([
+      "自然事物 / 地理 / 区域",
+      "自然事物 / 天象 / 星相",
+    ]);
+    fireEvent.change(select(), { target: { value: "100" } });
+    expect(screen.getByText(/保存后会给它加一个「有时也指」/)).toBeTruthy();
+  });
+
+  it("没登记母题的词不预选，下拉框直接列全部", () => {
+    renderWorkbench();
+    fireEvent.click(screen.getByRole("button", { name: /新增标注/ }));
+    fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
+      target: { value: "明月" },
+    });
+    const select = screen.getByRole("combobox", {
+      name: "母题",
+    }) as HTMLSelectElement;
+    expect(select.value).toBe("");
+    expect([...select.options].map((o) => o.value)).toEqual(["", "200", "100"]);
+  });
+
   it("歌词里没有的词不能保存", () => {
     renderWorkbench();
-    fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
+    fireEvent.click(screen.getByRole("button", { name: /新增标注/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
       target: { value: "孤灯" },
     });
@@ -153,15 +197,15 @@ describe("SongRelationWorkbench", () => {
     ).toBe(true);
   });
 
-  it("词典里没有的意象标为新意象，保存时 imageryId 为 null", () => {
+  it("词典里没有的词标为新词，保存时 imageryId 为 null", () => {
     renderWorkbench();
-    fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
+    fireEvent.click(screen.getByRole("button", { name: /新增标注/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
       target: { value: "天地" },
     });
-    expect(screen.getByText("新意象，保存时创建")).toBeTruthy();
+    expect(screen.getByText("词典里没有，保存时随标注创建")).toBeTruthy();
 
-    // 新意象没有常用分类，未选分类前不能保存
+    // 新词没有登记的母题，未选母题前不能保存
     const saveButton = screen.getByRole("button", { name: "保存" });
     expect((saveButton as HTMLButtonElement).disabled).toBe(true);
 
@@ -176,20 +220,67 @@ describe("SongRelationWorkbench", () => {
     });
   });
 
-  it("同一首歌不能重复添加同一意象", () => {
+  it("同一首歌不能重复标同一个词", () => {
     renderWorkbench([occurrence({ id: 1, lyric_timetag: ["00:10.00"] })]);
-    fireEvent.click(screen.getByRole("button", { name: /新增关系/ }));
+    fireEvent.click(screen.getByRole("button", { name: /新增标注/ }));
     fireEvent.change(screen.getByPlaceholderText("输入或选择意象"), {
       target: { value: "明月" },
     });
-    expect(screen.getByText("这首歌已有这个意象")).toBeTruthy();
+    expect(screen.getByText("这首歌已经标过这个词")).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "保存" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "打开那一条" }));
-    expect(screen.getByText("编辑关系 #1")).toBeTruthy();
+    expect(screen.getByText("编辑标注 #1")).toBeTruthy();
+  });
+
+  it("补写了「同时算进」的词合成一行，编辑、删除都按主条", () => {
+    // 假设「天涯」通常算作区域（200），同时算进星相（100）：库里是两条
+    const withPart = items.map((i) =>
+      i.id === 2 ? { ...i, parts: [100] } : i,
+    );
+    render(
+      <SongAnnotationWorkbench
+        song={song}
+        occurrences={[
+          occurrence({
+            id: 5,
+            imagery_id: 2,
+            imagery_name: "天涯",
+            category_id: 100,
+            lyric_timetag: ["00:10.00", "01:10.00"],
+          }),
+          occurrence({
+            id: 4,
+            imagery_id: 2,
+            imagery_name: "天涯",
+            category_id: 200,
+            lyric_timetag: ["00:10.00", "01:10.00"],
+          }),
+        ]}
+        loading={false}
+        items={withPart}
+        motifs={motifs}
+        submitting={false}
+        getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
+        onSave={onSave}
+        onDelete={onDelete}
+        onReload={onReload}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "标注 1" })).toBeTruthy();
+    expect(screen.getByText("地理 / 区域 · 同时算进 星相")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("天涯", { selector: "span" }));
+    expect(screen.getByText("编辑标注 #4")).toBeTruthy();
+    expect(screen.queryByText("这首歌已经标过这个词")).toBeNull();
+    expect(screen.getByText("保存时同时算进：星相")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+    expect(onDelete).toHaveBeenCalledWith(4, "天涯");
   });
 
   it("提示歌词中已找不到的时间标签", () => {
@@ -205,10 +296,10 @@ describe("SongRelationWorkbench", () => {
     expect(onDelete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
     expect(onDelete).toHaveBeenCalledWith(1, "明月");
-    expect(screen.queryByText("编辑关系 #1")).toBeNull();
+    expect(screen.queryByText("编辑标注 #1")).toBeNull();
   });
 
-  it("候选审核：生成候选后在歌词中标出，批量保存后刷新关系", async () => {
+  it("候选审核：生成候选后在歌词中标出，批量保存后刷新标注", async () => {
     vi.mocked(apiGetImagerySuggestions).mockResolvedValue({
       published: true,
       hasLyrics: true,
@@ -226,8 +317,6 @@ describe("SongRelationWorkbench", () => {
           recommended: true,
         },
       ],
-      categories: [{ id: 200, label: "自然事物 / 地理 / 区域" }],
-      dictionary: [{ id: 2, name: "天涯", categoryIds: [200] }],
     });
     vi.mocked(apiCreateOccurrencesBatch).mockResolvedValue({
       created: 1,
@@ -244,10 +333,11 @@ describe("SongRelationWorkbench", () => {
       await screen.findByRole("tab", { name: "候选审核 1/1" }),
     ).toBeTruthy();
 
-    // 已有关系与勾选的候选在同一行里各自高亮
+    // 已有标注与勾选的候选在同一行里各自高亮
     const marks = [...line(container, "00:10.00").querySelectorAll("mark")];
     expect(marks.map((m) => m.textContent)).toEqual(["明月", "天涯"]);
-    expect(marks[1].className).toContain("decoration-dashed");
+    expect(marks[0].className).toContain("underline"); // 已存
+    expect(marks[1].className).toContain("bg-amber-200"); // 候选
 
     fireEvent.click(screen.getByRole("button", { name: "保存选中" }));
     await vi.waitFor(() => expect(onReload).toHaveBeenCalled());

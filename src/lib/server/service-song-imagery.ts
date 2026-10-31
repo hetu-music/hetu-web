@@ -19,6 +19,7 @@ import {
   type CreditAliasMap,
 } from "@/lib/utils/utils-credits";
 import { getCreditAliases } from "@/lib/server/service-credit-aliases";
+import { groupMarks } from "@/lib/utils/utils-excerpt";
 
 const RELATED_LIMIT = 4;
 const SHARED_LIMIT = 3;
@@ -108,32 +109,30 @@ export async function getSongImagery(
     for (const id of set) df.set(id, (df.get(id) ?? 0) + 1);
   }
 
-  // ── 本曲意象：一个词一处高亮。并列词（「风雨」）有几条标注，取第一条的母题作说明 ──
-  const imageryName = new Map(index.imagery.map((i) => [i.id, i.name]));
-  const byImagery = new Map<number, SongImageryMark>();
-  const own = new Set<number>();
-  for (const occ of index.occurrences) {
-    if (occ.song_id !== songId) continue;
-    own.add(occ.category_id);
-    const existing = byImagery.get(occ.imagery_id);
-    if (existing) {
-      for (const tag of occ.lyric_timetag ?? []) {
-        if (!existing.timetags.includes(tag)) existing.timetags.push(tag);
-      }
-      continue;
+  // ── 本曲意象：一个词一处高亮。分组规则与登录页封面墙共用（groupMarks），
+  // 卷首摘句才挑得出同一句。并列词（「风雨」）有几条标注，取第一条的母题作说明 ──
+  const ownOccurrences = index.occurrences.filter((o) => o.song_id === songId);
+  const own = new Set(ownOccurrences.map((o) => o.category_id));
+  const motifOf = new Map<number, number>();
+  for (const occ of ownOccurrences) {
+    if (!motifOf.has(occ.imagery_id)) {
+      motifOf.set(occ.imagery_id, occ.category_id);
     }
-    const path = pathOf(occ.category_id);
-    byImagery.set(occ.imagery_id, {
-      id: occ.imagery_id,
-      name: tr(imageryName.get(occ.imagery_id) ?? ""),
-      motifId: occ.category_id,
+  }
+  const marks: SongImageryMark[] = (
+    groupMarks(ownOccurrences, index.imagery).get(songId) ?? []
+  ).map((mark) => {
+    const motifId = motifOf.get(mark.id) as number;
+    const path = pathOf(motifId);
+    return {
+      ...mark,
+      name: tr(mark.name),
+      motifId,
       path: path.map((c) => tr(c.name)),
       accent: (path[0] && l1Color.get(path[0].id)) ?? GRAY_PALETTE.accent,
-      timetags: [...new Set(occ.lyric_timetag ?? [])],
-      songCount: songsByWord.get(occ.imagery_id)?.size ?? 1,
-    });
-  }
-  const marks = [...byImagery.values()].filter((m) => m.name);
+      songCount: songsByWord.get(mark.id)?.size ?? 1,
+    };
+  });
 
   // ── 相关作品：以 IDF 加权的母题集合余弦相似度，少见的共同母题更能说明气质相近；
   // 再按基调相似度微调，免得意象相近、情绪相反的歌排在前面。推荐理由只列意象 ──

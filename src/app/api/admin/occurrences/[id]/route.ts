@@ -13,10 +13,16 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
-const UpdateOccurrenceSchema = z.object({
-  imagery_id: z.number().int().positive().optional(),
-  category_id: z.number().int().positive().optional(),
-});
+/** 词给 imagery_id 或 imagery_name（歌词里的原文，词典里没有时创建），二者择一 */
+const UpdateOccurrenceSchema = z
+  .object({
+    imagery_id: z.number().int().positive().optional(),
+    imagery_name: z.string().trim().min(1).max(50).optional(),
+    category_id: z.number().int().positive().optional(),
+  })
+  .refine((v) => v.imagery_id === undefined || v.imagery_name === undefined, {
+    message: "imagery_id 与 imagery_name 只能给一个",
+  });
 
 function getIdFromUrl(request: NextRequest): number | null {
   const segments = request.nextUrl.pathname.split("/");
@@ -54,7 +60,7 @@ export const PUT = withAuth(
     } catch (e) {
       if (
         e instanceof Error &&
-        ["NOT_LEAF_CATEGORY", "IMAGERY_NOT_IN_LYRICS"].includes(
+        ["NOT_MOTIF", "IMAGERY_NOT_IN_LYRICS"].includes(
           (e as Error & { code?: string }).code ?? "",
         )
       ) {
@@ -81,12 +87,12 @@ export const DELETE = withAuth(
       } = await supabase.auth.getSession();
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      const before = await getOccurrenceRefs(id);
-      await deleteOccurrence(id, session.access_token);
-      const purge = before
+      // 连同补写的「同时算进」一起删，它们挂的母题都要刷新
+      const deleted = await deleteOccurrence(id, session.access_token);
+      const purge = deleted
         ? await refreshImagery({
-            songIds: [before.song_id],
-            motifIds: [before.category_id],
+            songIds: [deleted.songId],
+            motifIds: deleted.motifIds,
           })
         : { failed: [] };
       return withPurgeStatus(NextResponse.json({ success: true }), purge);

@@ -8,7 +8,7 @@ import {
 } from "@/components/auth/AuthGallery";
 import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
-import type { GallerySong } from "@/lib/auth-gallery";
+import type { GallerySong } from "@/lib/auth-gallery-shared";
 import { cn } from "@/lib/utils/utils";
 import { INK_TONE } from "@/lib/utils/utils-tone";
 import { useTranslations } from "next-intl";

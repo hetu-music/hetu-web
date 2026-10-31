@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { NextIntlClientProvider } from "next-intl";
 import React from "react";
 import type { UserInfo } from "@/context/UserContext";
 
@@ -9,6 +10,7 @@ import type { UserInfo } from "@/context/UserContext";
 
 let mockUser: UserInfo | null = null;
 let mockUserLoaded = true;
+let mockLocale = "zh-CN";
 
 vi.mock("@/context/UserContext", () => ({
   useUserContext: () => ({
@@ -69,7 +71,9 @@ function renderWithProvider() {
     </FavoritesProvider>,
     {
       wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        <NextIntlClientProvider locale={mockLocale} messages={{}}>
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        </NextIntlClientProvider>
       ),
     },
   );
@@ -85,6 +89,7 @@ function mockCollectionsResponse(body: unknown, ok = true) {
 beforeEach(() => {
   mockUser = null;
   mockUserLoaded = true;
+  mockLocale = "zh-CN";
   vi.restoreAllMocks();
 });
 
@@ -141,6 +146,36 @@ describe("FavoritesProvider — 登录态与收藏加载", () => {
     );
     expect(screen.getByTestId("songs").textContent).toBe("倾尽天下,如花");
     expect(screen.getByTestId("loaded").textContent).toBe("true");
+  });
+
+  it("按页面语系请求，切换简繁后重新拉取对应字形", async () => {
+    mockUser = makeUser("u1");
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => ({
+        songIds: [1],
+        songs: [{ id: 1, title: url.endsWith("zh-TW") ? "夢回還" : "梦回还" }],
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { rerender } = renderWithProvider();
+    await waitFor(() =>
+      expect(screen.getByTestId("songs").textContent).toBe("梦回还"),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/public/collections?locale=zh-CN",
+    );
+
+    mockLocale = "zh-TW";
+    rerender(
+      <FavoritesProvider>
+        <Probe />
+      </FavoritesProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("songs").textContent).toBe("夢回還"),
+    );
   });
 
   it("接口失败时收藏为空但仍标记为已加载，不会卡在加载中", async () => {

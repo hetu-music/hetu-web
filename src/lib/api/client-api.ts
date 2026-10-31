@@ -3,20 +3,31 @@ import { apiRequest } from "@/lib/api/request";
 import type {
   CreateRequestPayload,
   Emotion,
+  ImageryCategory,
+  ImageryItem,
   ReplyRequestPayload,
   Song,
+  SongCollation,
   UserRecord,
   UserRequest,
   UserUpdatePayload,
 } from "@/lib/types";
 import type { ReviewCandidate, ReviewResult } from "@/lib/imagery/review";
-import type { OccurrenceBatchItem } from "@/lib/server/service-imagery";
+import type {
+  OccurrenceBatchItem,
+  OccurrenceWithSong,
+  UnusedMotif,
+} from "@/lib/server/service-imagery";
 import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
 import type { AudioOverview } from "@/lib/server/service-navidrome";
 import type { ApplyResult } from "@/lib/navidrome/store";
 import type { NavSong } from "@/lib/navidrome/sync";
 import type { CreditAliasRow } from "@/lib/server/service-credit-aliases";
 import type { CreditNameUsage } from "@/lib/utils/utils-credits";
+import type {
+  CollationPayload,
+  SupplementPayload,
+} from "@/lib/utils/utils-collations";
 
 /**
  * 没标返回类型的接口沿用原来 res.json() 的 any，调用方按各自的形状取用。
@@ -67,95 +78,91 @@ export function apiGetSongs() {
 }
 
 // ─── Imagery Admin API ─────────────────────────────────────────────────────────
+// 词不单独新建或改名：标注时按歌词原文创建（apiCreateOccurrencesBatch）。
 
 export function apiGetImageryItems() {
-  return apiRequest<Untyped>("/api/admin/imagery", {
-    fallback: "获取意象列表失败",
+  return apiRequest<ImageryItem[]>("/api/admin/imagery", {
+    fallback: "获取意象词典失败",
   });
 }
 
-export function apiCreateImagery(name: string) {
-  return apiRequest<Untyped>("/api/admin/imagery", {
-    method: "POST",
-    body: { name },
-    fallback: "新增意象失败",
-  });
-}
-
-export function apiUpdateImagery(id: number, name: string) {
-  return apiRequest<Untyped>(`/api/admin/imagery/${id}`, {
+/** 整体改写一个词登记的母题；400 带着可读的原因（去掉的母题下还有标注等） */
+export function apiSetWordMotifs(
+  imageryId: number,
+  motifs: { primary: number; alternatives: number[]; parts: number[] },
+) {
+  return apiRequest<typeof motifs>(`/api/admin/imagery/${imageryId}/motifs`, {
     method: "PUT",
-    body: { name },
-    fallback: "更新意象失败",
-  });
-}
-
-export function apiGetImageryOccurrences(imageryId: number) {
-  return apiRequest<Untyped>(`/api/admin/imagery/${imageryId}`, {
-    fallback: "获取出现记录失败",
+    body: motifs,
+    fallback: "保存词的母题失败",
+    serverMessage: [400],
   });
 }
 
 export function apiGetImageryCategories() {
-  return apiRequest<Untyped>("/api/admin/imagery/categories", {
-    fallback: "获取分类失败",
+  return apiRequest<ImageryCategory[]>("/api/admin/imagery/categories", {
+    fallback: "获取母题失败",
   });
 }
 
-export function apiCreateImageryCategory(data: {
+/** 只能新建母题：挂在类别（第二级）下，说明必填 */
+export function apiCreateMotif(data: {
   name: string;
-  parent_id?: number | null;
-  level?: number | null;
-  description?: string | null;
+  parent_id: number;
+  description: string;
 }) {
-  return apiRequest<Untyped>("/api/admin/imagery/categories", {
+  return apiRequest<ImageryCategory>("/api/admin/imagery/categories", {
     method: "POST",
     body: data,
-    fallback: "新增分类失败",
+    fallback: "新增母题失败",
+    serverMessage: [400],
   });
 }
 
-export function apiUpdateImageryCategory(
+export function apiUpdateMotif(
   id: number,
-  data: {
-    name?: string;
-    parent_id?: number | null;
-    level?: number | null;
-    description?: string | null;
-  },
+  data: { name?: string; parent_id?: number; description?: string },
 ) {
-  return apiRequest<Untyped>(`/api/admin/imagery/categories/${id}`, {
+  return apiRequest<ImageryCategory>(`/api/admin/imagery/categories/${id}`, {
     method: "PUT",
     body: data,
-    fallback: "更新分类失败",
+    fallback: "更新母题失败",
+    serverMessage: [400],
   });
 }
 
-// ─── Occurrences API ───────────────────────────────────────────────────────────
-
-export function apiGetOccurrencesForImagery(imageryId: number) {
-  return apiRequest<Untyped>(`/api/admin/occurrences?imagery_id=${imageryId}`, {
-    fallback: "获取关系列表失败",
+/** 整理：没有标注的母题，连同登记了它的词 */
+export function apiGetUnusedMotifs() {
+  return apiRequest<UnusedMotif[]>("/api/admin/imagery/categories/unused", {
+    fallback: "查找空母题失败",
   });
+}
+
+/** 只删服务端重查后仍然没用上的，返回实际删掉的 id 与换了默认母题的词 */
+export function apiDeleteUnusedMotifs(ids: number[]) {
+  return apiRequest<{
+    deleted: number[];
+    promoted: Array<{ word: string; motif: string }>;
+  }>("/api/admin/imagery/categories/unused", {
+    method: "DELETE",
+    body: { ids },
+    fallback: "删除空母题失败",
+  });
+}
+
+// ─── Occurrences API（标注） ───────────────────────────────────────────────────
+
+/** 一个词的全部标注：哪些歌、挂哪个母题 */
+export function apiGetOccurrencesForImagery(imageryId: number) {
+  return apiRequest<OccurrenceWithSong[]>(
+    `/api/admin/occurrences?imagery_id=${imageryId}`,
+    { fallback: "获取标注失败" },
+  );
 }
 
 export function apiGetOccurrencesForSong(songId: number) {
   return apiRequest<Untyped>(`/api/admin/occurrences?song_id=${songId}`, {
     fallback: "获取歌曲意象失败",
-  });
-}
-
-/** 时间标签由服务端按歌词算出；400 带着可读的原因（词不在歌词里等） */
-export function apiCreateOccurrence(data: {
-  song_id: number;
-  imagery_id: number;
-  category_id: number;
-}) {
-  return apiRequest<Untyped>("/api/admin/occurrences", {
-    method: "POST",
-    body: data,
-    fallback: "新增关系失败",
-    serverMessage: [400],
   });
 }
 
@@ -179,7 +186,10 @@ export function apiReviewImagery(
   });
 }
 
-/** 400 带着可读的原因（歌曲未发布、校验不过等） */
+/**
+ * 新增标注：手动添加一条或审核后多条，词典里没有的词随之创建。
+ * 400 带着可读的原因（歌曲未发布、词不在歌词里等）
+ */
 export function apiCreateOccurrencesBatch(
   songId: number,
   items: OccurrenceBatchItem[],
@@ -195,17 +205,19 @@ export function apiCreateOccurrencesBatch(
   );
 }
 
+/** 词给 imagery_id 或 imagery_name（词典里没有时创建）；时间标签由服务端重算 */
 export function apiUpdateOccurrence(
   id: number,
   data: {
     imagery_id?: number;
+    imagery_name?: string;
     category_id?: number;
   },
 ) {
   return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "PUT",
     body: data,
-    fallback: "更新关系失败",
+    fallback: "更新标注失败",
     serverMessage: [400],
   });
 }
@@ -213,7 +225,7 @@ export function apiUpdateOccurrence(
 export function apiDeleteOccurrence(id: number) {
   return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
     method: "DELETE",
-    fallback: "删除关系失败",
+    fallback: "删除标注失败",
   });
 }
 
@@ -251,6 +263,68 @@ export function apiSetSongEmotions(songId: number, emotionIds: number[]) {
     body: { song_id: songId, emotion_ids: emotionIds },
     fallback: "保存基调失败",
     serverMessage: [400],
+  });
+}
+
+// ─── Collations API ────────────────────────────────────────────────────────────
+
+export function apiGetCollations(songId: number) {
+  return apiRequest<{ collations: SongCollation[] }>(
+    `/api/admin/collations?song_id=${songId}`,
+    { fallback: "获取校记失败" },
+  );
+}
+
+/** 400 带着可读的原因（歌曲未发布、字段校验），404 是校记已被别人删掉 */
+export function apiCreateCollation(
+  songId: number,
+  collation: CollationPayload,
+) {
+  return apiRequest<{ id: number }>("/api/admin/collations", {
+    method: "POST",
+    body: { song_id: songId, entry: collation },
+    fallback: "保存校记失败",
+    serverMessage: [400],
+  });
+}
+
+export function apiUpdateCollation(id: number, collation: CollationPayload) {
+  return apiRequest<{ success: true }>("/api/admin/collations", {
+    method: "PUT",
+    body: { id, entry: collation },
+    fallback: "保存校记失败",
+    serverMessage: [400, 404],
+  });
+}
+
+export function apiCreateSupplement(
+  songId: number,
+  supplement: SupplementPayload,
+) {
+  return apiRequest<{ id: number }>("/api/admin/supplements", {
+    method: "POST",
+    body: { song_id: songId, entry: supplement },
+    fallback: "保存补遗失败",
+    serverMessage: [400],
+  });
+}
+
+export function apiUpdateSupplement(id: number, supplement: SupplementPayload) {
+  return apiRequest<{ success: true }>("/api/admin/supplements", {
+    method: "PUT",
+    body: { id, entry: supplement },
+    fallback: "保存补遗失败",
+    serverMessage: [400, 404],
+  });
+}
+
+/** 校记与补遗同表，删除共用 */
+export function apiDeleteCollation(id: number) {
+  return apiRequest<{ success: true }>("/api/admin/collations", {
+    method: "DELETE",
+    body: { id },
+    fallback: "删除校记失败",
+    serverMessage: [404],
   });
 }
 

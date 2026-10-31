@@ -14,7 +14,7 @@ import {
 } from "@/components/shared/text-button";
 import { Link, useRouter } from "@/i18n/navigation";
 import { postAuth } from "@/lib/api/auth-api";
-import type { GallerySong } from "@/lib/auth-gallery";
+import type { GallerySong } from "@/lib/auth-gallery-shared";
 import {
   newPasswordFormSchema,
   recoveryEmailFormSchema,

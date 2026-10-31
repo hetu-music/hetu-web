@@ -44,16 +44,19 @@ function mockUserSong(data: unknown) {
   );
 }
 
-/** fetchAll 按 imagery → occurrences → music → categories 的顺序调用 .from() */
+/**
+ * getImagerySuggestions 的 fetchAll 按 imagery → occurrences → music → motifs 的顺序调用 .from()；
+ * 校验（review）只取分类，放在第一个
+ */
 function mockServiceTables(tables: {
   imagery?: unknown[];
   occurrences?: unknown[];
   music?: unknown[];
-  categories?: unknown[];
+  motifs?: unknown[];
 }) {
   vi.mocked(getServiceClient).mockReturnValue(
     createMockSupabaseClient(
-      [tables.imagery, tables.occurrences, tables.music, tables.categories]
+      [tables.imagery, tables.occurrences, tables.music, tables.motifs]
         .filter((rows) => rows !== undefined)
         .map((rows) => makeQueryBuilder({ data: rows, error: null })),
     ),
@@ -85,7 +88,7 @@ describe("getImagerySuggestions", () => {
         { id: 5, lyrics },
         { id: 7, lyrics: "[00:01.00]明月与人" },
       ],
-      categories: categoryRows,
+      motifs: [],
     });
 
     const result = await getImagerySuggestions(5, "token");
@@ -93,12 +96,10 @@ describe("getImagerySuggestions", () => {
       published: true,
       hasLyrics: true,
       llmEnabled: true,
-      // 按拼音排序：地理（dì）在天象（tiān）之前
-      categories: [
-        { id: 11, label: "自然 / 地理" },
-        { id: 10, label: "自然 / 天象" },
-      ],
     });
+    // 词典与母题不随结果返回，审核时用后台共用的那一份
+    expect(result).not.toHaveProperty("dictionary");
+    expect(result).not.toHaveProperty("categories");
     const byName = new Map(result?.suggestions.map((s) => [s.name, s]));
     expect(byName.has("天涯")).toBe(false); // 已标注
     expect(byName.get("明月")).toMatchObject({
@@ -108,11 +109,6 @@ describe("getImagerySuggestions", () => {
       annotated: 1,
     });
     expect(byName.get("人")).toMatchObject({ recommended: false, rate: 0 });
-    expect(result?.dictionary).toContainEqual({
-      id: 1,
-      name: "明月",
-      categoryIds: [10],
-    });
   });
 
   it("歌曲只在暂存表中时标记为未发布", async () => {
@@ -121,7 +117,7 @@ describe("getImagerySuggestions", () => {
       imagery: dictionary,
       occurrences: [],
       music: [],
-      categories: categoryRows,
+      motifs: [],
     });
     expect(await getImagerySuggestions(5, "token")).toMatchObject({
       published: false,
@@ -136,7 +132,7 @@ describe("getImagerySuggestions", () => {
       imagery: [],
       occurrences: [],
       music: [],
-      categories: [],
+      motifs: [],
     });
     await expect(getImagerySuggestions(5, "token")).rejects.toThrow(
       "意象词典为空",

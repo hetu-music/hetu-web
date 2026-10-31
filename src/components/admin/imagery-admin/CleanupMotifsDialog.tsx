@@ -21,18 +21,18 @@ import {
 import { notify, notifyError } from "../kit/toast";
 
 const ROLE_LABEL: Record<UnusedMotifWord["role"], string> = {
-  primary: "默认母题",
-  alternative: "多义候选",
-  part: "并列组成",
+  primary: "通常算作它",
+  alternative: "有时也指它",
+  part: "同时算进它",
 };
 
-/** 「汗」默认母题，删后改为 身躯 */
+/** 「汗」通常算作它，删后改为通常算作 身躯 */
 function describeWord(word: UnusedMotifWord): string {
   const base = `「${word.name}」${ROLE_LABEL[word.role]}`;
-  if (word.role !== "primary") return `${base}，解除登记`;
+  if (word.role !== "primary") return `${base}，删后去掉这一项`;
   return word.promoteTo
-    ? `${base}，删后改为 ${word.promoteTo.name}`
-    : `${base}，删后没有可用的默认母题，需另行指定`;
+    ? `${base}，删后改为通常算作 ${word.promoteTo.name}`
+    : `${base}，删后没有别的可选，需要另选「通常算作」`;
 }
 
 /**
@@ -109,7 +109,7 @@ export function CleanupMotifsDialog({
           text: [
             "母题一个都没删掉：可能刚有了标注，或数据库没给管理员删除权限",
             changed.length > 0
-              ? `词的登记已经改了，默认母题改为：${changed.join("、")}`
+              ? `词已经改了，通常算作：${changed.join("、")}`
               : "",
           ]
             .filter(Boolean)
@@ -122,7 +122,7 @@ export function CleanupMotifsDialog({
             kept > 0
               ? `已删除 ${deleted.length} 个母题，另有 ${kept} 个刚有了标注或没删成，已保留`
               : `已删除 ${deleted.length} 个母题`,
-            changed.length > 0 ? `默认母题改为：${changed.join("、")}` : "",
+            changed.length > 0 ? `改为通常算作：${changed.join("、")}` : "",
           ]
             .filter(Boolean)
             .join("；"),
@@ -175,7 +175,7 @@ export function CleanupMotifsDialog({
         <div className="space-y-6">
           <p className="text-sm text-slate-500 dark:text-slate-400">
             以下 {unused.data.length}{" "}
-            个母题没有任何标注，可以删掉。只列第三级，门类与类别不动。登记了它们的词会解除登记；以它为默认母题的词，改用其余候选里标注最多的。
+            个母题没有任何标注，可以删掉。只列母题，门类与类别不动。通常算作它的词，改为它其余可选母题里标注最多的那个。
           </p>
 
           {groups.map((group) => (

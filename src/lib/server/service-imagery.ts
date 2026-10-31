@@ -249,7 +249,7 @@ export async function setWordMotifs(
     [next.primary, "primary"] as const,
   ]);
   if (wanted.size !== 1 + next.alternatives.length + next.parts.length) {
-    throw badRequest("同一个母题只能登记一次", "DUPLICATE_MOTIF");
+    throw badRequest("同一个母题只能出现一次", "DUPLICATE_MOTIF");
   }
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");

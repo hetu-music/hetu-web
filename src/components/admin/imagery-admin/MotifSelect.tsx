@@ -28,7 +28,7 @@ export default function MotifSelect({
   motifs: readonly MotifOption[];
   onChange: (id: number | null) => void;
   placeholder?: string;
-  /** 选了登记之外的母题时，在下方提示会登记为多义候选 */
+  /** 选了这个词可选范围之外的母题时，在下方提示保存后会加一个「有时也指」 */
   hint?: boolean;
   className?: string;
   "aria-label"?: string;
@@ -45,10 +45,10 @@ export default function MotifSelect({
           label:
             labelOf(id) +
             (id === candidateIds[0]
-              ? "（默认）"
+              ? "（通常）"
               : candidateIds.includes(id)
                 ? ""
-                : "（未登记）"),
+                : "（新的意思）"),
         }),
       );
   const offCandidate =
@@ -78,7 +78,7 @@ export default function MotifSelect({
       </select>
       {hint && offCandidate && (
         <span className="block text-xs text-slate-400 dark:text-slate-500">
-          不是这个词登记的母题，保存后登记为它的多义候选
+          这个词以前没这样标过，保存后会给它加一个「有时也指」
         </span>
       )}
     </>

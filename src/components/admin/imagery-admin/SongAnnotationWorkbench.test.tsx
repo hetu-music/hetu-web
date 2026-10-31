@@ -156,7 +156,7 @@ describe("SongAnnotationWorkbench", () => {
       screen.getByRole("combobox", { name: "母题" }) as HTMLSelectElement;
     const labels = () => [...select().options].map((o) => o.textContent);
     expect(select().value).toBe("200");
-    expect(labels()).toEqual(["自然事物 / 地理 / 区域（默认）", "其他母题…"]);
+    expect(labels()).toEqual(["自然事物 / 地理 / 区域（通常）", "其他母题…"]);
 
     fireEvent.change(select(), { target: { value: "__all" } });
     expect(select().value).toBe("200");
@@ -165,7 +165,7 @@ describe("SongAnnotationWorkbench", () => {
       "自然事物 / 天象 / 星相",
     ]);
     fireEvent.change(select(), { target: { value: "100" } });
-    expect(screen.getByText(/保存后登记为它的多义候选/)).toBeTruthy();
+    expect(screen.getByText(/保存后会给它加一个「有时也指」/)).toBeTruthy();
   });
 
   it("没登记母题的词不预选，下拉框直接列全部", () => {

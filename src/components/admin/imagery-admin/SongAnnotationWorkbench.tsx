@@ -53,7 +53,9 @@ const TONE_CLASS: Record<Tone, string> = {
   draft: ACTIVE_CLASS,
   hover: ACTIVE_CLASS,
   candidate: ACTIVE_CLASS,
-  saved: "underline decoration-(--tone) decoration-2 underline-offset-4",
+  // <mark> 自带浏览器的亮黄底和黑字，只画下划线时要显式清掉
+  saved:
+    "bg-transparent text-inherit underline decoration-(--tone) decoration-2 underline-offset-4",
 };
 const TONE_PRIORITY: Record<Tone, number> = {
   hover: 4,

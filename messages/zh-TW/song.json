@@ -83,7 +83,8 @@
       "colophon": "版記",
       "related": "同有此意",
       "notes": "創作手記",
-      "comments": "評點"
+      "comments": "評點",
+      "collations": "校勘記"
     },
     "imageryTotal": "本曲共 {count} 個意象",
     "imageryMore": "等",
@@ -106,6 +107,22 @@
     "nowPlaying": "正在播放",
     "expand": "展開全文",
     "collapse": "收起",
+    "collations": {
+      "kinds": {
+        "slip": "口誤",
+        "sung": "異唱",
+        "version": "異本",
+        "note": "附記"
+      },
+      "sungAs": "「{quote}」唱作「{sung}」。",
+      "collator": "{name}校",
+      "reviser": "{name}訂",
+      "anonymous": "佚名",
+      "marker": "校",
+      "markerLabel": "看這一句的校記",
+      "jump": "回到原句",
+      "orphan": "原句已改動"
+    },
     "comments": {
       "intro": "批註寫在字句旁；這裡是對整首歌的評點。",
       "count": "共 {count} 則批評",

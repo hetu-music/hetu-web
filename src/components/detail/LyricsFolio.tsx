@@ -1,5 +1,6 @@
 "use client";
 
+import { CollationMarker } from "@/components/detail/Collations";
 import CommentGutter from "@/components/detail/comments/CommentGutter";
 import { useComments } from "@/components/detail/comments/CommentsContext";
 import SlotMarker from "@/components/detail/comments/SlotMarker";
@@ -42,6 +43,8 @@ interface LyricsFolioProps {
   markById: Map<number, SongImageryMark>;
   activeImagery: number | null;
   onSelectImagery: (id: number | null) => void;
+  /** 有校记的行 → 该行第一条校记 */
+  collationByLine: Map<number, number>;
 }
 
 export default function LyricsFolio({
@@ -52,6 +55,7 @@ export default function LyricsFolio({
   markById,
   activeImagery,
   onSelectImagery,
+  collationByLine,
 }: LyricsFolioProps) {
   const t = useTranslations("song");
   const [mode, setMode] = useState<"poem" | "lrc">("poem");
@@ -224,6 +228,7 @@ export default function LyricsFolio({
               }
               markById={markById}
               activeImagery={activeImagery}
+              collationId={collationByLine.get(i)}
               isCurrent={isCurrentTrack && currentIndex === i}
               seekable={seekable && line.time !== null}
               seekHint={t("folio.seekHint")}
@@ -254,6 +259,8 @@ interface FolioRowProps {
   numeralMuted: boolean;
   markById: Map<number, SongImageryMark>;
   activeImagery: number | null;
+  /** 这一句的校记，句末挂「校」 */
+  collationId: number | undefined;
   isCurrent: boolean;
   seekable: boolean;
   seekHint: string;
@@ -277,6 +284,7 @@ const FolioRow = memo(function FolioRow({
   numeralMuted,
   markById,
   activeImagery,
+  collationId,
   isCurrent,
   seekable,
   seekHint,
@@ -382,6 +390,7 @@ const FolioRow = memo(function FolioRow({
               </button>
             );
           })}
+          {collationId !== undefined && <CollationMarker id={collationId} />}
           {!inlineThreads && <SlotMarker slot={slot} />}
         </p>
 

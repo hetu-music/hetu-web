@@ -59,6 +59,7 @@ export const TABLES = {
   IMAGERY_OCC: "imagery_occurrences",
   EMOTIONS: "emotions", // 基调词表（见 IMAGERY.md）
   SONG_EMOTIONS: "song_emotions", // 每首歌的主、副基调
+  SONG_COLLATIONS: "song_collations", // 校记：管理员写在歌词上的勘误
 
   // 用户与互动表
   USERS: "users",

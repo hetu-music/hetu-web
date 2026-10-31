@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import SongDetailClient from "@/components/detail/SongDetailClient";
 import { getSongById } from "@/lib/server/service-songs";
 import { getSongImagery } from "@/lib/server/service-song-imagery";
+import { getSongCollations } from "@/lib/server/service-collations";
 import { TABLES } from "@/lib/db/supabase-server";
 import { buildFolio, markLines, pickExcerpt } from "@/lib/utils/utils-folio";
 import { SITE_URL } from "@/lib/constants";
@@ -91,10 +92,12 @@ export default async function SongDetailPage({
 
   let song;
   let imagery;
+  let collations;
   try {
-    [song, imagery] = await Promise.all([
+    [song, imagery, collations] = await Promise.all([
       getSongById(songId, TABLES.MUSIC, undefined, locale),
       getSongImagery(songId, locale),
+      getSongCollations(songId, locale),
     ]);
   } catch (error) {
     console.error("Error in SongDetailPage:", error);
@@ -112,7 +115,14 @@ export default async function SongDetailPage({
   });
   const excerpt = pickExcerpt(lines, markLines(lines, imagery.marks));
 
-  return <SongDetailClient song={song} imagery={imagery} excerpt={excerpt} />;
+  return (
+    <SongDetailClient
+      song={song}
+      imagery={imagery}
+      excerpt={excerpt}
+      collations={collations}
+    />
+  );
 }
 
 // 生成静态参数

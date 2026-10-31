@@ -74,6 +74,7 @@ export interface SongDetailClientProps {
   imagery: SongImageryView;
   /** 卷首竖排摘句，按空格分列；在服务端挑好，见 pickExcerpt */
   excerpt: string | null;
+  collations: SongCollation[];
 }
 
 // 歌曲详情页的意象视图
@@ -211,6 +212,28 @@ export interface SongComment {
   author: string | null;
   createdAt: string;
   editedAt: string | null;
+}
+
+// 校记：管理员写在某句歌词上的勘误，署校者之名
+/** slip 口误 / sung 异唱 / version 异本 / note 附记 */
+export type CollationKind = "slip" | "sung" | "version" | "note";
+
+export interface SongCollation {
+  id: number;
+  /** 位置的存法与批注相同，歌词改动后按原句找回 */
+  anchor: CommentAnchor;
+  anchorIndex: number | null;
+  anchorTime: number | null;
+  anchorQuote: string | null;
+  kind: CollationKind;
+  /** 句中的哪几个字，实际唱成什么 */
+  quote: string | null;
+  sung: string | null;
+  body: string;
+  /** 校者；账号已删为 null */
+  collator: string | null;
+  /** 订者：别人改过时才有 */
+  reviser: string | null;
 }
 
 // 个人页「我的批评」：按歌分组

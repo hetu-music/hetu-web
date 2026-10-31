@@ -185,6 +185,11 @@ export async function refreshSongEmotions(
   });
 }
 
+/** 校记变了：只显示在这首歌的详情页，不进意象索引 */
+export async function refreshCollations(songId: number): Promise<PurgeReport> {
+  return invalidate({ pages: [songPage(songId)] });
+}
+
 /** 部署后预热与外部同步脚本用：列表类页面和各项聚合数据 */
 export async function refreshPublicPages(): Promise<PurgeReport> {
   return invalidate({

@@ -155,6 +155,22 @@
 
 /* ── 5. 业务动画 ─────────────────────────────────────────────────────────────── */
 
+/* 校记与所校的句子互相跳转时，落点处淡淡亮一下，好让眼睛找到 */
+@keyframes collation-flash {
+  0%,
+  30% {
+    background-color: color-mix(in srgb, var(--tone) 14%, transparent);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.collation-flash {
+  animation: collation-flash 1.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 /* 古典水墨涟漪动画 */
 @keyframes classical-ripple {
   0% {

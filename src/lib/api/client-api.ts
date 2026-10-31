@@ -5,6 +5,7 @@ import type {
   Emotion,
   ReplyRequestPayload,
   Song,
+  SongCollation,
   UserRecord,
   UserRequest,
   UserUpdatePayload,
@@ -17,6 +18,7 @@ import type { ApplyResult } from "@/lib/navidrome/store";
 import type { NavSong } from "@/lib/navidrome/sync";
 import type { CreditAliasRow } from "@/lib/server/service-credit-aliases";
 import type { CreditNameUsage } from "@/lib/utils/utils-credits";
+import type { CollationPayload } from "@/lib/utils/utils-collations";
 
 /**
  * 没标返回类型的接口沿用原来 res.json() 的 any，调用方按各自的形状取用。
@@ -251,6 +253,46 @@ export function apiSetSongEmotions(songId: number, emotionIds: number[]) {
     body: { song_id: songId, emotion_ids: emotionIds },
     fallback: "保存基调失败",
     serverMessage: [400],
+  });
+}
+
+// ─── Collations API ────────────────────────────────────────────────────────────
+
+export function apiGetCollations(songId: number) {
+  return apiRequest<{ collations: SongCollation[] }>(
+    `/api/admin/collations?song_id=${songId}`,
+    { fallback: "获取校记失败" },
+  );
+}
+
+/** 400 带着可读的原因（歌曲未发布、字段校验），404 是校记已被别人删掉 */
+export function apiCreateCollation(
+  songId: number,
+  collation: CollationPayload,
+) {
+  return apiRequest<{ id: number }>("/api/admin/collations", {
+    method: "POST",
+    body: { song_id: songId, collation },
+    fallback: "保存校记失败",
+    serverMessage: [400],
+  });
+}
+
+export function apiUpdateCollation(id: number, collation: CollationPayload) {
+  return apiRequest<{ success: true }>("/api/admin/collations", {
+    method: "PUT",
+    body: { id, collation },
+    fallback: "保存校记失败",
+    serverMessage: [400, 404],
+  });
+}
+
+export function apiDeleteCollation(id: number) {
+  return apiRequest<{ success: true }>("/api/admin/collations", {
+    method: "DELETE",
+    body: { id },
+    fallback: "删除校记失败",
+    serverMessage: [404],
   });
 }
 

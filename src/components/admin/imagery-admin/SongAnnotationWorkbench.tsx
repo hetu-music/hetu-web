@@ -45,15 +45,15 @@ type Tone = "draft" | "hover" | "candidate" | "saved";
 
 type View = "annotations" | "suggestions";
 
-// 歌词里的标记：正在编辑的用强调色，悬停定位用 amber，候选只画虚线，已存的铺浅灰
+// 歌词里的标记。已存的要在正文的灰字里一眼认出来：墨蓝字加浅墨蓝底；
+// 正在编辑的铺实色反白，和已存的分开；悬停定位用琥珀；候选只画加粗的虚线
 const TONE_CLASS: Record<Tone, string> = {
-  draft: "bg-(--tone)/20 text-slate-900 dark:text-slate-50 rounded-sm",
+  draft: "rounded-sm bg-(--tone) text-white dark:text-slate-900",
   hover:
-    "bg-amber-200/80 text-amber-900 dark:bg-amber-500/30 dark:text-amber-100 rounded-sm",
+    "rounded-sm bg-amber-300 text-amber-950 dark:bg-amber-400/70 dark:text-amber-50",
   candidate:
-    "bg-transparent text-inherit underline decoration-(--tone) decoration-dashed underline-offset-4",
-  saved:
-    "bg-slate-200/80 text-slate-900 dark:bg-slate-700/60 dark:text-slate-100 rounded-sm",
+    "bg-transparent text-slate-900 underline decoration-(--tone) decoration-dashed decoration-2 underline-offset-4 dark:text-slate-50",
+  saved: "rounded-sm bg-(--tone)/15 font-medium text-(--tone)",
 };
 const TONE_PRIORITY: Record<Tone, number> = {
   hover: 4,

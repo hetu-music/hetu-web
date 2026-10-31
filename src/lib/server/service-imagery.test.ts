@@ -538,7 +538,14 @@ describe("updateOccurrence / deleteOccurrence", () => {
     ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 
+  // 改完都按歌词重算整首：歌词没有时间轴时读两次就返回
+  const noTimeline = () => [
+    makeQueryBuilder({ data: { lyrics: null }, error: null }),
+    makeQueryBuilder({ data: [], error: null }),
+  ];
+
   it("词在原母题下已没有标注、原母题是它的默认母题时，默认母题跟到新母题上", async () => {
+    const siblings = makeQueryBuilder({ data: null, error: null });
     const unregister = makeQueryBuilder({ data: null, error: null });
     const promote = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
@@ -552,17 +559,23 @@ describe("updateOccurrence / deleteOccurrence", () => {
           data: [{ imagery_id: 2, category_id: 10, role: "primary" }],
           error: null,
         }), // 登记
-        makeQueryBuilder({ data: null, error: null }), // 登记身躯为多义候选
+        makeQueryBuilder({ data: null, error: null }), // 登记身躯为「有时也指」
+        siblings, // 删掉补写的「同时算进」
         makeQueryBuilder({ data: { id: 1 }, error: null }), // 更新
         makeQueryBuilder({ data: { role: "primary" }, error: null }), // 原母题的登记
         makeQueryBuilder({ data: [], error: null }), // 原母题下已没有标注
         unregister,
         promote,
+        makeQueryBuilder({
+          data: [{ category_id: 20, role: "primary" }],
+          error: null,
+        }), // 补写「同时算进」：这个词没有
+        ...noTimeline(),
         relations(),
       ]),
     );
     await updateOccurrence(1, { category_id: 20 }, "token");
-    expect(unregister.delete).toHaveBeenCalled();
+    expect(siblings.neq).toHaveBeenCalledWith("id", 1);
     expect(unregister.eq).toHaveBeenCalledWith("category_id", 10);
     expect(promote.upsert).toHaveBeenCalledWith(
       { imagery_id: 2, category_id: 20, role: "primary" },
@@ -582,14 +595,66 @@ describe("updateOccurrence / deleteOccurrence", () => {
         error: null,
       }),
       makeQueryBuilder({ data: null, error: null }),
+      makeQueryBuilder({ data: null, error: null }), // 删掉补写的
       makeQueryBuilder({ data: { id: 1 }, error: null }),
       makeQueryBuilder({ data: { role: "primary" }, error: null }),
       makeQueryBuilder({ data: [{ id: 5 }], error: null }), // 别的歌还挂在原母题
+      makeQueryBuilder({
+        data: [
+          { category_id: 10, role: "primary" },
+          { category_id: 20, role: "alternative" },
+        ],
+        error: null,
+      }),
+      ...noTimeline(),
       relations(),
     ]);
     vi.mocked(getUserClient).mockReturnValue(client);
     await updateOccurrence(1, { category_id: 20 }, "token");
-    expect(client.from).toHaveBeenCalledTimes(8);
+    expect(client.from).toHaveBeenCalledTimes(12);
+  });
+
+  it("改挂到词的「通常算作」上时，补写它「同时算进」的各条", async () => {
+    const siblings = makeQueryBuilder({ data: null, error: null });
+    const parts = makeQueryBuilder({ data: null, error: null });
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: [{ id: 10, level: 3 }], error: null }),
+        makeQueryBuilder({
+          data: { song_id: 1, imagery_id: 1, category_id: 30 },
+          error: null,
+        }), // 「风雨」原来挂在「有时也指」30 上
+        makeQueryBuilder({
+          data: [
+            { imagery_id: 1, category_id: 10, role: "primary" },
+            { imagery_id: 1, category_id: 11, role: "part" },
+            { imagery_id: 1, category_id: 30, role: "alternative" },
+          ],
+          error: null,
+        }), // 已登记，不用再登记
+        siblings,
+        makeQueryBuilder({ data: { id: 1 }, error: null }),
+        makeQueryBuilder({ data: { role: "alternative" }, error: null }),
+        makeQueryBuilder({ data: [], error: null }),
+        makeQueryBuilder({
+          data: [
+            { category_id: 10, role: "primary" },
+            { category_id: 11, role: "part" },
+            { category_id: 30, role: "alternative" },
+          ],
+          error: null,
+        }),
+        parts,
+        ...noTimeline(),
+        relations(),
+      ]),
+    );
+    await updateOccurrence(1, { category_id: 10 }, "token");
+    expect(siblings.eq).toHaveBeenCalledWith("imagery_id", 1);
+    expect(parts.upsert).toHaveBeenCalledWith(
+      [{ song_id: 1, imagery_id: 1, category_id: 11, lyric_timetag: [] }],
+      { onConflict: "song_id,imagery_id,category_id", ignoreDuplicates: true },
+    );
   });
 
   it("换成词典里没有的词：核对歌词后创建，再改这条标注", async () => {
@@ -597,6 +662,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
       data: [{ id: 31, name: "孤灯" }],
       error: null,
     });
+    const siblings = makeQueryBuilder({ data: null, error: null });
     const update = makeQueryBuilder({ data: { id: 1 }, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
@@ -604,31 +670,40 @@ describe("updateOccurrence / deleteOccurrence", () => {
           data: { song_id: 1, imagery_id: 2, category_id: 10 },
           error: null,
         }), // 当前
-        makeQueryBuilder({ data: { lyrics: null }, error: null }), // 核对歌词：没有时间轴
-        makeQueryBuilder({ data: [], error: null }),
+        ...noTimeline(), // 核对歌词：没有时间轴
         makeQueryBuilder({ data: [], error: null }), // 按名查找
         createWord,
         makeQueryBuilder({ data: [], error: null }), // 新词还没有登记
         makeQueryBuilder({ data: null, error: null }), // 登记默认母题
+        siblings, // 旧词补写的「同时算进」
         update,
-        makeQueryBuilder({ data: { lyrics: null }, error: null }), // 重算时间标签
-        makeQueryBuilder({ data: [], error: null }),
+        makeQueryBuilder({
+          data: [{ category_id: 10, role: "primary" }],
+          error: null,
+        }),
+        ...noTimeline(),
         relations(),
       ]),
     );
     await updateOccurrence(1, { imagery_name: "孤灯" }, "token");
     expect(createWord.insert).toHaveBeenCalledWith([{ name: "孤灯" }]);
+    expect(siblings.eq).toHaveBeenCalledWith("imagery_id", 2);
     expect(update.update).toHaveBeenCalledWith({
       imagery_id: 31,
       category_id: 10,
     });
   });
 
-  it("deleteOccurrence 后重算整首：被删长词覆盖的短词拿回那几行", async () => {
+  it("deleteOccurrence 连同补写的「同时算进」一起删，再重算整首", async () => {
+    const remove = makeQueryBuilder({
+      data: [{ category_id: 5 }, { category_id: 6 }],
+      error: null,
+    });
     const updateBuilder = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ song_id: 1 }], error: null }), // 删除「岁月」
+        makeQueryBuilder({ data: { song_id: 1, imagery_id: 8 }, error: null }), // 「岁月」
+        remove,
         makeQueryBuilder({
           data: { lyrics: "[00:01.00]岁月如月\n[00:02.00]岁月" },
           error: null,
@@ -638,6 +713,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
             {
               id: 2,
               imagery_id: 9,
+              category_id: 7,
               lyric_timetag: ["00:01.00"],
               imagery: { name: "月" },
             },
@@ -647,10 +723,14 @@ describe("updateOccurrence / deleteOccurrence", () => {
         updateBuilder,
       ]),
     );
-    await deleteOccurrence(1, "token");
+    const result = await deleteOccurrence(1, "token");
+    expect(remove.eq).toHaveBeenCalledWith("song_id", 1);
+    expect(remove.eq).toHaveBeenCalledWith("imagery_id", 8);
+    // 删掉长词后，被它覆盖的短词拿回那几行
     expect(updateBuilder.update).toHaveBeenCalledWith({
       lyric_timetag: ["00:01.00", "00:02.00"],
     });
+    expect(result).toEqual({ songId: 1, motifIds: [5, 6] });
   });
 
   it("deleteOccurrence 出错时抛异常", async () => {

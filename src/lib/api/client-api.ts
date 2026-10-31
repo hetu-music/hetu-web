@@ -77,7 +77,7 @@ export function apiGetSongs() {
   >("/api/admin/edit", { fallback: "获取歌曲列表失败" });
 }
 
-/// ─── Imagery Admin API ─────────────────────────────────────────────────────────
+// ─── Imagery Admin API ─────────────────────────────────────────────────────────
 // 词不单独新建或改名：标注时按歌词原文创建（apiCreateOccurrencesBatch）。
 
 export function apiGetImageryItems() {

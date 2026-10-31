@@ -236,6 +236,53 @@ describe("SongAnnotationWorkbench", () => {
     expect(screen.getByText("编辑标注 #1")).toBeTruthy();
   });
 
+  it("补写了「同时算进」的词合成一行，编辑、删除都按主条", () => {
+    // 假设「天涯」通常算作区域（200），同时算进星相（100）：库里是两条
+    const withPart = items.map((i) =>
+      i.id === 2 ? { ...i, parts: [100] } : i,
+    );
+    render(
+      <SongAnnotationWorkbench
+        song={song}
+        occurrences={[
+          occurrence({
+            id: 5,
+            imagery_id: 2,
+            imagery_name: "天涯",
+            category_id: 100,
+            lyric_timetag: ["00:10.00", "01:10.00"],
+          }),
+          occurrence({
+            id: 4,
+            imagery_id: 2,
+            imagery_name: "天涯",
+            category_id: 200,
+            lyric_timetag: ["00:10.00", "01:10.00"],
+          }),
+        ]}
+        loading={false}
+        items={withPart}
+        motifs={motifs}
+        submitting={false}
+        getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
+        onSave={onSave}
+        onDelete={onDelete}
+        onReload={onReload}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "标注 1" })).toBeTruthy();
+    expect(screen.getByText("地理 / 区域 · 同时算进 星相")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("天涯", { selector: "span" }));
+    expect(screen.getByText("编辑标注 #4")).toBeTruthy();
+    expect(screen.queryByText("这首歌已经标过这个词")).toBeNull();
+    expect(screen.getByText("保存时同时算进：星相")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+    expect(onDelete).toHaveBeenCalledWith(4, "天涯");
+  });
+
   it("提示歌词中已找不到的时间标签", () => {
     renderWorkbench([
       occurrence({ id: 1, lyric_timetag: ["00:10.00", "03:00.00"] }),

@@ -87,12 +87,12 @@ export const DELETE = withAuth(
       } = await supabase.auth.getSession();
       if (!session?.access_token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      const before = await getOccurrenceRefs(id);
-      await deleteOccurrence(id, session.access_token);
-      const purge = before
+      // 连同补写的「同时算进」一起删，它们挂的母题都要刷新
+      const deleted = await deleteOccurrence(id, session.access_token);
+      const purge = deleted
         ? await refreshImagery({
-            songIds: [before.song_id],
-            motifIds: [before.category_id],
+            songIds: [deleted.songId],
+            motifIds: deleted.motifIds,
           })
         : { failed: [] };
       return withPurgeStatus(NextResponse.json({ success: true }), purge);

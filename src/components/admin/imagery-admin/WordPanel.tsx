@@ -8,7 +8,11 @@ import {
   apiGetOccurrencesForImagery,
   apiSetWordMotifs,
 } from "@/lib/api/client-api";
-import { categoryPath, type MotifOption } from "@/lib/imagery/word-motifs";
+import {
+  categoryPath,
+  type MotifOption,
+  WORD_ROLE,
+} from "@/lib/imagery/word-motifs";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { ErrorState, LoadingState } from "../kit/parts";
@@ -21,25 +25,6 @@ import {
 } from "../kit/styles";
 import { notify, notifyError } from "../kit/toast";
 import { IMAGERY_KEYS, useUpdateCache } from "./queries";
-
-/**
- * 界面上的叫法。库里是 primary / alternative / part（见 IMAGERY.md），
- * 其他管理员不熟这些术语，界面一律用白话，并配一个例子
- */
-export const WORD_ROLE = {
-  primary: {
-    label: "通常算作",
-    help: "标注这个词时默认选它。",
-  },
-  alternative: {
-    label: "有时也指",
-    help: "同一个词在不同歌里意思不同，标注时按歌词选。例：「烟花」通常算焰火，「三月烟花」指春。",
-  },
-  part: {
-    label: "同时算进",
-    help: "这个词本身包含两样东西，标一次两个都算。例：「风雨」既算风也算雨。",
-  },
-} as const;
 
 type WordMotifs = { primary: number; alternatives: number[]; parts: number[] };
 

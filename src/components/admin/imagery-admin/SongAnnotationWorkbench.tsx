@@ -4,7 +4,11 @@ import { linesForWord } from "@/lib/imagery/consistency";
 import { parseLrcLines, type LrcLine } from "@/lib/imagery/suggest";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
 import type { ImageryItem } from "@/lib/types";
-import { type MotifOption, wordMotifIds } from "@/lib/imagery/word-motifs";
+import {
+  type MotifOption,
+  WORD_ROLE,
+  wordMotifIds,
+} from "@/lib/imagery/word-motifs";
 import { AlertCircle, Plus, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -108,6 +112,21 @@ function shortPath(path: string): string {
 }
 
 /**
+ * 一个词在这首歌里的标注。挂「通常算作」的词会补写「同时算进」的各条（「风雨」写风、雨两条），
+ * 它们是一次标注写出来的：界面上合成一行，编辑、删除都按主条
+ */
+interface WordAnnotation {
+  main: OccurrenceWithSong;
+  parts: OccurrenceWithSong[];
+}
+
+function firstSecond(o: OccurrenceWithSong): number {
+  return o.lyric_timetag.length > 0
+    ? Math.min(...o.lyric_timetag.map(tagToSeconds))
+    : Infinity;
+}
+
+/**
  * 一首歌的标注对照编辑：左侧整首歌词，右侧这首歌的标注。
  * 出现位置按歌词自动确定（词字面出现的行），划选词语可直接新建标注。
  * 右侧可切换到「候选审核」：词典匹配 + AI 校验生成候选，勾选的候选在歌词中就地标出。
@@ -155,26 +174,31 @@ export default function SongAnnotationWorkbench({
     () => new Map(items.map((i) => [i.name.toLowerCase(), i])),
     [items],
   );
-  const sortedOccurrences = useMemo(
-    () =>
-      [...occurrences].sort((a, b) => {
-        const first = (o: OccurrenceWithSong) =>
-          o.lyric_timetag.length > 0
-            ? Math.min(...o.lyric_timetag.map(tagToSeconds))
-            : Infinity;
-        return first(a) - first(b);
-      }),
-    [occurrences],
-  );
+  /** 按词合并的标注，主条是不在这个词「同时算进」里的那条，按首次出现排 */
+  const annotations = useMemo(() => {
+    const partsOf = new Map(items.map((i) => [i.id, new Set(i.parts)]));
+    const byWord = new Map<number, OccurrenceWithSong[]>();
+    for (const o of occurrences) {
+      byWord.set(o.imagery_id, [...(byWord.get(o.imagery_id) ?? []), o]);
+    }
+    return [...byWord.values()]
+      .map((rows): WordAnnotation => {
+        const parts = partsOf.get(rows[0].imagery_id) ?? new Set<number>();
+        const main = rows.find((r) => !parts.has(r.category_id)) ?? rows[0];
+        return { main, parts: rows.filter((r) => r !== main) };
+      })
+      .sort((a, b) => firstSecond(a.main) - firstSecond(b.main));
+  }, [items, occurrences]);
+  /** 歌词行上的标注，一个词只算一次 */
   const occurrencesByTag = useMemo(() => {
     const map = new Map<string, OccurrenceWithSong[]>();
-    for (const o of occurrences) {
-      for (const tag of o.lyric_timetag) {
-        map.set(tag, [...(map.get(tag) ?? []), o]);
+    for (const { main } of annotations) {
+      for (const tag of main.lyric_timetag) {
+        map.set(tag, [...(map.get(tag) ?? []), main]);
       }
     }
     return map;
-  }, [occurrences]);
+  }, [annotations]);
 
   /** 新建标注时默认选的母题：这个词登记的默认母题 */
   const defaultMotif = (item: ImageryItem | undefined) =>
@@ -237,11 +261,17 @@ export default function SongAnnotationWorkbench({
     : null;
   const duplicate =
     editor && resolvedItem
-      ? occurrences.find(
-          (o) =>
-            o.imagery_id === resolvedItem.id && o.id !== editor.occurrenceId,
-        )
+      ? annotations.find(
+          ({ main }) =>
+            main.imagery_id === resolvedItem.id &&
+            main.id !== editor.occurrenceId,
+        )?.main
       : undefined;
+  // 挂「通常算作」时会一并算进的母题，编辑时说一声
+  const willAlsoCount =
+    editor && resolvedItem && editor.categoryId === resolvedItem.primary
+      ? resolvedItem.parts
+      : [];
 
   /** 词在本曲应有的出现位置：字面出现的行，被同曲其他更长标注词覆盖的除外（见 IMAGERY.md） */
   const linesFor = (name: string, exceptOccurrenceId: number | null = null) =>
@@ -273,7 +303,7 @@ export default function SongAnnotationWorkbench({
   const startNew = (name = "") => {
     const item = itemByName.get(name.trim().toLowerCase());
     const existing = item
-      ? occurrences.find((o) => o.imagery_id === item.id)
+      ? annotations.find(({ main }) => main.imagery_id === item.id)?.main
       : undefined;
     if (existing) {
       openExisting(existing);
@@ -503,7 +533,7 @@ export default function SongAnnotationWorkbench({
         <div className="flex items-center gap-2">
           <TabsList variant="inline" aria-label="标注与候选">
             <TabsTrigger value="annotations" variant="inline">
-              标注 {occurrences.length}
+              标注 {annotations.length}
             </TabsTrigger>
             <TabsTrigger value="suggestions" variant="inline">
               {suggest.result
@@ -604,6 +634,14 @@ export default function SongAnnotationWorkbench({
                   hint
                   className={SELECT_CLASS}
                 />
+                {willAlsoCount.length > 0 && (
+                  <span className="block text-xs text-slate-400 dark:text-slate-500">
+                    保存时{WORD_ROLE.part.label}：
+                    {willAlsoCount
+                      .map((id) => getCategoryPath(id).split(" / ").pop())
+                      .join("、")}
+                  </span>
+                )}
               </label>
 
               <div className="space-y-1">
@@ -667,12 +705,12 @@ export default function SongAnnotationWorkbench({
               <p className="py-6 text-center text-sm text-slate-400">
                 加载标注中…
               </p>
-            ) : sortedOccurrences.length === 0 ? (
+            ) : annotations.length === 0 ? (
               <p className="py-8 text-center font-kaiti text-base text-slate-400">
                 还没有标注。在左侧划选词语，或点「新增标注」开始。
               </p>
             ) : (
-              sortedOccurrences.map((o) => {
+              annotations.map(({ main: o, parts }) => {
                 const orphans = o.lyric_timetag.filter(
                   (t) => !lyricTags.has(t),
                 );
@@ -702,6 +740,14 @@ export default function SongAnnotationWorkbench({
                         </span>
                         <span className="text-[11px] text-slate-400">
                           {shortPath(getCategoryPath(o.category_id))}
+                          {parts.length > 0 &&
+                            ` · ${WORD_ROLE.part.label} ${parts
+                              .map((p) =>
+                                getCategoryPath(p.category_id)
+                                  .split(" / ")
+                                  .pop(),
+                              )
+                              .join("、")}`}
                         </span>
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">

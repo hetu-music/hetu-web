@@ -946,11 +946,22 @@ export async function updateOccurrence(
     await assertInLyrics(supabase, before.song_id, [{ imagery_id: imageryId }]);
   }
   const categoryId = data.category_id ?? before.category_id;
-  if (data.category_id !== undefined || imageryId !== before.imagery_id) {
-    await registerMotifs(supabase, [
-      { imagery_id: imageryId, category_id: categoryId },
-    ]);
+  if (categoryId === before.category_id && imageryId === before.imagery_id) {
+    return getOccurrenceWithRelationsById(id, accessToken);
   }
+  await registerMotifs(supabase, [
+    { imagery_id: imageryId, category_id: categoryId },
+  ]);
+
+  // 这条标注补写过的「同时算进」随它走：先删掉（免得改挂到其中某个母题时撞上唯一约束），
+  // 改完再按改后的词与母题重新补
+  const { error: siblingsError } = await supabase
+    .from(TABLES.IMAGERY_OCC)
+    .delete()
+    .eq("song_id", before.song_id)
+    .eq("imagery_id", before.imagery_id)
+    .neq("id", id);
+  if (siblingsError) throw siblingsError;
 
   const { error } = await supabase
     .from(TABLES.IMAGERY_OCC)
@@ -961,24 +972,78 @@ export async function updateOccurrence(
   if (error) throw error;
   if (imageryId === before.imagery_id) {
     await followPrimary(supabase, imageryId, before.category_id, categoryId);
-  } else {
-    await syncSongTimetags(supabase, before.song_id);
   }
+  await addParts(supabase, before.song_id, imageryId, categoryId);
+  await syncSongTimetags(supabase, before.song_id);
   return getOccurrenceWithRelationsById(id, accessToken);
 }
 
-export async function deleteOccurrence(id: number, accessToken: string) {
+/** 标注挂在词的「通常算作」上时，补写它「同时算进」的各条（时间标签随后统一重算） */
+async function addParts(
+  supabase: UserClient,
+  songId: number,
+  imageryId: number,
+  categoryId: number,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from(TABLES.IMAGERY_MOTIFS)
+    .select("category_id,role")
+    .eq("imagery_id", imageryId);
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ category_id: number; role: string }>;
+  if (!rows.some((r) => r.role === "primary" && r.category_id === categoryId)) {
+    return;
+  }
+  const parts = rows.filter((r) => r.role === "part");
+  if (parts.length === 0) return;
+  const { error: insertError } = await supabase.from(TABLES.IMAGERY_OCC).upsert(
+    parts.map((p) => ({
+      song_id: songId,
+      imagery_id: imageryId,
+      category_id: p.category_id,
+      lyric_timetag: [] as string[],
+    })),
+    { onConflict: "song_id,imagery_id,category_id", ignoreDuplicates: true },
+  );
+  if (insertError) throw insertError;
+}
+
+/**
+ * 删掉一条标注，连同它补写的「同时算进」：一首歌里同一个词的各条是一次标注写出来的。
+ * 返回删掉的各条所挂的母题，供刷新缓存；标注不存在时返回 null
+ */
+export async function deleteOccurrence(
+  id: number,
+  accessToken: string,
+): Promise<{ songId: number; motifIds: number[] } | null> {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
+  const { data: row, error: rowError } = await supabase
+    .from(TABLES.IMAGERY_OCC)
+    .select("song_id,imagery_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (rowError) throw rowError;
+  if (!row) return null;
+  const { song_id: songId, imagery_id: imageryId } = row as {
+    song_id: number;
+    imagery_id: number;
+  };
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_OCC)
     .delete()
-    .eq("id", id)
-    .select("song_id");
+    .eq("song_id", songId)
+    .eq("imagery_id", imageryId)
+    .select("category_id");
   if (error) throw error;
   // 删掉长词后，被它覆盖的短词要拿回那几行
-  const songId = (data as { song_id: number }[] | null)?.[0]?.song_id;
-  if (songId !== undefined) await syncSongTimetags(supabase, songId);
+  await syncSongTimetags(supabase, songId);
+  return {
+    songId,
+    motifIds: ((data ?? []) as { category_id: number }[]).map(
+      (r) => r.category_id,
+    ),
+  };
 }
 
 // ─── public read functions ─────────────────────────────────────────────────────

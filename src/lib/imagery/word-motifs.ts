@@ -5,6 +5,25 @@ import type { ImageryCategory, ImageryItem } from "@/lib/types";
  * 后台的母题页、歌曲工作台的标注与预标注审核都从这里取，不各写一份。
  */
 
+/**
+ * 界面上的叫法。库里是 primary / alternative / part（见 IMAGERY.md），
+ * 其他管理员不熟这些术语，界面一律用白话，并配一个例子
+ */
+export const WORD_ROLE = {
+  primary: {
+    label: "通常算作",
+    help: "标注这个词时默认选它。",
+  },
+  alternative: {
+    label: "有时也指",
+    help: "同一个词在不同歌里意思不同，标注时按歌词选。例：「烟花」通常算焰火，「三月烟花」指春。",
+  },
+  part: {
+    label: "同时算进",
+    help: "这个词本身包含两样东西，标一次两个都算。例：「风雨」既算风也算雨。",
+  },
+} as const;
+
 /** 母题就是第三级分类；第一、二级是门类与类别 */
 export function isMotif(category: Pick<ImageryCategory, "level">): boolean {
   return category.level === 3;

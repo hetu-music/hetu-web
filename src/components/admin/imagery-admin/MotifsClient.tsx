@@ -6,7 +6,12 @@ import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import { Link } from "@/i18n/navigation";
 import { apiCreateMotif, apiUpdateMotif } from "@/lib/api/client-api";
 import type { MotifPayload } from "@/lib/forms/imagery-form";
-import { categoryPath, isMotif, motifOptions } from "@/lib/imagery/word-motifs";
+import {
+  categoryPath,
+  isMotif,
+  motifOptions,
+  WORD_ROLE,
+} from "@/lib/imagery/word-motifs";
 import type { ImageryCategory, ImageryItem } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import AdminShell from "../kit/AdminShell";
@@ -33,7 +38,7 @@ import {
   useImageryItemsQuery,
   useUpdateCache,
 } from "./queries";
-import WordPanel, { WORD_ROLE } from "./WordPanel";
+import WordPanel from "./WordPanel";
 
 /** 每个母题先列这么多个词，其余点「还有 N 个」展开 */
 const WORDS_SHOWN = 16;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { updateImageryCategory } from "@/lib/server/service-imagery";
+import { updateMotif } from "@/lib/server/service-imagery";
 import {
   refreshImagery,
   withPurgeStatus,
@@ -9,11 +9,16 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
-const UpdateCategorySchema = z.object({
-  name: z.string().min(1).max(50).optional(),
-  parent_id: z.number().int().positive().nullable().optional(),
-  level: z.number().int().min(1).nullable().optional(),
-  description: z.string().max(500).nullable().optional(),
+/** 只能改母题：名称、说明，或移到别的类别下 */
+const UpdateMotifSchema = z.object({
+  name: z.string().trim().min(1).max(50).optional(),
+  parent_id: z.number().int().positive().optional(),
+  description: z
+    .string()
+    .trim()
+    .min(1, "写一句这个母题指什么")
+    .max(500)
+    .optional(),
 });
 
 function getIdFromUrl(request: NextRequest): number | null {
@@ -31,7 +36,7 @@ export const PUT = withAuth(
     try {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
-        UpdateCategorySchema,
+        UpdateMotifSchema,
       );
       if (invalid) return invalid;
 
@@ -43,18 +48,19 @@ export const PUT = withAuth(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const updated = await updateImageryCategory(
+      const updated = await updateMotif(
         categoryId,
         input,
         session.access_token,
       );
-      // 分类牵动全部详情页，CDN 上的副本等 s-maxage 到期
-      const purge = await refreshImagery();
+      // 母题名与归属牵动全部详情页，CDN 上的副本等 s-maxage 到期
+      const purge = await refreshImagery({ motifIds: [categoryId] });
       return withPurgeStatus(NextResponse.json(updated), purge);
     } catch (e) {
+      const code = (e as Error & { code?: string }).code;
       if (
         e instanceof Error &&
-        (e as Error & { code?: string }).code === "INVALID_PARENT_LEVEL"
+        (code === "INVALID_PARENT" || code === "NOT_MOTIF")
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

@@ -299,11 +299,14 @@ export type ImageryCategory = {
 export type ImageryItem = {
   id: number;
   name: string;
+  /** 标注条数，含争议歌曲 */
   count: number;
-  /** 标注里用过的母题（按 id 排，不分主次） */
-  categoryIds: number[];
-  /** imagery_motifs 登记的候选：默认母题在前，其后是多义候选，不含并列组成 */
-  motifIds: number[];
+  /** imagery_motifs 登记的母题（见 IMAGERY.md）：默认母题，没登记过为 null */
+  primary: number | null;
+  /** 多义词的其他候选，标注时按语境与默认母题二选一 */
+  alternatives: number[];
+  /** 并列词的其余组成（「风雨」的雨），标注默认母题时一并写入 */
+  parts: number[];
 };
 
 export type ImageryOccurrence = {

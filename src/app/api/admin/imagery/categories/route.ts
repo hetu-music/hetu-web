@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import {
   getImageryCategories,
-  createImageryCategory,
+  createMotif,
 } from "@/lib/server/service-imagery";
 import {
   refreshImagery,
@@ -12,11 +12,11 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
-const CreateCategorySchema = z.object({
-  name: z.string().min(1).max(50),
-  parent_id: z.number().int().positive().nullable().optional(),
-  level: z.number().int().min(1).nullable().optional(),
-  description: z.string().max(500).nullable().optional(),
+/** 只能新建母题：挂在某个类别（第二级）下，说明必填（见 IMAGERY.md） */
+const CreateMotifSchema = z.object({
+  name: z.string().trim().min(1).max(50),
+  parent_id: z.number().int().positive(),
+  description: z.string().trim().min(1, "写一句这个母题指什么").max(500),
 });
 
 export const GET = withAuth(
@@ -40,7 +40,7 @@ export const POST = withAuth(
     try {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
-        CreateCategorySchema,
+        CreateMotifSchema,
       );
       if (invalid) return invalid;
 
@@ -52,13 +52,13 @@ export const POST = withAuth(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const created = await createImageryCategory(input, session.access_token);
+      const created = await createMotif(input, session.access_token);
       const purge = await refreshImagery();
       return withPurgeStatus(NextResponse.json(created), purge);
     } catch (e) {
       if (
         e instanceof Error &&
-        (e as Error & { code?: string }).code === "MAX_DEPTH_EXCEEDED"
+        (e as Error & { code?: string }).code === "INVALID_PARENT"
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

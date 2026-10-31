@@ -8,14 +8,13 @@ import {
   apiReviewImagery,
 } from "@/lib/api/client-api";
 import type { ImagerySuggestion } from "@/lib/imagery/suggest";
+import { wordMotifIds } from "@/lib/imagery/word-motifs";
 import type {
   OccurrenceBatchItem,
   OccurrenceWithSong,
 } from "@/lib/server/service-imagery";
-import type {
-  DictionaryOption,
-  ImagerySuggestionsResult,
-} from "@/lib/server/service-imagery-suggest";
+import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
+import type { ImageryItem } from "@/lib/types";
 
 /** 单个候选的审核状态 */
 export interface SuggestionDraft {
@@ -32,11 +31,18 @@ export type AiNote =
   | { kind: "verdict"; keep: boolean; reason: string }
   | { kind: "addition"; reason: string };
 
-function initialDraft(s: ImagerySuggestion): SuggestionDraft {
+/**
+ * 候选的初始状态。母题取词典里这个词登记的默认母题（与手动标注同一份数据）；
+ * 词典里没有的（AI 补充的新词）用候选自带的
+ */
+function initialDraft(
+  s: ImagerySuggestion,
+  item: ImageryItem | null,
+): SuggestionDraft {
   return {
     checked: s.recommended,
     name: s.name,
-    categoryId: s.categoryIds[0] ?? null,
+    categoryId: (item && wordMotifIds(item)[0]) ?? s.categoryIds[0] ?? null,
   };
 }
 
@@ -44,19 +50,20 @@ const IMAGERY_NAME_MAX = 50;
 
 /**
  * 单首歌的意象预标注：生成候选（词典匹配）、AI 校验、审核后批量保存。
- * 歌曲管理与关系管理共用。
  *
- * options.existing 由调用方提供该歌已有的关系时不再自行请求，
+ * options.items 是后台共用的词典（含各词登记的母题），改名、选母题都按它解析。
+ * options.existing 由调用方提供该歌已有的标注时不再自行请求，
  * 保存后改为调用 options.onSaved 让调用方刷新。
  */
 export function useImagerySuggestions(
   songId: number,
   options: {
+    items: ImageryItem[];
     existing?: OccurrenceWithSong[];
     onSaved?: () => Promise<unknown>;
-  } = {},
+  },
 ) {
-  const { existing: externalExisting, onSaved } = options;
+  const { items, existing: externalExisting, onSaved } = options;
   const hasExternalExisting = externalExisting !== undefined;
   const [ownExisting, setOwnExisting] = useState<OccurrenceWithSong[] | null>(
     null,
@@ -106,6 +113,17 @@ export function useImagerySuggestions(
     };
   }, [hasExternalExisting, songId]);
 
+  /** 意象名（小写）→ 词典条目；与预标注的匹配规则一致，大小写不敏感 */
+  const itemByName = useMemo(
+    () => new Map(items.map((i) => [i.name.toLowerCase(), i])),
+    [items],
+  );
+  const resolveName = useCallback(
+    (name: string): ImageryItem | null =>
+      itemByName.get(name.trim().toLowerCase()) ?? null,
+    [itemByName],
+  );
+
   const generate = useCallback(async () => {
     setGenerating(true);
     setMessage(null);
@@ -115,7 +133,10 @@ export function useImagerySuggestions(
       setAiNotes({});
       setDrafts(
         Object.fromEntries(
-          next.suggestions.map((s) => [s.imageryId, initialDraft(s)]),
+          next.suggestions.map((s) => [
+            s.imageryId,
+            initialDraft(s, resolveName(s.name)),
+          ]),
         ),
       );
     } catch (error) {
@@ -126,7 +147,7 @@ export function useImagerySuggestions(
     } finally {
       setGenerating(false);
     }
-  }, [songId]);
+  }, [resolveName, songId]);
 
   const updateDraft = useCallback(
     (imageryId: number, patch: Partial<SuggestionDraft>) =>
@@ -145,25 +166,14 @@ export function useImagerySuggestions(
     });
   }, []);
 
-  /** 意象名（小写）→ 词典条目；与预标注的匹配规则一致，大小写不敏感 */
-  const dictionaryByName = useMemo(
-    () =>
-      new Map((result?.dictionary ?? []).map((d) => [d.name.toLowerCase(), d])),
-    [result],
-  );
-  const resolveName = useCallback(
-    (name: string): DictionaryOption | null =>
-      dictionaryByName.get(name.trim().toLowerCase()) ?? null,
-    [dictionaryByName],
-  );
   const existingImageryIds = useMemo(
     () => new Set((existing ?? []).map((o) => o.imagery_id)),
     [existing],
   );
 
   /**
-   * 把候选改成另一个意象。改成词典里已有的意象时，分类切换为它最常用的分类；
-   * 新意象或没有历史分类的意象沿用当前分类（改名多为近义替换，如「雪花」→「雪」）。
+   * 把候选改成另一个词。改成词典里已有的词时，母题切换为它登记的默认母题；
+   * 新词沿用当前母题（改名多为近义替换，如「雪花」→「雪」）。
    */
   const rename = useCallback(
     (imageryId: number, name: string) => {
@@ -176,7 +186,7 @@ export function useImagerySuggestions(
             ...draft,
             name: name.trim(),
             checked: true,
-            categoryId: entry?.categoryIds[0] ?? draft.categoryId,
+            categoryId: (entry && wordMotifIds(entry)[0]) ?? draft.categoryId,
           },
         };
       });
@@ -249,12 +259,8 @@ export function useImagerySuggestions(
           }
         }
         for (const s of added) {
-          // 词典里已有的词优先用它的历史分类，比模型挑的更贴合现有标注习惯
-          const known = resolveName(s.name)?.categoryIds[0];
-          next[s.imageryId] = {
-            ...initialDraft(s),
-            categoryId: known ?? s.categoryIds[0] ?? null,
-          };
+          // 词典里已有的词用它登记的默认母题，比模型挑的更贴合现有标注
+          next[s.imageryId] = initialDraft(s, resolveName(s.name));
         }
         return next;
       });

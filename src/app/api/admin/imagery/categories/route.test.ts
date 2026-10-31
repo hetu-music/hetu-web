@@ -30,7 +30,7 @@ vi.mock("@/lib/server/server-utils", () => ({
 
 vi.mock("@/lib/server/service-imagery", () => ({
   getImageryCategories: vi.fn(),
-  createImageryCategory: vi.fn(),
+  createMotif: vi.fn(),
 }));
 
 vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
@@ -39,7 +39,7 @@ vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
 }));
 
 import {
-  createImageryCategory,
+  createMotif,
   getImageryCategories,
 } from "@/lib/server/service-imagery";
 import { GET, POST } from "./route";
@@ -57,7 +57,7 @@ beforeEach(() => {
   mockCsrfValid = true;
   mockSessionAccessToken = "test-token";
   vi.mocked(getImageryCategories).mockReset();
-  vi.mocked(createImageryCategory).mockReset();
+  vi.mocked(createMotif).mockReset();
 });
 
 describe("GET /api/admin/imagery/categories", () => {
@@ -77,35 +77,41 @@ describe("GET /api/admin/imagery/categories", () => {
 });
 
 describe("POST /api/admin/imagery/categories", () => {
+  const valid = { name: "汗", parent_id: 2, description: "汗水、汗珠" };
+
   it("name 为空时返回 400", async () => {
-    const res = await POST(jsonRequest("POST", { name: "" }));
+    const res = await POST(jsonRequest("POST", { ...valid, name: "" }));
     expect(res.status).toBe(400);
   });
 
-  it("parent_id 为非正整数时返回 400", async () => {
+  it("只能建母题：缺 parent_id 返回 400", async () => {
     const res = await POST(
-      jsonRequest("POST", { name: "分类", parent_id: -1 }),
+      jsonRequest("POST", { name: "汗", description: "汗水" }),
     );
     expect(res.status).toBe(400);
   });
 
-  it("层级超限（MAX_DEPTH_EXCEEDED）时映射为 400 而不是 500", async () => {
-    vi.mocked(createImageryCategory).mockRejectedValue(
-      Object.assign(new Error("分类最多支持 3 层"), {
-        code: "MAX_DEPTH_EXCEEDED",
+  it("说明必填", async () => {
+    const res = await POST(jsonRequest("POST", { ...valid, description: " " }));
+    expect(res.status).toBe(400);
+    expect(createMotif).not.toHaveBeenCalled();
+  });
+
+  it("父级不是类别（INVALID_PARENT）时映射为 400 而不是 500", async () => {
+    vi.mocked(createMotif).mockRejectedValue(
+      Object.assign(new Error("母题只能放在类别（第二级）下"), {
+        code: "INVALID_PARENT",
       }),
     );
-    const res = await POST(
-      jsonRequest("POST", { name: "子分类", parent_id: 1 }),
-    );
+    const res = await POST(jsonRequest("POST", valid));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe("分类最多支持 3 层");
+    expect(body.error).toBe("母题只能放在类别（第二级）下");
   });
 
   it("其他未预期错误时返回 500，不泄露内部错误码", async () => {
-    vi.mocked(createImageryCategory).mockRejectedValue(new Error("db down"));
-    const res = await POST(jsonRequest("POST", { name: "分类" }));
+    vi.mocked(createMotif).mockRejectedValue(new Error("db down"));
+    const res = await POST(jsonRequest("POST", valid));
     expect(res.status).toBe(500);
   });
 
@@ -118,7 +124,7 @@ describe("POST /api/admin/imagery/categories", () => {
       "http://localhost/api/admin/imagery/categories",
       {
         method: "POST",
-        body: JSON.stringify({ name: "分类" }),
+        body: JSON.stringify(valid),
         headers: {
           "content-type": "application/json",
           authorization: "Bearer valid.header.token",
@@ -127,18 +133,19 @@ describe("POST /api/admin/imagery/categories", () => {
     );
     const res = await POST(request);
     expect(res.status).toBe(401);
-    expect(createImageryCategory).not.toHaveBeenCalled();
+    expect(createMotif).not.toHaveBeenCalled();
   });
 
-  it("创建成功返回新分类", async () => {
-    vi.mocked(createImageryCategory).mockResolvedValue({
-      id: 1,
-      name: "分类",
-      parent_id: null,
-      level: 1,
-    } as never);
-    const res = await POST(jsonRequest("POST", { name: "分类" }));
+  it("创建成功返回新母题", async () => {
+    vi.mocked(createMotif).mockResolvedValue({
+      id: 9,
+      name: "汗",
+      parent_id: 2,
+      level: 3,
+      description: "汗水、汗珠",
+    });
+    const res = await POST(jsonRequest("POST", valid));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: 1, name: "分类" });
+    expect(await res.json()).toMatchObject({ id: 9, name: "汗" });
   });
 });

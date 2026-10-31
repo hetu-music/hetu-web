@@ -16,16 +16,14 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 
 import { getServiceClient, getUserClient } from "@/lib/db/supabase-server";
 import {
-  createImagery,
-  createImageryCategory,
+  createMotif,
   deleteOccurrence,
   getOccurrencesForImagery,
   getOccurrencesForSong,
-  createOccurrence,
   createOccurrencesBatch,
   getImageryWithCounts,
-  updateImagery,
-  updateImageryCategory,
+  setWordMotifs,
+  updateMotif,
   updateOccurrence,
   getImageryLastModified,
   resyncSongTimetags,
@@ -39,22 +37,7 @@ beforeEach(() => {
 });
 
 describe("getImageryWithCounts", () => {
-  it("categoryIds 里的数字字符串被转换，非数字字符串被过滤掉", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: [
-            { id: 1, name: "明月", count: 5, categoryIds: [1, "2", "abc"] },
-          ],
-          error: null,
-        }),
-      ]),
-    );
-    const result = await getImageryWithCounts();
-    expect(result[0].categoryIds).toEqual([1, 2]);
-  });
-
-  it("读含争议歌曲、含 0 次的全量视图", async () => {
+  it("读含争议歌曲、含 0 次的全量视图与词的母题登记", async () => {
     const client = createMockSupabaseClient([
       makeQueryBuilder({ data: [], error: null }),
     ]);
@@ -66,13 +49,13 @@ describe("getImageryWithCounts", () => {
     ]);
   });
 
-  it("motifIds 取登记的候选：默认母题在前，多义候选在后，不含并列组成", async () => {
+  it("母题只看登记：默认母题、多义候选、并列组成分开；没登记的词默认母题为 null", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({
           data: [
-            { id: 1, name: "烟花", count: 3, categoryIds: [5, 9] },
-            { id: 2, name: "新词", count: 0, categoryIds: [] },
+            { id: 1, name: "烟花", count: 3 },
+            { id: 2, name: "新词", count: null },
           ],
           error: null,
         }),
@@ -86,21 +69,24 @@ describe("getImageryWithCounts", () => {
         }),
       ]),
     );
-    const result = await getImageryWithCounts();
-    expect(result.map((r) => r.motifIds)).toEqual([[9, 5], []]);
-  });
-
-  it("categoryIds 里的 null 会被 Number(null) 转成 0 而不是被过滤（现有行为，非本次改动范围）", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: [{ id: 1, name: "明月", count: 5, categoryIds: [1, null] }],
-          error: null,
-        }),
-      ]),
-    );
-    const result = await getImageryWithCounts();
-    expect(result[0].categoryIds).toEqual([1, 0]);
+    expect(await getImageryWithCounts()).toEqual([
+      {
+        id: 1,
+        name: "烟花",
+        count: 3,
+        primary: 9,
+        alternatives: [5],
+        parts: [7],
+      },
+      {
+        id: 2,
+        name: "新词",
+        count: 0,
+        primary: null,
+        alternatives: [],
+        parts: [],
+      },
+    ]);
   });
 
   it("service client 不可用时返回空数组", async () => {
@@ -161,207 +147,149 @@ describe("getOccurrencesForImagery（数据行映射）", () => {
   });
 });
 
-describe("createImageryCategory（层级深度校验）", () => {
-  it("父分类已是 L3 时拒绝创建（最多 3 层）", async () => {
+describe("createMotif / updateMotif（只增改第三级）", () => {
+  it("挂在类别（第二级）下时创建，level 固定为 3", async () => {
+    const insertBuilder = makeQueryBuilder({
+      data: { id: 9, name: "汗", parent_id: 2, level: 3, description: "汗水" },
+      error: null,
+    });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        makeQueryBuilder({ data: { level: 3 }, error: null }), // 查父分类 level
-      ]),
-    );
-    await expect(
-      createImageryCategory(
-        { name: "子分类", parent_id: 1, description: null },
-        "token",
-      ),
-    ).rejects.toMatchObject({ code: "MAX_DEPTH_EXCEEDED" });
-  });
-
-  it("父分类为 L2 时允许创建 L3 子分类", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { level: 2 }, error: null }), // 查父分类 level
-        makeQueryBuilder({
-          data: { id: 5, name: "子分类", parent_id: 1, level: 3 },
-          error: null,
-        }), // 插入
-      ]),
-    );
-    const created = await createImageryCategory(
-      { name: "子分类", parent_id: 1, description: null },
-      "token",
-    );
-    expect(created).toMatchObject({ id: 5, level: 3 });
-  });
-
-  it("无 parent_id（顶级分类）时跳过深度校验，直接创建", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: { id: 1, name: "顶级", parent_id: null, level: 1 },
-          error: null,
-        }),
-      ]),
-    );
-    const created = await createImageryCategory(
-      { name: "顶级", description: null },
-      "token",
-    );
-    expect(created).toMatchObject({ level: 1 });
-  });
-});
-
-describe("updateImageryCategory（父子层级一致性校验）", () => {
-  it("改为顶级（parent_id: null）但当前不是 L1 时拒绝", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { level: 2 }, error: null }), // 查当前分类 level
-      ]),
-    );
-    await expect(
-      updateImageryCategory(1, { parent_id: null }, "token"),
-    ).rejects.toMatchObject({ code: "INVALID_PARENT_LEVEL" });
-  });
-
-  it("改为顶级且当前就是 L1 时允许", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { level: 1 }, error: null }), // 当前 level
-        makeQueryBuilder({
-          data: { id: 1, parent_id: null, level: 1 },
-          error: null,
-        }), // 更新
-      ]),
-    );
-    const updated = await updateImageryCategory(
-      1,
-      { parent_id: null },
-      "token",
-    );
-    expect(updated).toMatchObject({ parent_id: null });
-  });
-
-  it("新父分类与当前分类不同级（相差不为 1）时拒绝", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { level: 3 }, error: null }), // 当前 level=3
-        makeQueryBuilder({ data: { level: 3 }, error: null }), // 新父 level=3（应为2）
-      ]),
-    );
-    await expect(
-      updateImageryCategory(1, { parent_id: 2 }, "token"),
-    ).rejects.toMatchObject({ code: "INVALID_PARENT_LEVEL" });
-  });
-
-  it("新父分类恰好同级（相差 1）时允许", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { level: 3 }, error: null }), // 当前 level=3
-        makeQueryBuilder({ data: { level: 2 }, error: null }), // 新父 level=2
-        makeQueryBuilder({
-          data: { id: 1, parent_id: 2, level: 3 },
-          error: null,
-        }), // 更新
-      ]),
-    );
-    const updated = await updateImageryCategory(1, { parent_id: 2 }, "token");
-    expect(updated).toMatchObject({ parent_id: 2 });
-  });
-
-  it("不传 parent_id 时完全跳过层级校验", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { id: 1, name: "改名" }, error: null }), // 直接更新
-      ]),
-    );
-    const updated = await updateImageryCategory(1, { name: "改名" }, "token");
-    expect(updated).toMatchObject({ name: "改名" });
-  });
-});
-
-describe("createOccurrence（叶子分类校验）", () => {
-  it("分类下还有子分类（非叶子）时拒绝挂载意象", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ id: 99 }], error: null }), // 存在子分类
-      ]),
-    );
-    await expect(
-      createOccurrence({ song_id: 1, imagery_id: 2, category_id: 3 }, "token"),
-    ).rejects.toMatchObject({ code: "NOT_LEAF_CATEGORY" });
-  });
-
-  it("词不在歌词里时拒绝", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [], error: null }), // 是叶子
-        makeQueryBuilder({ data: { lyrics: "[00:01.00]清风" }, error: null }),
-        makeQueryBuilder({ data: [], error: null }), // 该歌已有标注
-        makeQueryBuilder({ data: [{ name: "明月" }], error: null }),
-      ]),
-    );
-    await expect(
-      createOccurrence({ song_id: 1, imagery_id: 2, category_id: 3 }, "token"),
-    ).rejects.toMatchObject({ code: "IMAGERY_NOT_IN_LYRICS" });
-  });
-
-  it("叶子分类时正常创建，按歌词写入时间标签，返回带关联信息的完整记录", async () => {
-    const lyrics = { data: { lyrics: "[00:01.00]明月照我" }, error: null };
-    const updateBuilder = makeQueryBuilder({ data: null, error: null });
-    const insertBuilder = makeQueryBuilder({ data: { id: 7 }, error: null });
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [], error: null }), // 无子分类，是叶子
-        makeQueryBuilder(lyrics),
-        makeQueryBuilder({ data: [], error: null }), // 该歌还没有标注
-        makeQueryBuilder({ data: [{ name: "明月" }], error: null }),
-        makeQueryBuilder({
-          data: [{ imagery_id: 2, category_id: 3, role: "primary" }],
-          error: null,
-        }), // 该词已登记这个母题
+        makeQueryBuilder({ data: { level: 2 }, error: null }),
         insertBuilder,
-        makeQueryBuilder(lyrics), // 重算时间标签
+      ]),
+    );
+    const created = await createMotif(
+      { name: "汗", parent_id: 2, description: "汗水" },
+      "token",
+    );
+    expect(insertBuilder.insert).toHaveBeenCalledWith({
+      name: "汗",
+      parent_id: 2,
+      description: "汗水",
+      level: 3,
+    });
+    expect(created).toMatchObject({ id: 9, level: 3 });
+  });
+
+  it("父级是门类或母题时拒绝", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: { level: 1 }, error: null }),
+      ]),
+    );
+    await expect(
+      createMotif({ name: "汗", parent_id: 1, description: "汗水" }, "token"),
+    ).rejects.toMatchObject({ code: "INVALID_PARENT" });
+  });
+
+  it("不能改门类、类别", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: [{ id: 2, level: 2 }], error: null }),
+      ]),
+    );
+    await expect(
+      updateMotif(2, { name: "身体部位" }, "token"),
+    ).rejects.toMatchObject({ code: "NOT_MOTIF" });
+  });
+
+  it("移到别的类别下要校验新父级", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: [{ id: 9, level: 3 }], error: null }),
+        makeQueryBuilder({ data: { level: 3 }, error: null }), // 新父级是母题
+      ]),
+    );
+    await expect(
+      updateMotif(9, { parent_id: 10 }, "token"),
+    ).rejects.toMatchObject({ code: "INVALID_PARENT" });
+  });
+});
+
+describe("setWordMotifs（改写词的候选母题）", () => {
+  const motifRows = (ids: number[]) =>
+    makeQueryBuilder({
+      data: ids.map((id) => ({ id, level: 3 })),
+      error: null,
+    });
+
+  it("换默认母题、去掉没标注的候选：先删、再把旧默认降为多义、最后写入", async () => {
+    const remove = makeQueryBuilder({ data: null, error: null });
+    const demote = makeQueryBuilder({ data: null, error: null });
+    const upsert = makeQueryBuilder({ data: null, error: null });
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        motifRows([10, 20]),
         makeQueryBuilder({
           data: [
-            {
-              id: 7,
-              imagery_id: 2,
-              lyric_timetag: [],
-              imagery: { name: "明月" },
-            },
+            { category_id: 10, role: "primary" },
+            { category_id: 20, role: "alternative" },
+            { category_id: 30, role: "alternative" },
           ],
           error: null,
         }),
-        updateBuilder,
         makeQueryBuilder({
-          data: {
-            id: 7,
-            song_id: 1,
-            imagery_id: 2,
-            category_id: 3,
-            lyric_timetag: [],
-            music: { title: "标题" },
-            imagery: null,
-            imagery_categories: null,
-          },
+          data: [{ category_id: 10 }, { category_id: 20 }],
           error: null,
-        }), // 回查完整记录
+        }),
+        remove,
+        demote,
+        upsert,
       ]),
     );
-    const result = await createOccurrence(
-      { song_id: 1, imagery_id: 2, category_id: 3 },
+    await setWordMotifs(
+      7,
+      { primary: 20, alternatives: [10], parts: [] },
       "token",
     );
-    expect(result).toMatchObject({ id: 7, song_title: "标题" });
-    expect(insertBuilder.insert).toHaveBeenCalledWith({
-      song_id: 1,
-      imagery_id: 2,
-      category_id: 3,
-      lyric_timetag: [],
-    });
-    expect(updateBuilder.update).toHaveBeenCalledWith({
-      lyric_timetag: ["00:01.00"],
-    });
-    expect(updateBuilder.eq).toHaveBeenCalledWith("id", 7);
+    expect(remove.in).toHaveBeenCalledWith("category_id", [30]);
+    expect(demote.update).toHaveBeenCalledWith({ role: "alternative" });
+    expect(demote.eq).toHaveBeenCalledWith("category_id", 10);
+    expect(upsert.upsert).toHaveBeenCalledWith(
+      [
+        { imagery_id: 7, category_id: 10, role: "alternative" },
+        { imagery_id: 7, category_id: 20, role: "primary" },
+      ],
+      { onConflict: "imagery_id,category_id" },
+    );
+  });
+
+  it("要去掉的母题下还有这个词的标注时拒绝", async () => {
+    const client = createMockSupabaseClient([
+      motifRows([10]),
+      makeQueryBuilder({
+        data: [
+          { category_id: 10, role: "primary" },
+          { category_id: 20, role: "alternative" },
+        ],
+        error: null,
+      }),
+      makeQueryBuilder({ data: [{ category_id: 20 }], error: null }),
+    ]);
+    vi.mocked(getUserClient).mockReturnValue(client);
+    await expect(
+      setWordMotifs(7, { primary: 10, alternatives: [], parts: [] }, "token"),
+    ).rejects.toMatchObject({ code: "MOTIF_IN_USE" });
+    expect(client.from).toHaveBeenCalledTimes(3);
+  });
+
+  it("同一母题登记两次时拒绝，不访问数据库", async () => {
+    await expect(
+      setWordMotifs(7, { primary: 10, alternatives: [10], parts: [] }, "token"),
+    ).rejects.toMatchObject({ code: "DUPLICATE_MOTIF" });
+    expect(getUserClient).not.toHaveBeenCalled();
+  });
+
+  it("只能登记母题（第三级）", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: [{ id: 2, level: 2 }], error: null }),
+      ]),
+    );
+    await expect(
+      setWordMotifs(7, { primary: 2, alternatives: [], parts: [] }, "token"),
+    ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 });
 
@@ -370,7 +298,12 @@ describe("createOccurrencesBatch", () => {
     { imagery_id: 1, category_id: 10 },
     { imagery_id: 2, category_id: 10 },
   ];
-  const leafOk = () => makeQueryBuilder({ data: [], error: null });
+  // 校验母题：用到的都是第三级
+  const motifOk = () =>
+    makeQueryBuilder({
+      data: [10, 11, 12, 20].map((id) => ({ id, level: 3 })),
+      error: null,
+    });
   const published = () => makeQueryBuilder({ data: { id: 5 }, error: null });
   // 歌词没有时间轴：不拦、不重算，测的是其余逻辑。依次是歌词、已有标注、按 id 查的词名
   const lyricsCheck = (byId = true) => [
@@ -387,7 +320,7 @@ describe("createOccurrencesBatch", () => {
     const insertBuilder = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        leafOk(),
+        motifOk(),
         published(),
         ...lyricsCheck(),
         makeQueryBuilder({ data: [{ imagery_id: 1 }], error: null }), // 已有标注
@@ -416,7 +349,7 @@ describe("createOccurrencesBatch", () => {
     const insertBuilder = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        leafOk(),
+        motifOk(),
         published(),
         ...lyricsCheck(),
         makeQueryBuilder({ data: [{ id: 3, name: "月" }], error: null }), // 按名查找
@@ -460,20 +393,21 @@ describe("createOccurrencesBatch", () => {
     ]);
   });
 
-  it("非叶子分类时拒绝整批", async () => {
+  it("有一项不是母题（第三级）时拒绝整批", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ id: 99 }], error: null }),
+        // 空着的二级分类也没有子分类，原先按「叶子」判断会放过
+        makeQueryBuilder({ data: [{ id: 10, level: 2 }], error: null }),
       ]),
     );
     await expect(
       createOccurrencesBatch(5, items, "token"),
-    ).rejects.toMatchObject({ code: "NOT_LEAF_CATEGORY" });
+    ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 
   it("歌曲未发布时在创建意象之前就拒绝", async () => {
     const client = createMockSupabaseClient([
-      leafOk(),
+      motifOk(),
       makeQueryBuilder({ data: null, error: null }), // 正式曲库中没有
     ]);
     vi.mocked(getUserClient).mockReturnValue(client);
@@ -489,7 +423,7 @@ describe("createOccurrencesBatch", () => {
 
   it("词不在歌词里时在创建意象之前就拒绝", async () => {
     const client = createMockSupabaseClient([
-      leafOk(),
+      motifOk(),
       published(),
       makeQueryBuilder({ data: { lyrics: "[00:01.00]明月" }, error: null }),
       makeQueryBuilder({ data: [], error: null }),
@@ -513,7 +447,7 @@ describe("createOccurrencesBatch", () => {
     const insertBuilder = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        leafOk(),
+        motifOk(),
         published(),
         ...lyricsCheck(),
         noExisting(),
@@ -544,7 +478,7 @@ describe("createOccurrencesBatch", () => {
   it("插入时 song_id 外键失败也提示先发布歌曲", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        leafOk(),
+        motifOk(),
         published(),
         ...lyricsCheck(),
         noExisting(),
@@ -577,67 +511,117 @@ describe("createOccurrencesBatch", () => {
   });
 });
 
-describe("createImagery / updateImagery", () => {
-  it("createImagery：user client 不可用时抛异常", async () => {
-    vi.mocked(getUserClient).mockReturnValue(null);
-    await expect(createImagery("明月", "token")).rejects.toThrow();
-  });
+describe("updateOccurrence / deleteOccurrence", () => {
+  const relations = () =>
+    makeQueryBuilder({
+      data: {
+        id: 1,
+        song_id: 1,
+        imagery_id: 2,
+        category_id: 20,
+        lyric_timetag: [],
+        music: null,
+        imagery: null,
+        imagery_categories: null,
+      },
+      error: null,
+    });
 
-  it("createImagery：插入出错时把 supabase error 原样抛出", async () => {
-    const dbError = { message: "duplicate" };
+  it("改挂到非母题时拒绝", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        makeQueryBuilder({ data: null, error: dbError }),
-      ]),
-    );
-    await expect(createImagery("明月", "token")).rejects.toBe(dbError);
-  });
-
-  it("updateImagery：更新成功返回新数据", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { id: 1, name: "新名字" }, error: null }),
-      ]),
-    );
-    const result = await updateImagery(1, "新名字", "token");
-    expect(result).toMatchObject({ name: "新名字" });
-  });
-});
-
-describe("updateOccurrence / deleteOccurrence（叶子分类校验同样适用于更新）", () => {
-  it("更新时切换到非叶子分类会被拒绝", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ id: 1 }], error: null }), // 目标分类下还有子分类
+        makeQueryBuilder({ data: [{ id: 5, level: 2 }], error: null }),
       ]),
     );
     await expect(
       updateOccurrence(1, { category_id: 5 }, "token"),
-    ).rejects.toMatchObject({ code: "NOT_LEAF_CATEGORY" });
+    ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 
-  it("不改 category_id 时跳过叶子校验，直接更新", async () => {
+  it("词在原母题下已没有标注、原母题是它的默认母题时，默认母题跟到新母题上", async () => {
+    const unregister = makeQueryBuilder({ data: null, error: null });
+    const promote = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        makeQueryBuilder({ data: { song_id: 1, imagery_id: 2 }, error: null }), // 当前
-        makeQueryBuilder({ data: { id: 1 }, error: null }), // 更新
+        makeQueryBuilder({ data: [{ id: 20, level: 3 }], error: null }),
         makeQueryBuilder({
-          data: {
-            id: 1,
-            song_id: 1,
-            imagery_id: 2,
-            category_id: 3,
-            lyric_timetag: [],
-            music: null,
-            imagery: null,
-            imagery_categories: null,
-          },
+          data: { song_id: 1, imagery_id: 2, category_id: 10 },
           error: null,
-        }), // 回查
+        }), // 当前：「汗」挂在母题汗（10）
+        makeQueryBuilder({
+          data: [{ imagery_id: 2, category_id: 10, role: "primary" }],
+          error: null,
+        }), // 登记
+        makeQueryBuilder({ data: null, error: null }), // 登记身躯为多义候选
+        makeQueryBuilder({ data: { id: 1 }, error: null }), // 更新
+        makeQueryBuilder({ data: { role: "primary" }, error: null }), // 原母题的登记
+        makeQueryBuilder({ data: [], error: null }), // 原母题下已没有标注
+        unregister,
+        promote,
+        relations(),
       ]),
     );
-    const result = await updateOccurrence(1, { imagery_id: 2 }, "token");
-    expect(result).toMatchObject({ id: 1 });
+    await updateOccurrence(1, { category_id: 20 }, "token");
+    expect(unregister.delete).toHaveBeenCalled();
+    expect(unregister.eq).toHaveBeenCalledWith("category_id", 10);
+    expect(promote.upsert).toHaveBeenCalledWith(
+      { imagery_id: 2, category_id: 20, role: "primary" },
+      { onConflict: "imagery_id,category_id" },
+    );
+  });
+
+  it("原母题下还有这个词的标注时，默认母题不动", async () => {
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: [{ id: 20, level: 3 }], error: null }),
+      makeQueryBuilder({
+        data: { song_id: 1, imagery_id: 2, category_id: 10 },
+        error: null,
+      }),
+      makeQueryBuilder({
+        data: [{ imagery_id: 2, category_id: 10, role: "primary" }],
+        error: null,
+      }),
+      makeQueryBuilder({ data: null, error: null }),
+      makeQueryBuilder({ data: { id: 1 }, error: null }),
+      makeQueryBuilder({ data: { role: "primary" }, error: null }),
+      makeQueryBuilder({ data: [{ id: 5 }], error: null }), // 别的歌还挂在原母题
+      relations(),
+    ]);
+    vi.mocked(getUserClient).mockReturnValue(client);
+    await updateOccurrence(1, { category_id: 20 }, "token");
+    expect(client.from).toHaveBeenCalledTimes(8);
+  });
+
+  it("换成词典里没有的词：核对歌词后创建，再改这条标注", async () => {
+    const createWord = makeQueryBuilder({
+      data: [{ id: 31, name: "孤灯" }],
+      error: null,
+    });
+    const update = makeQueryBuilder({ data: { id: 1 }, error: null });
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({
+          data: { song_id: 1, imagery_id: 2, category_id: 10 },
+          error: null,
+        }), // 当前
+        makeQueryBuilder({ data: { lyrics: null }, error: null }), // 核对歌词：没有时间轴
+        makeQueryBuilder({ data: [], error: null }),
+        makeQueryBuilder({ data: [], error: null }), // 按名查找
+        createWord,
+        makeQueryBuilder({ data: [], error: null }), // 新词还没有登记
+        makeQueryBuilder({ data: null, error: null }), // 登记默认母题
+        update,
+        makeQueryBuilder({ data: { lyrics: null }, error: null }), // 重算时间标签
+        makeQueryBuilder({ data: [], error: null }),
+        relations(),
+      ]),
+    );
+    await updateOccurrence(1, { imagery_name: "孤灯" }, "token");
+    expect(createWord.insert).toHaveBeenCalledWith([{ name: "孤灯" }]);
+    expect(update.update).toHaveBeenCalledWith({
+      imagery_id: 31,
+      category_id: 10,
+    });
   });
 
   it("deleteOccurrence 后重算整首：被删长词覆盖的短词拿回那几行", async () => {

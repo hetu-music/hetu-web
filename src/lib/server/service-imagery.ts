@@ -313,68 +313,172 @@ async function getOccurrenceWithRelationsById(id: number, accessToken: string) {
   return mapOccurrenceRow(data as Record<string, unknown>);
 }
 
-// ─── 整理：删掉没挂词的母题 ───────────────────────────────────────────────────
+// ─── 整理：删掉没有标注的母题 ─────────────────────────────────────────────────
+
+export type UnusedMotifWord = {
+  id: number;
+  name: string;
+  role: "primary" | "alternative" | "part";
+  /**
+   * 只对默认母题有：母题删掉后这个词改用的默认母题，取它其余候选里标注最多的；
+   * 没有候选时取标注里用得最多的母题。null 表示无可替换，删后这个词没有默认母题
+   */
+  promoteTo?: { id: number; name: string } | null;
+};
+
+/** 可以整理掉的母题，连同登记了它的词（删母题时这些登记一并删掉） */
+export type UnusedMotif = ImageryCategory & { words: UnusedMotifWord[] };
 
 /**
- * 没用上的母题：第三级、没有子分类、imagery_motifs 里没有词登记、也没有标注指向它。
+ * 没用上的母题：第三级、没有子分类、没有标注指向它。
+ * 词登记不算用上：标注改挂别的母题后，原来自动登记的默认母题会留在 imagery_motifs 里
+ * （「汗」先标了母题汗、后改成身躯，汗仍是它的默认母题），整理时把登记一并处理掉。
  * 第一、二级是门类与类别，增减要先讨论（见 IMAGERY.md），不在整理范围内。
  */
-async function findUnusedMotifs(
-  supabase: UserClient,
-): Promise<ImageryCategory[]> {
+async function findUnusedMotifs(supabase: UserClient): Promise<UnusedMotif[]> {
   const [categories, motifs, occurrences] = await Promise.all([
     fetchAll<ImageryCategory>(
       supabase,
       TABLES.IMAGERY_CAT,
       "id,name,parent_id,level,description",
     ),
-    fetchAll<{ category_id: number }>(
+    fetchAll<MotifEntry>(
       supabase,
       TABLES.IMAGERY_MOTIFS,
-      "category_id",
+      "imagery_id,category_id,role",
     ),
-    fetchAll<{ category_id: number }>(
+    fetchAll<{ imagery_id: number; category_id: number }>(
       supabase,
       TABLES.IMAGERY_OCC,
-      "category_id",
+      "imagery_id,category_id",
     ),
   ]);
-  const used = new Set([
-    ...motifs.map((m) => m.category_id),
-    ...occurrences.map((o) => o.category_id),
-    ...categories.map((c) => c.parent_id),
-  ]);
-  return categories.filter((c) => c.level === 3 && !used.has(c.id));
+  const annotated = new Set(occurrences.map((o) => o.category_id));
+  const parents = new Set(categories.map((c) => c.parent_id));
+  const unused = categories.filter(
+    (c) => c.level === 3 && !annotated.has(c.id) && !parents.has(c.id),
+  );
+  if (unused.length === 0) return [];
+
+  const unusedIds = new Set(unused.map((c) => c.id));
+  const registrations = motifs.filter((m) => unusedIds.has(m.category_id));
+  const wordIds = [...new Set(registrations.map((m) => m.imagery_id))];
+  const wordName = new Map<number, string>();
+  if (wordIds.length > 0) {
+    const { data, error } = await supabase
+      .from(TABLES.IMAGERY)
+      .select("id,name")
+      .in("id", wordIds);
+    if (error) throw error;
+    for (const row of (data ?? []) as { id: number; name: string }[]) {
+      wordName.set(row.id, row.name);
+    }
+  }
+
+  const catName = new Map(categories.map((c) => [c.id, c.name]));
+  const promoteTo = (wordId: number) => {
+    const counts = new Map<number, number>();
+    for (const o of occurrences) {
+      if (o.imagery_id !== wordId) continue;
+      counts.set(o.category_id, (counts.get(o.category_id) ?? 0) + 1);
+    }
+    const alternatives = motifs
+      .filter(
+        (m) =>
+          m.imagery_id === wordId &&
+          m.role === "alternative" &&
+          !unusedIds.has(m.category_id),
+      )
+      .map((m) => m.category_id);
+    const pool = alternatives.length > 0 ? alternatives : [...counts.keys()];
+    const [id] = pool.sort(
+      (a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0),
+    );
+    return id === undefined ? null : { id, name: catName.get(id) ?? `#${id}` };
+  };
+
+  return unused.map((c) => ({
+    ...c,
+    words: registrations
+      .filter((m) => m.category_id === c.id)
+      .map((m) => ({
+        id: m.imagery_id,
+        name: wordName.get(m.imagery_id) ?? `#${m.imagery_id}`,
+        role: m.role,
+        ...(m.role === "primary" ? { promoteTo: promoteTo(m.imagery_id) } : {}),
+      })),
+  }));
 }
 
 export async function getUnusedMotifs(
   accessToken: string,
-): Promise<ImageryCategory[]> {
+): Promise<UnusedMotif[]> {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
   return findUnusedMotifs(supabase);
 }
 
 /**
- * 删掉选中的空母题。删之前按当前数据重查一遍：列表打开后又挂上词的母题不删。
- * 返回实际删掉的 id（权限不够时 RLS 会静默不删，这里能看出来）。
+ * 删掉选中的空母题。删之前按当前数据重查一遍：列表打开后又有了标注的母题不删。
+ *
+ * 顺序：先删这些母题的词登记（category_id 是 on delete restrict），再给默认母题被删的词
+ * 换上新的默认母题（每词只能有一个 primary，所以要在删之后），最后删母题。
+ * 返回实际删掉的 id（权限不够时 RLS 会静默不删，这里能看出来）与换了默认母题的词。
  */
 export async function deleteUnusedMotifs(
   ids: readonly number[],
   accessToken: string,
-): Promise<number[]> {
+): Promise<{
+  deleted: number[];
+  promoted: Array<{ word: string; motif: string }>;
+}> {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
-  const unused = new Set((await findUnusedMotifs(supabase)).map((c) => c.id));
-  const targets = ids.filter((id) => unused.has(id));
-  if (targets.length === 0) return [];
+  const wanted = new Set(ids);
+  const targets = (await findUnusedMotifs(supabase)).filter((c) =>
+    wanted.has(c.id),
+  );
+  if (targets.length === 0) return { deleted: [], promoted: [] };
+  const targetIds = targets.map((c) => c.id);
+
+  if (targets.some((c) => c.words.length > 0)) {
+    const { error } = await supabase
+      .from(TABLES.IMAGERY_MOTIFS)
+      .delete()
+      .in("category_id", targetIds);
+    if (error) throw error;
+  }
+
+  const promotions = targets.flatMap((c) =>
+    c.words.flatMap((w) =>
+      w.role === "primary" && w.promoteTo
+        ? [{ imagery_id: w.id, word: w.name, motif: w.promoteTo }]
+        : [],
+    ),
+  );
+  if (promotions.length > 0) {
+    // 换上的多半原本是多义候选，已有这一行，改 role 即可
+    const { error } = await supabase.from(TABLES.IMAGERY_MOTIFS).upsert(
+      promotions.map((p) => ({
+        imagery_id: p.imagery_id,
+        category_id: p.motif.id,
+        role: "primary" as const,
+      })),
+      { onConflict: "imagery_id,category_id" },
+    );
+    if (error) throw error;
+  }
+
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_CAT)
     .delete()
-    .in("id", targets)
+    .in("id", targetIds)
     .select("id");
   if (error) throw error;
-  return ((data ?? []) as { id: number }[]).map((r) => r.id);
+  return {
+    deleted: ((data ?? []) as { id: number }[]).map((r) => r.id),
+    promoted: promotions.map((p) => ({ word: p.word, motif: p.motif.name })),
+  };
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────

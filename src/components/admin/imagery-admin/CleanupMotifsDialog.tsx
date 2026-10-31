@@ -8,7 +8,10 @@ import {
   apiDeleteUnusedMotifs,
   apiGetUnusedMotifs,
 } from "@/lib/api/client-api";
-import type { ImageryCategory } from "@/lib/types";
+import type {
+  UnusedMotif,
+  UnusedMotifWord,
+} from "@/lib/server/service-imagery";
 import { EmptyState, ErrorState, LoadingState } from "../kit/parts";
 import {
   META_CLASS,
@@ -17,9 +20,25 @@ import {
 } from "../kit/styles";
 import { notify, notifyError } from "../kit/toast";
 
+const ROLE_LABEL: Record<UnusedMotifWord["role"], string> = {
+  primary: "默认母题",
+  alternative: "多义候选",
+  part: "并列组成",
+};
+
+/** 「汗」默认母题，删后改为 身躯 */
+function describeWord(word: UnusedMotifWord): string {
+  const base = `「${word.name}」${ROLE_LABEL[word.role]}`;
+  if (word.role !== "primary") return `${base}，解除登记`;
+  return word.promoteTo
+    ? `${base}，删后改为 ${word.promoteTo.name}`
+    : `${base}，删后没有可用的默认母题，需另行指定`;
+}
+
 /**
- * 整理分类：列出没挂词、也没有标注的母题，勾选后删掉。
- * 默认全选；新建了还没来得及挂词的母题可以取消勾选留下。
+ * 整理分类：列出没有标注的母题，勾选后删掉。
+ * 默认全选；新建了还没来得及标注的母题可以取消勾选留下。
+ * 登记了这些母题的词一并列出：登记随母题删掉，默认母题被删的词改用别的候选。
  */
 export function CleanupMotifsDialog({
   open,
@@ -44,7 +63,7 @@ export function CleanupMotifsDialog({
   const [deleting, setDeleting] = useState(false);
 
   const groups = useMemo(() => {
-    const byParent = new Map<number | null, ImageryCategory[]>();
+    const byParent = new Map<number | null, UnusedMotif[]>();
     for (const motif of unused.data ?? []) {
       const list = byParent.get(motif.parent_id) ?? [];
       list.push(motif);
@@ -79,21 +98,26 @@ export function CleanupMotifsDialog({
     if (selected.length === 0 || deleting) return;
     setDeleting(true);
     try {
-      const { deleted } = await apiDeleteUnusedMotifs(selected);
+      const { deleted, promoted } = await apiDeleteUnusedMotifs(selected);
       if (deleted.length > 0) onDeleted(deleted);
       const kept = selected.length - deleted.length;
       if (deleted.length === 0) {
         notify({
           type: "error",
-          text: "一个都没删掉：可能刚挂上了词，或没有删除权限",
+          text: "一个都没删掉：可能刚有了标注，或没有删除权限",
         });
       } else {
+        const changed = promoted.map((p) => `「${p.word}」→ ${p.motif}`);
         notify({
           type: "success",
-          text:
+          text: [
             kept > 0
-              ? `已删除 ${deleted.length} 个母题，另有 ${kept} 个刚挂上了词或没删成，已保留`
+              ? `已删除 ${deleted.length} 个母题，另有 ${kept} 个刚有了标注或没删成，已保留`
               : `已删除 ${deleted.length} 个母题`,
+            changed.length > 0 ? `默认母题改为：${changed.join("、")}` : "",
+          ]
+            .filter(Boolean)
+            .join("；"),
         });
       }
       close();
@@ -143,7 +167,7 @@ export function CleanupMotifsDialog({
         <div className="space-y-6">
           <p className="text-sm text-slate-500 dark:text-slate-400">
             以下 {unused.data.length}{" "}
-            个母题没有词登记，也没有标注指向，可以删掉。只列第三级，门类与类别不动。
+            个母题没有任何标注，可以删掉。只列第三级，门类与类别不动。登记了它们的词会解除登记；以它为默认母题的词，改用其余候选里标注最多的。
           </p>
 
           {groups.map((group) => (
@@ -166,6 +190,11 @@ export function CleanupMotifsDialog({
                         {motif.description && (
                           <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">
                             {motif.description}
+                          </span>
+                        )}
+                        {motif.words.length > 0 && (
+                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                            {motif.words.map(describeWord).join("；")}
                           </span>
                         )}
                       </span>

@@ -797,42 +797,81 @@ describe("resyncSongTimetags（发布新歌词后重算）", () => {
 describe("整理空母题", () => {
   const categories = [
     { id: 1, name: "自然", parent_id: null, level: 1, description: null },
-    { id: 2, name: "天象", parent_id: 1, level: 2, description: null },
+    { id: 2, name: "身体", parent_id: 1, level: 2, description: null },
     { id: 3, name: "空类", parent_id: 1, level: 2, description: null },
-    { id: 10, name: "月", parent_id: 2, level: 3, description: null },
-    { id: 11, name: "星", parent_id: 2, level: 3, description: null },
+    { id: 10, name: "汗", parent_id: 2, level: 3, description: null },
+    { id: 11, name: "身躯", parent_id: 2, level: 3, description: null },
     { id: 12, name: "虹", parent_id: 2, level: 3, description: null },
-    { id: 13, name: "霓", parent_id: 2, level: 3, description: null },
   ];
-  // 月有词登记，星只有标注，虹、霓都空着；空着的二级分类不动
+  // 「汗」先挂母题汗、后改成身躯：汗仍是它的默认母题，但已没有标注
   const lookups = () => [
     makeQueryBuilder({ data: categories, error: null }),
-    makeQueryBuilder({ data: [{ category_id: 10 }], error: null }),
-    makeQueryBuilder({ data: [{ category_id: 11 }], error: null }),
+    makeQueryBuilder({
+      data: [
+        { imagery_id: 1, category_id: 10, role: "primary" },
+        { imagery_id: 1, category_id: 11, role: "alternative" },
+      ],
+      error: null,
+    }),
+    makeQueryBuilder({
+      data: [{ imagery_id: 1, category_id: 11 }],
+      error: null,
+    }),
+    makeQueryBuilder({ data: [{ id: 1, name: "汗" }], error: null }),
   ];
 
-  it("只列第三级里没有词登记、也没有标注的", async () => {
+  it("没有标注的第三级都列出，只剩词登记的也算；空着的二级分类不动", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient(lookups()),
     );
     const result = await getUnusedMotifs("token");
-    expect(result.map((c) => c.id)).toEqual([12, 13]);
+    expect(result.map((c) => c.id)).toEqual([10, 12]);
+    expect(result[0].words).toEqual([
+      {
+        id: 1,
+        name: "汗",
+        role: "primary",
+        promoteTo: { id: 11, name: "身躯" },
+      },
+    ]);
+    expect(result[1].words).toEqual([]);
   });
 
-  it("删除前重查：已经用上的不删，返回实际删掉的 id", async () => {
-    const deleteBuilder = makeQueryBuilder({ data: [{ id: 12 }], error: null });
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([...lookups(), deleteBuilder]),
+  it("删除：先删登记，再把多义候选提为默认母题，最后删母题", async () => {
+    const unregister = makeQueryBuilder({ data: null, error: null });
+    const promote = makeQueryBuilder({ data: null, error: null });
+    const remove = makeQueryBuilder({
+      data: [{ id: 10 }, { id: 12 }],
+      error: null,
+    });
+    const client = createMockSupabaseClient([
+      ...lookups(),
+      unregister,
+      promote,
+      remove,
+    ]);
+    vi.mocked(getUserClient).mockReturnValue(client);
+    const result = await deleteUnusedMotifs([10, 11, 12], "token");
+    expect(unregister.delete).toHaveBeenCalled();
+    expect(unregister.in).toHaveBeenCalledWith("category_id", [10, 12]);
+    expect(promote.upsert).toHaveBeenCalledWith(
+      [{ imagery_id: 1, category_id: 11, role: "primary" }],
+      { onConflict: "imagery_id,category_id" },
     );
-    const deleted = await deleteUnusedMotifs([10, 12], "token");
-    expect(deleteBuilder.in).toHaveBeenCalledWith("id", [12]);
-    expect(deleted).toEqual([12]);
+    expect(remove.in).toHaveBeenCalledWith("id", [10, 12]);
+    expect(result).toEqual({
+      deleted: [10, 12],
+      promoted: [{ word: "汗", motif: "身躯" }],
+    });
   });
 
-  it("选中的都已用上时不发删除", async () => {
+  it("选中的都已有标注时不发删除", async () => {
     const client = createMockSupabaseClient(lookups());
     vi.mocked(getUserClient).mockReturnValue(client);
-    expect(await deleteUnusedMotifs([10, 11], "token")).toEqual([]);
-    expect(client.from).toHaveBeenCalledTimes(3);
+    expect(await deleteUnusedMotifs([11], "token")).toEqual({
+      deleted: [],
+      promoted: [],
+    });
+    expect(client.from).toHaveBeenCalledTimes(4);
   });
 });

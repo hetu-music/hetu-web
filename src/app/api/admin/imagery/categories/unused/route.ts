@@ -24,7 +24,7 @@ async function accessToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
-/** 没挂词也没有标注的母题：GET /api/admin/imagery/categories/unused */
+/** 没有标注的母题及登记了它的词：GET /api/admin/imagery/categories/unused */
 export const GET = withAuth(
   async (_request: NextRequest, _user: AuthenticatedUser) => {
     try {
@@ -43,7 +43,7 @@ export const GET = withAuth(
   { requireAdmin: true },
 );
 
-/** 删掉其中选中的：只删服务端重查后仍然没用上的，返回实际删掉的 id */
+/** 删掉其中选中的：只删服务端重查后仍然没用上的，返回实际删掉的 id 与换了默认母题的词 */
 export const DELETE = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
@@ -55,11 +55,11 @@ export const DELETE = withAuth(
       const token = await accessToken();
       if (!token)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      const deleted = await deleteUnusedMotifs(input.ids, token);
-      if (deleted.length === 0) return NextResponse.json({ deleted });
-      // 没挂词的母题不在任何公开页上，但分类树进了意象索引
+      const result = await deleteUnusedMotifs(input.ids, token);
+      if (result.deleted.length === 0) return NextResponse.json(result);
+      // 没有标注的母题不在任何公开页上，但分类树进了意象索引
       const purge = await refreshImagery();
-      return withPurgeStatus(NextResponse.json({ deleted }), purge);
+      return withPurgeStatus(NextResponse.json(result), purge);
     } catch (e) {
       console.error("[DELETE /api/admin/imagery/categories/unused]", e);
       return NextResponse.json(

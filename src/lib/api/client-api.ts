@@ -3,7 +3,6 @@ import { apiRequest } from "@/lib/api/request";
 import type {
   CreateRequestPayload,
   Emotion,
-  ImageryCategory,
   ReplyRequestPayload,
   Song,
   SongCollation,
@@ -12,7 +11,10 @@ import type {
   UserUpdatePayload,
 } from "@/lib/types";
 import type { ReviewCandidate, ReviewResult } from "@/lib/imagery/review";
-import type { OccurrenceBatchItem } from "@/lib/server/service-imagery";
+import type {
+  OccurrenceBatchItem,
+  UnusedMotif,
+} from "@/lib/server/service-imagery";
 import type { ImagerySuggestionsResult } from "@/lib/server/service-imagery-suggest";
 import type { AudioOverview } from "@/lib/server/service-navidrome";
 import type { ApplyResult } from "@/lib/navidrome/store";
@@ -137,19 +139,23 @@ export function apiUpdateImageryCategory(
   });
 }
 
-/** 整理分类：没挂词也没有标注的母题 */
+/** 整理分类：没有标注的母题，连同登记了它的词 */
 export function apiGetUnusedMotifs() {
-  return apiRequest<ImageryCategory[]>("/api/admin/imagery/categories/unused", {
+  return apiRequest<UnusedMotif[]>("/api/admin/imagery/categories/unused", {
     fallback: "查找空母题失败",
   });
 }
 
-/** 只删服务端重查后仍然没用上的，返回实际删掉的 id */
+/** 只删服务端重查后仍然没用上的，返回实际删掉的 id 与换了默认母题的词 */
 export function apiDeleteUnusedMotifs(ids: number[]) {
-  return apiRequest<{ deleted: number[] }>(
-    "/api/admin/imagery/categories/unused",
-    { method: "DELETE", body: { ids }, fallback: "删除空母题失败" },
-  );
+  return apiRequest<{
+    deleted: number[];
+    promoted: Array<{ word: string; motif: string }>;
+  }>("/api/admin/imagery/categories/unused", {
+    method: "DELETE",
+    body: { ids },
+    fallback: "删除空母题失败",
+  });
 }
 
 // ─── Occurrences API ───────────────────────────────────────────────────────────

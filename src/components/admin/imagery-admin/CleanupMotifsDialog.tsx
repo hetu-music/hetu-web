@@ -101,13 +101,21 @@ export function CleanupMotifsDialog({
       const { deleted, promoted } = await apiDeleteUnusedMotifs(selected);
       if (deleted.length > 0) onDeleted(deleted);
       const kept = selected.length - deleted.length;
+      // 词登记在删母题之前就改了：母题没删成时也要说清楚
+      const changed = promoted.map((p) => `「${p.word}」→ ${p.motif}`);
       if (deleted.length === 0) {
         notify({
           type: "error",
-          text: "一个都没删掉：可能刚有了标注，或没有删除权限",
+          text: [
+            "母题一个都没删掉：可能刚有了标注，或数据库没给管理员删除权限",
+            changed.length > 0
+              ? `词的登记已经改了，默认母题改为：${changed.join("、")}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("；"),
         });
       } else {
-        const changed = promoted.map((p) => `「${p.word}」→ ${p.motif}`);
         notify({
           type: "success",
           text: [

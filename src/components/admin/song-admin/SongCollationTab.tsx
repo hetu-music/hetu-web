@@ -240,7 +240,7 @@ export default function SongCollationTab({
 }
 
 function signature(c: SongCollation) {
-  return `${c.collator || "佚名"}校${c.reviser ? ` · ${c.reviser}订` : ""}`;
+  return `${c.collator || "佚名"} 校${c.reviser ? ` · ${c.reviser} 订` : ""}`;
 }
 
 function CollationItem({
@@ -414,7 +414,7 @@ function CollationForm({
         <span className={cn(META_CLASS, "mr-auto")}>
           {initial
             ? `${signature(initial)}${initial.collator !== user?.name ? `，保存后署你为订者` : ""}`
-            : `署名：${user?.name ?? ""}校`}
+            : `署名：${user?.name ?? ""} 校`}
         </span>
         {error && <span className="text-xs text-rose-500">{error}</span>}
         <button

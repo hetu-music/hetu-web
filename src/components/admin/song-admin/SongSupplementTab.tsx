@@ -45,7 +45,7 @@ const KIND_HINT: Record<SupplementKind, string> = {
 };
 
 function signature(c: SongCollation) {
-  return `${c.collator || "佚名"}辑${c.reviser ? ` · ${c.reviser}订` : ""}`;
+  return `${c.collator || "佚名"} 辑${c.reviser ? ` · ${c.reviser} 订` : ""}`;
 }
 
 /**
@@ -91,7 +91,7 @@ export default function SongSupplementTab({ songId }: { songId: number }) {
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className={META_CLASS}>
           记歌词以外、关于这首歌本身的资料，如各版本的发布时间、废弃的文案。
-          详情页里排在创作手记之后，署「某某辑」，按日期排。
+          详情页里排在创作手记之后，署「某某 辑」，按日期排。
         </p>
         {editing !== "new" && (
           <button
@@ -263,7 +263,7 @@ function SupplementForm({
         <span className={cn(META_CLASS, "mr-auto")}>
           {initial
             ? `${signature(initial)}${initial.collator !== user?.name ? "，保存后署你为订者" : ""}`
-            : `署名：${user?.name ?? ""}辑`}
+            : `署名：${user?.name ?? ""} 辑`}
         </span>
         {error && <span className="text-xs text-rose-500">{error}</span>}
         <button

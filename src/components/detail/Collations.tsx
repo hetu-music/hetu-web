@@ -12,7 +12,7 @@ import { useTranslations } from "next-intl";
  * 都与评点分开：评点在左栏，这两样不进评点。
  */
 
-/** 落款：校记署「某某校」，补遗署「某某辑」；别人改过再加「某某订」 */
+/** 落款：校记署「某某 校」，补遗署「某某 辑」；别人改过再加「某某 订」 */
 function useSignature(verb: "collator" | "compiler") {
   const t = useTranslations("song.folio");
   return (c: SongCollation) => {

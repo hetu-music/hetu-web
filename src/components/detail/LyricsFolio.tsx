@@ -424,9 +424,10 @@ const FolioRow = memo(function FolioRow({
         )}
       </div>
 
+      {/* 只占歌词那一行高：句下有校记时整行变高，意象名仍与歌词平齐 */}
       <div
         className={cn(
-          "hidden md:flex items-center gap-4 min-w-0 overflow-hidden whitespace-nowrap leading-[2.2] transition-opacity duration-500",
+          "hidden md:flex self-start items-center gap-4 min-w-0 overflow-hidden whitespace-nowrap leading-[2.2] transition-opacity duration-500",
           focused && !carriesActive && "opacity-20",
         )}
       >

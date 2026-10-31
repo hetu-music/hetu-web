@@ -17,18 +17,16 @@ import { useTranslations } from "next-intl";
 
 /** 类型的括号是排版的一部分，简繁相同，不进文案 */
 function KindHead({ label, className }: { label: string; className?: string }) {
-  // 类型连同括号是编者加的标目，用加粗的衬线体、略小，与章节题头同一种字，
-  // 和楷体写的「人话」分开。衬线体的括号紧贴着字，两边各留 0.15em；
-  // 字距在末字后多出的 0.1em 从右边扣掉，左右才一样宽
+  // 括号随校语用楷体，楷体的括号自带空隙，不贴字；括号里的类型是编者加的标目，
+  // 用加粗的衬线体、略小，与章节题头同一种字，和楷体写的「人话」分开。
+  // 括号不加粗：楷体没有粗体，浏览器硬描出来的粗会糊。
+  // 字距在末字后多出的 0.1em 用负边距收回，免得右括号离得比左括号远
   return (
-    <span
-      className={cn(
-        "font-serif font-semibold text-[0.92em] text-(--tone)",
-        className,
-      )}
-    >
+    <span className={cn("font-kaiti text-(--tone)", className)}>
       〔
-      <span className="pl-[0.15em] pr-[0.05em] tracking-[0.1em]">{label}</span>
+      <span className="font-serif font-semibold text-[0.92em] tracking-[0.1em] -mr-[0.1em]">
+        {label}
+      </span>
       〕
     </span>
   );

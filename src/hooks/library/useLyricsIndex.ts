@@ -24,7 +24,8 @@ type FuseExtended = Fuse<
   Song & { searchableContent: string; lyricContent: string }
 >;
 
-function buildFromEntries(
+/** 导出只为 scripts/search-eval.ts 按线上配置跑旧方案做对比 */
+export function buildFromEntries(
   songs: Song[],
   entries: LyricsEntry[],
 ): { map: Map<number, string>; fuse: FuseExtended } {

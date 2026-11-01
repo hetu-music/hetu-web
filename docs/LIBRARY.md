@@ -697,7 +697,7 @@ type LyricsLinesEntry = {
 - **命中的字**用正文色（`text-slate-700 dark:text-slate-300`），片段其余是 `text-slate-400`。不换强调色（DESIGN.md 里强调色只用在题头、当前项、选中状态），不加粗，不加底色。不用着重号：片段只有 11px，点太小，Safari 还有着重号字体加载的问题（DESIGN.md 第九节）。
 - **「等 N 处」**：片段太长截断时，「等 N 处」始终露在外面。
 - **歌词检索准备中**、**空状态**、**占位文字**：见「3.」。
-- **旧接口 `lyrics-index`**：这一阶段不再调用，接口和 Service Worker 里那条缓存规则留到阶段 6 一起删。
+- **旧接口 `lyrics-index`**：这一阶段不再调用，已经连同 `sw.ts`、`server-revalidate.ts`、`cache-headers.ts` 里的条目一起删掉。原计划等新版上线一个 CDN 缓存周期再删，照顾还开着旧页面的访客；页面重构完成前不上线、不兼容旧逻辑，所以不等了。
 
 **验收**（无头 Chrome，本机生产构建）：
 
@@ -736,7 +736,7 @@ type LyricsLinesEntry = {
 
 1. 后台 `useSongs`（`SongListClient` 在用）改用 `rank.ts`，只用元数据各档。
 2. 删除 `src/lib/library/legacy-fuse.ts`、`legacy-search.ts`（`createFuseInstance`、`searchAndFilterSongs`、`buildFromEntries` 都在这里）和 `processLyricsForSearch`，`filters.test.ts` 里和旧写法比对的那组测试一起删，`scripts/search-eval.ts` 去掉旧方案，卸载 `fuse.js`。`useLyricsIndex` 阶段 5 已删。
-3. 删除旧接口 `lyrics-index` 及其在 `sw.ts`、`server-revalidate.ts` 里的条目。旧接口要在新版上线至少一个 CDN 缓存周期之后再删。
+3. ~~删除旧接口 `lyrics-index`~~：阶段 5 已删。
 4. 后台歌曲列表 `SongListClient`、歌曲工作区 `SongWorkspace`、个人中心 `ProfileClient` 换成阶段 3 的地址栏 hook（个人中心切标签页仍记进浏览历史，用 `pushState`）；删除 `useSyncedQueryState`、`providers.tsx` 里的 `NuqsAdapter`、`profile/page.tsx` 里为 nuqs 包的那层 `<Suspense>`；`useLocaleSwitch` 里提到 nuqs 的注释改掉；卸载 `nuqs`。
 
 **验收**：仓库里不再有 Fuse 和 nuqs 的引用；后台歌曲列表的搜索结果合理（题名、人名能搜到）；后台列表、歌曲工作区、个人中心的地址栏参数和返回键行为与改之前一致。

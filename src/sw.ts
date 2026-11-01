@@ -26,7 +26,6 @@ declare const self: ServiceWorkerGlobalScope;
 // 用户请求（按 user_id 返回）、CSRF token（缓存会导致 token 与 cookie
 // 不一致）、Navidrome 串流凭证。用白名单而非黑名单，新增接口默认不缓存。
 const PUBLIC_CACHEABLE_API = [
-  /^\/api\/public\/songs\/lyrics-index$/,
   /^\/api\/public\/songs\/\d+\/lyrics$/,
   /^\/api\/public\/contributors$/,
   /^\/api\/imagery\/motifs\/\d+$/,

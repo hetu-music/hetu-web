@@ -9,7 +9,6 @@ describe("/api 下统一加 no-store 的范围", () => {
   it("自己设了缓存头的接口不在其中", () => {
     for (const path of [
       "/api/public/songs/42/lyrics",
-      "/api/public/songs/lyrics-index",
       "/api/public/songs/lyrics-lines",
       "/api/imagery/motifs/7",
       "/api/public/contributors",
@@ -27,7 +26,7 @@ describe("/api 下统一加 no-store 的范围", () => {
       "/api/admin/songs/42",
       "/api/navidrome/stream-url",
       "/api/public/songs/42/lyrics/extra",
-      "/api/public/songs/lyrics-index-old",
+      "/api/public/songs/lyrics-lines-old",
       "/api/imagery/motifs/7/words",
     ]) {
       expect(noStore(path), path).not.toBe(false);

@@ -37,8 +37,6 @@ export const NO_STORE_HEADERS = { "Cache-Control": PRIVATE_NO_STORE };
 export const API_PATHS_WITH_OWN_CACHE = [
   // 详情页、播放器的歌词：CDN 6 小时
   "public/songs/\\d+/lyrics",
-  // 曲库页旧的歌词索引：CDN 6 小时（阶段 6 删）
-  "public/songs/lyrics-index",
   // 意象词云的母题面板：CDN 6 小时
   "imagery/motifs/\\d+",
   // 「关于」里的维护团队：CDN 6 小时

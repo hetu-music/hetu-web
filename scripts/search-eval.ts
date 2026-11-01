@@ -47,7 +47,7 @@ interface RawLyrics {
 interface EvalData {
   /** 按页面字形转换过的歌曲列表，和线上首页拿到的一致 */
   songs: Record<Locale, Song[]>;
-  /** 线上 lyrics-index 接口的内容：只有简体，不分页面字形 */
+  /** 旧方案用的歌词（原 lyrics-index 接口的格式，接口已删）：只有简体，不分页面字形 */
   lyricsIndex: { id: number; l: string }[];
   rawLyrics: Map<number, RawLyrics>;
 }

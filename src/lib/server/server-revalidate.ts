@@ -118,19 +118,14 @@ const LYRICS_LINES_API = locales.map(
 
 /**
  * 歌曲资料变了（审批上线、外部同步）：首页曲库、详情页、播放器的歌词、
- * 曲库页搜歌词的数据（新旧两个接口）和 sitemap。歌名、类型、日期等也进了意象索引，
+ * 曲库页搜歌词的数据和 sitemap。歌名、类型、日期等也进了意象索引，
  * 意象页的计数、寻曲候选池、别的歌的相关作品都会变，所以要失效标签；
  * 详情页之外受波及的页面在 CDN 上等到期。
  */
 export async function refreshSongs(songIds: number[]): Promise<PurgeReport> {
   return invalidate({
     pages: ["", "/imagery", "/quiz", ...songIds.map(songPage)],
-    paths: [
-      "/sitemap.xml",
-      "/api/public/songs/lyrics-index",
-      ...LYRICS_LINES_API,
-      ...songIds.map(songLyricsApi),
-    ],
+    paths: ["/sitemap.xml", ...LYRICS_LINES_API, ...songIds.map(songLyricsApi)],
     tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
   });
 }
@@ -213,11 +208,7 @@ export async function refreshCollations(songId: number): Promise<PurgeReport> {
 export async function refreshPublicPages(): Promise<PurgeReport> {
   return invalidate({
     pages: ["", "/imagery", "/story/qjtx", "/quiz"],
-    paths: [
-      "/sitemap.xml",
-      "/api/public/songs/lyrics-index",
-      ...LYRICS_LINES_API,
-    ],
+    paths: ["/sitemap.xml", ...LYRICS_LINES_API],
     tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
   });
 }

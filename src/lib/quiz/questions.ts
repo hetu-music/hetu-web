@@ -15,7 +15,7 @@ import type { QuizQuestion } from "./types";
  * 修改题目或权重会改变测验结果，需同步更新 QUIZ_VERSION 与测试快照。
  * 作答短串按题目顺序逐位编码，调整顺序后旧的分享链接会对应到别的题。
  */
-export const QUIZ_VERSION = "0.4.5";
+export const QUIZ_VERSION = "0.4.6";
 
 export const QUESTIONS: readonly QuizQuestion[] = [
   {
@@ -142,12 +142,12 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["雪"],
       },
       {
-        text: "找家书肆，这座城历史悠久，应当有一些少见的典志",
+        text: "前往书肆，这座城历史悠久，应当有一些少见的典志",
         dims: { guangyin: 2, diangu: 1 },
         mood: { tone: 1, energy: -1 },
       },
       {
-        text: "城角有座草木繁茂的祠堂，它的传说你早有耳闻，当去一见",
+        text: "城角有座草木繁茂的旧祠堂，它的传说你早有耳闻，当去一见",
         dims: { caomu: 2, qingsi: 1 },
         mood: { tone: -1, energy: 1 },
       },
@@ -319,7 +319,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
         imagery: ["楼"],
       },
       {
-        text: "与街坊邻里闲谈琐事时突然失神，觉得眼下的安稳像一场大梦",
+        text: "与街坊邻里闲谈琐事时突然失神，觉得眼下的安稳好像一场大梦",
         dims: { qingsi: 2, renjian: 1 },
         mood: { tone: -1, energy: -1 },
         imagery: ["梦"],

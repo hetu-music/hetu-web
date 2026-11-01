@@ -1,7 +1,6 @@
 /// <reference lib="webworker" />
 
 import {
-  CacheableResponsePlugin,
   CacheFirst,
   ExpirationPlugin,
   NetworkFirst,
@@ -88,30 +87,6 @@ const serwist = new Serwist({
           new ExpirationPlugin({
             maxEntries: 200,
             maxAgeSeconds: 60 * 60 * 24 * 30,
-          }),
-        ],
-      }),
-    },
-    {
-      // 曲库页搜歌词的数据（docs/LIBRARY.md 阶段 5「2.」）：地址带版本号，同一地址内容不变，
-      // 第二次访问直接从这里读，不再等下载。简繁各留两三个版本，旧的自动淘汰。
-      // 只存版本号和数据对得上的响应（接口用响应头说明，见 lyrics-lines/route.ts）。
-      // 不带 v 的请求不进这条，走下面的白名单规则（也不在白名单里，不缓存）
-      matcher: ({ sameOrigin, url, request }) =>
-        sameOrigin &&
-        request.method === "GET" &&
-        url.pathname === "/api/public/songs/lyrics-lines" &&
-        url.searchParams.has("v"),
-      handler: new CacheFirst({
-        cacheName: "lyrics-lines",
-        plugins: [
-          new CacheableResponsePlugin({
-            statuses: [200],
-            headers: { "X-Lyrics-Version-Match": "1" },
-          }),
-          new ExpirationPlugin({
-            maxEntries: 6,
-            maxAgeSeconds: 60 * 60 * 24 * 90,
           }),
         ],
       }),

@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import MusicLibraryClient from "@/components/library/MusicLibraryClient";
-import { lyricsVersion } from "@/lib/server/service-lyrics-lines";
-import { getSongLastModifiedMap, getSongs } from "@/lib/server/service-songs";
+import { getSongs } from "@/lib/server/service-songs";
 import { countCatalogSongs } from "@/lib/utils/utils-song";
 import { Song } from "@/lib/types";
 import Loading from "@/components/shared/Loading";
@@ -80,21 +79,10 @@ export default async function MusicLibraryPage({ params }: Props) {
   const t = await getTranslations({ locale, namespace: "common" });
   let songsData: Song[] = [];
   let error: Error | null = null;
-  // 搜歌词时拉的数据按它区分缓存地址（docs/LIBRARY.md 阶段 5「2.」）；取不到时用空串，
-  // 照样能拉，只是那次不走长缓存
-  let version = "";
 
   try {
     // forListView = true 只获取列表展示需要的字段，排除歌词等大字段
-    const [songs, lastModified] = await Promise.all([
-      getSongs(undefined, undefined, true, locale),
-      getSongLastModifiedMap().catch((err: unknown) => {
-        console.error("Error fetching lyrics version:", err);
-        return null;
-      }),
-    ]);
-    songsData = songs;
-    if (lastModified) version = lyricsVersion(lastModified);
+    songsData = await getSongs(undefined, undefined, true, locale);
   } catch (err) {
     console.error("Error fetching songs:", err);
     error = err instanceof Error ? err : new Error("未知错误");
@@ -120,10 +108,7 @@ export default async function MusicLibraryPage({ params }: Props) {
           </div>
         }
       >
-        <MusicLibraryClient
-          initialSongsData={songsData}
-          lyricsVersion={version}
-        />
+        <MusicLibraryClient initialSongsData={songsData} />
       </Suspense>
     </>
   );

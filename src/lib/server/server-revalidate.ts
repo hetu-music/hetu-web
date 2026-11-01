@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { locales } from "@/i18n/config";
 import { CDN_PURGE_FAILED_HEADER } from "@/lib/cdn-purge";
 import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
+import { LYRICS_LINES_TAG } from "@/lib/library/tags";
 import {
   purgeCloudflareCache,
   purgeCloudFrontCache,
@@ -108,8 +109,16 @@ async function invalidate({
 const songLyricsApi = (id: number) => `/api/public/songs/${id}/lyrics`;
 
 /**
+ * 曲库页搜歌词的数据，简繁各一个地址（客户端简体也带 ?locale=zh-CN）。
+ * 浏览器和 CDN 都缓存 6 小时，这里清得掉 CDN 的，浏览器里的等到期
+ */
+const LYRICS_LINES_API = locales.map(
+  (locale) => `/api/public/songs/lyrics-lines?locale=${locale}`,
+);
+
+/**
  * 歌曲资料变了（审批上线、外部同步）：首页曲库、详情页、播放器的歌词、
- * 全文搜索的歌词索引和 sitemap。歌名、类型、日期等也进了意象索引，
+ * 曲库页搜歌词的数据（新旧两个接口）和 sitemap。歌名、类型、日期等也进了意象索引，
  * 意象页的计数、寻曲候选池、别的歌的相关作品都会变，所以要失效标签；
  * 详情页之外受波及的页面在 CDN 上等到期。
  */
@@ -119,9 +128,10 @@ export async function refreshSongs(songIds: number[]): Promise<PurgeReport> {
     paths: [
       "/sitemap.xml",
       "/api/public/songs/lyrics-index",
+      ...LYRICS_LINES_API,
       ...songIds.map(songLyricsApi),
     ],
-    tags: [IMAGERY_INDEX_TAG],
+    tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
   });
 }
 
@@ -194,8 +204,12 @@ export async function refreshCollations(songId: number): Promise<PurgeReport> {
 export async function refreshPublicPages(): Promise<PurgeReport> {
   return invalidate({
     pages: ["", "/imagery", "/story/qjtx", "/quiz"],
-    paths: ["/sitemap.xml", "/api/public/songs/lyrics-index"],
-    tags: [IMAGERY_INDEX_TAG],
+    paths: [
+      "/sitemap.xml",
+      "/api/public/songs/lyrics-index",
+      ...LYRICS_LINES_API,
+    ],
+    tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
   });
 }
 

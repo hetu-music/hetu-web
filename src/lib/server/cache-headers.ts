@@ -18,14 +18,11 @@ export const PUBLIC_API_CACHE =
   "public, s-maxage=21600, stale-while-revalidate=1800";
 
 /**
- * 地址里带版本号的公开数据（曲库页的歌词 lyrics-lines?v=）：数据变了地址就变，
- * 同一个地址的内容不会再变，浏览器和 CDN 都长缓存。
+ * 同上，浏览器也缓存 6 小时（曲库页搜歌词的数据 lyrics-lines）：数据大（gzip 约 165 KB），
+ * 想搜的访客第二次打开不用再下载。CDN 上的照样随数据变更清掉，浏览器里的清不掉，最多晚 6 小时。
  */
-export const IMMUTABLE_API_CACHE = "public, max-age=31536000, immutable";
-
-/** 同上，但地址里的版本号和数据对不上（首页还是旧的）：数据是新的，只短暂缓存 */
-export const SHORT_PUBLIC_API_CACHE =
-  "public, max-age=0, s-maxage=60, stale-while-revalidate=60";
+export const BROWSER_CACHED_API_CACHE =
+  "public, max-age=21600, s-maxage=21600, stale-while-revalidate=1800";
 
 /** 与当前用户相关的数据，以及 /api 下其余接口：任何一层都不缓存 */
 export const PRIVATE_NO_STORE = "private, no-store";
@@ -44,7 +41,7 @@ export const API_PATHS_WITH_OWN_CACHE = [
   "public/songs/lyrics-index",
   // 意象词云的母题面板：CDN 6 小时
   "imagery/motifs/\\d+",
-  // 曲库页搜歌词的数据：带版本号长缓存（docs/LIBRARY.md 阶段 5「2.」）
+  // 曲库页搜歌词的数据：浏览器和 CDN 都 6 小时（docs/LIBRARY.md 阶段 5「2.」）
   "public/songs/lyrics-lines",
 ];
 

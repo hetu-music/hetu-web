@@ -50,7 +50,6 @@ const NO_FACET_OPTIONS = Object.fromEntries(
  */
 export default function MusicLibraryClient({
   initialSongsData,
-  lyricsVersion,
 }: MusicLibraryClientProps) {
   const router = useRouter();
   const locale = useLocale();
@@ -87,7 +86,6 @@ export default function MusicLibraryClient({
   const state = useLibraryState(options, engine?.normalize);
   const lyrics = useLyricsLines({
     locale,
-    version: lyricsVersion,
     wanted: searchFocused || state.query !== "",
     engine,
   });

@@ -24,6 +24,11 @@ vi.mock("@/lib/db/supabase-auth", () => ({
   })),
 }));
 
+// unstable_cache 依赖 Next.js 的增量缓存，测试里直接透传，每次调用都重新查询
+vi.mock("next/cache", () => ({
+  unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+}));
+
 vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/db/supabase-server")>();
@@ -45,10 +50,6 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 import { GET as getContributors } from "../contributors/route";
 import { GET as getLyrics } from "./[id]/lyrics/route";
 import { GET as getLyricsLines } from "./lyrics-lines/route";
-import {
-  lyricsVersion,
-  resetLyricsLinesMemoForTests,
-} from "@/lib/server/service-lyrics-lines";
 import { GET as searchSongs } from "./search/route";
 
 beforeEach(() => {
@@ -145,7 +146,6 @@ describe("GET /api/public/songs/lyrics-lines", () => {
   ].join("\n");
 
   beforeEach(() => {
-    resetLyricsLinesMemoForTests();
     mockResult = {
       data: [
         { id: 1, title: "倾尽天下", lyrics: LYRICS, lyrics_start: null },
@@ -167,18 +167,10 @@ describe("GET /api/public/songs/lyrics-lines", () => {
     expect(body[0].lines).toEqual(["血染江山的畫", "怎敵你眉間一點硃砂"]);
   });
 
-  it("版本号和当前数据对得上才长缓存；对不上、不带时只短暂缓存，Service Worker 也不存", async () => {
-    // 这份假数据里没有 updated_at，当前版本号就是空表算出来的
-    const current = lyricsVersion(new Map());
-    const ok = await call(`locale=zh-CN&v=${current}`);
-    expect(ok.headers.get("Cache-Control")).toContain("immutable");
-    expect(ok.headers.get("X-Lyrics-Version-Match")).toBe("1");
-    for (const query of ["locale=zh-CN&v=old", "locale=zh-CN"]) {
-      const res = await call(query);
-      expect(res.headers.get("Cache-Control")).not.toContain("immutable");
-      expect(res.headers.get("X-Lyrics-Version-Match")).toBe("0");
-      expect((await res.json())[0].id).toBe(1);
-    }
+  it("浏览器和 CDN 都缓存 6 小时", async () => {
+    const cache = (await call("locale=zh-CN")).headers.get("Cache-Control");
+    expect(cache).toContain("max-age=21600");
+    expect(cache).toContain("s-maxage=21600");
   });
 
   it("service client 不可用时返回 500", async () => {

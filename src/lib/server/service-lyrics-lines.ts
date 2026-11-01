@@ -1,9 +1,10 @@
+import { unstable_cache } from "next/cache";
 import { fetchAll, getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import type { Locale } from "@/i18n/config";
+import { LYRICS_LINES_TAG } from "@/lib/library/tags";
 import type { LyricsLinesEntry } from "@/lib/search/corpus";
 import { toTraditional } from "@/lib/utils/utils-convert";
 import { buildFolio } from "@/lib/utils/utils-folio";
-import { getSongLastModifiedMap } from "./service-songs";
 
 /**
  * 曲库页搜歌词用的数据（docs/LIBRARY.md 阶段 5「1.」）：每首歌按句切好，按页面字形。
@@ -44,49 +45,15 @@ export async function getLyricsLines(
 }
 
 /**
- * 歌词版本号（阶段 5「2.」）：全部歌最近一次更新的时间加上歌数，用 36 进制写短。
- * 只用来区分缓存地址：歌词改了，地址就变，浏览器和 Service Worker 去拉新的。
- * 删了一首歌最近更新时间不变，所以带上歌数。
+ * 同上，存进 Next 的数据缓存：切一遍全部歌词要一两秒，不能每次请求都切。
+ * 不按时间过期，歌曲变动时 server-revalidate 用 expire: 0 失效标签，下一次请求当场重算，
+ * 不会先给一次旧数据被 CDN 存住。缓存键按字形分开（参数自动进键）。
+ *
+ * 部署时数据缓存是空的，改了切句逻辑也不会留旧结果；万一数据缓存跨部署保留了，
+ * 改切句逻辑或返回格式时把键里的 v1 加一。失败时抛错，unstable_cache 不缓存异常。
  */
-/** 版本号和数据对得上时为 1，Service Worker 只缓存带这个头的（sw.ts 里写的是同一个名字） */
-export const VERSION_MATCH_HEADER = "X-Lyrics-Version-Match";
-
-/** 每种字形按版本号记住切好的句子：切一遍全部歌词要一两秒，版本号不变就不再切 */
-const memo = new Map<
-  Locale,
-  { version: string; entries: Promise<LyricsLinesEntry[]> }
->();
-
-/**
- * 当前的版本号和对应的数据。版本号每次都从库里算（一条很轻的查询），所以数据总是最新的，
- * 不会把旧数据记在新版本号下面。
- */
-export async function getCurrentLyricsLines(
-  locale: Locale,
-): Promise<{ version: string; entries: LyricsLinesEntry[] }> {
-  const version = lyricsVersion(await getSongLastModifiedMap());
-  let hit = memo.get(locale);
-  if (!hit || hit.version !== version) {
-    const entries = getLyricsLines(locale);
-    const created = { version, entries };
-    memo.set(locale, created);
-    entries.catch(() => {
-      if (memo.get(locale) === created) memo.delete(locale);
-    });
-    hit = created;
-  }
-  return { version, entries: await hit.entries };
-}
-
-/** 只供测试 */
-export function resetLyricsLinesMemoForTests(): void {
-  memo.clear();
-}
-
-export function lyricsVersion(lastModified: ReadonlyMap<number, Date>): string {
-  let latest = 0;
-  for (const date of lastModified.values()) {
-    latest = Math.max(latest, date.getTime());
-  }
-  return `${latest.toString(36)}${lastModified.size.toString(36)}`;
-}
+export const getCachedLyricsLines = unstable_cache(
+  (locale: Locale) => getLyricsLines(locale),
+  ["lyrics-lines-v1"],
+  { tags: [LYRICS_LINES_TAG] },
+);

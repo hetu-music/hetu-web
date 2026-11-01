@@ -103,15 +103,18 @@ describe("清 CDN 的结果", () => {
 
 describe("refreshSongs", () => {
   // 歌名、类型、日期也进了意象索引，审批上线后候选池和相关作品要跟着变
-  it("失效意象索引，连带清歌词接口、歌词索引和 sitemap", async () => {
+  it("失效意象索引和搜歌词的数据，连带清歌词接口、歌词索引和 sitemap", async () => {
     await refreshSongs([5]);
     expect(revalidateTag).toHaveBeenCalledWith("imagery-index", { expire: 0 });
+    expect(revalidateTag).toHaveBeenCalledWith("lyrics-lines", { expire: 0 });
     expect(purged()).toEqual(
       expect.arrayContaining([
         "/zh-CN/song/5",
         "/zh-TW/quiz",
         "/api/public/songs/5/lyrics",
         "/api/public/songs/lyrics-index",
+        "/api/public/songs/lyrics-lines?locale=zh-CN",
+        "/api/public/songs/lyrics-lines?locale=zh-TW",
         "/sitemap.xml",
       ]),
     );

@@ -79,11 +79,16 @@ export interface LibraryFilters {
   facets: Record<FacetKey, FacetSelection>;
 }
 
-export function emptyFacets(): Record<FacetKey, FacetSelection> {
-  return Object.fromEntries(FACET_KEYS.map((k) => [k, NO_SELECTION])) as Record<
+/** 每个维度一项 */
+export function mapFacets<T>(fn: (key: FacetKey) => T): Record<FacetKey, T> {
+  return Object.fromEntries(FACET_KEYS.map((k) => [k, fn(k)])) as Record<
     FacetKey,
-    FacetSelection
+    T
   >;
+}
+
+export function emptyFacets(): Record<FacetKey, FacetSelection> {
+  return mapFacets(() => NO_SELECTION);
 }
 
 // ─── 选项 ─────────────────────────────────────────────────────────────────────

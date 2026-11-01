@@ -13,6 +13,7 @@ import {
   type FacetKey,
   type FacetOption,
   type LibraryFilters,
+  mapFacets,
   matchesFacet,
   matchesType,
   matchesYear,
@@ -86,9 +87,7 @@ export function filterSongs(
     if (!matchesType(song, filters.type)) return false;
     if (!matchesYear(song.year, filters.year)) return false;
     const meta = getSongMeta(song);
-    return FACET_KEYS.every((k) =>
-      matchesFacet(meta[k], filters.facets[k]),
-    );
+    return FACET_KEYS.every((k) => matchesFacet(meta[k], filters.facets[k]));
   });
 }
 
@@ -101,9 +100,7 @@ export function availableFacetValues(
   songs: readonly Song[],
   filters: LibraryFilters,
 ): Record<FacetKey, Set<string>> {
-  const out = Object.fromEntries(
-    FACET_KEYS.map((k) => [k, new Set<string>()]),
-  ) as Record<FacetKey, Set<string>>;
+  const out = mapFacets(() => new Set<string>());
 
   for (const song of songs) {
     if (!matchesType(song, filters.type)) continue;

@@ -16,11 +16,10 @@ import { useCallback, useMemo, useState } from "react";
 import type { LyricsSearchState } from "@/hooks/library/useLyricsLines";
 import type { LibraryEngine } from "@/lib/library/engine";
 import {
-  FACET_KEYS,
-  type FacetKey,
   filterByTypeAndYear,
   isAnyFacetActive,
   type LibraryFilters,
+  mapFacets,
 } from "@/lib/library/filters";
 import type { LyricsCorpus } from "@/lib/search/corpus";
 // 只能引用类型：rank.ts 连着归一化和繁转简表，引用值就把它们拉回首屏（第二档的东西都经 engine 用）
@@ -28,9 +27,7 @@ import type { SearchHit } from "@/lib/search/rank";
 import type { Snippet } from "@/lib/search/snippet";
 import type { Song } from "@/lib/types";
 
-const NOTHING_AVAILABLE = Object.fromEntries(
-  FACET_KEYS.map((k) => [k, new Set<string>()]),
-) as Record<FacetKey, Set<string>>;
+const NOTHING_AVAILABLE = mapFacets(() => new Set<string>());
 
 export function useLibraryResults({
   songs,

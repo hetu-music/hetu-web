@@ -16,15 +16,15 @@ import { useRouter } from "@/i18n/navigation";
 import { MUSIC_LIBRARY_ITEMS_PER_PAGE } from "@/lib/constants";
 import {
   buildBaseOptions,
-  FACET_KEYS,
-  type FacetKey,
   type FacetOption,
+  mapFacets,
 } from "@/lib/library/filters";
 import { LIST_ID } from "@/lib/library/reveal";
 import { needsDeferred } from "@/lib/library/url-state";
 import type { MusicLibraryClientProps } from "@/lib/types";
 import { sharePage } from "@/lib/utils/share";
 import { cn } from "@/lib/utils/utils";
+import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { countCatalogSongs } from "@/lib/utils/utils-song";
 import { Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -33,12 +33,8 @@ import HeroSection from "./HeroSection";
 import LibraryToolbar from "./LibraryToolbar";
 import SongResults from "./SongResults";
 
-const NAV_DEPTH_KEY = "__hetu_web_nav_depth";
-
 /** 第二档没到时人名、曲风没有选项 */
-const NO_FACET_OPTIONS = Object.fromEntries(
-  FACET_KEYS.map((k) => [k, [] as FacetOption[]]),
-) as Record<FacetKey, FacetOption[]>;
+const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
 
 /**
  * 曲库页：把地址栏状态（useLibraryState）、结果（useLibraryResults）接到
@@ -172,12 +168,7 @@ export default function MusicLibraryClient({
     (songId: number) => {
       setActiveSongId(songId);
       saveScroll();
-
-      const navDepth = parseInt(
-        sessionStorage.getItem(NAV_DEPTH_KEY) || "0",
-        10,
-      );
-      sessionStorage.setItem(NAV_DEPTH_KEY, String(navDepth + 1));
+      bumpNavDepth();
       // 还没写进地址栏的改动先写进去，返回时才回得到这里
       flushUrlState();
       router.push(`/song/${songId}`);

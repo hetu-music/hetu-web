@@ -23,6 +23,7 @@ import {
   isSelectionActive,
   type LibraryFilters,
   type LibraryOptions,
+  mapFacets,
   nextSelection,
   yearFromSlider,
   yearToSlider,
@@ -71,10 +72,7 @@ export function useLibraryState(
   }, [url.facets, allSelected]);
 
   const checked = useMemo(
-    () =>
-      Object.fromEntries(
-        FACET_KEYS.map((k) => [k, checkedValues(facets[k], options.facets[k])]),
-      ) as Record<FacetKey, string[]>,
+    () => mapFacets((k) => checkedValues(facets[k], options.facets[k])),
     [facets, options.facets],
   );
 

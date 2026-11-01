@@ -1,7 +1,8 @@
 "use client";
 
 import ProfileSectionHeading from "@/components/profile/ProfileSectionHeading";
-import { bumpNavDepth, formatDate } from "@/components/profile/profile-ui";
+import { formatDate } from "@/components/profile/profile-ui";
+import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useUserContext } from "@/context/UserContext";

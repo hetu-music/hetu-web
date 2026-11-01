@@ -9,6 +9,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import type { LibraryEngine } from "@/lib/library/engine";
+import { whenIdle } from "@/lib/utils/idle";
 import type { Song } from "@/lib/types";
 
 type DeferredModule = typeof import("@/components/library/deferred");
@@ -26,16 +27,6 @@ function load(): Promise<DeferredModule> {
     },
   );
   return loading;
-}
-
-/** 页面空闲时执行；Safari 没有 requestIdleCallback，退回定时器（同 TopBar 预加载「关于」） */
-function whenIdle(run: () => void): () => void {
-  if (typeof window.requestIdleCallback === "function") {
-    const id = window.requestIdleCallback(run, { timeout: 3000 });
-    return () => window.cancelIdleCallback(id);
-  }
-  const id = window.setTimeout(run, 1500);
-  return () => window.clearTimeout(id);
 }
 
 /** 一份曲库一个 engine；返回曲库时 initialSongsData 还是同一个数组就不重建 */
@@ -67,7 +58,7 @@ export function useLibraryDeferred(songs: Song[], needNow: boolean) {
         cancelled = true;
       };
     }
-    const cancelIdle = whenIdle(run);
+    const cancelIdle = whenIdle(run, { timeout: 3000 });
     return () => {
       cancelled = true;
       cancelIdle();

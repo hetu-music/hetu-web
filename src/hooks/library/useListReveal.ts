@@ -70,20 +70,16 @@ export function useListReveal(ready: boolean) {
     }
   }, [isClient, waiting]);
 
-  // 筛完了才滚回去。等一帧：Next 软导航自己的滚动处理在这之后，不能被它盖掉
+  // 筛完了才滚回去，滚完立刻显示：scrollTo 是同步的，下一次绘制时列表已经在原位。
+  // 不用等帧：返回、前进时 Next 不滚动（restore-reducer 不带滚动意图）；正向导航时它滚到顶，
+  // 但那在 layout effect 里（layout-router 的 InnerScrollHandler），总在这个 passive effect 之前
   useEffect(() => {
     if (!restoring || waiting) return;
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      const saved = sessionStorage.getItem(SCROLL_KEY);
-      sessionStorage.removeItem(SCROLL_KEY);
-      if (saved) window.scrollTo(0, parseInt(saved, 10));
-      inner = requestAnimationFrame(() => setRestoring(false));
-    });
-    return () => {
-      cancelAnimationFrame(outer);
-      cancelAnimationFrame(inner);
-    };
+    const saved = sessionStorage.getItem(SCROLL_KEY);
+    sessionStorage.removeItem(SCROLL_KEY);
+    if (saved) window.scrollTo(0, parseInt(saved, 10));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRestoring(false);
   }, [restoring, waiting]);
 
   /** 点进歌曲之前调用 */

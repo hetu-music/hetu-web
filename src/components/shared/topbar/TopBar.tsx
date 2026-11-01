@@ -8,6 +8,7 @@ import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { OverlayHostContext } from "@/components/ui/overlay-host";
 import { useRouter } from "@/i18n/navigation";
+import { whenIdle } from "@/lib/utils/idle";
 import { cn } from "@/lib/utils/utils";
 import {
   Download,
@@ -87,13 +88,7 @@ export default function TopBar({
 
   useEffect(() => {
     if (!hasAbout) return;
-    // Safari 没有 requestIdleCallback
-    if (typeof window.requestIdleCallback === "function") {
-      const id = window.requestIdleCallback(() => void loadAbout());
-      return () => window.cancelIdleCallback(id);
-    }
-    const id = window.setTimeout(() => void loadAbout(), 1500);
-    return () => window.clearTimeout(id);
+    return whenIdle(() => void loadAbout());
   }, [hasAbout]);
 
   return (

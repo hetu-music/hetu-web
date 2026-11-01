@@ -1,7 +1,8 @@
 /**
  * 曲库搜索评测集（见 docs/LIBRARY.md 阶段 0）。
  *
- * 由 scripts/search-eval.ts 对新旧两套搜索各跑一遍；阶段 2 起也作为单元测试的一部分。
+ * 由 scripts/search-eval.ts（pnpm search:eval）对新旧两套搜索各跑一遍，新方案必须全部通过。
+ * 要用线上曲库数据，所以不放进 vitest；搜索内核的单元测试用 test-fixtures.ts 里的小曲库。
  * 每条都取自线上曲库，歌词题目都核对过：所用的句子只出现在预期的那一首里。
  * 凡是按原字搜的条目（题名、人名、专辑、整句与半句歌词）都查 literal：
  * 每一条结果都得字面含有搜索词，用来量模糊匹配带出的噪音。
@@ -11,7 +12,7 @@
 export type EvalKind =
   | "title"
   | "title-partial"
-  | "pinyin"
+  | "title-typo"
   | "person"
   | "alias"
   | "album"
@@ -37,6 +38,10 @@ export interface EvalCase {
   credit?: string;
   /** 每一条结果都必须在题名、专辑、署名或歌词里字面含有搜索词（查噪音） */
   literal?: boolean;
+  /** 结果最多几条（查近似匹配带出的噪音） */
+  maxResults?: number;
+  /** 这些歌不应出现在结果里：记下已知的局限，局限解除时这条会失败，提醒来改 */
+  absent?: number[];
   note?: string;
 }
 
@@ -74,11 +79,73 @@ export const EVAL_CASES: EvalCase[] = [
   { query: "龙图", kind: "title-partial", literal: true, top: [71, 72], k: 2 },
   { query: "卫玠", kind: "title-partial", literal: true, top: [96, 97], k: 2 },
 
-  // ─── 拼音 ──────────────────────────────────────────────────────────────
-  { query: "qjtx", kind: "pinyin", top: [9], k: 1, note: "首字母" },
-  { query: "myrs", kind: "pinyin", top: [141], k: 1, note: "首字母" },
-  { query: "yuerenge", kind: "pinyin", top: [5], k: 1, note: "全拼" },
-  { query: "lanlingshang", kind: "pinyin", top: [62], k: 1, note: "全拼" },
+  // ─── 题名：打错字（阶段 2「5. 题名近似」；拼音搜索不做，原来的 4 条拼音用例已删）
+  {
+    query: "倾尽天夏",
+    kind: "title-typo",
+    top: [9],
+    k: 1,
+    maxResults: 1,
+    note: "下→夏",
+  },
+  {
+    query: "明月如双",
+    kind: "title-typo",
+    top: [141],
+    k: 1,
+    maxResults: 1,
+    note: "霜→双",
+  },
+  {
+    query: "雨碎江男",
+    kind: "title-typo",
+    top: [40, 27],
+    k: 2,
+    maxResults: 2,
+    note: "南→男",
+  },
+  {
+    query: "朝忆梨花暮忆血",
+    kind: "title-typo",
+    top: [65],
+    k: 1,
+    note: "雪→血",
+  },
+  {
+    query: "朝忆梨花忆雪",
+    kind: "title-typo",
+    top: [65],
+    k: 1,
+    note: "少「暮」",
+  },
+  {
+    query: "倾尽了天下",
+    kind: "title-typo",
+    top: [9],
+    k: 1,
+    note: "多「了」",
+  },
+  {
+    query: "江山夜此",
+    kind: "title-typo",
+    top: [14],
+    k: 1,
+    note: "两字颠倒",
+  },
+  {
+    query: "傾盡天夏",
+    kind: "title-typo",
+    locale: "zh-TW",
+    top: [9],
+    k: 1,
+    note: "繁体页上打错字",
+  },
+  {
+    query: "越人哥",
+    kind: "title-typo",
+    absent: [5],
+    note: "已知局限：三个字以内的题名打错字搜不到",
+  },
 
   // ─── 人名 ──────────────────────────────────────────────────────────────
   {

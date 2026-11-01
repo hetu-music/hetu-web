@@ -4,13 +4,18 @@
  * 按条目和类别报告是否通过。只读，不写数据库。见 docs/LIBRARY.md 阶段 0。
  *
  * 用法：pnpm search:eval [--engine old] [--verbose]
- *   --engine   要跑的方案，默认全部；目前只有 old（线上的 Fuse 方案），阶段 2 加上 new
+ *   --engine   要跑的方案，默认全部：old（线上的 Fuse 方案）、new（阶段 2 的搜索内核）
  *   --verbose  通过的条目也列出前几名
+ *
+ * 新方案有任何一条不通过时以非零状态退出。评测要用线上曲库数据，所以不放进 vitest；
+ * 改动 src/lib/search 之后跑一次。
  */
 import { createClient } from "@supabase/supabase-js";
 import { buildFromEntries } from "../src/hooks/library/useLyricsIndex";
 import { FILTER_OPTION_ALL } from "../src/lib/constants";
+import { buildCorpus } from "../src/lib/search/corpus";
 import { EVAL_CASES, type EvalCase } from "../src/lib/search/eval-cases";
+import { searchSongs } from "../src/lib/search/rank";
 import {
   SONG_LIST_VIEW_FIELDS,
   type Song,
@@ -21,6 +26,7 @@ import {
   toTraditionalArray,
 } from "../src/lib/utils/utils-convert";
 import { applyCreditAliases } from "../src/lib/utils/utils-credits";
+import { buildFolio } from "../src/lib/utils/utils-folio";
 import {
   mapAndSortSongs,
   processLyricsForSearch,
@@ -74,7 +80,32 @@ const oldEngine: SearchEngine = {
   },
 };
 
-const ENGINES: SearchEngine[] = [oldEngine];
+/**
+ * 阶段 2 的搜索内核，歌词数据已就绪。句子按 lyrics-lines 接口（阶段 5）的办法切：
+ * buildFolio 去掉署名区与说明行，繁体页逐句转繁体
+ */
+const newEngine: SearchEngine = {
+  name: "new",
+  prepare(data, locale) {
+    const songs = data.songs[locale];
+    const entries = [...data.rawLyrics].map(([id, raw]) => {
+      const lines = buildFolio(raw.lyrics, {
+        title: raw.title,
+        lyricsStart: raw.lyricsStart ?? undefined,
+      }).lines.map((l) => l.text);
+      return {
+        id,
+        lines:
+          locale === "zh-TW" ? lines.map((l) => toTraditional(l) ?? l) : lines,
+      };
+    });
+    const corpus = buildCorpus(entries.filter((e) => e.lines.length > 0));
+    return (query) =>
+      searchSongs(songs, query, corpus)?.hits.map((h) => h.song) ?? songs;
+  },
+};
+
+const ENGINES: SearchEngine[] = [oldEngine, newEngine];
 
 // ─── 数据 ─────────────────────────────────────────────────────────────────────
 
@@ -218,6 +249,13 @@ function check(
       );
     }
   }
+  if (c.maxResults !== undefined && results.length > c.maxResults) {
+    reasons.push(`${results.length} 条结果，最多应有 ${c.maxResults} 条`);
+  }
+  for (const id of c.absent ?? []) {
+    if (ids.includes(id))
+      reasons.push(`#${id} 不应出现（已知局限，若已解除请改评测集）`);
+  }
   return { pass: reasons.length === 0, reasons, results };
 }
 
@@ -238,6 +276,7 @@ async function main() {
     `曲库 ${data.songs["zh-CN"].length} 首，有歌词 ${data.rawLyrics.size} 首；评测 ${EVAL_CASES.length} 条\n`,
   );
 
+  let newFailed = false;
   for (const engine of engines) {
     const search = {
       "zh-CN": engine.prepare(data, "zh-CN"),
@@ -276,7 +315,9 @@ async function main() {
       console.log(`  ${kind.padEnd(14)} ${t.pass}/${t.total}`);
     }
     console.log("");
+    if (engine.name === "new" && passed < EVAL_CASES.length) newFailed = true;
   }
+  if (newFailed) process.exit(1);
 }
 
 main().catch((err) => {

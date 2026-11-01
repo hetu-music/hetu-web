@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import Fuse from "fuse.js";
 import {
-  calculateFilterOptions,
   countCatalogSongs,
-  decodeFilterParam,
-  encodeFilterParam,
   filterSongs,
   getCoverUrl,
   getNmnUrl,
@@ -94,43 +91,6 @@ describe("getCoverUrl / getNmnUrl", () => {
     expect(getNmnUrl(makeSong({ id: 42 }))).toBe(
       "https://cover.hetu-music.com/nmn/42.png",
     );
-  });
-});
-
-describe("calculateFilterOptions", () => {
-  it("汇总类型/流派/年份，并将缺失字段的歌曲归入“未知”", () => {
-    const songs = [
-      makeSong({ id: 1, type: ["原创"], genre: ["古风"], date: "2020-01-01" }),
-      makeSong({ id: 2, type: [], genre: [] }), // 触发“未知”分支
-    ];
-    const options = calculateFilterOptions(
-      mapAndSortSongs(songs), // 复用 mapAndSortSongs 补齐 year
-    );
-    expect(options.allTypes).toEqual(["全部", "原创", "未知"]);
-    expect(options.allGenres).toEqual(["全部", "古风", "未知"]);
-    expect(options.allYears).toEqual(["全部", 2020, "未知"]);
-  });
-
-  it("人名类字段按“英文在前、中文拼音在后”排序", () => {
-    const songs = [
-      makeSong({ id: 1, lyricist: ["张三"] }),
-      makeSong({ id: 2, lyricist: ["Alice"] }),
-      makeSong({ id: 3, lyricist: ["李四"] }),
-    ];
-    const options = calculateFilterOptions(songs);
-    // 全部/Alice 在前，中文按拼音排序（李四在张三之前）
-    expect(options.allLyricists).toEqual(["全部", "Alice", "李四", "张三"]);
-  });
-
-  it("composer/arranger/artist 缺失时同样归入“未知”", () => {
-    const songs = [
-      makeSong({ id: 1, composer: ["甲"], arranger: ["乙"], artist: ["丙"] }),
-      makeSong({ id: 2, composer: [], arranger: [], artist: [] }),
-    ];
-    const options = calculateFilterOptions(songs);
-    expect(options.allComposers).toEqual(["全部", "甲", "未知"]);
-    expect(options.allArrangers).toEqual(["全部", "乙", "未知"]);
-    expect(options.allArtists).toEqual(["全部", "丙", "未知"]);
   });
 });
 
@@ -260,80 +220,6 @@ describe("processLyricsForSearch", () => {
   it("空输入返回空字符串", () => {
     expect(processLyricsForSearch(null)).toBe("");
     expect(processLyricsForSearch("")).toBe("");
-  });
-});
-
-describe("encodeFilterParam & decodeFilterParam", () => {
-  const allGenres = ["全部", "古风", "流行", "民谣", "摇滚", "电子"];
-  const validGenres = ["古风", "流行", "民谣", "摇滚", "电子"]; // 5 项
-
-  it("空选择时返回空数组", () => {
-    expect(encodeFilterParam([], allGenres)).toEqual([]);
-    expect(decodeFilterParam([], allGenres)).toEqual([]);
-  });
-
-  it("选择项占少数时（<= N/2），正向保存", () => {
-    // 5 项中选 1 项或 2 项
-    expect(encodeFilterParam(["古风"], allGenres)).toEqual(["古风"]);
-    expect(decodeFilterParam(["古风"], allGenres)).toEqual(["古风"]);
-
-    expect(encodeFilterParam(["古风", "流行"], allGenres)).toEqual([
-      "古风",
-      "流行",
-    ]);
-    expect(decodeFilterParam(["古风", "流行"], allGenres)).toEqual([
-      "古风",
-      "流行",
-    ]);
-  });
-
-  it("全选时，压缩为 ['*']，且能正确还原为全部有效选项", () => {
-    expect(encodeFilterParam(validGenres, allGenres)).toEqual(["*"]);
-    expect(decodeFilterParam(["*"], allGenres)).toEqual(validGenres);
-    expect(decodeFilterParam(["all"], allGenres)).toEqual(validGenres);
-  });
-
-  it("全选 - 1 时（> N/2），转换为反向排除列表 ['!排除项']，且能正确还原", () => {
-    // 5 项中选 4 项（排除 电子）
-    const fourGenres = ["古风", "流行", "民谣", "摇滚"];
-    const encoded = encodeFilterParam(fourGenres, allGenres);
-    expect(encoded).toEqual(["!电子"]);
-
-    const decoded = decodeFilterParam(encoded, allGenres);
-    expect(decoded).toEqual(fourGenres);
-  });
-
-  it("全选 - 2 时，转换为反向排除列表，且能正确还原", () => {
-    // 5 项中选 3 项（排除 摇滚、电子，3 > 5/2）
-    const threeGenres = ["古风", "流行", "民谣"];
-    const encoded = encodeFilterParam(threeGenres, allGenres);
-    expect(encoded).toEqual(["!摇滚", "!电子"]);
-
-    const decoded = decodeFilterParam(encoded, allGenres);
-    expect(decoded).toEqual(threeGenres);
-  });
-
-  it("所有可能子集双向编解码满足自洽性 (Roundtrip)", () => {
-    // 对 [A, B, C] 全子集测试双向可逆性
-    const smallOptions = ["全部", "A", "B", "C"];
-
-    // 生成所有 2^3 = 8 个子集
-    const subsets = [
-      [],
-      ["A"],
-      ["B"],
-      ["C"],
-      ["A", "B"],
-      ["A", "C"],
-      ["B", "C"],
-      ["A", "B", "C"],
-    ];
-
-    for (const subset of subsets) {
-      const encoded = encodeFilterParam(subset, smallOptions);
-      const decoded = decodeFilterParam(encoded, smallOptions);
-      expect(decoded.sort()).toEqual(subset.sort());
-    }
   });
 });
 

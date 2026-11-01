@@ -263,17 +263,6 @@ export interface MyCommentGroup {
   comments: MyComment[];
 }
 
-// 筛选选项类型
-export interface FilterOptions {
-  allTypes: string[];
-  allGenres: string[];
-  allYears: (string | number)[];
-  allLyricists: string[];
-  allComposers: string[];
-  allArrangers: string[];
-  allArtists: string[];
-}
-
 // 歌曲信息类型
 export interface SongInfoRow {
   label: string;

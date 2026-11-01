@@ -3,6 +3,7 @@
 import { useCallback, useTransition } from "react";
 import { useLocale } from "next-intl";
 import { useRouter as useNextRouter } from "next/navigation";
+import { flushUrlState } from "@/hooks/utils/useUrlState";
 import { getPathname, useRouter, usePathname } from "@/i18n/navigation";
 
 // 语言配置项，未来如需添加英语（en）、日语（ja）等，只需在此追加配置即可。
@@ -38,7 +39,9 @@ export function useLocaleSwitch() {
     (targetLocale: string) => {
       if (targetLocale === locale || isPending) return;
       // usePathname 不含查询参数和锚点，直接用它切换会丢掉曲库的搜索词、筛选和页码。
-      // 点击时才从地址栏读：这些参数由 nuqs 浅更新，不经过路由，渲染时拿到的可能已经过时
+      // 点击时才从地址栏读：这些参数由 useUrlState 浅更新，不经过路由，渲染时拿到的可能已经过时；
+      // 还在节流里没写出去的也先写进去
+      flushUrlState();
       const { search, hash } = window.location;
       startTransition(() => {
         router.replace(`${pathname}${search}${hash}`, { locale: targetLocale });

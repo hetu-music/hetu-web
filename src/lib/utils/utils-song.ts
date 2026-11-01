@@ -1,16 +1,5 @@
-import {
-  FILTER_OPTION_ALL,
-  FILTER_OPTION_UNKNOWN,
-  GENRE_ORDER,
-  TYPE_ORDER,
-} from "@/lib/constants";
-import {
-  FilterOptions,
-  Song,
-  SongDetail,
-  SongInfo,
-  SongInfoRow,
-} from "@/lib/types";
+import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
+import { Song, SongDetail, SongInfo, SongInfoRow } from "@/lib/types";
 import { formatDate, formatTime } from "@/lib/utils/utils-common";
 import Fuse from "fuse.js";
 import { useTranslations } from "next-intl";
@@ -21,7 +10,7 @@ function startsWithEnglish(str: string): boolean {
 }
 
 // 优化的排序函数：首字母英文的在前按字母表排序，首字母中文的在后按拼音排序
-function sortNamesOptimized(names: string[]): string[] {
+export function sortNamesOptimized(names: string[]): string[] {
   const englishStartNames: string[] = [];
   const chineseStartNames: string[] = [];
 
@@ -44,128 +33,6 @@ function sortNamesOptimized(names: string[]): string[] {
   );
 
   return [...englishStartNames, ...chineseStartNames];
-}
-
-// 计算筛选选项
-export function calculateFilterOptions(songsData: Song[]): FilterOptions {
-  // 处理类型
-  const typeSet = new Set<string>();
-  let hasUnknownType = false;
-  songsData.forEach((song) => {
-    if (!song.type || song.type.length === 0) {
-      hasUnknownType = true;
-    } else {
-      song.type.forEach((t) => typeSet.add(t));
-    }
-  });
-  // 按 TYPE_ORDER 顺序排序
-  const preferredOrder = TYPE_ORDER;
-  let allTypes = Array.from(typeSet);
-  allTypes = preferredOrder
-    .filter((t) => allTypes.includes(t))
-    .concat(allTypes.filter((t) => !preferredOrder.includes(t)));
-  allTypes = [FILTER_OPTION_ALL, ...allTypes];
-  if (hasUnknownType) allTypes.push(FILTER_OPTION_UNKNOWN);
-
-  // 处理流派
-  const genreSet = new Set<string>();
-  let hasUnknownGenre = false;
-  songsData.forEach((song) => {
-    if (!song.genre || song.genre.length === 0) {
-      hasUnknownGenre = true;
-    } else {
-      song.genre.forEach((g) => genreSet.add(g));
-    }
-  });
-  const preferredGenreOrder = GENRE_ORDER;
-  let allGenres = Array.from(genreSet);
-  allGenres = preferredGenreOrder
-    .filter((g) => allGenres.includes(g))
-    .concat(allGenres.filter((g) => !preferredGenreOrder.includes(g)));
-  allGenres = [FILTER_OPTION_ALL, ...allGenres];
-  if (hasUnknownGenre) allGenres.push(FILTER_OPTION_UNKNOWN);
-
-  // 处理年份
-  const yearSet = new Set<number>();
-  let hasUnknownYear = false;
-  songsData.forEach((song) => {
-    if (!song.year) {
-      hasUnknownYear = true;
-    } else {
-      yearSet.add(song.year);
-    }
-  });
-  const allYears = [
-    FILTER_OPTION_ALL,
-    ...Array.from(yearSet).sort((a, b) => b - a),
-  ];
-  if (hasUnknownYear) allYears.push(FILTER_OPTION_UNKNOWN);
-
-  // 处理作词
-  const lyricistSet = new Set<string>();
-  let hasUnknownLyricist = false;
-  songsData.forEach((song) => {
-    if (!song.lyricist || song.lyricist.length === 0) {
-      hasUnknownLyricist = true;
-    } else {
-      song.lyricist.forEach((l) => lyricistSet.add(l));
-    }
-  });
-  const sortedLyricists = sortNamesOptimized(Array.from(lyricistSet));
-  const allLyricists = [FILTER_OPTION_ALL, ...sortedLyricists];
-  if (hasUnknownLyricist) allLyricists.push(FILTER_OPTION_UNKNOWN);
-
-  // 处理作曲
-  const composerSet = new Set<string>();
-  let hasUnknownComposer = false;
-  songsData.forEach((song) => {
-    if (!song.composer || song.composer.length === 0) {
-      hasUnknownComposer = true;
-    } else {
-      song.composer.forEach((c) => composerSet.add(c));
-    }
-  });
-  const sortedComposers = sortNamesOptimized(Array.from(composerSet));
-  const allComposers = [FILTER_OPTION_ALL, ...sortedComposers];
-  if (hasUnknownComposer) allComposers.push(FILTER_OPTION_UNKNOWN);
-
-  // 处理编曲
-  const arrangerSet = new Set<string>();
-  let hasUnknownArranger = false;
-  songsData.forEach((song) => {
-    if (!song.arranger || song.arranger.length === 0) {
-      hasUnknownArranger = true;
-    } else {
-      song.arranger.forEach((a) => arrangerSet.add(a));
-    }
-  });
-  const sortedArrangers = sortNamesOptimized(Array.from(arrangerSet));
-  const allArrangers = [FILTER_OPTION_ALL, ...sortedArrangers];
-  if (hasUnknownArranger) allArrangers.push(FILTER_OPTION_UNKNOWN);
-
-  // 处理演唱
-  const artistSet = new Set<string>();
-  let hasUnknownArtist = false;
-  songsData.forEach((song) => {
-    if (!song.artist || song.artist.length === 0) {
-      hasUnknownArtist = true;
-    } else {
-      song.artist.forEach((a) => artistSet.add(a));
-    }
-  });
-  const sortedArtists = sortNamesOptimized(Array.from(artistSet));
-  const allArtists = [FILTER_OPTION_ALL, ...sortedArtists];
-  if (hasUnknownArtist) allArtists.push(FILTER_OPTION_UNKNOWN);
-
-  return {
-    allTypes,
-    allGenres,
-    allYears,
-    allLyricists,
-    allComposers,
-    allArrangers,
-    allArtists,
-  };
 }
 
 // 处理 LRC 歌词用于搜索
@@ -541,73 +408,4 @@ export function getCoverUrl(song: Pick<Song, "id" | "hascover">): string {
 // 获取乐谱图片 URL
 export function getNmnUrl(song: Song | SongDetail): string {
   return `https://cover.hetu-music.com/nmn/${song.id}.png`;
-}
-
-/**
- * 将前端多选列表压缩编码为 URL 参数
- * - 列表为空时返回 []
- * - 全选状态压缩为 ["*"]
- * - 选中项超过有效选项总数的一半时（如全选 - 1），转换为反向排除列表 ["!排除项1", ...]
- * - 其余情况保持正向选择列表
- */
-export function encodeFilterParam(
-  selected: string[],
-  allOptions: string[],
-): string[] {
-  if (!selected || selected.length === 0) return [];
-
-  const validOptions = allOptions.filter((opt) => opt !== FILTER_OPTION_ALL);
-  if (validOptions.length === 0) return selected;
-
-  const selectedSet = new Set(selected);
-  const isAllIncluded =
-    validOptions.length > 0 &&
-    validOptions.every((opt) => selectedSet.has(opt));
-
-  if (isAllIncluded) {
-    return ["*"];
-  }
-
-  // 超过一半被选中时，反向记录排除项（例如全选 - 1 仅记录 ["!排除项"]）
-  if (selected.length > validOptions.length / 2) {
-    const excluded = validOptions.filter((opt) => !selectedSet.has(opt));
-    if (excluded.length === 0) return ["*"];
-    return excluded.map((opt) => `!${opt}`);
-  }
-
-  return selected;
-}
-
-/**
- * 将 URL 参数还原为前端多选列表
- * - 参数为空时返回 []
- * - ["*"] 或 ["all"] 还原为所有有效选项列表
- * - 带 "!" 前缀的项还原为“全集减去排除项”
- * - 其余情况保持正向选择列表
- */
-export function decodeFilterParam(
-  paramValues: string[],
-  allOptions: string[],
-): string[] {
-  if (!paramValues || paramValues.length === 0) return [];
-
-  const validOptions = allOptions.filter((opt) => opt !== FILTER_OPTION_ALL);
-  if (validOptions.length === 0) return paramValues;
-
-  if (
-    paramValues.length === 1 &&
-    (paramValues[0] === "*" || paramValues[0] === "all")
-  ) {
-    return validOptions;
-  }
-
-  const isExcludeMode = paramValues.some((v) => v.startsWith("!"));
-  if (isExcludeMode) {
-    const excludedSet = new Set(
-      paramValues.map((v) => (v.startsWith("!") ? v.slice(1) : v)),
-    );
-    return validOptions.filter((opt) => !excludedSet.has(opt));
-  }
-
-  return paramValues;
 }

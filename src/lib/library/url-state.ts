@@ -1,0 +1,135 @@
+/**
+ * 曲库页的地址栏格式（见 docs/LIBRARY.md 阶段 3「3. 地址栏格式」）。
+ *
+ *   q          搜索词
+ *   type       类型标签
+ *   year       年份：2015-2020、2018、2015-、-2010、unknown
+ *   genre / artist / lyricist / composer / arranger
+ *              一个个勾选的值（包含），重复参数：?artist=司夏&artist=李萌
+ *   genreNot / artistNot / …
+ *              在全选的基础上取消勾选的值（排除）
+ *   view       视图，默认 grid
+ *   page       页码，默认 1
+ *   advanced   筛选面板是否展开，1 为展开
+ *
+ * 人名、曲风存归一化后的简体（F2）。全选不写（结果和不筛选一样）。
+ * 不兼容旧格式（yearStart、yearEnd、*、!）：页面重构完成前不会上线。
+ */
+import {
+  readArray,
+  readFlag,
+  readInt,
+  readLiteral,
+  readString,
+  writeArray,
+  writeFlag,
+  writeInt,
+  writeString,
+} from "@/lib/utils/url-params";
+import {
+  DEFAULT_MUSIC_LIBRARY_VIEW_MODE,
+  FILTER_OPTION_ALL,
+  MUSIC_LIBRARY_VIEW_MODES,
+  type MusicLibraryViewMode,
+} from "@/lib/constants";
+import { normalize } from "@/lib/search/normalize";
+import {
+  emptyFacets,
+  FACET_KEYS,
+  type FacetKey,
+  type FacetSelection,
+  formatYear,
+  type LibraryFilters,
+  NO_SELECTION,
+  parseYear,
+  type YearFilter,
+} from "./filters";
+
+export interface LibraryUrlState extends LibraryFilters {
+  query: string;
+  view: MusicLibraryViewMode;
+  page: number;
+  advanced: boolean;
+}
+
+const excludeKey = (key: FacetKey) => `${key}Not`;
+
+/** 地址栏里的人名可能是手打的、繁体的，按归一化后的值比较 */
+function readFacetValues(params: URLSearchParams, key: string): string[] {
+  return [...new Set(readArray(params, key).map(normalize).filter(Boolean))];
+}
+
+function readFacet(params: URLSearchParams, key: FacetKey): FacetSelection {
+  // 两种都写了时以包含为准：包含更具体
+  const include = readFacetValues(params, key);
+  if (include.length > 0) return { mode: "include", values: include };
+  const exclude = readFacetValues(params, excludeKey(key));
+  if (exclude.length > 0) return { mode: "exclude", values: exclude };
+  return NO_SELECTION;
+}
+
+export function parseLibraryUrl(params: URLSearchParams): LibraryUrlState {
+  const facets = emptyFacets();
+  for (const key of FACET_KEYS) facets[key] = readFacet(params, key);
+  return {
+    query: readString(params, "q"),
+    type: readString(params, "type", FILTER_OPTION_ALL),
+    year: parseYear(params.get("year")),
+    facets,
+    view: readLiteral(
+      params,
+      "view",
+      MUSIC_LIBRARY_VIEW_MODES,
+      DEFAULT_MUSIC_LIBRARY_VIEW_MODE,
+    ),
+    page: Math.max(1, readInt(params, "page", 1)),
+    advanced: readFlag(params, "advanced"),
+  };
+}
+
+export function writeQuery(draft: URLSearchParams, query: string): void {
+  writeString(draft, "q", query);
+}
+
+export function writeType(draft: URLSearchParams, type: string): void {
+  writeString(draft, "type", type, FILTER_OPTION_ALL);
+}
+
+export function writeYear(draft: URLSearchParams, year: YearFilter): void {
+  const raw = formatYear(year);
+  if (raw === null) draft.delete("year");
+  else draft.set("year", raw);
+}
+
+/** 全选（排除空）和不选都不写 */
+export function writeFacet(
+  draft: URLSearchParams,
+  key: FacetKey,
+  sel: FacetSelection,
+): void {
+  writeArray(draft, key, sel.mode === "include" ? sel.values : []);
+  writeArray(draft, excludeKey(key), sel.mode === "exclude" ? sel.values : []);
+}
+
+export function writeView(
+  draft: URLSearchParams,
+  view: MusicLibraryViewMode,
+): void {
+  writeString(draft, "view", view, DEFAULT_MUSIC_LIBRARY_VIEW_MODE);
+}
+
+export function writePage(draft: URLSearchParams, page: number): void {
+  writeInt(draft, "page", Math.max(1, page), 1);
+}
+
+export function writeAdvanced(draft: URLSearchParams, open: boolean): void {
+  writeFlag(draft, "advanced", open);
+}
+
+/** 筛选条件全部清空（视图保留：那是怎么看，不是看什么） */
+export function clearFilters(draft: URLSearchParams): void {
+  for (const key of ["q", "type", "year", "page", "advanced"]) {
+    draft.delete(key);
+  }
+  for (const key of FACET_KEYS) writeFacet(draft, key, NO_SELECTION);
+}

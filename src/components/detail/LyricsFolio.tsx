@@ -8,7 +8,7 @@ import SectionHeading from "@/components/detail/SectionHeading";
 import { usePlayerTime } from "@/hooks/player/usePlayerTime";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import type { SongCollation, SongImageryMark } from "@/lib/types";
-import { cn } from "@/lib/utils/utils";
+import { cn, toChineseNumeral } from "@/lib/utils/utils";
 import {
   type CommentSlot,
   type CommentThread,
@@ -26,14 +26,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-
-const NUMERALS = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-
-function toChineseNumeral(n: number): string {
-  if (n < 10) return NUMERALS[n];
-  const tens = Math.floor(n / 10);
-  return `${tens > 1 ? NUMERALS[tens] : ""}十${NUMERALS[n % 10]}`;
-}
 
 interface LyricsFolioProps {
   songId: number;

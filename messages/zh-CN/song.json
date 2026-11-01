@@ -117,6 +117,7 @@
       "sungAs": "「{quote}」唱作「{sung}」。",
       "collator": "{name} 校",
       "reviser": "{name} 订",
+      "revisersMany": "{names}等{count}人 订",
       "anonymous": "佚名"
     },
     "supplements": {

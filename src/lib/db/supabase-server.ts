@@ -60,6 +60,7 @@ export const TABLES = {
   EMOTIONS: "emotions", // 基调词表（见 IMAGERY.md）
   SONG_EMOTIONS: "song_emotions", // 每首歌的主、副基调
   SONG_COLLATIONS: "song_collations", // 校记：管理员写在歌词上的勘误
+  SONG_COLLATION_REVISERS: "song_collation_revisers", // 校记、补遗的订者名单
 
   // 用户与互动表
   USERS: "users",

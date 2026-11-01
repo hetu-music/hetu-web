@@ -102,6 +102,31 @@ export function sortSupplements(list: SongCollation[]): SongCollation[] {
   });
 }
 
+/**
+ * 前台落款里的订者：三人以内全列，用顿号隔开；再多只列第一个和最后一个，
+ * 记作「乙、戊等四人」，count 为总人数。没有订者时为 null
+ */
+export function summarizeRevisers(
+  revisers: string[],
+): { names: string; count: number | null } | null {
+  if (revisers.length === 0) return null;
+  if (revisers.length <= 3) return { names: revisers.join("、"), count: null };
+  return {
+    names: `${revisers[0]}、${revisers[revisers.length - 1]}`,
+    count: revisers.length,
+  };
+}
+
+/** 后台提示：改了内容再保存，是否会把自己新记进订者名单 */
+export function willSignAsReviser(
+  c: SongCollation,
+  userName: string | null | undefined,
+): boolean {
+  return (
+    !!userName && c.collator !== userName && !c.revisers.includes(userName)
+  );
+}
+
 export interface ResolvedCollation {
   collation: SongCollation;
   /** 所校的那一行；原句已改动、找不回时为 null */

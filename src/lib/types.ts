@@ -237,8 +237,8 @@ export interface SongCollation {
   body: string;
   /** 校者；账号已删为 null */
   collator: string | null;
-  /** 订者：别人改过时才有 */
-  reviser: string | null;
+  /** 订者：校者以外改过的人，按第一次修改的先后；账号已删的不列 */
+  revisers: string[];
 }
 
 // 个人页「我的批评」：按歌分组

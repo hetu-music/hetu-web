@@ -43,9 +43,8 @@ const baseRow = {
   sung: "实唱",
   body: "说明",
   created_by: "u1",
-  updated_by: null,
   collator: { name: "校者" },
-  reviser: null,
+  revisers: [],
 };
 
 beforeEach(() => {
@@ -97,7 +96,7 @@ describe("getSongCollations", () => {
       sung: "实唱",
       body: "说明",
       collator: "校者",
-      reviser: null,
+      revisers: [],
     });
     expect(toTraditional).not.toHaveBeenCalled();
   });
@@ -130,31 +129,36 @@ describe("getSongCollations", () => {
     expect(c.anchorQuote).toBe("原句");
   });
 
-  it("他人修订时署订者；自己改自己的不署；无 created_by 不署校者", async () => {
+  it("订者按第一次修改的先后排，账号已删的不列；无 created_by 不署校者", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({
           data: [
-            { ...baseRow, id: 1, updated_by: "u2", reviser: { name: "订者" } },
-            { ...baseRow, id: 2, updated_by: "u1", reviser: { name: "自己" } },
             {
               ...baseRow,
-              id: 3,
+              id: 1,
+              revisers: [
+                { first_at: "2026-11-03T00:00:00Z", user: { name: "丙" } },
+                { first_at: "2026-11-01T00:00:00Z", user: { name: "乙" } },
+                { first_at: "2026-11-02T00:00:00Z", user: null },
+              ],
+            },
+            {
+              ...baseRow,
+              id: 2,
               created_by: null,
               collator: { name: "不该出现" },
+              revisers: null,
             },
-            { ...baseRow, id: 4, collator: null, updated_by: "u2" },
           ],
           error: null,
         }),
       ]),
     );
     const list = await getSongCollations(7, "zh-CN");
-    expect(list.map((c) => [c.collator, c.reviser])).toEqual([
-      ["校者", "订者"],
-      ["校者", null],
-      [null, null],
-      [null, null],
+    expect(list.map((c) => [c.collator, c.revisers])).toEqual([
+      ["校者", ["乙", "丙"]],
+      [null, []],
     ]);
   });
 

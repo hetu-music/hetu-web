@@ -23,7 +23,7 @@ import { toTraditional } from "@/lib/utils/utils-convert";
  */
 
 const FIELDS =
-  "id, song_id, anchor, anchor_index, anchor_time, anchor_quote, kind, date, quote, sung, body, created_by, updated_by";
+  "id, song_id, anchor, anchor_index, anchor_time, anchor_quote, kind, date, quote, sung, body, created_by";
 
 interface CollationRow {
   id: number;
@@ -38,9 +38,10 @@ interface CollationRow {
   sung: string | null;
   body: string;
   created_by: string | null;
-  updated_by: string | null;
   collator: { name: string | null } | null;
-  reviser: { name: string | null } | null;
+  revisers:
+    | { first_at: string; user: { name: string | null } | null }[]
+    | null;
 }
 
 export class CollationError extends Error {
@@ -63,11 +64,12 @@ export async function getSongCollations(
 ): Promise<SongCollation[]> {
   const db = getServiceClient();
   if (!db) return [];
-  // 校者、订者都指向 users，用列名指明走哪条外键
+  // song_collations 有两条外键指向 users，用列名指明校者走 created_by；
+  // 订者名单由触发器记，校者本人不在其中
   const { data, error } = await db
     .from(TABLES.SONG_COLLATIONS)
     .select(
-      `${FIELDS}, collator:${TABLES.USERS}!created_by(name), reviser:${TABLES.USERS}!updated_by(name)`,
+      `${FIELDS}, collator:${TABLES.USERS}!created_by(name), revisers:${TABLES.SONG_COLLATION_REVISERS}(first_at, user:${TABLES.USERS}(name))`,
     )
     .eq("song_id", songId)
     .order("id");
@@ -91,11 +93,9 @@ export async function getSongCollations(
     sung: tr(r.sung),
     body: tr(r.body) ?? "",
     collator: r.created_by ? (r.collator?.name ?? null) : null,
-    // 自己改自己的不另署「订」
-    reviser:
-      r.updated_by && r.updated_by !== r.created_by
-        ? (r.reviser?.name ?? null)
-        : null,
+    revisers: [...(r.revisers ?? [])]
+      .sort((a, b) => Date.parse(a.first_at) - Date.parse(b.first_at))
+      .flatMap((v) => (v.user?.name ? [v.user.name] : [])),
   }));
 }
 

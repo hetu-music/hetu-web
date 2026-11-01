@@ -22,6 +22,7 @@ import {
  *   CDN 上不另设时长。但 Cloudflare 默认不缓存 HTML 和 JSON，要两条 Cache Rule：
  *   一条让页面和公开接口按源站头进缓存（排除 /api/admin、/api/auth），
  *   一条让站内跳转请求（?_rsc= 或 rsc: 1）绕过缓存。
+ *   规则原文和待加的缓存键设置见 docs/CACHE.md。
  *   只能按 URL 清，所以受影响的页面和接口要逐个列出来。
  *   站内跳转的 ?_rsc=… 变体只有 CloudFront 能按通配清。
  *

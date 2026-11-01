@@ -182,10 +182,14 @@ describe("年份", () => {
   const cells = buildLibraryOptions(SONGS).years; // [2020, 2015, 2012, 2010, 未知]
 
   it("地址栏写法往返", () => {
-    for (const raw of ["2015-2020", "2018", "2015-", "-2010", "unknown"]) {
+    for (const raw of ["2020-2015", "2018", "-2015", "2010-", "unknown"]) {
       expect(formatYear(parseYear(raw))).toBe(raw);
     }
     expect(parseYear("2020-2015")).toEqual({ from: 2015, to: 2020 });
+    // 和滑轨一致：左端（较新）在前；两端写反了也照样认
+    expect(parseYear("-2015")).toEqual({ from: 2015, to: null });
+    expect(parseYear("2010-")).toEqual({ from: null, to: 2010 });
+    expect(parseYear("2015-2020")).toEqual({ from: 2015, to: 2020 });
     expect(parseYear(null)).toBeNull();
     expect(parseYear("-")).toBeNull();
     expect(parseYear("abc")).toBeNull();
@@ -220,8 +224,8 @@ describe("年份", () => {
 
   it("曲库加了更新年份的歌：拖到最左一格的链接包含它们，闭区间的链接不变", () => {
     const later = [...SONGS, song(7, { year: 2026 })];
-    const open = parseYear("2015-");
-    const closed = parseYear("2012-2020");
+    const open = parseYear("-2015");
+    const closed = parseYear("2020-2012");
     expect(ids(filterSongs(later, filters({ year: open })))).toContain(7);
     expect(ids(filterSongs(later, filters({ year: closed })))).toEqual(
       ids(filterSongs(SONGS, filters({ year: closed }))),

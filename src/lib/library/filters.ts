@@ -331,14 +331,18 @@ export function yearToSlider(
   return left <= right ? [left, right] : [left, left];
 }
 
-/** 地址栏里的写法：2015-2020、2018、2015-（及以后）、-2010（及以前，含未知）、unknown */
+/**
+ * 地址栏里的写法，和滑轨一样从左到右、从新到旧：「左端-右端」。
+ * 2020-2015、2018、-2015（最左拖到头：2015 年及以后）、
+ * 2010-（最右拖到头：2010 年及以前，含未知）、unknown
+ */
 export function formatYear(filter: YearFilter): string | null {
   if (filter === null) return null;
   if (filter === "unknown") return "unknown";
   if (filter.from !== null && filter.from === filter.to) {
     return String(filter.from);
   }
-  return `${filter.from ?? ""}-${filter.to ?? ""}`;
+  return `${filter.to ?? ""}-${filter.from ?? ""}`;
 }
 
 export function parseYear(raw: string | null): YearFilter {
@@ -350,8 +354,8 @@ export function parseYear(raw: string | null): YearFilter {
   }
   const m = /^(\d{1,4})?-(\d{1,4})?$/.exec(raw);
   if (!m) return null;
-  let from = m[1] ? Number(m[1]) : null;
-  let to = m[2] ? Number(m[2]) : null;
+  let to = m[1] ? Number(m[1]) : null;
+  let from = m[2] ? Number(m[2]) : null;
   if (from === null && to === null) return null;
   if (from !== null && to !== null && from > to) [from, to] = [to, from];
   return { from, to };

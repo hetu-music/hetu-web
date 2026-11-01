@@ -95,7 +95,7 @@ describe("useLibraryState", () => {
     act(() => result.current.setYearSlider([0, 1]));
     act(() => vi.advanceTimersByTime(300));
     act(() => vi.runAllTimers());
-    expect(search().get("year")).toBe("2015-");
+    expect(search().get("year")).toBe("-2015");
     expect(result.current.yearSlider).toEqual([0, 1]);
   });
 

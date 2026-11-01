@@ -104,7 +104,7 @@ describe("写地址栏", () => {
 
   it("清空筛选时保留视图", () => {
     const d = new URLSearchParams(
-      "q=天下&type=原创&year=2015-&artist=河图&lyricistNot=x&page=2&advanced=1&view=list",
+      "q=天下&type=原创&year=-2015&artist=河图&lyricistNot=x&page=2&advanced=1&view=list",
     );
     clearFilters(d);
     expect(d.toString()).toBe("view=list");

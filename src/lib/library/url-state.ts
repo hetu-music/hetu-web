@@ -3,7 +3,7 @@
  *
  *   q          搜索词
  *   type       类型标签
- *   year       年份：2015-2020、2018、2015-、-2010、unknown
+ *   year       年份：2020-2015、2018、-2015、2010-、unknown（和滑轨一样从新到旧）
  *   genre / artist / lyricist / composer / arranger
  *              一个个勾选的值（包含），重复参数：?artist=司夏&artist=李萌
  *   genreNot / artistNot / …

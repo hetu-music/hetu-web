@@ -5,14 +5,23 @@ import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import { addToast } from "@/components/ui/toast";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useDeferredCjkFonts } from "@/hooks/library/useDeferredCjkFonts";
+import { useLibraryDeferred } from "@/hooks/library/useLibraryDeferred";
 import { useLibraryResults } from "@/hooks/library/useLibraryResults";
 import { useLibraryState } from "@/hooks/library/useLibraryState";
+import { useListReveal } from "@/hooks/library/useListReveal";
 import { useScrollRestore } from "@/hooks/library/useScrollRestore";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
-import { flushUrlState } from "@/hooks/utils/useUrlState";
+import { flushUrlState, useUrlState } from "@/hooks/utils/useUrlState";
 import { useRouter } from "@/i18n/navigation";
 import { MUSIC_LIBRARY_ITEMS_PER_PAGE } from "@/lib/constants";
-import { buildLibraryOptions } from "@/lib/library/filters";
+import {
+  buildBaseOptions,
+  FACET_KEYS,
+  type FacetKey,
+  type FacetOption,
+} from "@/lib/library/filters";
+import { LIST_ID } from "@/lib/library/reveal";
+import { needsDeferred } from "@/lib/library/url-state";
 import type { MusicLibraryClientProps } from "@/lib/types";
 import { sharePage } from "@/lib/utils/share";
 import { cn } from "@/lib/utils/utils";
@@ -22,14 +31,21 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HeroSection from "./HeroSection";
 import LibraryToolbar from "./LibraryToolbar";
-import SongFilters from "./SongFilters";
 import SongResults from "./SongResults";
 
 const NAV_DEPTH_KEY = "__hetu_web_nav_depth";
 
+/** 第二档没到时人名、曲风没有选项 */
+const NO_FACET_OPTIONS = Object.fromEntries(
+  FACET_KEYS.map((k) => [k, [] as FacetOption[]]),
+) as Record<FacetKey, FacetOption[]>;
+
 /**
  * 曲库页：把地址栏状态（useLibraryState）、结果（useLibraryResults）接到
  * 卷首、工具栏、筛选面板、列表这几块上。各块只认传进来的值（见 docs/LIBRARY.md 阶段 3）。
+ *
+ * 首屏只有列表、卷首、工具栏；筛选面板和搜索、人名曲风筛选（第二档）页面空闲时才加载，
+ * 带参数打开时列表先藏着，筛完再显示（阶段 4）。
  */
 export default function MusicLibraryClient({
   initialSongsData,
@@ -44,13 +60,26 @@ export default function MusicLibraryClient({
   const { showScrollTop, scrollToTop } = useScrollTop();
   const listStartRef = useRef<HTMLDivElement>(null);
 
-  const options = useMemo(
-    () => buildLibraryOptions(initialSongsData),
+  const [params, , urlSynced] = useUrlState();
+  const deferred = useLibraryDeferred(initialSongsData, needsDeferred(params));
+  const { engine, SongFilters } = deferred;
+
+  const baseOptions = useMemo(
+    () => buildBaseOptions(initialSongsData),
     [initialSongsData],
   );
-  const state = useLibraryState(options);
-  const { results, available, lyricsState, getLyricsSnippet } =
-    useLibraryResults(initialSongsData, state.query, state.filters);
+  const options = useMemo(
+    () => ({
+      ...baseOptions,
+      facets: engine?.facetOptions ?? NO_FACET_OPTIONS,
+    }),
+    [baseOptions, engine],
+  );
+  const state = useLibraryState(options, engine?.normalize);
+  const { results, available, lyricsState, getLyricsSnippet, pending } =
+    useLibraryResults(initialSongsData, state.query, state.filters, engine);
+  // 读到这一页的地址栏、并且按它筛完了，列表才显示
+  const listHidden = useListReveal(urlSynced && (!pending || deferred.failed));
   const { isRestoringScroll, notifyDataReady, saveScroll, clearSavedScroll } =
     useScrollRestore();
 
@@ -73,11 +102,12 @@ export default function MusicLibraryClient({
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    // 列表还藏着（等第二档筛完）时不滚：滚回去的位置要按筛完的列表算
+    if (!mounted || listHidden) return;
 
     const timer = setTimeout(notifyDataReady, 0);
     return () => clearTimeout(timer);
-  }, [mounted, results, mountKey, notifyDataReady, state.view]);
+  }, [mounted, listHidden, results, mountKey, notifyDataReady, state.view]);
 
   const totalPages = Math.max(
     1,
@@ -186,32 +216,39 @@ export default function MusicLibraryClient({
           view={state.view}
           onViewChange={state.setView}
         >
-          <SongFilters
-            options={options}
-            checked={state.checked}
-            onFacetChange={state.setFacetChecked}
-            available={available}
-            yearSlider={state.yearSlider}
-            onYearChange={state.setYearSlider}
-          />
+          {SongFilters ? (
+            <SongFilters
+              options={options}
+              checked={state.checked}
+              onFacetChange={state.setFacetChecked}
+              available={available}
+              yearSlider={state.yearSlider}
+              onYearChange={state.setYearSlider}
+            />
+          ) : (
+            // 面板的代码还没到（带 ?advanced=1 打开时）：先占住它的高度，到了不跳
+            <div aria-hidden className="h-75 lg:h-26" />
+          )}
         </LibraryToolbar>
 
-        <SongResults
-          songs={pageSongs}
-          isEmpty={results.length === 0}
-          view={state.view}
-          page={safePage}
-          totalPages={totalPages}
-          onPageChange={setPage}
-          scrollTarget={listStartRef}
-          remountKey={`page-${safePage}-${mountKey}`}
-          activeSongId={activeSongId}
-          onSongClick={navigateToSong}
-          getLyricsSnippet={getLyricsSnippet}
-          onFirstCoverSettled={releaseCjkFonts}
-          showFavoriteColumn={isLoggedIn}
-          isRestoringScroll={isRestoringScroll}
-        />
+        <div id={LIST_ID} className={cn(listHidden && "invisible")}>
+          <SongResults
+            songs={pageSongs}
+            isEmpty={results.length === 0}
+            view={state.view}
+            page={safePage}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            scrollTarget={listStartRef}
+            remountKey={`page-${safePage}-${mountKey}`}
+            activeSongId={activeSongId}
+            onSongClick={navigateToSong}
+            getLyricsSnippet={getLyricsSnippet}
+            onFirstCoverSettled={releaseCjkFonts}
+            showFavoriteColumn={isLoggedIn}
+            isRestoringScroll={isRestoringScroll}
+          />
+        </div>
       </main>
 
       <FloatingActionButtons

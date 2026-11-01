@@ -1,73 +1,19 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Fuse from "fuse.js";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import type { LyricsEntry } from "@/lib/library/legacy-fuse";
 import type { Song } from "@/lib/types";
-import { LYRIC_SEARCH_KEY, type MatchRanges } from "@/lib/utils/utils-song";
+import type { MatchRanges } from "@/lib/utils/utils-song";
 
-export type LyricsEntry = { id: number; l: string };
+export type { LyricsEntry };
 
 export type LyricsSearchState = "idle" | "loading" | "ready" | "error";
 
 export interface UseLyricsIndexResult {
-  // 扩充了歌词后的 Fuse 实例（ready 后替代初始实例）
-  lyricsFuseInstance: Fuse<
-    Song & { searchableContent: string; lyricContent: string }
-  > | null;
-  // 按 id 映射的歌词索引 Map，供展示搜索命中片段用
-  lyricsMap: Map<number, string>;
+  /** 全部歌词文本，到了之后由搜索那一端建含歌词的索引（见 src/lib/library/engine.ts） */
+  entries: LyricsEntry[] | undefined;
   state: LyricsSearchState;
-}
-
-type FuseExtended = Fuse<
-  Song & { searchableContent: string; lyricContent: string }
->;
-
-/** 导出只为 scripts/search-eval.ts 按线上配置跑旧方案做对比 */
-export function buildFromEntries(
-  songs: Song[],
-  entries: LyricsEntry[],
-): { map: Map<number, string>; fuse: FuseExtended } {
-  const map = new Map<number, string>();
-  entries.forEach((entry) => map.set(entry.id, entry.l));
-
-  const searchData = songs.map((song) => ({
-    ...song,
-    searchableContent: [
-      song.title,
-      song.album || "",
-      (song.artist || []).join(" "),
-      (song.lyricist || []).join(" "),
-      (song.composer || []).join(" "),
-      (song.arranger || []).join(" "),
-    ]
-      .filter(Boolean)
-      .join(" "),
-    [LYRIC_SEARCH_KEY]: map.get(song.id) || "",
-  }));
-
-  const fuse = new Fuse(searchData, {
-    keys: [
-      { name: "title", weight: 0.35 },
-      { name: "album", weight: 0.15 },
-      { name: "artist", weight: 0.15 },
-      { name: "lyricist", weight: 0.1 },
-      { name: "composer", weight: 0.05 },
-      { name: "arranger", weight: 0.05 },
-      { name: "creditAliases", weight: 0.05 },
-      { name: LYRIC_SEARCH_KEY, weight: 0.15 },
-    ],
-    threshold: 0.35,
-    includeScore: true,
-    ignoreLocation: true,
-    findAllMatches: true,
-    minMatchCharLength: 1,
-    shouldSort: true,
-    includeMatches: true,
-  });
-
-  return { map, fuse };
 }
 
 async function fetchLyricsIndex(): Promise<LyricsEntry[]> {
@@ -80,9 +26,10 @@ async function fetchLyricsIndex(): Promise<LyricsEntry[]> {
 }
 
 /**
- * 后台异步拉取全部歌词文本，构建包含歌词的 Fuse.js 索引。
+ * 后台异步拉取全部歌词文本，供搜索歌词用。
  * 拉取是非阻塞的，不影响页面首屏，完成后无感刷新搜索能力。
- * 拉取结果缓存在模块级变量中，返回详情页再回来时可即时恢复，无需重新 fetch。
+ * 拉取结果由 react-query 缓存，返回详情页再回来时可即时恢复，无需重新 fetch。
+ * 阶段 5 换成按需拉取（见 docs/LIBRARY.md 阶段 5「3.」）。
  */
 export function useLyricsIndex(songs: Song[]): UseLyricsIndexResult {
   const [enabled, setEnabled] = useState(false);
@@ -101,18 +48,6 @@ export function useLyricsIndex(songs: Song[]): UseLyricsIndexResult {
     retry: 1,
   });
 
-  const builtIndex = useMemo(() => {
-    if (!query.data) {
-      return {
-        map: new Map<number, string>(),
-        fuse: null as FuseExtended | null,
-      };
-    }
-
-    const { map, fuse } = buildFromEntries(songs, query.data);
-    return { map, fuse };
-  }, [songs, query.data]);
-
   const state: LyricsSearchState = !enabled
     ? "idle"
     : query.isPending
@@ -121,11 +56,7 @@ export function useLyricsIndex(songs: Song[]): UseLyricsIndexResult {
         ? "error"
         : "ready";
 
-  return {
-    lyricsFuseInstance: builtIndex.fuse,
-    lyricsMap: builtIndex.map,
-    state,
-  };
+  return { entries: query.data, state };
 }
 
 /**

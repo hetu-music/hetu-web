@@ -6,6 +6,9 @@
  *
  * 搜索框和年份滑轨各有一份草稿：界面上立刻变，停下 300 毫秒才写进地址栏；
  * 结果直接跟着地址栏走。每次改动只写一次地址栏，改筛选时顺带把页码清掉（X6）。
+ *
+ * 人名、曲风的选项和归一化在第二档（engine.ts），到之前 options.facets 是空的、
+ * 地址栏里的人名只去掉首尾空白；到了之后传进来，按归一化后的值重新读一遍。
  */
 import { useCallback, useMemo, useState } from "react";
 import { useDebouncedDraft } from "@/hooks/ui/useDebouncedDraft";
@@ -42,9 +45,15 @@ const INPUT_DEBOUNCE_MS = 300;
 const sameRange = (a: [number, number], b: [number, number]) =>
   a[0] === b[0] && a[1] === b[1];
 
-export function useLibraryState(options: LibraryOptions) {
+export function useLibraryState(
+  options: LibraryOptions,
+  normalize?: (text: string) => string,
+) {
   const [params, update] = useUrlState();
-  const url = useMemo(() => parseLibraryUrl(params), [params]);
+  const url = useMemo(
+    () => parseLibraryUrl(params, normalize),
+    [params, normalize],
+  );
 
   // 全选在地址栏里不写（结果和不筛选一样），界面上却要显示成全部勾上，记在这里
   const [allSelected, setAllSelected] = useState<ReadonlySet<FacetKey>>(

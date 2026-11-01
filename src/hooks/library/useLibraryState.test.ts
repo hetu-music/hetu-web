@@ -2,7 +2,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetUrlStateForTests } from "@/hooks/utils/useUrlState";
-import { buildLibraryOptions } from "@/lib/library/filters";
+import { buildLibraryOptions } from "@/lib/library/engine";
+import { normalize } from "@/lib/search/normalize";
 import type { Song } from "@/lib/types";
 import { useLibraryState } from "./useLibraryState";
 
@@ -39,7 +40,7 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 function setup() {
-  return renderHook(() => useLibraryState(OPTIONS));
+  return renderHook(() => useLibraryState(OPTIONS, normalize));
 }
 
 describe("useLibraryState", () => {

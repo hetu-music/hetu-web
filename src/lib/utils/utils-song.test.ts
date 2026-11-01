@@ -2,14 +2,13 @@ import { describe, it, expect } from "vitest";
 import Fuse from "fuse.js";
 import {
   countCatalogSongs,
-  filterSongs,
   getCoverUrl,
   getNmnUrl,
   LYRIC_SEARCH_KEY,
   mapAndSortSongs,
   processLyricsForSearch,
-  searchAndFilterSongs,
 } from "./utils-song";
+import { filterSongs, searchAndFilterSongs } from "@/lib/library/legacy-fuse";
 import type { Song } from "@/lib/types";
 
 function makeSong(overrides: Partial<Song> & { id: number }): Song {

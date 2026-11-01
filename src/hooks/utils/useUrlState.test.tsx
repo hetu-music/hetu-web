@@ -10,6 +10,9 @@ import React from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const router = vi.hoisted(() => ({ pathname: null as string | null }));
+vi.mock("next/navigation", () => ({ usePathname: () => router.pathname }));
+
 import {
   flushUrlState,
   resetUrlStateForTests,
@@ -41,6 +44,7 @@ function Probe() {
 const text = (id: string) => screen.getByTestId(id).textContent;
 
 beforeEach(() => {
+  router.pathname = null;
   resetUrlStateForTests();
   window.history.replaceState(null, "", "/");
 });
@@ -83,6 +87,45 @@ describe("useUrlState：读", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     expect(text("q")).toBe("如花");
+  });
+});
+
+describe("useUrlState：软导航", () => {
+  it("地址栏还是上一页的（Next 提交时才改）：参数按空的算，提交后读到新的", () => {
+    window.history.replaceState(null, "", "/song/9");
+    router.pathname = "/";
+    const seen: [string, boolean][] = [];
+    function Page() {
+      const [params, , synced] = useUrlState();
+      seen.push([params.toString(), synced]);
+      return null;
+    }
+    // 和 Next 的 HistoryUpdater 一样：在提交时用没被我们订阅的 pushState 改地址栏
+    function HistoryUpdater() {
+      React.useInsertionEffect(() => {
+        window.history.pushState(null, "", "/?artist=司夏");
+      }, []);
+      return null;
+    }
+    render(
+      <>
+        <Page />
+        <HistoryUpdater />
+      </>,
+    );
+    expect(seen[0]).toEqual(["", false]);
+    expect(seen[seen.length - 1]).toEqual([
+      new URLSearchParams({ artist: "司夏" }).toString(),
+      true,
+    ]);
+  });
+
+  it("路径一致就是读到了，编码与否不影响", () => {
+    window.history.replaceState(null, "", "/zh-TW/song/%E4%B8%80?q=1");
+    router.pathname = "/zh-TW/song/一";
+    const { result } = renderHook(() => useUrlState());
+    expect(result.current[2]).toBe(true);
+    expect(result.current[0].get("q")).toBe("1");
   });
 });
 

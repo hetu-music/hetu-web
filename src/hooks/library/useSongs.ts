@@ -2,11 +2,8 @@ import { useDebouncedValue } from "@/hooks/ui/useDebouncedValue";
 import { useMemo, useState } from "react";
 import { FILTER_OPTION_ALL } from "@/lib/constants";
 import type { SongDetail } from "@/lib/types";
-import {
-  mapAndSortSongs,
-  filterSongs,
-  createFuseInstance,
-} from "@/lib/utils/utils-song";
+import { mapAndSortSongs } from "@/lib/utils/utils-song";
+import { createFuseInstance, filterSongs } from "@/lib/library/legacy-fuse";
 
 export function useSongs(
   initialSongs: SongDetail[],

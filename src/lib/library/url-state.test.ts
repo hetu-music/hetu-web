@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { FILTER_OPTION_ALL } from "@/lib/constants";
+import { normalize } from "@/lib/search/normalize";
 import { ALL_SELECTED, NO_SELECTION } from "./filters";
 import {
   clearFilters,
+  LIST_PARAMS,
+  needsDeferred,
   parseLibraryUrl,
   writeFacet,
   writePage,
@@ -10,7 +13,7 @@ import {
   writeYear,
 } from "./url-state";
 
-const parse = (s: string) => parseLibraryUrl(new URLSearchParams(s));
+const parse = (s: string) => parseLibraryUrl(new URLSearchParams(s), normalize);
 
 describe("parseLibraryUrl", () => {
   it("什么都不带就是默认状态", () => {
@@ -108,5 +111,44 @@ describe("写地址栏", () => {
     );
     clearFilters(d);
     expect(d.toString()).toBe("view=list");
+  });
+});
+
+describe("第二档什么时候要马上加载", () => {
+  const needs = (s: string) => needsDeferred(new URLSearchParams(s));
+
+  it("搜索、人名曲风（包含或排除）、展开筛选面板：要", () => {
+    expect(needs("q=天下")).toBe(true);
+    expect(needs("artist=河图")).toBe(true);
+    expect(needs("genreNot=古风")).toBe(true);
+    expect(needs("advanced=1")).toBe(true);
+  });
+
+  it("只有类型、年份、视图、页码：不用", () => {
+    expect(needs("")).toBe(false);
+    expect(needs("q=")).toBe(false);
+    expect(needs("type=原创&year=2020-2015&view=list&page=3")).toBe(false);
+  });
+
+  it("不传归一化时人名只去掉首尾空白", () => {
+    const state = parseLibraryUrl(new URLSearchParams("artist=%20河圖%20"));
+    expect(state.facets.artist.values).toEqual(["河圖"]);
+  });
+});
+
+describe("影响列表的参数", () => {
+  it("含筛选、搜索、视图、页码，不含 advanced", () => {
+    for (const k of [
+      "q",
+      "type",
+      "year",
+      "artist",
+      "artistNot",
+      "view",
+      "page",
+    ]) {
+      expect(LIST_PARAMS).toContain(k);
+    }
+    expect(LIST_PARAMS).not.toContain("advanced");
   });
 });

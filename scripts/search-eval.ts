@@ -11,7 +11,10 @@
  * 改动 src/lib/search 之后跑一次。
  */
 import { createClient } from "@supabase/supabase-js";
-import { buildFromEntries } from "../src/hooks/library/useLyricsIndex";
+import {
+  buildFromEntries,
+  searchAndFilterSongs,
+} from "../src/lib/library/legacy-fuse";
 import { FILTER_OPTION_ALL } from "../src/lib/constants";
 import { buildCorpus } from "../src/lib/search/corpus";
 import { EVAL_CASES, type EvalCase } from "../src/lib/search/eval-cases";
@@ -30,7 +33,6 @@ import { buildFolio } from "../src/lib/utils/utils-folio";
 import {
   mapAndSortSongs,
   processLyricsForSearch,
-  searchAndFilterSongs,
 } from "../src/lib/utils/utils-song";
 
 type Locale = "zh-CN" | "zh-TW";

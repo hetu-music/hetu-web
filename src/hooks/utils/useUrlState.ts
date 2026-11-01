@@ -11,8 +11,13 @@
  * 同一次 update 里改几个参数只写一次地址栏（X6）；连续改写合成一次，
  * 避开 Safari 对 history.replaceState 调用次数的限制。Next 已把原生 history API
  * 接进它的路由，所以直接用 replaceState / pushState。
+ *
+ * 软导航时 Next 先渲染新页面，提交时（useInsertionEffect）才改地址栏，而且绕开了我们的订阅：
+ * 新页面第一次渲染读到的还是上一页的地址栏。所以快照里带上路径，和路由的路径（usePathname）
+ * 对不上就当作还没读到（synced 为 false，参数按空的算）；Next 改完地址栏后再读一遍。
  */
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
 /** 两次写入地址栏之间至少隔这么久 */
 export const URL_WRITE_INTERVAL_MS = 50;
@@ -51,12 +56,29 @@ function subscribe(listener: () => void) {
   };
 }
 
-function getSnapshot(): string {
+/** 当前的查询串：还没写出去的改动优先 */
+function currentSearch(): string {
   return pending ?? window.location.search;
 }
 
+/** 快照是「路径 + 换行 + 查询串」，路径用来判断地址栏是不是这一页的 */
+const SEP = "\n";
+
+function getSnapshot(): string {
+  return `${window.location.pathname}${SEP}${currentSearch()}`;
+}
+
+/** 服务端和水合时：没有路径，按默认状态（空查询串） */
 function getServerSnapshot(): string {
   return "";
+}
+
+function decodePath(path: string): string {
+  try {
+    return decodeURI(path);
+  } catch {
+    return path;
+  }
 }
 
 /** 立刻把待写的改动写进 history。跳转页面前调用，返回时地址栏才是最新的 */
@@ -82,7 +104,7 @@ function schedule() {
 }
 
 function write(search: string, mode: HistoryMode) {
-  if (search === getSnapshot()) return;
+  if (search === currentSearch()) return;
   pending = search;
   pendingPath = window.location.pathname;
   if (mode === "push") pendingMode = "push";
@@ -96,8 +118,9 @@ export interface UrlUpdateOptions {
 }
 
 /**
- * 返回当前的查询参数（只读）和改写函数。改写函数收到一份副本，改完一次性写回。
- * 参数对象只在查询串变化时换新，可以放进 useMemo 的依赖里。
+ * 返回当前的查询参数（只读）、改写函数，以及地址栏是否已经读到（synced）。
+ * 改写函数收到一份副本，改完一次性写回。参数对象只在查询串变化时换新，可以放进 useMemo 的依赖里。
+ * synced 为 false：服务端、水合时，或软导航时 Next 还没改地址栏；这时参数是空的。
  */
 export function useUrlState(): readonly [
   URLSearchParams,
@@ -105,26 +128,41 @@ export function useUrlState(): readonly [
     mutate: (draft: URLSearchParams) => void,
     options?: UrlUpdateOptions,
   ) => void,
+  boolean,
 ] {
-  const search = useSyncExternalStore(
+  // 不在 Next 的路由里（单元测试）时是 null，那就不比路径
+  const routerPath = usePathname();
+  const snapshot = useSyncExternalStore(
     subscribe,
     getSnapshot,
     getServerSnapshot,
   );
+  const sep = snapshot.indexOf(SEP);
+  const synced =
+    sep !== -1 &&
+    (routerPath === null ||
+      decodePath(snapshot.slice(0, sep)) === decodePath(routerPath));
+  const search = synced ? snapshot.slice(sep + SEP.length) : "";
+
+  // 软导航：Next 在这次提交里改了地址栏，但没有通知我们，提交之后自己再读一遍
+  useEffect(() => {
+    if (sep !== -1 && !synced) emit();
+  });
+
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const update = useCallback(
     (
       mutate: (draft: URLSearchParams) => void,
       options: UrlUpdateOptions = {},
     ) => {
-      const draft = new URLSearchParams(getSnapshot());
+      const draft = new URLSearchParams(currentSearch());
       mutate(draft);
       const next = draft.toString();
       write(next ? `?${next}` : "", options.history ?? "replace");
     },
     [],
   );
-  return [params, update] as const;
+  return [params, update, synced] as const;
 }
 
 /** 只供测试：清掉模块里的待写状态 */

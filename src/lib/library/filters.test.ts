@@ -4,17 +4,21 @@ import type { Song } from "@/lib/types";
 import {
   createFuseInstance,
   searchAndFilterSongs,
-} from "@/lib/utils/utils-song";
+} from "@/lib/library/legacy-fuse";
 import {
-  ALL_SELECTED,
   availableFacetValues,
   buildLibraryOptions,
+  createLibraryEngine,
+  filterSongs,
+} from "./engine";
+import {
+  ALL_SELECTED,
   checkedValues,
   emptyFacets,
   FACET_KEYS,
   type FacetKey,
   type FacetSelection,
-  filterSongs,
+  filterByTypeAndYear,
   formatYear,
   type LibraryFilters,
   matchesFacet,
@@ -429,5 +433,50 @@ describe("拆分前后结果一致", () => {
                 ids(oldPipeline(q, type, range, artist, genre)),
               );
             }
+  });
+});
+
+describe("首屏和第二档分开（阶段 4）", () => {
+  it("没选人名、曲风时，只按类型年份过滤和完整的过滤结果相同", () => {
+    const options = buildLibraryOptions(SONGS);
+    for (const type of options.types) {
+      for (const year of [
+        null,
+        "unknown" as const,
+        { newest: 2015, oldest: null },
+        { newest: null, oldest: 2012 },
+        { newest: 2015, oldest: 2012 },
+      ]) {
+        const f = filters({ type, year });
+        expect(ids(filterByTypeAndYear(SONGS, f))).toEqual(
+          ids(filterSongs(SONGS, f)),
+        );
+      }
+    }
+  });
+
+  it("engine 的搜索和直接调 Fuse 相同；歌词到了以后连歌词一起搜，并给出歌词原文", () => {
+    const engine = createLibraryEngine(SONGS);
+    expect(engine.search("  ", undefined)).toBeNull();
+    expect(ids(engine.search("江南", undefined)?.songs ?? [])).toEqual(
+      ids(legacySearch(SONGS, "江南", createFuseInstance(SONGS))?.songs ?? []),
+    );
+    expect(engine.search("杏花微雨", undefined)?.songs ?? []).toEqual([]);
+
+    const entries = [{ id: 6, l: "杏花微雨 湿了青石" }];
+    const found = engine.search("杏花微雨", entries);
+    expect(ids(found?.songs ?? [])).toContain(6);
+    expect(found?.lyricMatchesById.has(6)).toBe(true);
+    expect(engine.lyricsOf(6)).toBe("杏花微雨 湿了青石");
+  });
+
+  it("engine 的人名选项按归一化合并简繁", () => {
+    const engine = createLibraryEngine([
+      ...SONGS,
+      song(7, { artist: ["河圖"] }),
+    ]);
+    const artists = engine.facetOptions.artist.map((o) => o.value);
+    expect(artists.filter((v) => v === "河图")).toHaveLength(1);
+    expect(engine.normalize("河圖")).toBe("河图");
   });
 });

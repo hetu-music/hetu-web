@@ -6,6 +6,9 @@
  * 简繁两种页面打开同一个链接，结果一致。选项的显示文字仍按页面字形，取自 Song。
  *
  * 类型是单选，年份是区间，各有各的写法。
+ *
+ * 这个文件在首屏路径上，不能用归一化（含繁转简表）：要用到归一化的选项统计、
+ * 按人名和曲风匹配、置灰在 engine.ts，页面空闲时才加载（见 docs/LIBRARY.md 阶段 4「2.」）。
  */
 import {
   FILTER_OPTION_ALL,
@@ -13,12 +16,9 @@ import {
   GENRE_ORDER,
   TYPE_ORDER,
 } from "@/lib/constants";
-import { getSongMeta, type SongMeta } from "@/lib/search/meta";
-import { normalize } from "@/lib/search/normalize";
 import type { Song } from "@/lib/types";
-import { sortNamesOptimized } from "@/lib/utils/utils-song";
 
-type FacetConfig = {
+export type FacetConfig = {
   key: "genre" | "artist" | "lyricist" | "composer" | "arranger";
   /** 显示用的原文，按页面字形 */
   values: (song: Song) => readonly string[] | null | undefined;
@@ -38,11 +38,6 @@ export type FacetKey = (typeof FACETS)[number]["key"];
 
 export const FACET_KEYS: readonly FacetKey[] = FACETS.map((f) => f.key);
 
-/** 归一化后的值；SongMeta 里每个维度都按同名字段存 */
-function metaValues(meta: SongMeta, key: FacetKey): readonly string[] {
-  return meta[key];
-}
-
 /**
  * 一个维度选了什么。include：选中的这几项（空表示不筛选）；
  * exclude：全部选项减去这几项（空表示全选，结果和不筛选一样）。
@@ -59,6 +54,13 @@ export const ALL_SELECTED: FacetSelection = { mode: "exclude", values: [] };
 /** 选中这一维度会不会改变结果：不选和全选都不会 */
 export function isSelectionActive(sel: FacetSelection): boolean {
   return sel.values.length > 0;
+}
+
+/** 有没有哪个维度会改变结果（这时要用 engine.ts 才筛得出来） */
+export function isAnyFacetActive(
+  facets: Record<FacetKey, FacetSelection>,
+): boolean {
+  return FACET_KEYS.some((k) => isSelectionActive(facets[k]));
 }
 
 /**
@@ -96,6 +98,9 @@ export interface FacetOption {
 /** 滑轨的一格：年份从新到旧，「未知」在最右 */
 export type YearCell = number | typeof FILTER_OPTION_UNKNOWN;
 
+/** 首屏就算得出来的选项：类型和年份 */
+export type BaseOptions = Omit<LibraryOptions, "facets">;
+
 export interface LibraryOptions {
   /** 类型标签：FILTER_OPTION_ALL 在最前，FILTER_OPTION_UNKNOWN 在最后（有的话） */
   types: string[];
@@ -103,14 +108,14 @@ export interface LibraryOptions {
   facets: Record<FacetKey, FacetOption[]>;
 }
 
-function orderBy(values: string[], order: readonly string[]): string[] {
+export function orderBy(values: string[], order: readonly string[]): string[] {
   return [
     ...order.filter((v) => values.includes(v)),
     ...values.filter((v) => !order.includes(v)),
   ];
 }
 
-export function buildLibraryOptions(songs: readonly Song[]): LibraryOptions {
+export function buildBaseOptions(songs: readonly Song[]): BaseOptions {
   const typeSet = new Set<string>();
   let unknownType = false;
   const yearSet = new Set<number>();
@@ -126,39 +131,7 @@ export function buildLibraryOptions(songs: readonly Song[]): LibraryOptions {
   const years: YearCell[] = [...yearSet].sort((a, b) => b - a);
   if (unknownYear) years.push(FILTER_OPTION_UNKNOWN);
 
-  const facets = {} as Record<FacetKey, FacetOption[]>;
-  for (const facet of FACETS as readonly FacetConfig[]) {
-    // 同一个归一化值只出一项，显示文字取第一次见到的
-    const labels = new Map<string, string>();
-    let unknown = false;
-    for (const song of songs) {
-      const raw = facet.values(song);
-      if (!raw?.length) {
-        unknown = true;
-        continue;
-      }
-      for (const label of raw) {
-        const value = normalize(label);
-        if (value && !labels.has(value)) labels.set(value, label);
-      }
-    }
-    const byLabel = new Map([...labels].map(([v, l]) => [l, v]));
-    const sortedLabels = facet.order
-      ? orderBy([...byLabel.keys()], facet.order)
-      : sortNamesOptimized([...byLabel.keys()]);
-    const options = sortedLabels.map((label) => ({
-      value: byLabel.get(label) as string,
-      label,
-    }));
-    if (unknown) {
-      options.push({
-        value: FILTER_OPTION_UNKNOWN,
-        label: FILTER_OPTION_UNKNOWN,
-      });
-    }
-    facets[facet.key] = options;
-  }
-  return { types, years, facets };
+  return { types, years };
 }
 
 // ─── 匹配 ─────────────────────────────────────────────────────────────────────
@@ -198,55 +171,15 @@ export function matchesYear(year: number | null, filter: YearFilter): boolean {
   );
 }
 
-/** 按筛选条件过滤，保持原有顺序 */
-export function filterSongs(
+/** 只按类型和年份过滤（没选人名、曲风时用，不用等 engine.ts），保持原有顺序 */
+export function filterByTypeAndYear(
   songs: readonly Song[],
-  filters: LibraryFilters,
+  filters: Pick<LibraryFilters, "type" | "year">,
 ): Song[] {
-  return songs.filter((song) => {
-    if (!matchesType(song, filters.type)) return false;
-    if (!matchesYear(song.year, filters.year)) return false;
-    const meta = getSongMeta(song);
-    return FACET_KEYS.every((k) =>
-      matchesFacet(metaValues(meta, k), filters.facets[k]),
-    );
-  });
-}
-
-/**
- * 每个维度里「勾上之后还有歌」的值（F5）：按其他维度的筛选，再加上这一项。
- * 同一维度内是「或」，再勾本维度的其他项只会让结果变多，所以不看本维度选了什么。
- * songs 应当是已经按搜索词搜过的那些歌。
- */
-export function availableFacetValues(
-  songs: readonly Song[],
-  filters: LibraryFilters,
-): Record<FacetKey, Set<string>> {
-  const out = Object.fromEntries(
-    FACET_KEYS.map((k) => [k, new Set<string>()]),
-  ) as Record<FacetKey, Set<string>>;
-
-  for (const song of songs) {
-    if (!matchesType(song, filters.type)) continue;
-    if (!matchesYear(song.year, filters.year)) continue;
-    const meta = getSongMeta(song);
-    let failed: FacetKey | null = null;
-    let failures = 0;
-    for (const k of FACET_KEYS) {
-      if (!matchesFacet(metaValues(meta, k), filters.facets[k])) {
-        failed = k;
-        if (++failures > 1) break;
-      }
-    }
-    // 两个维度不满足：去掉哪一个维度的限制都还有一个不满足，对谁都没有贡献
-    if (failures > 1) continue;
-    for (const k of failures === 1 ? [failed as FacetKey] : FACET_KEYS) {
-      const values = metaValues(meta, k);
-      if (values.length === 0) out[k].add(FILTER_OPTION_UNKNOWN);
-      else values.forEach((v) => out[k].add(v));
-    }
-  }
-  return out;
+  return songs.filter(
+    (song) =>
+      matchesType(song, filters.type) && matchesYear(song.year, filters.year),
+  );
 }
 
 // ─── 界面上的勾选 ↔ 选择 ─────────────────────────────────────────────────────

@@ -158,6 +158,13 @@
   font-family: var(--font-sans);
 }
 
+/* 带参数打开曲库链接时，服务端渲染的默认列表先藏起来，按地址栏筛完再显示（docs/LIBRARY.md 阶段 4「1.」）。
+   属性由页面里的内联脚本在首次绘制前加在 <html> 上（src/lib/library/reveal.ts）。
+   用 visibility：高度照占，页脚不会先跳上来再被推下去 */
+html[data-library-pending] #library-list {
+  visibility: hidden;
+}
+
 @utility mask-linear-fade-edges {
   mask-image: linear-gradient(
     to right,

@@ -13,6 +13,7 @@
  *   advanced   筛选面板是否展开，1 为展开
  *
  * 人名、曲风存归一化后的简体（F2）。全选不写（结果和不筛选一样）。
+ * 读的时候归一化由调用方传进来：归一化要用繁转简表，不在首屏路径上（阶段 4「2.」）。
  * 不兼容旧格式（yearStart、yearEnd、*、!）：页面重构完成前不会上线。
  */
 import {
@@ -32,7 +33,6 @@ import {
   MUSIC_LIBRARY_VIEW_MODES,
   type MusicLibraryViewMode,
 } from "@/lib/constants";
-import { normalize } from "@/lib/search/normalize";
 import {
   emptyFacets,
   FACET_KEYS,
@@ -54,23 +54,62 @@ export interface LibraryUrlState extends LibraryFilters {
 
 const excludeKey = (key: FacetKey) => `${key}Not`;
 
+const FACET_PARAMS = FACET_KEYS.flatMap((k) => [k, excludeKey(k)]);
+
+/**
+ * 影响列表的参数：带了其中任何一个打开，服务端渲染的默认列表就不对，
+ * 要先藏起来（lib/library/reveal.ts）。advanced 只管筛选面板展开，不在其中。
+ */
+export const LIST_PARAMS: readonly string[] = [
+  "q",
+  "type",
+  "year",
+  ...FACET_PARAMS,
+  "view",
+  "page",
+];
+
+/** 要不要马上加载第二档（engine.ts 和筛选面板）：搜索、按人名曲风筛选、展开筛选面板 */
+export function needsDeferred(params: URLSearchParams): boolean {
+  return (
+    !!params.get("q") ||
+    readFlag(params, "advanced") ||
+    FACET_PARAMS.some((k) => params.has(k))
+  );
+}
+
+/** 第二档没到时的权宜：只去掉首尾空白。人名、曲风筛选要等真正的归一化才算 */
+const trimOnly = (text: string) => text.trim();
+
 /** 地址栏里的人名可能是手打的、繁体的，按归一化后的值比较 */
-function readFacetValues(params: URLSearchParams, key: string): string[] {
+function readFacetValues(
+  params: URLSearchParams,
+  key: string,
+  normalize: (text: string) => string,
+): string[] {
   return [...new Set(readArray(params, key).map(normalize).filter(Boolean))];
 }
 
-function readFacet(params: URLSearchParams, key: FacetKey): FacetSelection {
+function readFacet(
+  params: URLSearchParams,
+  key: FacetKey,
+  normalize: (text: string) => string,
+): FacetSelection {
   // 两种都写了时以包含为准：包含更具体
-  const include = readFacetValues(params, key);
+  const include = readFacetValues(params, key, normalize);
   if (include.length > 0) return { mode: "include", values: include };
-  const exclude = readFacetValues(params, excludeKey(key));
+  const exclude = readFacetValues(params, excludeKey(key), normalize);
   if (exclude.length > 0) return { mode: "exclude", values: exclude };
   return NO_SELECTION;
 }
 
-export function parseLibraryUrl(params: URLSearchParams): LibraryUrlState {
+/** normalize 传 engine.ts 的归一化；不传时人名、曲风只去掉首尾空白 */
+export function parseLibraryUrl(
+  params: URLSearchParams,
+  normalize: (text: string) => string = trimOnly,
+): LibraryUrlState {
   const facets = emptyFacets();
-  for (const key of FACET_KEYS) facets[key] = readFacet(params, key);
+  for (const key of FACET_KEYS) facets[key] = readFacet(params, key, normalize);
   return {
     query: readString(params, "q"),
     type: readString(params, "type", FILTER_OPTION_ALL),

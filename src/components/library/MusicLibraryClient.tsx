@@ -10,7 +10,6 @@ import { useLibraryResults } from "@/hooks/library/useLibraryResults";
 import { useLibraryState } from "@/hooks/library/useLibraryState";
 import { useLyricsLines } from "@/hooks/library/useLyricsLines";
 import { useListReveal } from "@/hooks/library/useListReveal";
-import { useScrollRestore } from "@/hooks/library/useScrollRestore";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { flushUrlState, useUrlState } from "@/hooks/utils/useUrlState";
 import { useRouter } from "@/i18n/navigation";
@@ -56,7 +55,6 @@ export default function MusicLibraryClient({
   const t = useTranslations("library");
   const tCommon = useTranslations("common");
   const { isLoggedIn } = useFavorites();
-  const [mounted, setMounted] = useState(false);
   const [activeSongId, setActiveSongId] = useState<number | null>(null);
   const [mountKey, setMountKey] = useState(0);
   const { showScrollTop, scrollToTop } = useScrollTop();
@@ -105,16 +103,13 @@ export default function MusicLibraryClient({
     lyricsState: lyrics.state,
     withAvailable: state.advanced,
   });
-  // 读到这一页的地址栏、并且按它筛完了，列表才显示
-  const listHidden = useListReveal(urlSynced && (!pending || deferred.failed));
-  const { isRestoringScroll, notifyDataReady, saveScroll, clearSavedScroll } =
-    useScrollRestore();
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      setMounted(true);
-    });
-  }, []);
+  // 读到这一页的地址栏、并且按它筛完了，列表才显示；从详情页返回时还要先滚回原位
+  const {
+    hidden: listHidden,
+    restoring,
+    saveScroll,
+    clearSavedScroll,
+  } = useListReveal(urlSynced && (!pending || deferred.failed));
 
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -127,14 +122,6 @@ export default function MusicLibraryClient({
     window.addEventListener("pageshow", handlePageShow);
     return () => window.removeEventListener("pageshow", handlePageShow);
   }, []);
-
-  useEffect(() => {
-    // 列表还藏着（等第二档筛完）时不滚：滚回去的位置要按筛完的列表算
-    if (!mounted || listHidden) return;
-
-    const timer = setTimeout(notifyDataReady, 0);
-    return () => clearTimeout(timer);
-  }, [mounted, listHidden, results, mountKey, notifyDataReady, state.view]);
 
   const totalPages = Math.max(
     1,
@@ -262,7 +249,14 @@ export default function MusicLibraryClient({
           )}
         </LibraryToolbar>
 
-        <div id={LIST_ID} className={cn(listHidden && "invisible")}>
+        {/* 滚回原位期间卡片不播进场动画，显示时才播 */}
+        <div
+          id={LIST_ID}
+          className={cn(
+            listHidden && "invisible",
+            restoring && "**:animate-none!",
+          )}
+        >
           <SongResults
             songs={pageSongs}
             isEmpty={results.length === 0}
@@ -279,7 +273,6 @@ export default function MusicLibraryClient({
             lyricsPending={lyricsPending}
             onFirstCoverSettled={releaseCjkFonts}
             showFavoriteColumn={isLoggedIn}
-            isRestoringScroll={isRestoringScroll}
           />
         </div>
       </main>

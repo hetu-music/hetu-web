@@ -523,7 +523,7 @@ const FACETS = [
 | `src/hooks/ui/useDebouncedDraft.ts` | 输入控件的草稿，停下才提交 |
 | `src/hooks/library/useLibraryState.ts` | 曲库页的状态，都在地址栏里 |
 | `src/hooks/library/useLibraryResults.ts` | 搜索、筛选、置灰 |
-| `src/hooks/library/useScrollRestore.ts` | 返回时恢复滚动位置（从旧的状态 hook 里原样拆出） |
+| `src/hooks/library/useScrollRestore.ts` | 返回时恢复滚动位置（从旧的状态 hook 里原样拆出）；后来并进 `useListReveal`，已删（见阶段 4「实现时定下的细节」X5） |
 | `src/components/library/LibraryToolbar.tsx`、`SongResults.tsx` | 工具栏、列表，从 `MusicLibraryClient` 拆出，只认传进来的值 |
 
 删掉了 `useMusicLibraryState`、`useFilteredSongs`、`calculateFilterOptions`、`encodeFilterParam` / `decodeFilterParam` 和 `FilterOptions` 类型。`useSyncedQueryState` 后台还在用，阶段 6 删。`MusicLibraryClient` 从 642 行减到 230 行左右。
@@ -605,7 +605,7 @@ const FACETS = [
 |---|---|
 | `src/lib/library/reveal.ts` | 内联脚本、属性名、3 秒保底 |
 | `src/components/shared/InlineScript.tsx` | 只在整页加载时执行的内联脚本（Next 文档 preventing-flash-before-hydration 的写法） |
-| `src/hooks/library/useListReveal.ts` | 列表什么时候显示：读到地址栏并筛完；整页加载和软导航都管 |
+| `src/hooks/library/useListReveal.ts` | 列表什么时候显示：读到地址栏并筛完；整页加载和软导航都管；从详情页返回时先滚回原位（X5） |
 | `src/components/library/deferred.ts` | 第二档的入口：筛选面板 + `engine.ts`，一个 chunk |
 | `src/hooks/library/useLibraryDeferred.ts` | 空闲时加载第二档；地址栏带了搜索、人名曲风或 `advanced` 时立即加载 |
 | `src/lib/library/engine.ts` | 从 `filters.ts` 拆出要用归一化的部分（人名、曲风的选项、匹配、置灰），加上搜索 |
@@ -619,6 +619,8 @@ const FACETS = [
 - **软导航时 Next 先渲染新页面，提交时才改地址栏**。Next 在 `HistoryUpdater` 的 `useInsertionEffect` 里改，绕开了我们的订阅，新页面第一次渲染读到的还是上一页的查询串。实测从详情页软导航到 `?artist=司夏`，默认列表露了约 70 毫秒。所以地址栏 hook 的快照里带上路径，和 `usePathname()` 对不上就当作还没读到，提交之后再读一遍。列表要等读到这一页的地址栏、并且筛完了才显示。
 - **带 `?advanced=1` 打开时筛选面板的占位**：实测面板内容宽屏高 104 px，手机（390 px 宽）高 300 px，占位用 `h-75 lg:h-26`。
 - **X5**：服务端渲染之后，返回时恢复滚动位置的逻辑仍然需要：列表要等第二档筛完才是返回前的那一页，要按筛完的列表滚。改成列表显示之后才滚，其余照旧。实测带 `?artist=河图&page=2` 滚到 900 px 后点进歌曲再返回：地址栏、歌曲数、滚动位置都和之前一样。
+
+  之后又把它并进了 `useListReveal`：「等筛完」和「滚回原位」原来各藏一次（`invisible` 和 `opacity-0`），现在由同一个 hook 管，列表只有一个「藏着」的状态（`useScrollRestore` 删掉）。返回时等筛完，下一帧滚回原位，再下一帧显示；滚回原位期间卡片不播进场动画，显示时才播，和原来一样。等筛完那段时间不停动画（见本阶段验收）。原来显示时有 200 毫秒的整体淡入，现在没有了，卡片自己的进场动画已经是淡入。无头 Chrome 实测（本机开发服务器）：默认列表滚到 1800 px、`?artist=河图&page=2` 滚到 1400 px、`?view=list&q=天下` 滚到 900 px，点进歌曲再返回，三种情况都停在原位，逐帧记录里没有一帧列表在别的位置露出来，地址栏和第一首歌都和之前一样。
 
 ### 实测
 
@@ -746,6 +748,7 @@ type LyricsLinesEntry = {
 - **每次请求都渲染的页面，打开时不闪默认状态**：这三个页面都是 `force-dynamic`，原来 nuqs 在服务端就读到了参数。地址栏 hook 是为 ISR 的首页设计的，服务端和水合时按「没有参数」渲染，换过来以后打开 `/profile?tab=quiz` 会先渲染「收藏」（还会白拉一次收藏数据）再跳到「寻曲」。所以 hook 加了可选的 `initialSearch`：页面把收到的 `searchParams` 用 `toSearchString`（`src/lib/utils/url-params.ts`）转成查询串传进来，服务端、水合时，以及软导航时还没读到地址栏，都按它渲染；读到地址栏以后以地址栏为准。ISR、静态页面不传，也没法传：所有参数共用一份 HTML，读 `searchParams` 会让整页变成动态渲染。
 - **后台搜索的排序**：没有搜索词时按日期从新到旧；有搜索词时按档位排（题名完全对上、题名开头、题名包含、人名、专辑、题名近似），同一档里仍按日期。原来是 Fuse 搜完再按日期重排，相关度没用上。
 - **后台不搜歌词**：只查元数据。按歌词找歌去首页搜。
+- **后台搜索框的防抖和曲库页一样放在输入这一端**（`useDebouncedDraft`，300 毫秒）：搜索框立刻变，停下才写进地址栏，并顺带清掉页码；结果直接跟着地址栏走，`useSongs` 不再防抖。清空时立刻生效。原来是每敲一个字都写地址栏、再对结果防抖，写地址栏的次数多，也和曲库页的做法相反。
 
 ### 实现
 
@@ -753,9 +756,9 @@ type LyricsLinesEntry = {
 |---|---|
 | `src/hooks/utils/useUrlState.ts` | 可选的 `initialSearch` |
 | `src/lib/utils/url-params.ts` | `toSearchString`：页面的 `searchParams` 转成查询串 |
-| `src/hooks/admin/useSongs.ts` | 从 `hooks/library` 移过来，改用 `rank.ts`；只做搜索和排序 |
+| `src/hooks/admin/useSongs.ts` | 从 `hooks/library` 移过来，改用 `rank.ts`；只做搜索和排序，不防抖 |
 | `src/lib/search/rank.ts` | `searchSongs` 改成泛型，传入 `SongDetail` 返回的也是 `SongDetail` |
-| `src/components/admin/song-admin/SongListClient.tsx` | `q`、`page`、`f`、`miss` 走地址栏 hook，每次操作只写一次地址栏 |
+| `src/components/admin/song-admin/SongListClient.tsx` | `q`、`page`、`f`、`miss` 走地址栏 hook，每次操作只写一次地址栏；搜索框用 `useDebouncedDraft` |
 | `src/components/admin/song-admin/SongWorkspace.tsx` | `tab` 走地址栏 hook，新增页不传 `initialSearch`（只有资料一栏） |
 | `src/components/profile/ProfileClient.tsx` | `tab` 走地址栏 hook，切换记进浏览历史 |
 | 三个页面的 `page.tsx` | 读 `searchParams`，传 `initialSearch` |
@@ -807,7 +810,7 @@ type LyricsLinesEntry = {
 - **X2 卷首的歌曲总数随筛选结果变化，每次变化都有动画。**（保留）有意的设计。
 - **X3 点左上角标志会调用 `router.refresh()`，重新下载整页数据。**（保留）替代了早先的整页刷新，不打断播放；代价约 27 KB，只在点标志时发生。
 - **X4 点卡片进详情页之前没有预加载。**（保留）歌名链接设了 `prefetch={false}`，卡片点击走 `router.push`。讨论后决定不预加载。
-- **X5 从详情页返回时恢复滚动位置会闪一下。**（已检查 → 阶段 4：仍然需要，改成列表显示之后再滚，其余照旧）内容先设为透明，等数据就绪、滚回原位再显示。
+- **X5 从详情页返回时恢复滚动位置会闪一下。**（已检查 → 阶段 4：仍然需要，改成列表显示之后再滚，并和「等筛完」合进同一个 `useListReveal`）内容先设为透明，等数据就绪、滚回原位再显示。
 - **X6 搜索框每敲一个字都改写地址栏两次。**（已确认 → 阶段 3：新的地址栏 hook 合并写入）搜索词一次，页码重置为 1 又一次。外面还包了一层 `useSyncedQueryState` 和 nuqs 的状态互相同步。
 
 ### 筛选

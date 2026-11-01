@@ -53,8 +53,6 @@ interface SongResultsProps {
   /** 网格第一张封面加载完（或失败）时调用 */
   onFirstCoverSettled?: () => void;
   showFavoriteColumn: boolean;
-  /** 从详情页返回、正在恢复滚动位置时先透明 */
-  isRestoringScroll: boolean;
 }
 
 /**
@@ -77,17 +75,12 @@ export default function SongResults({
   lyricsPending,
   onFirstCoverSettled,
   showFavoriteColumn,
-  isRestoringScroll,
 }: SongResultsProps) {
   const t = useTranslations("library");
 
+  // 什么时候藏、什么时候显示（等筛完、从详情页返回时滚回原位）由外面的 useListReveal 管
   return (
-    <section
-      className={cn(
-        "min-h-[50vh] transition-opacity duration-200",
-        isRestoringScroll ? "opacity-0 **:animate-none!" : "opacity-100",
-      )}
-    >
+    <section className="min-h-[50vh]">
       {!isEmpty ? (
         <>
           {approximate && (

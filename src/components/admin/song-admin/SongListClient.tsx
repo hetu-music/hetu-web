@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import Pagination from "@/components/shared/Pagination";
 import { useSongs } from "@/hooks/admin/useSongs";
+import { useDebouncedDraft } from "@/hooks/ui/useDebouncedDraft";
 import { useUrlState } from "@/hooks/utils/useUrlState";
 import { Link } from "@/i18n/navigation";
 import { isPoolEligible, MIN_OCCURRENCES } from "@/lib/quiz/pool";
@@ -38,6 +39,9 @@ import {
 } from "./utils";
 
 const ITEMS_PER_PAGE = 30;
+
+/** 搜索框停下多久才写进地址栏（同曲库页） */
+const SEARCH_DEBOUNCE_MS = 300;
 
 type Filter =
   "all" | "incomplete" | "unpublished" | "imagery" | "score" | "links";
@@ -81,6 +85,22 @@ export default function SongListClient({
   const filter = readString(params, "f", "all");
   // 待完善、缺链接下再细分：缺哪组资料、缺哪个平台
   const miss = readString(params, "miss", "all");
+
+  // 防抖在输入这一端（同曲库页）：搜索框立刻变，停下才写进地址栏；结果直接跟着地址栏走。
+  // 写地址栏时顺带清掉页码，只写一次。清空时立刻生效
+  const commitSearch = useCallback(
+    (value: string) =>
+      updateUrl((draft) => {
+        writeString(draft, "q", value);
+        draft.delete("page");
+      }),
+    [updateUrl],
+  );
+  const [searchInput, updateSearchInput] = useDebouncedDraft(
+    searchTerm,
+    commitSearch,
+    SEARCH_DEBOUNCE_MS,
+  );
 
   const sortedSongs = useSongs(songs, searchTerm);
 
@@ -191,13 +211,8 @@ export default function SongListClient({
       <AdminToolbar
         search={
           <SearchInput
-            value={searchTerm}
-            onChange={(value) =>
-              updateUrl((draft) => {
-                writeString(draft, "q", value);
-                draft.delete("page");
-              })
-            }
+            value={searchInput}
+            onChange={(value) => updateSearchInput(value, value === "")}
             placeholder="搜索标题、专辑、作者"
           />
         }

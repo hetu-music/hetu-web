@@ -39,9 +39,7 @@ interface CollationRow {
   body: string;
   created_by: string | null;
   collator: { name: string | null } | null;
-  revisers:
-    | { first_at: string; user: { name: string | null } | null }[]
-    | null;
+  revisers: { first_at: string; user: { name: string | null } | null }[] | null;
 }
 
 export class CollationError extends Error {

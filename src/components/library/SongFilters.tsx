@@ -73,7 +73,7 @@ const SongFilters: React.FC<SongFiltersProps> = ({
     options.years.length > 0
       ? options.years
       : [new Date().getFullYear(), FILTER_OPTION_UNKNOWN];
-  const [from, to] = yearSlider;
+  const [left, right] = yearSlider;
   const yearLabel = (i: number) => {
     const v = years[i];
     return v === FILTER_OPTION_UNKNOWN ? tCommon("unknown") : String(v);
@@ -88,16 +88,16 @@ const SongFilters: React.FC<SongFiltersProps> = ({
         <span className={FIELD_LABEL_CLASS}>{t("yearRange")}</span>
         {/* 区间文字定宽右对齐，拖动时滑轨长度不跟着变 */}
         <span className="text-right text-xs tabular-nums tracking-wider text-slate-700 dark:text-slate-300 lg:order-last lg:min-w-28">
-          {from === to
-            ? yearLabel(from)
-            : `${yearLabel(from)} — ${yearLabel(to)}`}
+          {left === right
+            ? yearLabel(left)
+            : `${yearLabel(left)} — ${yearLabel(right)}`}
         </span>
         <div className="col-span-2 flex h-5 items-center lg:col-span-1">
           <Slider
             min={0}
             max={years.length - 1}
             step={1}
-            value={[from, to]}
+            value={[left, right]}
             onValueChange={(v) => onYearChange([v[0], v[1]])}
             minStepsBetweenValues={0}
             aria-label={t("yearRange")}

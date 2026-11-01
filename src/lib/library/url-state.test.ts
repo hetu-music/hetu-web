@@ -88,14 +88,14 @@ describe("写地址栏", () => {
   it("往返不变", () => {
     const d = new URLSearchParams();
     writeType(d, "原创");
-    writeYear(d, { from: null, to: 2015 });
+    writeYear(d, { newest: 2015, oldest: null });
     writeFacet(d, "genre", { mode: "include", values: ["古风"] });
     writeFacet(d, "artist", { mode: "exclude", values: ["河图"] });
     writePage(d, 3);
     const state = parseLibraryUrl(new URLSearchParams(d.toString()));
     expect(state).toMatchObject({
       type: "原创",
-      year: { from: null, to: 2015 },
+      year: { newest: 2015, oldest: null },
       page: 3,
     });
     expect(state.facets.genre).toEqual({ mode: "include", values: ["古风"] });

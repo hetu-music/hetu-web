@@ -62,13 +62,13 @@ export function isSelectionActive(sel: FacetSelection): boolean {
 }
 
 /**
- * 年份筛选。from 是较早的一端，to 是较新的一端，都含在内。
- * to 为 null：较新的一侧开放，滑轨拖到了最左（最新）一格，以后加了更新年份的歌也包含。
- * from 为 null：较早的一侧开放，滑轨拖到了最右一格「未知」，含年份未知的歌。
+ * 年份筛选，和滑轨一样从左到右、从新到旧：newest 是左端，oldest 是右端，都含在内。
+ * newest 为 null：左端拖到了最左（最新）一格，那一侧开放，以后加了更新年份的歌也包含。
+ * oldest 为 null：右端拖到了最右一格「未知」，那一侧开放，含年份未知的歌。
  * "unknown"：只看年份未知的歌。null：不筛选。
  */
 export type YearFilter =
-  { from: number | null; to: number | null } | "unknown" | null;
+  { newest: number | null; oldest: number | null } | "unknown" | null;
 
 export interface LibraryFilters {
   /** 类型标签，单选；FILTER_OPTION_ALL 表示不筛选 */
@@ -191,10 +191,10 @@ export function matchesType(song: Song, type: string): boolean {
 export function matchesYear(year: number | null, filter: YearFilter): boolean {
   if (filter === null) return true;
   if (filter === "unknown") return !year;
-  if (!year) return filter.from === null;
+  if (!year) return filter.oldest === null;
   return (
-    (filter.from === null || year >= filter.from) &&
-    (filter.to === null || year <= filter.to)
+    (filter.newest === null || year <= filter.newest) &&
+    (filter.oldest === null || year >= filter.oldest)
   );
 }
 
@@ -296,12 +296,12 @@ export function yearFromSlider(
   const l = Math.max(0, Math.min(left, right, last));
   const r = Math.min(last, Math.max(left, right, 0));
   if (cells[l] === FILTER_OPTION_UNKNOWN) return "unknown";
-  const to = l === 0 ? null : (cells[l] as number);
-  const from =
+  const newest = l === 0 ? null : (cells[l] as number);
+  const oldest =
     r === last || cells[r] === FILTER_OPTION_UNKNOWN
       ? null
       : (cells[r] as number);
-  return from === null && to === null ? null : { from, to };
+  return newest === null && oldest === null ? null : { newest, oldest };
 }
 
 /** 年份筛选在当前滑轨上的位置。曲库里没有的年份落到最近的、仍在区间内的格子上 */
@@ -315,34 +315,29 @@ export function yearToSlider(
     const i = cells.indexOf(FILTER_OPTION_UNKNOWN);
     return i === -1 ? [last, last] : [i, i];
   }
+  const { newest, oldest } = filter;
   const numeric = cells
     .map((c, i) => [c, i] as const)
     .filter((e): e is readonly [number, number] => typeof e[0] === "number");
   const left =
-    filter.to === null
-      ? 0
-      : (numeric.find(([y]) => y <= (filter.to as number))?.[1] ?? last);
+    newest === null ? 0 : (numeric.find(([y]) => y <= newest)?.[1] ?? last);
   const right =
-    filter.from === null
+    oldest === null
       ? last
-      : ([...numeric]
-          .reverse()
-          .find(([y]) => y >= (filter.from as number))?.[1] ?? 0);
+      : ([...numeric].reverse().find(([y]) => y >= oldest)?.[1] ?? 0);
   return left <= right ? [left, right] : [left, left];
 }
 
 /**
- * 地址栏里的写法，和滑轨一样从左到右、从新到旧：「左端-右端」。
- * 2020-2015、2018、-2015（最左拖到头：2015 年及以后）、
- * 2010-（最右拖到头：2010 年及以前，含未知）、unknown
+ * 地址栏里的写法，和滑轨一样「左端-右端」：2020-2015、2018（单独一年）、
+ * -2015（左端拖到头：2015 年及以后）、2010-（右端拖到头：2010 年及以前，含未知）、unknown
  */
 export function formatYear(filter: YearFilter): string | null {
   if (filter === null) return null;
   if (filter === "unknown") return "unknown";
-  if (filter.from !== null && filter.from === filter.to) {
-    return String(filter.from);
-  }
-  return `${filter.to ?? ""}-${filter.from ?? ""}`;
+  const { newest, oldest } = filter;
+  if (newest !== null && newest === oldest) return String(newest);
+  return `${newest ?? ""}-${oldest ?? ""}`;
 }
 
 export function parseYear(raw: string | null): YearFilter {
@@ -350,13 +345,16 @@ export function parseYear(raw: string | null): YearFilter {
   if (raw === "unknown") return "unknown";
   if (/^\d{1,4}$/.test(raw)) {
     const y = Number(raw);
-    return { from: y, to: y };
+    return { newest: y, oldest: y };
   }
   const m = /^(\d{1,4})?-(\d{1,4})?$/.exec(raw);
   if (!m) return null;
-  let to = m[1] ? Number(m[1]) : null;
-  let from = m[2] ? Number(m[2]) : null;
-  if (from === null && to === null) return null;
-  if (from !== null && to !== null && from > to) [from, to] = [to, from];
-  return { from, to };
+  let newest = m[1] ? Number(m[1]) : null;
+  let oldest = m[2] ? Number(m[2]) : null;
+  if (newest === null && oldest === null) return null;
+  // 手写链接两端写反了也照样认
+  if (newest !== null && oldest !== null && newest < oldest) {
+    [newest, oldest] = [oldest, newest];
+  }
+  return { newest, oldest };
 }

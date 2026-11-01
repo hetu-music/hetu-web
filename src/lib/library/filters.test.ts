@@ -185,11 +185,11 @@ describe("年份", () => {
     for (const raw of ["2020-2015", "2018", "-2015", "2010-", "unknown"]) {
       expect(formatYear(parseYear(raw))).toBe(raw);
     }
-    expect(parseYear("2020-2015")).toEqual({ from: 2015, to: 2020 });
+    expect(parseYear("2020-2015")).toEqual({ newest: 2020, oldest: 2015 });
     // 和滑轨一致：左端（较新）在前；两端写反了也照样认
-    expect(parseYear("-2015")).toEqual({ from: 2015, to: null });
-    expect(parseYear("2010-")).toEqual({ from: null, to: 2010 });
-    expect(parseYear("2015-2020")).toEqual({ from: 2015, to: 2020 });
+    expect(parseYear("-2015")).toEqual({ newest: null, oldest: 2015 });
+    expect(parseYear("2010-")).toEqual({ newest: 2010, oldest: null });
+    expect(parseYear("2015-2020")).toEqual({ newest: 2020, oldest: 2015 });
     expect(parseYear(null)).toBeNull();
     expect(parseYear("-")).toBeNull();
     expect(parseYear("abc")).toBeNull();
@@ -197,11 +197,23 @@ describe("年份", () => {
 
   it("滑轨：最左一格是最新，拖到头的那一侧开放；最右一格是未知", () => {
     expect(yearFromSlider([0, 4], cells)).toBeNull();
-    expect(yearFromSlider([0, 1], cells)).toEqual({ from: 2015, to: null });
-    expect(yearFromSlider([1, 4], cells)).toEqual({ from: null, to: 2015 });
-    expect(yearFromSlider([1, 2], cells)).toEqual({ from: 2012, to: 2015 });
+    expect(yearFromSlider([0, 1], cells)).toEqual({
+      newest: null,
+      oldest: 2015,
+    });
+    expect(yearFromSlider([1, 4], cells)).toEqual({
+      newest: 2015,
+      oldest: null,
+    });
+    expect(yearFromSlider([1, 2], cells)).toEqual({
+      newest: 2015,
+      oldest: 2012,
+    });
     expect(yearFromSlider([4, 4], cells)).toBe("unknown");
-    expect(yearFromSlider([3, 3], cells)).toEqual({ from: 2010, to: 2010 });
+    expect(yearFromSlider([3, 3], cells)).toEqual({
+      newest: 2010,
+      oldest: 2010,
+    });
   });
 
   it("滑轨位置往返不变", () => {
@@ -216,8 +228,8 @@ describe("年份", () => {
   });
 
   it("拖到最右一格包含年份未知的歌；只看未知时只有未知", () => {
-    expect(matchesYear(null, { from: null, to: 2015 })).toBe(true);
-    expect(matchesYear(null, { from: 2012, to: 2015 })).toBe(false);
+    expect(matchesYear(null, { newest: 2015, oldest: null })).toBe(true);
+    expect(matchesYear(null, { newest: 2015, oldest: 2012 })).toBe(false);
     expect(matchesYear(null, "unknown")).toBe(true);
     expect(matchesYear(2015, "unknown")).toBe(false);
   });
@@ -233,7 +245,7 @@ describe("年份", () => {
   });
 
   it("地址栏里的年份曲库里没有时，滑轨落到区间内最近的格子", () => {
-    expect(yearToSlider({ from: 2011, to: 2019 }, cells)).toEqual([1, 2]);
+    expect(yearToSlider({ newest: 2019, oldest: 2011 }, cells)).toEqual([1, 2]);
   });
 });
 
@@ -299,7 +311,7 @@ describe("availableFacetValues（F5）", () => {
   const combos: LibraryFilters[] = [
     filters(),
     filters({ type: "原创" }),
-    filters({ year: { from: 2015, to: null } }),
+    filters({ year: { newest: null, oldest: 2015 } }),
     withFacet("artist", { mode: "include", values: ["河图"] }),
     withFacet("artist", { mode: "exclude", values: ["河图"] }),
     filters({

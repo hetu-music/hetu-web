@@ -148,7 +148,7 @@ export async function refreshAudio(songIds: number[]): Promise<PurgeReport> {
  * 意象标注变了：详情页的意象与相关作品、意象词云、寻曲候选池都由标注聚合而来。
  *
  * 标签让 Next 上的全部详情页与母题页失效（相关作品、作品数会牵动别处）；CDN 上只清
- * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等 2 小时到期。
+ * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等到期：页面 2 小时，面板接口 6 小时。
  */
 export async function refreshImagery({
   songIds = [],

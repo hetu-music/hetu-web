@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PUBLIC_AGGREGATE_CACHE } from "@/lib/server/cache-headers";
+import { PUBLIC_API_CACHE, NO_STORE_HEADERS } from "@/lib/server/cache-headers";
 import { localeFromRequest } from "@/lib/server/request-locale";
 import { getMotifDetail } from "@/lib/server/service-imagery-cloud";
 
@@ -11,19 +11,29 @@ export async function GET(
   const { motifId } = await params;
   const id = parseInt(motifId, 10);
   if (isNaN(id)) {
-    return NextResponse.json({ motif: null }, { status: 400 });
+    return NextResponse.json(
+      { motif: null },
+      { status: 400, headers: NO_STORE_HEADERS },
+    );
   }
   const locale = localeFromRequest(req);
 
   try {
     const motif = await getMotifDetail(id, locale);
-    if (!motif) return NextResponse.json({ motif: null }, { status: 404 });
+    if (!motif)
+      return NextResponse.json(
+        { motif: null },
+        { status: 404, headers: NO_STORE_HEADERS },
+      );
     return NextResponse.json(
       { motif },
-      { headers: { "Cache-Control": PUBLIC_AGGREGATE_CACHE } },
+      { headers: { "Cache-Control": PUBLIC_API_CACHE } },
     );
   } catch (err) {
     console.error("Failed to load motif:", err);
-    return NextResponse.json({ motif: null }, { status: 500 });
+    return NextResponse.json(
+      { motif: null },
+      { status: 500, headers: NO_STORE_HEADERS },
+    );
   }
 }

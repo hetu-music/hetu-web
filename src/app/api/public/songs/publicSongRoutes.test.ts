@@ -102,9 +102,14 @@ describe("GET /api/public/songs/[id]/lyrics", () => {
     expect((await call("abc")).status).toBe(400);
   });
 
-  it("歌曲不存在返回 404", async () => {
+  it("歌曲不存在返回 404，错误响应不进缓存", async () => {
     mockResult = { data: null, error: { message: "no rows" } };
-    expect((await call("42")).status).toBe(404);
+    const res = await call("42");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect((await call("abc")).headers.get("Cache-Control")).toBe(
+      "private, no-store",
+    );
   });
 
   it("返回歌词并带上 CDN 缓存头", async () => {
@@ -179,7 +184,9 @@ describe("GET /api/public/songs/lyrics-lines", () => {
   it("service client 不可用时返回 500", async () => {
     mockServiceAvailable = false;
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    expect((await call("locale=zh-CN")).status).toBe(500);
+    const res = await call("locale=zh-CN");
+    expect(res.status).toBe(500);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
     spy.mockRestore();
   });
 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   IMMUTABLE_API_CACHE,
   SHORT_PUBLIC_API_CACHE,
+  NO_STORE_HEADERS,
 } from "@/lib/server/cache-headers";
 import { localeFromRequest } from "@/lib/server/request-locale";
 import {
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error("Failed to load lyrics lines:", err);
-    return NextResponse.json({ error: "failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "failed" },
+      { status: 500, headers: NO_STORE_HEADERS },
+    );
   }
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PUBLIC_API_CACHE } from "@/lib/server/cache-headers";
+import { PUBLIC_API_CACHE, NO_STORE_HEADERS } from "@/lib/server/cache-headers";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
 import { processLyricsForSearch } from "@/lib/utils/utils-song";
 
@@ -10,7 +10,7 @@ export const GET = async () => {
   if (!supabase) {
     return NextResponse.json(
       { error: "Supabase not available" },
-      { status: 500 },
+      { status: 500, headers: NO_STORE_HEADERS },
     );
   }
 
@@ -35,6 +35,3 @@ export const GET = async () => {
     headers: { "Cache-Control": PUBLIC_API_CACHE },
   });
 };
-
-// ISR - 每 2 小时重新生成
-export const revalidate = 7200;

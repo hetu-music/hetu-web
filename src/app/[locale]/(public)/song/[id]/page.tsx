@@ -130,5 +130,5 @@ export async function generateStaticParams() {
   return [];
 }
 
-// 配置 ISR
-export const revalidate = 7200;
+// 配置 ISR：全站统一 6 小时
+export const revalidate = 21600;

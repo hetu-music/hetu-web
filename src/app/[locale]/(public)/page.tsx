@@ -114,5 +114,5 @@ export default async function MusicLibraryPage({ params }: Props) {
   );
 }
 
-// 启用 ISR - 每2小时重新生成页面，减少服务器负载
-export const revalidate = 7200;
+// 启用 ISR - 每 6 小时重新生成页面（全站统一），减少服务器负载
+export const revalidate = 21600;

@@ -26,7 +26,7 @@ import {
  *   站内跳转的 ?_rsc=… 变体只有 CloudFront 能按通配清。
  *
  * 只能靠标签波及、列不出 URL 的页面（如改分类牵动全部详情页），
- * CDN 上的副本要等 s-maxage 到期，最多 2 小时。
+ * CDN 上的副本要等 s-maxage 到期，最多 6 小时。
  *
  * 下面每个 refresh 函数对应一类数据变动，受牵连的页面、接口和标签都写在函数里，
  * 调用方只说改了哪些歌、哪些母题，不自己补路径。
@@ -158,7 +158,7 @@ export async function refreshAudio(songIds: number[]): Promise<PurgeReport> {
  * 意象标注变了：详情页的意象与相关作品、意象词云、寻曲候选池都由标注聚合而来。
  *
  * 标签让 Next 上的全部详情页与母题页失效（相关作品、作品数会牵动别处）；CDN 上只清
- * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等到期：页面 2 小时，面板接口 6 小时。
+ * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等 6 小时到期。
  */
 export async function refreshImagery({
   songIds = [],

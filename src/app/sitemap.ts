@@ -108,5 +108,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [...staticRoutes, ...songRoutes, ...motifRoutes];
 }
 
-// 使用 ISR，与主页同步更新
-export const revalidate = 7200;
+// 使用 ISR，与主页同步更新（全站统一 6 小时）
+export const revalidate = 21600;

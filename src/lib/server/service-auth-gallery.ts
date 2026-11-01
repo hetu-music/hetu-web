@@ -12,12 +12,12 @@ import { loadImageryIndex } from "@/lib/server/imagery-index";
 
 /**
  * 候选池要读全库的歌词再逐首取摘句，登录页又是动态渲染的，
- * 因此跨请求缓存 2 小时（与曲库 ISR 周期一致），每次请求只从池里随机挑。
+ * 因此跨请求缓存 6 小时（与全站 ISR 周期一致），每次请求只从池里随机挑。
  */
 const loadGalleryPool = unstable_cache(
   async (locale: string): Promise<GallerySong[]> => {
     // 失败时抛错而不返回空数组：unstable_cache 不缓存异常，
-    // 否则一次查询失败会让空池被缓存 2 小时
+    // 否则一次查询失败会让空池被缓存 6 小时
     const supabase = getServiceClient();
     if (!supabase) throw new Error("Supabase 未配置");
     // 只取资料无争议的歌（同 music_catalog 的规则）；视图是 select * 建的，
@@ -43,7 +43,7 @@ const loadGalleryPool = unstable_cache(
     return pool;
   },
   ["auth-gallery-v2", IMAGERY_INDEX_TAG],
-  { revalidate: 7200, tags: [IMAGERY_INDEX_TAG] },
+  { revalidate: 21600, tags: [IMAGERY_INDEX_TAG] },
 );
 
 /** 登录、注册页用：取不到就返回空数组，页面退回没有封面墙的样子 */

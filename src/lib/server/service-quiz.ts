@@ -71,18 +71,18 @@ function poolRows(index: ImageryIndex): PoolRows {
 
 /**
  * 结果页按链接动态渲染，每次都从全库标注建候选池太浪费，
- * 建好的候选池跨请求缓存，2 小时刷新，与意象页 ISR 周期一致。
+ * 建好的候选池跨请求缓存，6 小时刷新，与全站 ISR 周期一致。
  */
 const loadQuizPool = unstable_cache(
   async (): Promise<PoolSong[]> => {
     // 失败时一律抛错而不返回空数组：unstable_cache 不缓存异常，
-    // 否则一次查询失败会让残缺的候选池被缓存 2 小时
+    // 否则一次查询失败会让残缺的候选池被缓存 6 小时
     const pool = buildPool(poolRows(await loadImageryIndex()));
     if (pool.length === 0) throw new Error("候选池为空");
     return pool;
   },
   [`quiz-pool-v${POOL_VERSION}`, IMAGERY_INDEX_TAG],
-  { revalidate: 7200, tags: [IMAGERY_INDEX_TAG] },
+  { revalidate: 21600, tags: [IMAGERY_INDEX_TAG] },
 );
 
 const getQuizModel = cache(async (): Promise<QuizModel> => {

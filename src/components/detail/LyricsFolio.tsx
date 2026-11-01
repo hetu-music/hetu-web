@@ -416,10 +416,12 @@ const FolioRow = memo(function FolioRow({
         )}
       </div>
 
-      {/* 只占歌词那一行高：句下有校记时整行变高，意象名仍与歌词平齐 */}
+      {/* 只占歌词首行的高：句下有校记、或歌词折行时整行变高，意象名仍与首行平齐。
+          高度用与歌词相同的字号 × 2.2 算出；不能靠 leading 撑，flex 容器没有行框，
+          里面 text-sm 的按钮行高是 text-sm 自带的，不继承 leading */}
       <div
         className={cn(
-          "hidden md:flex self-start items-center gap-4 min-w-0 overflow-hidden whitespace-nowrap leading-[2.2] transition-opacity duration-500",
+          "hidden md:flex self-start items-center gap-4 min-w-0 overflow-hidden whitespace-nowrap text-[17px] sm:text-lg h-[2.2em] transition-opacity duration-500",
           focused && !carriesActive && "opacity-20",
         )}
       >

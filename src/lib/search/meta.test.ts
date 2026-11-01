@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSongMeta, getSongMeta, namesOf } from "./meta";
+import { getSongMeta, namesOf } from "./meta";
 import { song } from "./test-fixtures";
 
 describe("SongMeta", () => {
@@ -32,8 +32,8 @@ describe("SongMeta", () => {
   it("同一个 Song 对象只建一次：筛选后的新数组也复用", () => {
     const a = song(1, "如花");
     const b = song(2, "越人歌");
-    const all = buildSongMeta([a, b]);
-    const filtered = buildSongMeta([b]);
+    const all = [a, b].map(getSongMeta);
+    const filtered = [b].map(getSongMeta);
     expect(filtered[0]).toBe(all[1]);
     expect(getSongMeta(a)).toBe(all[0]);
   });

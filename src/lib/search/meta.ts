@@ -53,10 +53,6 @@ export function getSongMeta(song: Song): SongMeta {
   return meta;
 }
 
-export function buildSongMeta(songs: readonly Song[]): SongMeta[] {
-  return songs.map(getSongMeta);
-}
-
 /** 搜索时各角色一起查：演唱、作词、作曲、编曲和别署 */
 export function namesOf(meta: SongMeta): string[] {
   return [

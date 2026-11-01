@@ -21,7 +21,7 @@ export function writeString(
   else draft.set(key, value);
 }
 
-/** 正整数；不是合法整数时用默认值 */
+/** 整数（可以是负数，范围由调用方再限制）；不是合法整数时用默认值 */
 export function readInt(
   params: URLSearchParams,
   key: string,

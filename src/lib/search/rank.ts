@@ -24,9 +24,6 @@ export const TIER = {
 } as const;
 export type Tier = (typeof TIER)[keyof typeof TIER];
 
-/** 元数据各档的最后一档；歌词数据没到时只查到这里 */
-export const LAST_META_TIER = TIER.TITLE_FUZZY;
-
 /** 精确命中的歌少于这么多首时才启用歌词兜底。评测里设成 3 会给打对了的题名（如「明月如霜」）带出近似的歌词，所以只在一首都没有时兜底 */
 export const FALLBACK_BELOW = 1;
 /** 兜底：一句至少包含搜索词这么大比例的相邻两字片段 */

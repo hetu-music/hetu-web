@@ -13,8 +13,6 @@ import {
   type FacetKey,
   type FacetOption,
   type LibraryFilters,
-  type LibraryOptions,
-  buildBaseOptions,
   matchesFacet,
   matchesType,
   matchesYear,
@@ -25,7 +23,7 @@ import {
   type LyricsCorpus,
   type LyricsLinesEntry,
 } from "@/lib/search/corpus";
-import { getSongMeta, type SongMeta } from "@/lib/search/meta";
+import { getSongMeta } from "@/lib/search/meta";
 import { normalize } from "@/lib/search/normalize";
 import {
   type SearchHit,
@@ -36,11 +34,6 @@ import {
 import { buildSnippet, type Snippet } from "@/lib/search/snippet";
 import type { Song } from "@/lib/types";
 import { sortNamesOptimized } from "@/lib/utils/utils-song";
-
-/** 归一化后的值；SongMeta 里每个维度都按同名字段存 */
-function metaValues(meta: SongMeta, key: FacetKey): readonly string[] {
-  return meta[key];
-}
 
 /** 人名、曲风各维度的选项：值是归一化后的，显示文字按页面字形 */
 export function buildFacetOptions(
@@ -81,11 +74,10 @@ export function buildFacetOptions(
   return facets;
 }
 
-export function buildLibraryOptions(songs: readonly Song[]): LibraryOptions {
-  return { ...buildBaseOptions(songs), facets: buildFacetOptions(songs) };
-}
-
-/** 按筛选条件过滤，保持原有顺序 */
+/**
+ * 按筛选条件过滤，保持原有顺序。人名、曲风按 SongMeta 里归一化后的值比较
+ * （SongMeta 的字段和 FacetKey 同名）
+ */
 export function filterSongs(
   songs: readonly Song[],
   filters: LibraryFilters,
@@ -95,7 +87,7 @@ export function filterSongs(
     if (!matchesYear(song.year, filters.year)) return false;
     const meta = getSongMeta(song);
     return FACET_KEYS.every((k) =>
-      matchesFacet(metaValues(meta, k), filters.facets[k]),
+      matchesFacet(meta[k], filters.facets[k]),
     );
   });
 }
@@ -120,7 +112,7 @@ export function availableFacetValues(
     let failed: FacetKey | null = null;
     let failures = 0;
     for (const k of FACET_KEYS) {
-      if (!matchesFacet(metaValues(meta, k), filters.facets[k])) {
+      if (!matchesFacet(meta[k], filters.facets[k])) {
         failed = k;
         if (++failures > 1) break;
       }
@@ -128,7 +120,7 @@ export function availableFacetValues(
     // 两个维度不满足：去掉哪一个维度的限制都还有一个不满足，对谁都没有贡献
     if (failures > 1) continue;
     for (const k of failures === 1 ? [failed as FacetKey] : FACET_KEYS) {
-      const values = metaValues(meta, k);
+      const values = meta[k];
       if (values.length === 0) out[k].add(FILTER_OPTION_UNKNOWN);
       else values.forEach((v) => out[k].add(v));
     }

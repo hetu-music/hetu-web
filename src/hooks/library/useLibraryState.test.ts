@@ -2,7 +2,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetUrlStateForTests } from "@/hooks/utils/useUrlState";
-import { buildLibraryOptions } from "@/lib/library/engine";
+import { buildFacetOptions } from "@/lib/library/engine";
+import { buildBaseOptions } from "@/lib/library/filters";
 import { normalize } from "@/lib/search/normalize";
 import type { Song } from "@/lib/types";
 import { useLibraryState } from "./useLibraryState";
@@ -23,11 +24,15 @@ function song(id: number, extra: Partial<Song>): Song {
   };
 }
 
-const OPTIONS = buildLibraryOptions([
+const SONGS = [
   song(1, { artist: ["河图"], year: 2010 }),
   song(2, { artist: ["司夏"], year: 2015 }),
   song(3, { artist: ["李萌"], year: 2020 }),
-]);
+];
+const OPTIONS = {
+  ...buildBaseOptions(SONGS),
+  facets: buildFacetOptions(SONGS),
+};
 const ALL = ["李萌", "河图", "司夏"].sort();
 
 const search = () => new URLSearchParams(window.location.search);

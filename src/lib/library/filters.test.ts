@@ -3,12 +3,13 @@ import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import type { Song } from "@/lib/types";
 import {
   availableFacetValues,
-  buildLibraryOptions,
+  buildFacetOptions,
   createLibraryEngine,
   filterSongs,
 } from "./engine";
 import {
   ALL_SELECTED,
+  buildBaseOptions,
   checkedValues,
   emptyFacets,
   FACET_KEYS,
@@ -17,6 +18,7 @@ import {
   filterByTypeAndYear,
   formatYear,
   type LibraryFilters,
+  type LibraryOptions,
   matchesFacet,
   matchesYear,
   nextSelection,
@@ -99,7 +101,13 @@ const withFacet = (key: FacetKey, sel: FacetSelection) =>
 
 const ids = (songs: Song[]) => songs.map((s) => s.id);
 
-describe("buildLibraryOptions", () => {
+/** 页面上的完整选项：首屏的类型、年份，加上第二档的人名、曲风 */
+const buildLibraryOptions = (songs: Song[]): LibraryOptions => ({
+  ...buildBaseOptions(songs),
+  facets: buildFacetOptions(songs),
+});
+
+describe("选项（buildBaseOptions + buildFacetOptions）", () => {
   const options = buildLibraryOptions(SONGS);
 
   it("类型：全部在最前，按约定顺序，缺失的归入未知", () => {

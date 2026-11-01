@@ -455,19 +455,46 @@ describe("首屏和第二档分开（阶段 4）", () => {
     }
   });
 
-  it("engine 的搜索和直接调 Fuse 相同；歌词到了以后连歌词一起搜，并给出歌词原文", () => {
+  it("engine 搜索：歌词索引分段建好，歌词命中排在题名命中之后，带片段", async () => {
     const engine = createLibraryEngine(SONGS);
-    expect(engine.search("  ", undefined)).toBeNull();
-    expect(ids(engine.search("江南", undefined)?.songs ?? [])).toEqual(
-      ids(legacySearch(SONGS, "江南", createFuseInstance(SONGS))?.songs ?? []),
-    );
-    expect(engine.search("杏花微雨", undefined)?.songs ?? []).toEqual([]);
+    expect(engine.search(SONGS, "  ", null)).toBeNull();
+    // 歌词没到：只查元数据
+    expect(
+      ids(engine.search(SONGS, "江南", null)?.hits.map((h) => h.song) ?? []),
+    ).toEqual([3, 4]);
+    expect(engine.search(SONGS, "杏花微雨", null)?.hits ?? []).toEqual([]);
 
-    const entries = [{ id: 6, l: "杏花微雨 湿了青石" }];
-    const found = engine.search("杏花微雨", entries);
-    expect(ids(found?.songs ?? [])).toContain(6);
-    expect(found?.lyricMatchesById.has(6)).toBe(true);
-    expect(engine.lyricsOf(6)).toBe("杏花微雨 湿了青石");
+    const entries = [
+      { id: 6, lines: ["杏花微雨", "湿了青石"] },
+      { id: 1, lines: ["一句江南"] },
+    ];
+    expect(engine.builtCorpus(entries)).toBeNull();
+    const corpus = await engine.buildCorpus(entries);
+    expect(engine.builtCorpus(entries)).toBe(corpus);
+    expect(await engine.buildCorpus(entries)).toBe(corpus);
+
+    const found = engine.search(SONGS, "江南", corpus);
+    // 已显示的题名命中不重排，歌词命中追加在后面
+    expect(ids(found?.hits.map((h) => h.song) ?? [])).toEqual([3, 4, 1]);
+    if (!found) throw new Error("没搜到");
+    expect(engine.snippet(corpus, found.hits[2], found.words)).toMatchObject({
+      text: "一句江南",
+      ranges: [[2, 4]],
+      more: 0,
+      approximate: false,
+    });
+  });
+
+  it("engine 搜索：先筛后搜，只在传进来的歌里找", async () => {
+    const engine = createLibraryEngine(SONGS);
+    const corpus = await engine.buildCorpus([{ id: 6, lines: ["杏花微雨"] }]);
+    const onlyHetu = SONGS.filter((s) => s.artist?.includes("河图"));
+    expect(engine.search(onlyHetu, "杏花微雨", corpus)?.hits ?? []).toEqual([]);
+    expect(
+      ids(
+        engine.search(SONGS, "杏花微雨", corpus)?.hits.map((h) => h.song) ?? [],
+      ),
+    ).toEqual([6]);
   });
 
   it("engine 的人名选项按归一化合并简繁", () => {

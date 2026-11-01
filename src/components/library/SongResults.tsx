@@ -2,6 +2,7 @@
 
 import Pagination from "@/components/shared/Pagination";
 import type { MusicLibraryViewMode } from "@/lib/constants";
+import type { Snippet } from "@/lib/search/snippet";
 import type { Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { useTranslations } from "next-intl";
@@ -25,6 +26,10 @@ const enterStyle = (index: number): React.CSSProperties => ({
   animationFillMode: "both",
 });
 
+/** 列表上下的一句提示：楷体灰字，同空状态（DESIGN.md「空状态与提示」） */
+const NOTE_CLASS =
+  "mb-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500";
+
 interface SongResultsProps {
   /** 当前这一页的歌 */
   songs: Song[];
@@ -40,7 +45,11 @@ interface SongResultsProps {
   remountKey: string;
   activeSongId: number | null;
   onSongClick: (songId: number) => void;
-  getLyricsSnippet: (songId: number) => string | undefined;
+  getLyricsSnippet: (songId: number) => Snippet | undefined;
+  /** 结果全是歌词兜底（近似）命中：列表上方说一句 */
+  approximate: boolean;
+  /** 在搜，歌词还没搜上：列表末尾说一句，空状态也改说这个 */
+  lyricsPending: boolean;
   /** 网格第一张封面加载完（或失败）时调用 */
   onFirstCoverSettled?: () => void;
   showFavoriteColumn: boolean;
@@ -64,6 +73,8 @@ export default function SongResults({
   activeSongId,
   onSongClick,
   getLyricsSnippet,
+  approximate,
+  lyricsPending,
   onFirstCoverSettled,
   showFavoriteColumn,
   isRestoringScroll,
@@ -79,6 +90,9 @@ export default function SongResults({
     >
       {!isEmpty ? (
         <>
+          {approximate && (
+            <p className={NOTE_CLASS}>{t("search.approximate")}</p>
+          )}
           {view === "grid" ? (
             <div
               key={`grid-${remountKey}`}
@@ -130,6 +144,13 @@ export default function SongResults({
             </div>
           )}
 
+          {/* 歌词到了以后，歌词命中的歌追加在全部结果后面；标在这一页末尾，第 1 页上也看得到 */}
+          {lyricsPending && (
+            <p className={cn(NOTE_CLASS, "mt-12 mb-0")}>
+              {t("search.lyricsPending")}
+            </p>
+          )}
+
           <Pagination
             className="mt-12"
             currentPage={page}
@@ -140,7 +161,7 @@ export default function SongResults({
         </>
       ) : (
         <p className="py-20 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
-          {t("noFilteredSongs")}
+          {lyricsPending ? t("search.lyricsPending") : t("noFilteredSongs")}
         </p>
       )}
     </section>

@@ -44,6 +44,11 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 
 import { GET as getContributors } from "../contributors/route";
 import { GET as getLyrics } from "./[id]/lyrics/route";
+import { GET as getLyricsLines } from "./lyrics-lines/route";
+import {
+  lyricsVersion,
+  resetLyricsLinesMemoForTests,
+} from "@/lib/server/service-lyrics-lines";
 import { GET as searchSongs } from "./search/route";
 
 beforeEach(() => {
@@ -117,6 +122,65 @@ describe("GET /api/public/songs/[id]/lyrics", () => {
     const res = await call("42");
     expect(res.status).toBe(200);
     expect((await res.json()).lyrics).toBeNull();
+  });
+});
+
+describe("GET /api/public/songs/lyrics-lines", () => {
+  const call = (query: string) =>
+    getLyricsLines(
+      new NextRequest(
+        `http://localhost/api/public/songs/lyrics-lines?${query}`,
+      ),
+    );
+  const LYRICS = [
+    "[00:01.00]倾尽天下",
+    "[00:03.00]作词：Vagary",
+    "[00:20.00]血染江山的画",
+    "[00:25.00]怎敌你眉间一点朱砂",
+  ].join("\n");
+
+  beforeEach(() => {
+    resetLyricsLinesMemoForTests();
+    mockResult = {
+      data: [
+        { id: 1, title: "倾尽天下", lyrics: LYRICS, lyrics_start: null },
+        { id: 2, title: "空", lyrics: "", lyrics_start: null },
+      ],
+      error: null,
+    };
+  });
+
+  it("按句切好，去掉署名区；没有句子的歌不返回", async () => {
+    const body = await (await call("locale=zh-CN")).json();
+    expect(body).toEqual([
+      { id: 1, lines: ["血染江山的画", "怎敌你眉间一点朱砂"] },
+    ]);
+  });
+
+  it("繁体逐句转换，句数不变", async () => {
+    const body = await (await call("locale=zh-TW")).json();
+    expect(body[0].lines).toEqual(["血染江山的畫", "怎敵你眉間一點硃砂"]);
+  });
+
+  it("版本号和当前数据对得上才长缓存；对不上、不带时只短暂缓存，Service Worker 也不存", async () => {
+    // 这份假数据里没有 updated_at，当前版本号就是空表算出来的
+    const current = lyricsVersion(new Map());
+    const ok = await call(`locale=zh-CN&v=${current}`);
+    expect(ok.headers.get("Cache-Control")).toContain("immutable");
+    expect(ok.headers.get("X-Lyrics-Version-Match")).toBe("1");
+    for (const query of ["locale=zh-CN&v=old", "locale=zh-CN"]) {
+      const res = await call(query);
+      expect(res.headers.get("Cache-Control")).not.toContain("immutable");
+      expect(res.headers.get("X-Lyrics-Version-Match")).toBe("0");
+      expect((await res.json())[0].id).toBe(1);
+    }
+  });
+
+  it("service client 不可用时返回 500", async () => {
+    mockServiceAvailable = false;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect((await call("locale=zh-CN")).status).toBe(500);
+    spy.mockRestore();
   });
 });
 

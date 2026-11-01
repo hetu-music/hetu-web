@@ -8,6 +8,7 @@ import { useDeferredCjkFonts } from "@/hooks/library/useDeferredCjkFonts";
 import { useLibraryDeferred } from "@/hooks/library/useLibraryDeferred";
 import { useLibraryResults } from "@/hooks/library/useLibraryResults";
 import { useLibraryState } from "@/hooks/library/useLibraryState";
+import { useLyricsLines } from "@/hooks/library/useLyricsLines";
 import { useListReveal } from "@/hooks/library/useListReveal";
 import { useScrollRestore } from "@/hooks/library/useScrollRestore";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
@@ -27,7 +28,7 @@ import { sharePage } from "@/lib/utils/share";
 import { cn } from "@/lib/utils/utils";
 import { countCatalogSongs } from "@/lib/utils/utils-song";
 import { Share2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HeroSection from "./HeroSection";
 import LibraryToolbar from "./LibraryToolbar";
@@ -49,8 +50,10 @@ const NO_FACET_OPTIONS = Object.fromEntries(
  */
 export default function MusicLibraryClient({
   initialSongsData,
+  lyricsVersion,
 }: MusicLibraryClientProps) {
   const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations("library");
   const tCommon = useTranslations("common");
   const { isLoggedIn } = useFavorites();
@@ -61,7 +64,13 @@ export default function MusicLibraryClient({
   const listStartRef = useRef<HTMLDivElement>(null);
 
   const [params, , urlSynced] = useUrlState();
-  const deferred = useLibraryDeferred(initialSongsData, needsDeferred(params));
+  // 点过搜索框：要搜了，第二档和歌词都马上去拉
+  const [searchFocused, setSearchFocused] = useState(false);
+  const handleSearchFocus = useCallback(() => setSearchFocused(true), []);
+  const deferred = useLibraryDeferred(
+    initialSongsData,
+    searchFocused || needsDeferred(params),
+  );
   const { engine, SongFilters } = deferred;
 
   const baseOptions = useMemo(
@@ -76,8 +85,28 @@ export default function MusicLibraryClient({
     [baseOptions, engine],
   );
   const state = useLibraryState(options, engine?.normalize);
-  const { results, available, lyricsState, getLyricsSnippet, pending } =
-    useLibraryResults(initialSongsData, state.query, state.filters, engine);
+  const lyrics = useLyricsLines({
+    locale,
+    version: lyricsVersion,
+    wanted: searchFocused || state.query !== "",
+    engine,
+  });
+  const {
+    results,
+    available,
+    getLyricsSnippet,
+    pending,
+    approximate,
+    lyricsPending,
+  } = useLibraryResults({
+    songs: initialSongsData,
+    query: state.query,
+    filters: state.filters,
+    engine,
+    corpus: lyrics.corpus,
+    lyricsState: lyrics.state,
+    withAvailable: state.advanced,
+  });
   // 读到这一页的地址栏、并且按它筛完了，列表才显示
   const listHidden = useListReveal(urlSynced && (!pending || deferred.failed));
   const { isRestoringScroll, notifyDataReady, saveScroll, clearSavedScroll } =
@@ -116,9 +145,12 @@ export default function MusicLibraryClient({
   const safePage = Math.min(Math.max(1, state.page), totalPages);
   const { setPage } = state;
 
+  // 页码超出时改回最后一页。结果还会变多时（engine 没到、歌词还没搜上）先不改：
+  // 带 ?q=…&page=3 打开，题名的结果只有一页，歌词一到就有三页了
+  const resultsSettled = !pending && !lyricsPending;
   useEffect(() => {
-    if (safePage !== state.page) setPage(safePage);
-  }, [state.page, safePage, setPage]);
+    if (resultsSettled && safePage !== state.page) setPage(safePage);
+  }, [resultsSettled, state.page, safePage, setPage]);
 
   const pageSongs = useMemo(() => {
     const start = (safePage - 1) * MUSIC_LIBRARY_ITEMS_PER_PAGE;
@@ -210,7 +242,8 @@ export default function MusicLibraryClient({
           onReset={handleReset}
           searchInput={state.searchInput}
           onSearchChange={state.setSearchInput}
-          lyricsState={lyricsState}
+          lyricsState={lyrics.state}
+          onSearchFocus={handleSearchFocus}
           advanced={state.advanced}
           onAdvancedChange={state.setAdvanced}
           view={state.view}
@@ -244,6 +277,8 @@ export default function MusicLibraryClient({
             activeSongId={activeSongId}
             onSongClick={navigateToSong}
             getLyricsSnippet={getLyricsSnippet}
+            approximate={approximate}
+            lyricsPending={lyricsPending}
             onFirstCoverSettled={releaseCjkFonts}
             showFavoriteColumn={isLoggedIn}
             isRestoringScroll={isRestoringScroll}

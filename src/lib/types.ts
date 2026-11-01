@@ -66,6 +66,8 @@ export type SongDetail = Song & {
 // 音乐库客户端组件属性
 export interface MusicLibraryClientProps {
   initialSongsData: Song[];
+  /** 歌词版本号，搜歌词时拉的数据按它区分缓存地址（docs/LIBRARY.md 阶段 5「2.」） */
+  lyricsVersion: string;
 }
 
 // 歌曲详情客户端组件属性

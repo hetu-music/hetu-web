@@ -17,5 +17,15 @@ export const PUBLIC_API_CACHE =
 export const PUBLIC_AGGREGATE_CACHE =
   "public, s-maxage=7200, stale-while-revalidate=1800";
 
+/**
+ * 地址里带版本号的公开数据（曲库页的歌词 lyrics-lines?v=）：数据变了地址就变，
+ * 同一个地址的内容不会再变，浏览器和 CDN 都长缓存。
+ */
+export const IMMUTABLE_API_CACHE = "public, max-age=31536000, immutable";
+
+/** 同上，但地址里的版本号和数据对不上（首页还是旧的）：数据是新的，只短暂缓存 */
+export const SHORT_PUBLIC_API_CACHE =
+  "public, max-age=0, s-maxage=60, stale-while-revalidate=60";
+
 /** 与当前用户相关的数据：任何一层都不缓存 */
 export const PRIVATE_NO_STORE = "private, no-store";

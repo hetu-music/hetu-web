@@ -2,7 +2,7 @@
 
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
-import type { LyricsSearchState } from "@/hooks/library/useLyricsIndex";
+import type { LyricsSearchState } from "@/hooks/library/useLyricsLines";
 import { useMouseDragScroll } from "@/hooks/ui/useMouseDragScroll";
 import {
   FILTER_OPTION_ALL,
@@ -84,6 +84,8 @@ interface LibraryToolbarProps {
   onReset: () => void;
   searchInput: string;
   onSearchChange: (query: string) => void;
+  /** 搜索框获得焦点：这时才去拉歌词（docs/LIBRARY.md 阶段 5「3.」） */
+  onSearchFocus: () => void;
   lyricsState: LyricsSearchState;
   advanced: boolean;
   onAdvancedChange: (open: boolean) => void;
@@ -110,6 +112,7 @@ export default function LibraryToolbar({
   onReset,
   searchInput,
   onSearchChange,
+  onSearchFocus,
   lyricsState,
   advanced,
   onAdvancedChange,
@@ -193,12 +196,10 @@ export default function LibraryToolbar({
             <Search size={15} className="shrink-0 text-slate-400" />
             <input
               type="text"
-              placeholder={
-                lyricsState === "ready"
-                  ? t("search.placeholderWithLyrics")
-                  : t("search.placeholderNoLyrics")
-              }
+              // 固定提到歌词：点了搜索框才拉歌词，没点之前它永远没到
+              placeholder={t("search.placeholder")}
               value={searchInput}
+              onFocus={onSearchFocus}
               onChange={(event) => onSearchChange(event.target.value)}
               className="h-full min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
             />

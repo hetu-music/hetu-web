@@ -12,6 +12,8 @@ import type React from "react";
 import CoverArt, { type CoverPriority } from "./CoverArt";
 import MultiTagDisplay from "./MultiTagDisplay";
 import SongTitleLink from "./SongTitleLink";
+import type { Snippet } from "@/lib/search/snippet";
+import LyricsSnippet from "./LyricsSnippet";
 import { useTranslations } from "next-intl";
 
 interface ListRowProps {
@@ -20,7 +22,7 @@ interface ListRowProps {
   style?: React.CSSProperties;
   className?: string;
   isActive?: boolean;
-  lyricsSnippet?: string;
+  lyricsSnippet?: Snippet;
   coverPriority?: CoverPriority;
 }
 
@@ -80,11 +82,7 @@ export default function ListRow({
           </p>
         )}
         {lyricsSnippet && (
-          <div className="mt-1 border-l-2 border-slate-200 pl-2 dark:border-slate-700">
-            <p className="truncate text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
-              {lyricsSnippet}
-            </p>
-          </div>
+          <LyricsSnippet snippet={lyricsSnippet} className="mt-1" />
         )}
       </div>
 

@@ -1,6 +1,6 @@
 /**
- * 曲库页的第二档（见 docs/LIBRARY.md 阶段 4「2.」）：要用归一化（含繁转简表）和 Fuse 的部分——
- * 人名、曲风的选项统计和匹配、置灰（F5）、搜索。不在首屏路径上，页面空闲时和筛选面板
+ * 曲库页的第二档（见 docs/LIBRARY.md 阶段 4「2.」）：要用归一化（含繁转简表）的部分——
+ * 人名、曲风的选项统计和匹配、置灰（F5）、搜索（阶段 5 起是 src/lib/search/rank.ts）、歌词索引的构建。不在首屏路径上，页面空闲时和筛选面板
  * 一起加载（src/components/library/deferred.ts）；地址栏带了搜索词或人名、曲风时挂载后立即加载。
  *
  * 只按类型、年份筛选不用等它（filters.ts 的 filterByTypeAndYear）。
@@ -21,16 +21,19 @@ import {
   orderBy,
 } from "@/lib/library/filters";
 import {
-  buildFromEntries,
-  createFuseInstance,
-  type LyricsEntry,
-} from "@/lib/library/legacy-fuse";
-import {
-  type LegacySearchResult,
-  legacySearch,
-} from "@/lib/library/legacy-search";
+  buildCorpusChunked,
+  type LyricsCorpus,
+  type LyricsLinesEntry,
+} from "@/lib/search/corpus";
 import { getSongMeta, type SongMeta } from "@/lib/search/meta";
 import { normalize } from "@/lib/search/normalize";
+import {
+  type SearchHit,
+  type SearchResult,
+  searchSongs,
+  TIER,
+} from "@/lib/search/rank";
+import { buildSnippet, type Snippet } from "@/lib/search/snippet";
 import type { Song } from "@/lib/types";
 import { sortNamesOptimized } from "@/lib/utils/utils-song";
 
@@ -137,45 +140,70 @@ export interface LibraryEngine {
   facetOptions: Record<FacetKey, FacetOption[]>;
   /** 地址栏里手打的、繁体的人名也按归一化后的值比较 */
   normalize: (text: string) => string;
-  /** 在全部歌里搜；歌词到了（entries）就连歌词一起搜。没有可搜的字时返回 null */
-  search(
-    query: string,
-    entries: readonly LyricsEntry[] | undefined,
-  ): LegacySearchResult | null;
-  /** 歌词全文，显示片段用；歌词还没到时是空串 */
-  lyricsOf(songId: number): string;
   filter(songs: readonly Song[], filters: LibraryFilters): Song[];
   available(
     songs: readonly Song[],
     filters: LibraryFilters,
   ): Record<FacetKey, Set<string>>;
+  /** 在 songs 里搜；corpus 为 null（歌词还没到）时只查元数据各档。没有可搜的字时返回 null */
+  search(
+    songs: readonly Song[],
+    query: string,
+    corpus: LyricsCorpus | null,
+  ): SearchResult | null;
+  snippet(
+    corpus: LyricsCorpus,
+    hit: SearchHit,
+    words: readonly string[],
+  ): Snippet | null;
+  /** 结果全是兜底（近似）命中：兜底只在一首精确命中都没有时才有，不会和精确的混在一起 */
+  isApproximate(result: SearchResult): boolean;
+  /** 分段构建歌词索引，不卡输入；同一份数据只建一次 */
+  buildCorpus(entries: readonly LyricsLinesEntry[]): Promise<LyricsCorpus>;
+  /** 已经建好的索引，没建好时 null：从详情页返回时直接用上，不再等一轮 */
+  builtCorpus(entries: readonly LyricsLinesEntry[]): LyricsCorpus | null;
 }
 
-/** 一份曲库一个；Fuse 索引第一次搜索时才建 */
-export function createLibraryEngine(songs: Song[]): LibraryEngine {
-  let baseFuse: ReturnType<typeof createFuseInstance> | null = null;
-  let lyrics:
-    | ({ entries: readonly LyricsEntry[] } & ReturnType<
-        typeof buildFromEntries
-      >)
-    | null = null;
+/** 一份歌词数据一个索引；返回曲库页、切换简繁再切回来时不重建 */
+const corpora = new WeakMap<
+  readonly LyricsLinesEntry[],
+  { promise: Promise<LyricsCorpus>; value: LyricsCorpus | null }
+>();
 
+function corpusFor(entries: readonly LyricsLinesEntry[]) {
+  let entry = corpora.get(entries);
+  if (!entry) {
+    const created: {
+      promise: Promise<LyricsCorpus>;
+      value: LyricsCorpus | null;
+    } = {
+      value: null,
+      promise: buildCorpusChunked(entries).then((corpus) => {
+        created.value = corpus;
+        return corpus;
+      }),
+    };
+    // 失败了下次重建
+    created.promise.catch(() => corpora.delete(entries));
+    corpora.set(entries, created);
+    entry = created;
+  }
+  return entry;
+}
+
+/** 一份曲库一个 */
+export function createLibraryEngine(songs: Song[]): LibraryEngine {
   return {
     facetOptions: buildFacetOptions(songs),
     normalize,
-    search(query, entries) {
-      if (!query.trim()) return null;
-      if (entries) {
-        if (lyrics?.entries !== entries) {
-          lyrics = { entries, ...buildFromEntries(songs, entries) };
-        }
-        return legacySearch(songs, query, lyrics.fuse);
-      }
-      const fuse = (baseFuse ??= createFuseInstance(songs));
-      return legacySearch(songs, query, fuse);
-    },
-    lyricsOf: (songId) => lyrics?.map.get(songId) ?? "",
     filter: filterSongs,
     available: availableFacetValues,
+    search: searchSongs,
+    snippet: buildSnippet,
+    isApproximate: (result) =>
+      result.hits.length > 0 &&
+      result.hits.every((h) => h.tier === TIER.LYRIC_FALLBACK),
+    buildCorpus: (entries) => corpusFor(entries).promise,
+    builtCorpus: (entries) => corpora.get(entries)?.value ?? null,
   };
 }

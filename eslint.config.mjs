@@ -131,6 +131,61 @@ export default defineConfig(
     },
   },
 
+  // 曲库页首屏的代码不能直接引用第二档（docs/LIBRARY.md 阶段 4「2.」）：
+  // 搜索内核连着归一化和繁转简表，筛选面板连着 Base UI 的下拉框和滑轨，Fuse 本身也不小。
+  // 静态引用一个值就会把它们拉回首屏（阶段 5 就因为引用了 TIER 常量多了 16 KB）。
+  // 只能引用类型；要用的值经 engine（src/lib/library/engine.ts）拿，它和筛选面板一起由
+  // src/components/library/deferred.ts 按需加载。
+  {
+    files: [
+      "src/components/library/**/*.{ts,tsx}",
+      "src/hooks/library/**/*.ts",
+      "src/lib/library/**/*.ts",
+    ],
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      // 第二档自己
+      "src/components/library/deferred.ts",
+      "src/components/library/SongFilters.tsx",
+      "src/components/library/CustomSelect.tsx",
+      "src/lib/library/engine.ts",
+      "src/lib/library/legacy-*.ts",
+      // 后台歌曲列表用的旧搜索，阶段 6 删
+      "src/hooks/library/useSongs.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            "@/lib/library/engine",
+            "@/lib/library/legacy-fuse",
+            "@/lib/library/legacy-search",
+            "@/lib/search/corpus",
+            "@/lib/search/fuzzy",
+            "@/lib/search/meta",
+            "@/lib/search/normalize",
+            "@/lib/search/rank",
+            "@/lib/search/snippet",
+            "@/components/library/SongFilters",
+            "@/components/library/deferred",
+            "@/components/ui/combobox",
+            "@/components/ui/slider",
+            "./SongFilters",
+            "./deferred",
+            "./engine",
+            "fuse.js",
+          ].map((name) => ({
+            name,
+            allowTypeImports: true,
+            message:
+              "曲库页首屏不能静态引用第二档（见 docs/LIBRARY.md 阶段 4「2.」）：只引用类型，值经 engine 拿。",
+          })),
+        },
+      ],
+    },
+  },
+
   // 配置文件特殊处理
   {
     files: ["*.config.{js,mjs,ts}"],

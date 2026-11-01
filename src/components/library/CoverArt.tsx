@@ -7,13 +7,31 @@ import { TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
+/**
+ * 首屏封面的加载方式：high 是最可能成为 LCP 的那一张，立即加载且优先；
+ * eager 是首屏其余几张，立即加载、优先级照常。不传则懒加载
+ */
+export type CoverPriority = "high" | "eager";
+
 interface CoverArtProps {
   song: Song;
+  /** 封面实际显示的宽度，供浏览器从 srcset 里挑尺寸；不写会按整屏宽下载 */
+  sizes: string;
+  priority?: CoverPriority;
+  /** 图片加载完或加载失败时调用 */
+  onSettled?: () => void;
   className?: string;
   isActive?: boolean;
 }
 
-export default function CoverArt({ song, className, isActive }: CoverArtProps) {
+export default function CoverArt({
+  song,
+  sizes,
+  priority,
+  onSettled,
+  className,
+  isActive,
+}: CoverArtProps) {
   const coverUrl = getCoverUrl(song);
 
   return (
@@ -28,6 +46,11 @@ export default function CoverArt({ song, className, isActive }: CoverArtProps) {
         alt={song.title}
         width={400}
         height={400}
+        sizes={sizes}
+        loading={priority ? "eager" : undefined}
+        fetchPriority={priority === "high" ? "high" : undefined}
+        onLoad={onSettled}
+        onError={onSettled}
         className={cn(
           "h-full w-full object-cover transition-transform duration-500",
           isActive ? "scale-105" : "group-hover:scale-105",

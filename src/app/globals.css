@@ -143,6 +143,21 @@
   scrollbar-color: rgb(148 163 184 / 0.4) transparent;
 }
 
+/* 先不用思源宋体、黑体，落到后面的系统字体上（曲库页首屏用，docs/LIBRARY.md T1）。
+   首页有几百个歌名，两套思源要下载两千多 KB 的分片，慢网下和首屏封面抢带宽；
+   封面到了再去掉这个类，浏览器这才去下载思源、换上字形。
+   要在这里重写整个字体栈：--font-sans 等在 :root 上就已代入，只改 --font-body-sc 不生效。
+   正文的字体是从 body 继承下来的，所以本层要自己再设一次 font-family */
+@utility cjk-deferred {
+  --font-sans:
+    var(--font-body), ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-serif:
+    var(--font-heading), ui-serif, Georgia, Cambria, "Times New Roman", Times,
+    serif;
+  font-family: var(--font-sans);
+}
+
 @utility mask-linear-fade-edges {
   mask-image: linear-gradient(
     to right,

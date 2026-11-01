@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { Heart } from "lucide-react";
 import type React from "react";
-import CoverArt from "./CoverArt";
+import CoverArt, { type CoverPriority } from "./CoverArt";
 import SongTitleLink from "./SongTitleLink";
 import EnqueueButton from "@/components/shared/EnqueueButton";
 import PlayButton from "@/components/shared/PlayButton";
@@ -20,7 +20,20 @@ interface GridCardProps {
   className?: string;
   isActive?: boolean;
   lyricsSnippet?: string;
+  coverPriority?: CoverPriority;
+  onCoverSettled?: () => void;
 }
+
+/**
+ * 网格里一张封面的显示宽度，与列表的栅格对应：
+ * 内容区 max-w-7xl 减去 px-6 两侧，列间 gap-x-8；宽屏 4 列、lg 3 列、sm 2 列、窄屏 1 列。
+ *
+ * 窄屏一列时故意少报四分之一：手机多是 2.6–3 倍屏，照实写会去要 1080–1200px 的图，
+ * 而近年的封面原图多在 1280px 以上，真会给这么大，比不写 sizes 时（最大 828px）还重。
+ * 少报之后约等于按 2 倍屏取图，3 倍屏上与原来同为 828px
+ */
+const GRID_COVER_SIZES =
+  "(min-width: 1280px) 284px, (min-width: 1024px) calc((100vw - 112px) / 3), (min-width: 640px) calc((100vw - 80px) / 2), calc((100vw - 48px) * 0.75)";
 
 export default function GridCard({
   song,
@@ -29,6 +42,8 @@ export default function GridCard({
   className,
   isActive,
   lyricsSnippet,
+  coverPriority,
+  onCoverSettled,
 }: GridCardProps) {
   const { isFavorite, toggleFavorite, isLoggedIn } = useFavorites();
   const t = useTranslations("song");
@@ -54,7 +69,13 @@ export default function GridCard({
             : "group-hover:-translate-y-2 group-hover:shadow-2xl",
         )}
       >
-        <CoverArt song={song} isActive={isActive} />
+        <CoverArt
+          song={song}
+          sizes={GRID_COVER_SIZES}
+          priority={coverPriority}
+          onSettled={onCoverSettled}
+          isActive={isActive}
+        />
 
         <div
           className={cn(

@@ -7,6 +7,7 @@ import Pagination from "@/components/shared/Pagination";
 import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
 import { addToast } from "@/components/ui/toast";
 import { useFavorites } from "@/context/FavoritesContext";
+import { useDeferredCjkFonts } from "@/hooks/library/useDeferredCjkFonts";
 import { useFilteredSongs } from "@/hooks/library/useFilteredSongs";
 import { extractLyricsSnippet } from "@/hooks/library/useLyricsIndex";
 import { useMusicLibraryState } from "@/hooks/library/useMusicLibraryState";
@@ -105,6 +106,14 @@ function toolButtonClass(active: boolean) {
 }
 
 const NAV_DEPTH_KEY = "__hetu_web_nav_depth";
+
+/**
+ * 首屏封面不懒加载。网格首行最多 4 张（宽屏），第一张最可能是 LCP，另给高优先级；
+ * 列表的缩略图只有 64px，首屏能看到的七八行都立即加载
+ */
+const gridCoverPriority = (index: number) =>
+  index === 0 ? "high" : index < 4 ? "eager" : undefined;
+const listCoverPriority = (index: number) => (index < 8 ? "eager" : undefined);
 
 export default function MusicLibraryClient({
   initialSongsData,
@@ -292,6 +301,10 @@ export default function MusicLibraryClient({
     return filteredSongs.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredSongs, itemsPerPage, safePage]);
 
+  // 思源字体等首屏封面到了再加载；网格视图等第一张封面，其余情况等页面加载完
+  const { deferred: cjkDeferred, release: releaseCjkFonts } =
+    useDeferredCjkFonts(viewMode === "grid" && paginatedSongs.length > 0);
+
   const handleShare = useCallback(async () => {
     // 与卷首那句同一句话，卷首在句末接「……」，这里也一样
     const outcome = await sharePage({
@@ -341,7 +354,12 @@ export default function MusicLibraryClient({
   );
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
+    <div
+      className={cn(
+        "min-h-screen bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]",
+        cjkDeferred && "cjk-deferred",
+      )}
+    >
       <TopBar
         exit={{
           kind: "logo",
@@ -548,6 +566,8 @@ export default function MusicLibraryClient({
                     <GridCard
                       key={song.id}
                       song={song}
+                      coverPriority={gridCoverPriority(index)}
+                      onCoverSettled={index === 0 ? releaseCjkFonts : undefined}
                       isActive={activeSongId === song.id}
                       lyricsSnippet={getLyricsSnippet(song.id)}
                       onClick={() => navigateToSong(song.id)}
@@ -583,6 +603,7 @@ export default function MusicLibraryClient({
                     <ListRow
                       key={song.id}
                       song={song}
+                      coverPriority={listCoverPriority(index)}
                       isActive={activeSongId === song.id}
                       lyricsSnippet={getLyricsSnippet(song.id)}
                       onClick={() => navigateToSong(song.id)}

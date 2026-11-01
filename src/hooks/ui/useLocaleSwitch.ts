@@ -37,8 +37,11 @@ export function useLocaleSwitch() {
   const switchTo = useCallback(
     (targetLocale: string) => {
       if (targetLocale === locale || isPending) return;
+      // usePathname 不含查询参数和锚点，直接用它切换会丢掉曲库的搜索词、筛选和页码。
+      // 点击时才从地址栏读：这些参数由 nuqs 浅更新，不经过路由，渲染时拿到的可能已经过时
+      const { search, hash } = window.location;
       startTransition(() => {
-        router.replace(pathname, { locale: targetLocale });
+        router.replace(`${pathname}${search}${hash}`, { locale: targetLocale });
       });
     },
     [router, pathname, locale, isPending],

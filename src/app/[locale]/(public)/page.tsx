@@ -90,10 +90,18 @@ export default async function MusicLibraryPage({ params }: Props) {
     return <ErrorState error={error} />;
   }
 
+  // 标题和加载屏也先用系统字体：它们在曲库渲染出来之前就在页面上，
+  // 用思源的话会先下载几个分片，和首屏封面抢带宽（见 useDeferredCjkFonts）
   return (
     <>
-      <h1 className="sr-only">{t("site.title")}</h1>
-      <Suspense fallback={<Loading />}>
+      <h1 className="sr-only cjk-deferred">{t("site.title")}</h1>
+      <Suspense
+        fallback={
+          <div className="cjk-deferred">
+            <Loading />
+          </div>
+        }
+      >
         <MusicLibraryClient initialSongsData={songsData} />
       </Suspense>
     </>

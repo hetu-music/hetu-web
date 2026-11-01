@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 地址栏查询参数的读写（见 docs/LIBRARY.md 阶段 3「5.」），取代 nuqs。
+ * 地址栏查询参数的读写（见 docs/LIBRARY.md 阶段 3「5.」）。全站共用：曲库页、个人中心、后台。
  *
  * 读：useSyncExternalStore。服务端快照是空串，水合时按默认状态渲染，和服务端的 HTML 一致；
  * 水合完成后 React 自动换成真实的地址栏再渲染一次。不调用 useSearchParams：
@@ -15,6 +15,10 @@
  * 软导航时 Next 先渲染新页面，提交时（useInsertionEffect）才改地址栏，而且绕开了我们的订阅：
  * 新页面第一次渲染读到的还是上一页的地址栏。所以快照里带上路径，和路由的路径（usePathname）
  * 对不上就当作还没读到（synced 为 false，参数按空的算）；Next 改完地址栏后再读一遍。
+ *
+ * 每次请求都在服务端渲染的页面（个人中心、后台）知道这次请求的查询参数，传进 initialSearch：
+ * 还没读到地址栏时按它渲染，打开就是对的标签页、页码，不先闪一下默认状态。
+ * ISR、静态生成的页面所有参数共用一份 HTML，不知道参数，不传（读 searchParams 会让整页变成动态渲染）。
  */
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
@@ -112,6 +116,15 @@ function write(search: string, mode: HistoryMode) {
   schedule();
 }
 
+export interface UrlStateOptions {
+  /**
+   * 服务端渲染时这次请求的查询串（用 url-params 的 toSearchString 从页面的 searchParams 转）。
+   * 服务端、水合时，以及软导航时还没读到地址栏，都按它渲染；读到地址栏以后不再用。
+   * 只有每次请求都渲染的页面才传，ISR、静态页面不传。
+   */
+  initialSearch?: string;
+}
+
 export interface UrlUpdateOptions {
   /** 记进浏览历史（返回键能回到改之前），默认 replace */
   history?: HistoryMode;
@@ -120,9 +133,11 @@ export interface UrlUpdateOptions {
 /**
  * 返回当前的查询参数（只读）、改写函数，以及地址栏是否已经读到（synced）。
  * 改写函数收到一份副本，改完一次性写回。参数对象只在查询串变化时换新，可以放进 useMemo 的依赖里。
- * synced 为 false：服务端、水合时，或软导航时 Next 还没改地址栏；这时参数是空的。
+ * synced 为 false：服务端、水合时，或软导航时 Next 还没改地址栏；这时参数是空的，传了 initialSearch 时按它算。
  */
-export function useUrlState(): readonly [
+export function useUrlState(
+  options: UrlStateOptions = {},
+): readonly [
   URLSearchParams,
   (
     mutate: (draft: URLSearchParams) => void,
@@ -142,7 +157,9 @@ export function useUrlState(): readonly [
     sep !== -1 &&
     (routerPath === null ||
       decodePath(snapshot.slice(0, sep)) === decodePath(routerPath));
-  const search = synced ? snapshot.slice(sep + SEP.length) : "";
+  const search = synced
+    ? snapshot.slice(sep + SEP.length)
+    : (options.initialSearch ?? "");
 
   // 软导航：Next 在这次提交里改了地址栏，但没有通知我们，提交之后自己再读一遍
   useEffect(() => {

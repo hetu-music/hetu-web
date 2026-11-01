@@ -81,3 +81,19 @@ export function writeArray(
   draft.delete(key);
   for (const v of new Set(values)) if (v) draft.append(key, v);
 }
+
+/**
+ * 服务端页面收到的 searchParams 转成查询串（带「?」，没有参数时是空串），
+ * 传给 useUrlState 的 initialSearch。只在每次请求都渲染的页面里用。
+ */
+export function toSearchString(
+  params: Record<string, string | string[] | undefined>,
+): string {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+    for (const v of Array.isArray(value) ? value : [value]) sp.append(key, v);
+  }
+  const search = sp.toString();
+  return search ? `?${search}` : "";
+}

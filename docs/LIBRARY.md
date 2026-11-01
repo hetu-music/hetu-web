@@ -12,9 +12,9 @@
 | 1 | 独立的小改动 | I1、I2、R2（播放条）、F3、T1 | — | 已提交，上线后在线上重测 Lighthouse |
 | 2 | 搜索内核（纯函数，不接入页面） | 为 S1–S4、F2 准备 | 0 | 已提交 |
 | 3 | 拆分 `MusicLibraryClient`，重构筛选，自写地址栏 hook | C1、C2、C3、F1、F2、F4、F5、X6 | 2 | 已提交 |
-| 4 | 服务端渲染默认状态，三档加载 | R1、R2、X5 | 3 | 完成，待提交；上线后量 LCP |
-| 5 | 接入新搜索 | S1–S5、R3 | 2、4 | 已提交；缓存改成固定地址待提交；上线后手机实测 |
-| 6 | 后台与清理 | — | 5 | 未开始 |
+| 4 | 服务端渲染默认状态，三档加载 | R1、R2、X5 | 3 | 已提交；上线后量 LCP |
+| 5 | 接入新搜索 | S1–S5、R3 | 2、4 | 已提交；上线后手机实测 |
+| 6 | 后台与清理 | — | 5 | 完成，待提交 |
 | 7（可选） | 点片段跳到那一句 | — | 5 | 未开始 |
 | 未排期 | 封面绕开图片优化器 | I3 | — | 待讨论 |
 
@@ -24,7 +24,7 @@
 
 - **视觉样式不变。** 必须改动界面的地方（如阶段 5 的片段高亮），按 DESIGN.md 来。
 - **动画原样保留（X1、X2）。** 搜索、筛选时新出现的卡片播进场动画；翻页时网格的 `key` 带页码，整页重播；卷首的歌曲总数每次变化都有动画。这些是有意的设计。拆组件、改渲染方式之后，以上几种情况都要照旧播放。framer-motion 因此保留。
-- **依赖变化**：不新增搜索库（拼音搜索不做，不引入 `pinyin-match`）；删除 `fuse.js` 和 `nuqs`（阶段 6）；`opencc-js` 仍然只在服务端用。
+- **依赖变化**：不新增搜索库（拼音搜索不做，不引入 `pinyin-match`）；`fuse.js` 和 `nuqs` 已在阶段 6 删除；`opencc-js` 仍然只在服务端用。
 
 ## 背景：实测数据
 
@@ -737,9 +737,33 @@ type LyricsLinesEntry = {
 1. 后台 `useSongs`（`SongListClient` 在用）改用 `rank.ts`，只用元数据各档。
 2. 删除 `src/lib/library/legacy-fuse.ts`、`legacy-search.ts`（`createFuseInstance`、`searchAndFilterSongs`、`buildFromEntries` 都在这里）和 `processLyricsForSearch`，`filters.test.ts` 里和旧写法比对的那组测试一起删，`scripts/search-eval.ts` 去掉旧方案，卸载 `fuse.js`。`useLyricsIndex` 阶段 5 已删。
 3. ~~删除旧接口 `lyrics-index`~~：阶段 5 已删。
-4. 后台歌曲列表 `SongListClient`、歌曲工作区 `SongWorkspace`、个人中心 `ProfileClient` 换成阶段 3 的地址栏 hook（个人中心切标签页仍记进浏览历史，用 `pushState`）；删除 `useSyncedQueryState`、`providers.tsx` 里的 `NuqsAdapter`、`profile/page.tsx` 里为 nuqs 包的那层 `<Suspense>`；`useLocaleSwitch` 里提到 nuqs 的注释改掉；卸载 `nuqs`。
+4. 后台歌曲列表 `SongListClient`、歌曲工作区 `SongWorkspace`、个人中心 `ProfileClient` 换成阶段 3 的地址栏 hook（个人中心切标签页仍记进浏览历史，用 `pushState`）；删除 `useSyncedQueryState`、`providers.tsx` 里的 `NuqsAdapter`、`profile/page.tsx` 里为 nuqs 包的那层 `<Suspense>`；卸载 `nuqs`。
 
 **验收**：仓库里不再有 Fuse 和 nuqs 的引用；后台歌曲列表的搜索结果合理（题名、人名能搜到）；后台列表、歌曲工作区、个人中心的地址栏参数和返回键行为与改之前一致。
+
+**已定**：
+
+- **每次请求都渲染的页面，打开时不闪默认状态**：这三个页面都是 `force-dynamic`，原来 nuqs 在服务端就读到了参数。地址栏 hook 是为 ISR 的首页设计的，服务端和水合时按「没有参数」渲染，换过来以后打开 `/profile?tab=quiz` 会先渲染「收藏」（还会白拉一次收藏数据）再跳到「寻曲」。所以 hook 加了可选的 `initialSearch`：页面把收到的 `searchParams` 用 `toSearchString`（`src/lib/utils/url-params.ts`）转成查询串传进来，服务端、水合时，以及软导航时还没读到地址栏，都按它渲染；读到地址栏以后以地址栏为准。ISR、静态页面不传，也没法传：所有参数共用一份 HTML，读 `searchParams` 会让整页变成动态渲染。
+- **后台搜索的排序**：没有搜索词时按日期从新到旧；有搜索词时按档位排（题名完全对上、题名开头、题名包含、人名、专辑、题名近似），同一档里仍按日期。原来是 Fuse 搜完再按日期重排，相关度没用上。
+- **后台不搜歌词**：只查元数据。按歌词找歌去首页搜。
+
+### 实现
+
+| 文件 | 内容 |
+|---|---|
+| `src/hooks/utils/useUrlState.ts` | 可选的 `initialSearch` |
+| `src/lib/utils/url-params.ts` | `toSearchString`：页面的 `searchParams` 转成查询串 |
+| `src/hooks/admin/useSongs.ts` | 从 `hooks/library` 移过来，改用 `rank.ts`；只做搜索和排序 |
+| `src/lib/search/rank.ts` | `searchSongs` 改成泛型，传入 `SongDetail` 返回的也是 `SongDetail` |
+| `src/components/admin/song-admin/SongListClient.tsx` | `q`、`page`、`f`、`miss` 走地址栏 hook，每次操作只写一次地址栏 |
+| `src/components/admin/song-admin/SongWorkspace.tsx` | `tab` 走地址栏 hook，新增页不传 `initialSearch`（只有资料一栏） |
+| `src/components/profile/ProfileClient.tsx` | `tab` 走地址栏 hook，切换记进浏览历史 |
+| 三个页面的 `page.tsx` | 读 `searchParams`，传 `initialSearch` |
+| `scripts/search-eval.ts` | 只跑新方案；「字面含有」检查用按句切好的歌词 |
+
+首页首屏 JS 从 380.9 KB 降到 376.9 KB（gzip）：`NuqsAdapter` 原来在全站的 providers 里。构建产物里已经没有 Fuse 和 nuqs。
+
+后台和个人中心要登录，没有在浏览器里点过；`initialSearch` 的服务端渲染、水合、软导航三种情况有单元测试。上线前请在后台列表（带 `?q=`、`?page=`、`?f=` 打开、翻页、按返回键）、歌曲工作区（带 `?tab=` 打开、切标签页）、个人中心（带 `?tab=` 打开、切标签页后按返回键）各点一遍。
 
 ---
 

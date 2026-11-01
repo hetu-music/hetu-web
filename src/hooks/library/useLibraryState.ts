@@ -2,7 +2,7 @@
 
 /**
  * 曲库页的状态：都存在地址栏里（格式见 src/lib/library/url-state.ts），
- * 读写走 useUrlState，不用 nuqs（见 docs/LIBRARY.md 阶段 3「5.」）。
+ * 读写走 useUrlState（见 docs/LIBRARY.md 阶段 3「5.」）。
  *
  * 搜索框和年份滑轨各有一份草稿：界面上立刻变，停下 300 毫秒才写进地址栏；
  * 结果直接跟着地址栏走。每次改动只写一次地址栏，改筛选时顺带把页码清掉（X6）。

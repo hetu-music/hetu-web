@@ -29,7 +29,7 @@ export default defineConfig(
   ...tseslint.configs.recommended,
 
   // Next.js 完整配置（包含 jsx-a11y）
-  nextConfig,  // 直接使用，不拆分
+  nextConfig, // 直接使用，不拆分
 
   // React Hooks（手动注册）
   {
@@ -40,7 +40,7 @@ export default defineConfig(
       ...reactHooks.configs.recommended.rules,
     },
   },
-  
+
   {
     rules: {
       "jsx-a11y/alt-text": [
@@ -85,7 +85,11 @@ export default defineConfig(
 
       "@typescript-eslint/no-unused-vars": [
         "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-empty-function": "warn",
@@ -132,7 +136,7 @@ export default defineConfig(
   },
 
   // 曲库页首屏的代码不能直接引用第二档（docs/LIBRARY.md 阶段 4「2.」）：
-  // 搜索内核连着归一化和繁转简表，筛选面板连着 Base UI 的下拉框和滑轨，Fuse 本身也不小。
+  // 搜索内核连着归一化和繁转简表，筛选面板连着 Base UI 的下拉框和滑轨。
   // 静态引用一个值就会把它们拉回首屏（阶段 5 就因为引用了 TIER 常量多了 16 KB）。
   // 只能引用类型；要用的值经 engine（src/lib/library/engine.ts）拿，它和筛选面板一起由
   // src/components/library/deferred.ts 按需加载。
@@ -149,9 +153,6 @@ export default defineConfig(
       "src/components/library/SongFilters.tsx",
       "src/components/library/CustomSelect.tsx",
       "src/lib/library/engine.ts",
-      "src/lib/library/legacy-*.ts",
-      // 后台歌曲列表用的旧搜索，阶段 6 删
-      "src/hooks/library/useSongs.ts",
     ],
     rules: {
       "@typescript-eslint/no-restricted-imports": [
@@ -159,8 +160,6 @@ export default defineConfig(
         {
           paths: [
             "@/lib/library/engine",
-            "@/lib/library/legacy-fuse",
-            "@/lib/library/legacy-search",
             "@/lib/search/corpus",
             "@/lib/search/fuzzy",
             "@/lib/search/meta",
@@ -174,7 +173,6 @@ export default defineConfig(
             "./SongFilters",
             "./deferred",
             "./engine",
-            "fuse.js",
           ].map((name) => ({
             name,
             allowTypeImports: true,

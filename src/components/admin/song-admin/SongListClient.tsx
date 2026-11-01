@@ -1,14 +1,19 @@
 "use client";
 
-import { parseAsInteger, parseAsString } from "nuqs";
 import { useEffect, useMemo } from "react";
 import Pagination from "@/components/shared/Pagination";
-import { useSongs } from "@/hooks/library/useSongs";
-import { useSyncedQueryState } from "@/hooks/utils/useSyncedQueryState";
+import { useSongs } from "@/hooks/admin/useSongs";
+import { useUrlState } from "@/hooks/utils/useUrlState";
 import { Link } from "@/i18n/navigation";
 import { isPoolEligible, MIN_OCCURRENCES } from "@/lib/quiz/pool";
 import type { SongDetail } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
+import {
+  readInt,
+  readString,
+  writeInt,
+  writeString,
+} from "@/lib/utils/url-params";
 import type { PublishStatus } from "@/lib/utils/utils-song-diff";
 import AdminShell from "../kit/AdminShell";
 import {
@@ -57,39 +62,27 @@ const join = (value: string[] | string | null | undefined) =>
   Array.isArray(value) ? value.join("、") : value || "";
 
 export default function SongListClient({
-  initialSongs,
-  initialError,
+  initialSongs: songs,
+  initialError: error,
   publishStatuses,
   occurrenceCounts,
+  initialSearch,
 }: {
   initialSongs: SongDetail[];
   initialError: string | null;
   publishStatuses: Record<number, PublishStatus>;
   occurrenceCounts: Record<number, number>;
+  /** 这次请求的查询串，打开时直接是对的筛选和页码（见 useUrlState） */
+  initialSearch: string;
 }) {
-  const [searchTerm, setSearchTerm] = useSyncedQueryState<string>(
-    "q",
-    parseAsString.withDefault("").withOptions({ shallow: true }),
-  );
-  const [currentPage, setCurrentPage] = useSyncedQueryState<number>(
-    "page",
-    parseAsInteger.withDefault(1).withOptions({ shallow: true }),
-  );
-  const [filter, setFilter] = useSyncedQueryState<string>(
-    "f",
-    parseAsString.withDefault("all").withOptions({ shallow: true }),
-  );
+  const [params, updateUrl] = useUrlState({ initialSearch });
+  const searchTerm = readString(params, "q");
+  const currentPage = readInt(params, "page", 1);
+  const filter = readString(params, "f", "all");
   // 待完善、缺链接下再细分：缺哪组资料、缺哪个平台
-  const [miss, setMiss] = useSyncedQueryState<string>(
-    "miss",
-    parseAsString.withDefault("all").withOptions({ shallow: true }),
-  );
+  const miss = readString(params, "miss", "all");
 
-  const { songs, sortedSongs, error } = useSongs(
-    initialSongs,
-    initialError,
-    searchTerm,
-  );
+  const sortedSongs = useSongs(songs, searchTerm);
 
   const predicates = useMemo<Record<Filter, (s: SongDetail) => boolean>>(
     () => ({
@@ -157,8 +150,10 @@ export default function SongListClient({
   );
 
   useEffect(() => {
-    if (safePage !== currentPage) setCurrentPage(safePage);
-  }, [currentPage, safePage, setCurrentPage]);
+    if (safePage !== currentPage) {
+      updateUrl((draft) => writeInt(draft, "page", safePage, 1));
+    }
+  }, [currentPage, safePage, updateUrl]);
 
   const filters: FilterOption<Filter>[] = [
     { key: "all", label: "全部", count: counts.all },
@@ -197,10 +192,12 @@ export default function SongListClient({
         search={
           <SearchInput
             value={searchTerm}
-            onChange={(value) => {
-              setSearchTerm(value);
-              setCurrentPage(1);
-            }}
+            onChange={(value) =>
+              updateUrl((draft) => {
+                writeString(draft, "q", value);
+                draft.delete("page");
+              })
+            }
             placeholder="搜索标题、专辑、作者"
           />
         }
@@ -208,11 +205,13 @@ export default function SongListClient({
         <FilterOptions
           options={filters}
           active={activeFilter}
-          onSelect={(key) => {
-            setFilter(key);
-            setMiss("all");
-            setCurrentPage(1);
-          }}
+          onSelect={(key) =>
+            updateUrl((draft) => {
+              writeString(draft, "f", key, "all");
+              draft.delete("miss");
+              draft.delete("page");
+            })
+          }
         />
         {subs && (
           <div className="flex items-baseline gap-3">
@@ -228,10 +227,12 @@ export default function SongListClient({
                 })),
               ]}
               active={activeSub?.id ?? "all"}
-              onSelect={(id) => {
-                setMiss(id);
-                setCurrentPage(1);
-              }}
+              onSelect={(id) =>
+                updateUrl((draft) => {
+                  writeString(draft, "miss", id, "all");
+                  draft.delete("page");
+                })
+              }
             />
           </div>
         )}
@@ -272,7 +273,11 @@ export default function SongListClient({
             className="mt-10"
             currentPage={safePage}
             totalPages={totalPages}
-            onPageChange={(page) => setCurrentPage(Math.max(1, page))}
+            onPageChange={(page) =>
+              updateUrl((draft) =>
+                writeInt(draft, "page", Math.max(1, page), 1),
+              )
+            }
           />
         </>
       )}

@@ -3,6 +3,7 @@ import {
   readArray,
   readFlag,
   readInt,
+  toSearchString,
   readLiteral,
   readString,
   writeArray,
@@ -12,6 +13,18 @@ import {
 } from "./url-params";
 
 const p = (s: string) => new URLSearchParams(s);
+
+describe("toSearchString", () => {
+  it("服务端页面的 searchParams 转成查询串，数组按重复参数", () => {
+    expect(toSearchString({})).toBe("");
+    expect(toSearchString({ tab: undefined })).toBe("");
+    const search = toSearchString({ q: "明月 心", artist: ["司夏", "河图"] });
+    expect(search.startsWith("?")).toBe(true);
+    const back = p(search);
+    expect(back.get("q")).toBe("明月 心");
+    expect(back.getAll("artist")).toEqual(["司夏", "河图"]);
+  });
+});
 
 describe("url-params", () => {
   it("字符串：读不到用默认值，等于默认值时不写", () => {

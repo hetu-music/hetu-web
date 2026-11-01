@@ -41,17 +41,17 @@ export interface LyricMatch {
   count: number;
 }
 
-export interface SearchHit {
-  song: Song;
+export interface SearchHit<T extends Song = Song> {
+  song: T;
   tier: Tier;
   /** 只有落在歌词各档的歌才有 */
   lyric?: LyricMatch;
 }
 
-export interface SearchResult {
+export interface SearchResult<T extends Song = Song> {
   /** 归一化之后的搜索词，片段高亮用 */
   words: string[];
-  hits: SearchHit[];
+  hits: SearchHit<T>[];
 }
 
 /** 一个词在元数据上的最好档位，0 表示没命中（题名近似另算） */
@@ -80,11 +80,11 @@ interface FallbackHit {
  * 搜索。query 里没有可搜的字（空串、全是标点）时返回 null，调用方照常显示全部。
  * corpus 为 null 表示歌词数据还没就绪，只查元数据各档。
  */
-export function searchSongs(
-  songs: readonly Song[],
+export function searchSongs<T extends Song>(
+  songs: readonly T[],
   query: string,
   corpus: LyricsCorpus | null,
-): SearchResult | null {
+): SearchResult<T> | null {
   const words = splitQuery(query);
   if (words.length === 0) return null;
 
@@ -155,18 +155,22 @@ export function searchSongs(
     }
   }
 
-  const hits: (SearchHit & { order: number; first: number; score: number })[] =
-    [];
+  const hits: (SearchHit<T> & {
+    order: number;
+    first: number;
+    score: number;
+  })[] = [];
   for (let i = 0; i < n; i++) {
     const tier = tiers[i] as Tier | 0;
     if (!tier) continue;
-    const hit: SearchHit & { order: number; first: number; score: number } = {
-      song: songs[i],
-      tier,
-      order: i,
-      first: 0,
-      score: 0,
-    };
+    const hit: SearchHit<T> & { order: number; first: number; score: number } =
+      {
+        song: songs[i],
+        tier,
+        order: i,
+        first: 0,
+        score: 0,
+      };
     if (tier === TIER.LYRIC_FALLBACK) {
       const fb = fallback.get(i) as FallbackHit;
       hit.lyric = { line: fb.line, count: fb.count };

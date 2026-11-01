@@ -129,6 +129,65 @@ describe("useUrlState：软导航", () => {
   });
 });
 
+describe("useUrlState：服务端渲染的页面传 initialSearch", () => {
+  function TabProbe({ initialSearch }: { initialSearch: string }) {
+    const [params] = useUrlState({ initialSearch });
+    return <span data-testid="tab">{params.get("tab") ?? "favorites"}</span>;
+  }
+
+  it("服务端按它渲染", () => {
+    const html = renderToString(<TabProbe initialSearch="?tab=quiz" />);
+    expect(html).toContain("quiz");
+  });
+
+  it("水合时就是对的值，没有不一致，也不先渲染默认值", async () => {
+    window.history.replaceState(null, "", "/?tab=quiz");
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(
+      <TabProbe initialSearch="?tab=quiz" />,
+    );
+    document.body.appendChild(container);
+    const errors = vi.spyOn(console, "error").mockImplementation(() => null);
+    const seen: string[] = [];
+    function Recorder() {
+      const [params] = useUrlState({ initialSearch: "?tab=quiz" });
+      seen.push(params.get("tab") ?? "");
+      return <span data-testid="tab">{params.get("tab") ?? "favorites"}</span>;
+    }
+    await act(async () => {
+      hydrateRoot(container, <Recorder />);
+    });
+    expect(errors).not.toHaveBeenCalled();
+    expect(seen.every((tab) => tab === "quiz")).toBe(true);
+    container.remove();
+  });
+
+  it("软导航时地址栏还是上一页的：先按它算，读到地址栏以后以地址栏为准", () => {
+    window.history.replaceState(null, "", "/song/9");
+    router.pathname = "/profile";
+    const seen: string[] = [];
+    function Page() {
+      const [params] = useUrlState({ initialSearch: "?tab=quiz" });
+      seen.push(params.get("tab") ?? "");
+      return null;
+    }
+    function HistoryUpdater() {
+      React.useInsertionEffect(() => {
+        window.history.pushState(null, "", "/profile?tab=account");
+      }, []);
+      return null;
+    }
+    render(
+      <>
+        <Page />
+        <HistoryUpdater />
+      </>,
+    );
+    expect(seen[0]).toBe("quiz");
+    expect(seen[seen.length - 1]).toBe("account");
+  });
+});
+
 describe("useUrlState：写", () => {
   it("立刻反映在界面上，再写进地址栏", () => {
     vi.useFakeTimers();

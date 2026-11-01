@@ -2,10 +2,6 @@ import { describe, expect, it } from "vitest";
 import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import type { Song } from "@/lib/types";
 import {
-  createFuseInstance,
-  searchAndFilterSongs,
-} from "@/lib/library/legacy-fuse";
-import {
   availableFacetValues,
   buildLibraryOptions,
   createLibraryEngine,
@@ -29,7 +25,6 @@ import {
   yearFromSlider,
   yearToSlider,
 } from "./filters";
-import { legacySearch } from "./legacy-search";
 
 function song(id: number, extra: Partial<Song> = {}): Song {
   return {
@@ -354,85 +349,6 @@ describe("availableFacetValues（F5）", () => {
   it("不看本维度已经选了什么", () => {
     const base = withFacet("artist", { mode: "include", values: ["汐音社"] });
     expect(availableFacetValues(SONGS, base).artist.has("河图")).toBe(true);
-  });
-});
-
-describe("拆分前后结果一致", () => {
-  const fuse = createFuseInstance(SONGS);
-  const options = buildLibraryOptions(SONGS);
-  const sliderYears = options.years;
-
-  /** 旧写法：一次调用里搜索加筛选 */
-  function oldPipeline(
-    query: string,
-    type: string,
-    yearRange: [number, number],
-    artist: string[],
-    genre: string[],
-  ) {
-    const full = yearRange[0] === 0 && yearRange[1] === sliderYears.length - 1;
-    const selectedYear = full
-      ? FILTER_OPTION_ALL
-      : sliderYears.slice(yearRange[0], yearRange[1] + 1);
-    return searchAndFilterSongs(
-      SONGS,
-      query,
-      type,
-      selectedYear,
-      [],
-      [],
-      [],
-      genre,
-      artist,
-      fuse,
-    ).songs;
-  }
-
-  function newPipeline(
-    query: string,
-    type: string,
-    yearRange: [number, number],
-    artist: string[],
-    genre: string[],
-  ) {
-    const pool = legacySearch(SONGS, query, fuse)?.songs ?? SONGS;
-    return filterSongs(
-      pool,
-      filters({
-        type,
-        year: yearFromSlider(yearRange, sliderYears),
-        facets: {
-          ...emptyFacets(),
-          artist: { mode: "include", values: artist },
-          genre: { mode: "include", values: genre },
-        },
-      }),
-    );
-  }
-
-  it("搜索、类型、年份、人名、曲风的各种组合，结果和顺序都相同", () => {
-    const queries = ["", "江南", "河图", "天"];
-    const types = [FILTER_OPTION_ALL, "原创", FILTER_OPTION_UNKNOWN];
-    const ranges: [number, number][] = [];
-    for (let l = 0; l < sliderYears.length; l++) {
-      for (let r = l; r < sliderYears.length; r++) ranges.push([l, r]);
-    }
-    const artists = [
-      [],
-      ["河图"],
-      ["司夏", FILTER_OPTION_UNKNOWN],
-      [FILTER_OPTION_UNKNOWN],
-    ];
-    const genres = [[], ["古风"], ["流行", FILTER_OPTION_UNKNOWN]];
-    for (const q of queries)
-      for (const type of types)
-        for (const range of ranges)
-          for (const artist of artists)
-            for (const genre of genres) {
-              expect(ids(newPipeline(q, type, range, artist, genre))).toEqual(
-                ids(oldPipeline(q, type, range, artist, genre)),
-              );
-            }
   });
 });
 

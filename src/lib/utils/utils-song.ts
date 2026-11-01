@@ -33,34 +33,6 @@ export function sortNamesOptimized(names: string[]): string[] {
   return [...englishStartNames, ...chineseStartNames];
 }
 
-// 处理 LRC 歌词用于搜索
-export function processLyricsForSearch(lrcLyrics: string | null): string {
-  if (!lrcLyrics) return "";
-
-  // 1. 过滤掉头部信息行 (ar:, ti:, al:, by:, offset:, re:, ve: 等)
-  let processedText = lrcLyrics.replace(
-    /^\[(?:ar|ti|al|by|offset|re|ve):[^\]]*\]\s*$/gm,
-    "",
-  );
-
-  // 2. 移除时间戳 [00:26.87] [00:15.365] 等
-  processedText = processedText.replace(/\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]/g, "");
-
-  // 3. 清理多余的空白字符和空行
-  const lines = processedText
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  return lines.join(" ");
-}
-
-/** 歌词全文在 Fuse 索引中的字段名，检索与片段展示共用 */
-export const LYRIC_SEARCH_KEY = "lyricContent";
-
-/** Fuse 给出的命中字符区间 [start, end]（闭区间） */
-export type MatchRanges = ReadonlyArray<readonly [number, number]>;
-
 type TranslationFn = ReturnType<typeof useTranslations>;
 
 // 计算歌曲信息

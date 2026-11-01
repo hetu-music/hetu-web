@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import {
+  API_NO_STORE_SOURCE,
+  PRIVATE_NO_STORE,
+} from "./src/lib/server/cache-headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -10,7 +14,9 @@ const nextConfig: NextConfig = {
         hostname: "cover.hetu-music.com",
       },
     ],
-    minimumCacheTTL: 3600,
+    // 优化后的封面在源站和 CDN 都存 6 小时，和全站统一（见 docs/CACHE.md）。
+    // 封面地址不随内容变，换了封面最多 6 小时后才显示新图
+    minimumCacheTTL: 21600,
     // 本地网络下 cover.hetu-music.com 会解析到内网地址，图片优化器默认拒绝；
     // 只在开发环境放开，生产环境保留 SSRF 防护
     dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",
@@ -59,6 +65,12 @@ const nextConfig: NextConfig = {
             value: "same-origin",
           },
         ],
+      },
+      {
+        // /api 下默认不缓存，只有自己设了缓存头的几个公开接口除外（见 cache-headers.ts）。
+        // 必须把它们排除在外：这里设过的头，接口返回时不会被它自己的同名头覆盖
+        source: API_NO_STORE_SOURCE,
+        headers: [{ key: "Cache-Control", value: PRIVATE_NO_STORE }],
       },
       {
         // 字体分片（pnpm fonts:split 生成）以内容哈希命名，内容变了名字就变，可以永久缓存。

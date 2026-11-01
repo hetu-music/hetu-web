@@ -3,6 +3,7 @@
 import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
 import { useUserContext } from "@/context/UserContext";
 import { useRouter } from "@/i18n/navigation";
+import { bumpNavDepth, popNavDepth } from "@/lib/utils/nav-depth";
 import { cn } from "@/lib/utils/utils";
 import { ArrowLeft, ChevronDown, Home, User } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -10,13 +11,6 @@ import { ResponsivePanel } from "@/components/ui/responsive-panel";
 import { useCallback, useState } from "react";
 import { useGoToLogin } from "@/hooks/ui/useGoToLogin";
 import { MenuList, type MenuItem } from "./menu";
-
-/** 站内导航深度：进入内页前递增，返回时据此判断有没有站内历史可退 */
-const NAV_DEPTH_KEY = "__hetu_web_nav_depth";
-
-function readDepth() {
-  return parseInt(sessionStorage.getItem(NAV_DEPTH_KEY) || "0", 10);
-}
 
 /** 入口页的出口：站名。中间的竖线是站标的一部分，固定用蓝色，不随 --tone 变 */
 export function SiteLogo({
@@ -54,9 +48,7 @@ export function BackHome() {
 
   const handleBack = () => {
     setPressed(true);
-    const depth = readDepth();
-    if (depth > 0) {
-      sessionStorage.setItem(NAV_DEPTH_KEY, String(depth - 1));
+    if (popNavDepth()) {
       router.back();
     } else {
       router.push("/");
@@ -115,7 +107,7 @@ export function UserButton() {
       goToLogin();
       return;
     }
-    sessionStorage.setItem(NAV_DEPTH_KEY, String(readDepth() + 1));
+    bumpNavDepth();
     router.push("/profile?tab=favorites");
   }, [router, goToLogin, user, loaded]);
 

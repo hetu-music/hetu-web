@@ -11,23 +11,31 @@ import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
+import { useUrlState } from "@/hooks/utils/useUrlState";
 import { cn } from "@/lib/utils/utils";
 import { INK_TONE } from "@/lib/utils/utils-tone";
+import { readLiteral, writeString } from "@/lib/utils/url-params";
 import { useTranslations } from "next-intl";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
-import React from "react";
+import React, { useCallback } from "react";
 
 /** 个人中心：左栏卷首与目录，右栏为当前一节 */
-export default function ProfileClient() {
+export default function ProfileClient({
+  initialSearch,
+}: {
+  /** 这次请求的查询串，打开时直接是对的标签页（见 useUrlState） */
+  initialSearch: string;
+}) {
   const t = useTranslations("profile");
   const { showScrollTop, scrollToTop } = useScrollTop();
-  const [activeTab, setActiveTab] = useQueryState(
-    "tab",
-    parseAsStringLiteral(PROFILE_TABS).withDefault("favorites").withOptions({
-      history: "push",
-      shallow: true,
-      throttleMs: 300,
-    }),
+  const [params, updateUrl] = useUrlState({ initialSearch });
+  const activeTab = readLiteral(params, "tab", PROFILE_TABS, "favorites");
+  // 切标签页记进浏览历史，返回键回到上一个标签页
+  const setActiveTab = useCallback(
+    (tab: ProfileTab) =>
+      updateUrl((draft) => writeString(draft, "tab", tab, "favorites"), {
+        history: "push",
+      }),
+    [updateUrl],
   );
 
   return (

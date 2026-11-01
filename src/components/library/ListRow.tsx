@@ -9,9 +9,11 @@ import { formatTime } from "@/lib/utils/utils-common";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { Heart } from "lucide-react";
 import type React from "react";
-import CoverArt from "./CoverArt";
+import CoverArt, { type CoverPriority } from "./CoverArt";
 import MultiTagDisplay from "./MultiTagDisplay";
 import SongTitleLink from "./SongTitleLink";
+import type { Snippet } from "@/lib/search/snippet";
+import LyricsSnippet from "./LyricsSnippet";
 import { useTranslations } from "next-intl";
 
 interface ListRowProps {
@@ -20,7 +22,8 @@ interface ListRowProps {
   style?: React.CSSProperties;
   className?: string;
   isActive?: boolean;
-  lyricsSnippet?: string;
+  lyricsSnippet?: Snippet;
+  coverPriority?: CoverPriority;
 }
 
 export default function ListRow({
@@ -30,6 +33,7 @@ export default function ListRow({
   className,
   isActive,
   lyricsSnippet,
+  coverPriority,
 }: ListRowProps) {
   const { isFavorite, toggleFavorite, isLoggedIn } = useFavorites();
   const t = useTranslations("song");
@@ -48,7 +52,12 @@ export default function ListRow({
       style={style}
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded shadow-sm">
-        <CoverArt song={song} isActive={isActive} />
+        <CoverArt
+          song={song}
+          sizes="64px"
+          priority={coverPriority}
+          isActive={isActive}
+        />
       </div>
 
       <div className="grow min-w-0 flex flex-col justify-center translate-y-[-1.5px] md:translate-y-0">
@@ -73,11 +82,7 @@ export default function ListRow({
           </p>
         )}
         {lyricsSnippet && (
-          <div className="mt-1 border-l-2 border-slate-200 pl-2 dark:border-slate-700">
-            <p className="truncate text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
-              {lyricsSnippet}
-            </p>
-          </div>
+          <LyricsSnippet snippet={lyricsSnippet} className="mt-1" />
         )}
       </div>
 

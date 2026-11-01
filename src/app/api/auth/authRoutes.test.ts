@@ -85,6 +85,15 @@ vi.mock("@/lib/db/supabase-auth", () => ({
   verifyPassword: vi.fn(async () => mockVerifyPasswordError),
 }));
 
+// 清缓存要 Next 的运行时，测试里只记下有没有调
+const refreshContributorsMock = vi.hoisted(() =>
+  vi.fn(async () => ({ failed: [] as string[] })),
+);
+vi.mock("@/lib/server/server-revalidate", () => ({
+  refreshContributors: refreshContributorsMock,
+  withPurgeStatus: <T>(response: T) => response,
+}));
+
 vi.mock("@/lib/server/server-utils", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/server/server-utils")>();
@@ -391,13 +400,21 @@ describe("POST /api/auth/account", () => {
     });
   });
 
-  it("管理员可以设 display", async () => {
+  it("管理员可以设 display，保存后清「关于」里的维护团队", async () => {
+    refreshContributorsMock.mockClear();
     mockUser = { ...BASE_USER, app_metadata: { is_admin: true } };
     await updateAccount(makeRequest("account", { ...VALID, display: true }));
     expect(lastBuilder.update).toHaveBeenCalledWith({
       name: "荼靡",
       display: true,
     });
+    expect(refreshContributorsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("普通用户保存资料不清 CDN：任何人都能反复调，不能拿来刷清缓存的配额", async () => {
+    refreshContributorsMock.mockClear();
+    await updateAccount(makeRequest("account", VALID));
+    expect(refreshContributorsMock).not.toHaveBeenCalled();
   });
 
   it("用户名被占用返回 409，不回数据库原文", async () => {

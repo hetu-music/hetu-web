@@ -47,6 +47,13 @@ vi.mock("@/i18n/navigation", () => ({
   usePathname: () => "/song/1",
 }));
 
+// GlobalPlayer 用 next/dynamic 按需加载播放条，测试里换成同步的真组件，
+// 照旧一渲染就能查到条子里的内容
+vi.mock("next/dynamic", async () => {
+  const { default: PlayerBar } = await import("./PlayerBar");
+  return { default: () => PlayerBar };
+});
+
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
     // eslint-disable-next-line @next/next/no-img-element

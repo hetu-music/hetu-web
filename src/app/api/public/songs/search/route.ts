@@ -9,13 +9,20 @@ import { toSimplified } from "@/lib/utils/utils-convert";
  * 按标题模糊搜索歌曲，仅返回 id 和 title，供前端选择器使用。
  * 需要登录才能访问。
  */
+function toInt(raw: string | null, fallback: number): number {
+  const n = parseInt(raw ?? "", 10);
+  return Number.isNaN(n) ? fallback : n;
+}
+
 export const GET = withAuth(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   // 标题以简体存储，繁体输入先转简体，否则「夢」搜不到「梦」
-  const q = toSimplified(searchParams.get("q")?.trim() ?? "");
+  // 歌名没有这么长的；截断免得超长的模糊匹配串拖慢查询
+  const q = toSimplified(searchParams.get("q")?.trim().slice(0, 50) ?? "");
   const limit = Math.min(
     20,
-    Math.max(1, parseInt(searchParams.get("limit") ?? "10", 10)),
+    // 不是数字时按默认的 10，不能把 NaN 传给查询
+    Math.max(1, toInt(searchParams.get("limit"), 10)),
   );
 
   if (!q) {

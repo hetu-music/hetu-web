@@ -1,13 +1,14 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
 import Image from "next/image";
 import type React from "react";
 import { FormProvider, useWatch } from "react-hook-form";
 import SectionHeading from "@/components/detail/SectionHeading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserContext } from "@/context/UserContext";
+import { useUrlState } from "@/hooks/utils/useUrlState";
+import { readLiteral, writeString } from "@/lib/utils/url-params";
 import { Link } from "@/i18n/navigation";
 import type { MusicProviderType } from "@/lib/api/api-auto-complete";
 import { songFields } from "@/lib/constants";
@@ -96,7 +97,10 @@ const PROVIDERS: { provider: MusicProviderType; label: string }[] = [
 export default function SongWorkspace({
   song: initialSong,
   published,
+  initialSearch,
 }: {
+  /** 这次请求的查询串，打开时直接是对的标签页（见 useUrlState）；新增页只有资料一栏，不用传 */
+  initialSearch?: string;
   /** null 为新增 */
   song: SongDetail | null;
   published: Record<string, unknown> | null;
@@ -104,10 +108,10 @@ export default function SongWorkspace({
   const ws = useSongWorkspace(initialSong, published);
   const { song } = ws;
   const { user } = useUserContext();
-  const [tabParam, setTab] = useQueryState(
-    "tab",
-    parseAsStringLiteral(TABS).withDefault("info"),
-  );
+  const [params, updateUrl] = useUrlState({ initialSearch });
+  const tabParam = readLiteral(params, "tab", TABS, "info");
+  const setTab = (next: Tab) =>
+    updateUrl((draft) => writeString(draft, "tab", next, "info"));
 
   // 新增时只有资料一栏；音频接口只对超级管理员开放
   const tabs = TABS.filter(
@@ -156,10 +160,7 @@ export default function SongWorkspace({
       pinned={<UsageNotesButton />}
     >
       <FormProvider {...ws.form}>
-        <Tabs
-          value={tab}
-          onValueChange={(t: Tab) => void setTab(t === "info" ? null : t)}
-        >
+        <Tabs value={tab} onValueChange={(t: Tab) => setTab(t)}>
           <AdminToolbar search={<SaveBar ws={ws} />}>
             {tabs.length > 1 && (
               // 页签撑满工具栏的行高，当前项的短线压在工具栏的细线上
@@ -186,7 +187,7 @@ export default function SongWorkspace({
           <form id="song-form" onSubmit={ws.save}>
             {/* 资料一直挂着：切到别的栏再回来，没暂存的改动还在 */}
             <TabsContent value="info" variant="inline" keepMounted>
-              <InfoTab ws={ws} onOpenAssets={() => void setTab("assets")} />
+              <InfoTab ws={ws} onOpenAssets={() => setTab("assets")} />
             </TabsContent>
             {song && (
               <TabsContent value="assets" variant="inline">

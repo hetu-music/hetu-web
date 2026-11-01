@@ -4,7 +4,9 @@ import {
   collationInputSchema,
   resolveCollations,
   sortSupplements,
+  summarizeRevisers,
   supplementInputSchema,
+  willSignAsReviser,
 } from "./utils-collations";
 import { buildFolio } from "./utils-folio";
 
@@ -31,7 +33,7 @@ function collation(overrides: Partial<SongCollation>): SongCollation {
     sung: "沧山",
     body: "",
     collator: "某某",
-    reviser: null,
+    revisers: [],
     ...overrides,
   };
 }
@@ -164,5 +166,29 @@ describe("sortSupplements", () => {
       collation({ id: 5, anchor: "song", kind: "note", date: null }),
     ]);
     expect(sorted.map((c) => c.id)).toEqual([4, 3, 2, 1, 5]);
+  });
+});
+
+describe("summarizeRevisers", () => {
+  it("三人以内全列，再多只列首尾两人并给总数", () => {
+    expect(summarizeRevisers([])).toBeNull();
+    expect(summarizeRevisers(["乙", "丙", "丁"])).toEqual({
+      names: "乙、丙、丁",
+      count: null,
+    });
+    expect(summarizeRevisers(["乙", "丙", "丁", "戊"])).toEqual({
+      names: "乙、戊",
+      count: 4,
+    });
+  });
+});
+
+describe("willSignAsReviser", () => {
+  it("校者本人、已在名单里的不再提示", () => {
+    const c = collation({ collator: "甲", revisers: ["乙"] });
+    expect(willSignAsReviser(c, "甲")).toBe(false);
+    expect(willSignAsReviser(c, "乙")).toBe(false);
+    expect(willSignAsReviser(c, "丙")).toBe(true);
+    expect(willSignAsReviser(c, undefined)).toBe(false);
   });
 });

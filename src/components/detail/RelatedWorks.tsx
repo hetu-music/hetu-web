@@ -3,6 +3,7 @@
 import SectionHeading from "@/components/detail/SectionHeading";
 import { Link } from "@/i18n/navigation";
 import type { RelatedSong } from "@/lib/types";
+import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -11,15 +12,6 @@ import Image from "next/image";
 export default function RelatedWorks({ songs }: { songs: RelatedSong[] }) {
   const t = useTranslations("song.folio");
   if (songs.length === 0) return null;
-
-  // 与主页一致：站内跳转前递增导航深度，详情页的返回键才会走 router.back()
-  const bumpNavDepth = () => {
-    const d = parseInt(
-      sessionStorage.getItem("__hetu_web_nav_depth") || "0",
-      10,
-    );
-    sessionStorage.setItem("__hetu_web_nav_depth", String(d + 1));
-  };
 
   return (
     <section id="related" className="py-16 md:py-20">

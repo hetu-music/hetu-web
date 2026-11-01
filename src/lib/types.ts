@@ -237,8 +237,8 @@ export interface SongCollation {
   body: string;
   /** 校者；账号已删为 null */
   collator: string | null;
-  /** 订者：别人改过时才有 */
-  reviser: string | null;
+  /** 订者：校者以外改过的人，按第一次修改的先后；账号已删的不列 */
+  revisers: string[];
 }
 
 // 个人页「我的批评」：按歌分组
@@ -261,17 +261,6 @@ export interface MyComment {
 export interface MyCommentGroup {
   song: Pick<Song, "id" | "title" | "artist" | "hascover">;
   comments: MyComment[];
-}
-
-// 筛选选项类型
-export interface FilterOptions {
-  allTypes: string[];
-  allGenres: string[];
-  allYears: (string | number)[];
-  allLyricists: string[];
-  allComposers: string[];
-  allArrangers: string[];
-  allArtists: string[];
 }
 
 // 歌曲信息类型

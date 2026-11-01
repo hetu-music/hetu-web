@@ -2,7 +2,8 @@
 
 import SectionHeading from "@/components/detail/SectionHeading";
 import type { SongCollation } from "@/lib/types";
-import { cn } from "@/lib/utils/utils";
+import { cn, toChineseNumeral } from "@/lib/utils/utils";
+import { summarizeRevisers } from "@/lib/utils/utils-collations";
 import { useTranslations } from "next-intl";
 
 /**
@@ -32,7 +33,10 @@ function KindHead({ label, className }: { label: string; className?: string }) {
   );
 }
 
-/** 落款：校记署「某某 校」，补遗署「某某 辑」；别人改过再加「某某 订」 */
+/**
+ * 落款：校记署「某某 校」，补遗署「某某 辑」；别人改过再加「乙、丙 订」。
+ * 订者超过三人只写首尾，如「乙、戊等四人 订」，全部名字放在悬停提示里
+ */
 function Signature({
   collation: c,
   verb,
@@ -46,9 +50,22 @@ function Signature({
     verb === "collator"
       ? t("collations.collator", { name })
       : t("supplements.compiler", { name });
-  return c.reviser
-    ? `${by} · ${t("collations.reviser", { name: c.reviser })}`
-    : by;
+  const revisers = summarizeRevisers(c.revisers);
+  if (!revisers) return by;
+  if (revisers.count === null) {
+    return `${by} · ${t("collations.reviser", { name: revisers.names })}`;
+  }
+  return (
+    <>
+      {by} ·{" "}
+      <span title={c.revisers.join("、")}>
+        {t("collations.revisersMany", {
+          names: revisers.names,
+          count: toChineseNumeral(revisers.count),
+        })}
+      </span>
+    </>
+  );
 }
 
 /**

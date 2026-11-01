@@ -151,7 +151,11 @@ export default function QuizResultClient({ result }: Props) {
                     href={`/song/${song.id}`}
                     className="h-20 w-20 shrink-0 md:h-24 md:w-24"
                   >
-                    <CoverArt song={song} className="rounded-sm" />
+                    <CoverArt
+                      song={song}
+                      sizes="(min-width: 768px) 96px, 80px"
+                      className="rounded-sm"
+                    />
                   </Link>
 
                   <div className="min-w-0 flex-1">

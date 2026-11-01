@@ -24,6 +24,11 @@ vi.mock("@/lib/db/supabase-auth", () => ({
   })),
 }));
 
+// unstable_cache 依赖 Next.js 的增量缓存，测试里直接透传，每次调用都重新查询
+vi.mock("next/cache", () => ({
+  unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+}));
+
 vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/db/supabase-server")>();
@@ -44,6 +49,7 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 
 import { GET as getContributors } from "../contributors/route";
 import { GET as getLyrics } from "./[id]/lyrics/route";
+import { GET as getLyricsLines } from "./lyrics-lines/route";
 import { GET as searchSongs } from "./search/route";
 
 beforeEach(() => {
@@ -97,9 +103,14 @@ describe("GET /api/public/songs/[id]/lyrics", () => {
     expect((await call("abc")).status).toBe(400);
   });
 
-  it("歌曲不存在返回 404", async () => {
+  it("歌曲不存在返回 404，错误响应不进缓存", async () => {
     mockResult = { data: null, error: { message: "no rows" } };
-    expect((await call("42")).status).toBe(404);
+    const res = await call("42");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect((await call("abc")).headers.get("Cache-Control")).toBe(
+      "private, no-store",
+    );
   });
 
   it("返回歌词并带上 CDN 缓存头", async () => {
@@ -117,6 +128,58 @@ describe("GET /api/public/songs/[id]/lyrics", () => {
     const res = await call("42");
     expect(res.status).toBe(200);
     expect((await res.json()).lyrics).toBeNull();
+  });
+});
+
+describe("GET /api/public/songs/lyrics-lines", () => {
+  const call = (query: string) =>
+    getLyricsLines(
+      new NextRequest(
+        `http://localhost/api/public/songs/lyrics-lines?${query}`,
+      ),
+    );
+  const LYRICS = [
+    "[00:01.00]倾尽天下",
+    "[00:03.00]作词：Vagary",
+    "[00:20.00]血染江山的画",
+    "[00:25.00]怎敌你眉间一点朱砂",
+  ].join("\n");
+
+  beforeEach(() => {
+    mockResult = {
+      data: [
+        { id: 1, title: "倾尽天下", lyrics: LYRICS, lyrics_start: null },
+        { id: 2, title: "空", lyrics: "", lyrics_start: null },
+      ],
+      error: null,
+    };
+  });
+
+  it("按句切好，去掉署名区；没有句子的歌不返回", async () => {
+    const body = await (await call("locale=zh-CN")).json();
+    expect(body).toEqual([
+      { id: 1, lines: ["血染江山的画", "怎敌你眉间一点朱砂"] },
+    ]);
+  });
+
+  it("繁体逐句转换，句数不变", async () => {
+    const body = await (await call("locale=zh-TW")).json();
+    expect(body[0].lines).toEqual(["血染江山的畫", "怎敵你眉間一點硃砂"]);
+  });
+
+  it("浏览器和 CDN 都缓存 6 小时", async () => {
+    const cache = (await call("locale=zh-CN")).headers.get("Cache-Control");
+    expect(cache).toContain("max-age=21600");
+    expect(cache).toContain("s-maxage=21600");
+  });
+
+  it("service client 不可用时返回 500", async () => {
+    mockServiceAvailable = false;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const res = await call("locale=zh-CN");
+    expect(res.status).toBe(500);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    spy.mockRestore();
   });
 });
 
@@ -156,5 +219,7 @@ describe("GET /api/public/songs/search", () => {
   it("limit 最小为 1，非法值回退到默认", async () => {
     await call("?q=倾&limit=0");
     expect(lastBuilder.limit).toHaveBeenCalledWith(1);
+    await call("?q=倾&limit=abc");
+    expect(lastBuilder.limit).toHaveBeenCalledWith(10);
   });
 });

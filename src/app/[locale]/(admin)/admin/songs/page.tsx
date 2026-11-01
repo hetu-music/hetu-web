@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/service-admin";
 import { getSongs } from "@/lib/server/service-songs";
 import type { SongDetail } from "@/lib/types";
+import { toSearchString } from "@/lib/utils/url-params";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,10 @@ export const metadata: Metadata = {
 
 type Props = {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function SongsAdminPage({ params }: Props) {
+export default async function SongsAdminPage({ params, searchParams }: Props) {
   const { locale } = await params;
   const session = await requireAdminPage(locale, "/admin/songs");
 
@@ -44,6 +46,7 @@ export default async function SongsAdminPage({ params }: Props) {
       initialError={error}
       publishStatuses={publishStatuses}
       occurrenceCounts={occurrenceCounts}
+      initialSearch={toSearchString(await searchParams)}
     />
   );
 }

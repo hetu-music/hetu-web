@@ -17,6 +17,7 @@ import {
   type SupplementPayload,
   sortSupplements,
   supplementInputSchema,
+  willSignAsReviser,
 } from "@/lib/utils/utils-collations";
 import {
   ConfirmButton,
@@ -44,8 +45,10 @@ const KIND_HINT: Record<SupplementKind, string> = {
   note: "以上都不算的资料",
 };
 
+/** 后台列出全部订者，不缩写 */
 function signature(c: SongCollation) {
-  return `${c.collator || "佚名"} 辑${c.reviser ? ` · ${c.reviser} 订` : ""}`;
+  const revisers = c.revisers.length ? ` · ${c.revisers.join("、")} 订` : "";
+  return `${c.collator || "佚名"} 辑${revisers}`;
 }
 
 /**
@@ -262,7 +265,7 @@ function SupplementForm({
       <div className="flex flex-wrap items-center justify-end gap-3">
         <span className={cn(META_CLASS, "mr-auto")}>
           {initial
-            ? `${signature(initial)}${initial.collator !== user?.name ? "，保存后署你为订者" : ""}`
+            ? `${signature(initial)}${willSignAsReviser(initial, user?.name) ? "，保存后署你为订者" : ""}`
             : `署名：${user?.name ?? ""} 辑`}
         </span>
         {error && <span className="text-xs text-rose-500">{error}</span>}

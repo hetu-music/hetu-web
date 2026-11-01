@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { locales } from "@/i18n/config";
 import { CDN_PURGE_FAILED_HEADER } from "@/lib/cdn-purge";
 import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
+import { LYRICS_LINES_TAG } from "@/lib/library/tags";
 import {
   purgeCloudflareCache,
   purgeCloudFrontCache,
@@ -21,11 +22,12 @@ import {
  *   CDN 上不另设时长。但 Cloudflare 默认不缓存 HTML 和 JSON，要两条 Cache Rule：
  *   一条让页面和公开接口按源站头进缓存（排除 /api/admin、/api/auth），
  *   一条让站内跳转请求（?_rsc= 或 rsc: 1）绕过缓存。
+ *   规则原文和待加的缓存键设置见 docs/CACHE.md。
  *   只能按 URL 清，所以受影响的页面和接口要逐个列出来。
  *   站内跳转的 ?_rsc=… 变体只有 CloudFront 能按通配清。
  *
  * 只能靠标签波及、列不出 URL 的页面（如改分类牵动全部详情页），
- * CDN 上的副本要等 s-maxage 到期，最多 2 小时。
+ * CDN 上的副本要等 s-maxage 到期，最多 6 小时。
  *
  * 下面每个 refresh 函数对应一类数据变动，受牵连的页面、接口和标签都写在函数里，
  * 调用方只说改了哪些歌、哪些母题，不自己补路径。
@@ -108,20 +110,24 @@ async function invalidate({
 const songLyricsApi = (id: number) => `/api/public/songs/${id}/lyrics`;
 
 /**
+ * 曲库页搜歌词的数据，简繁各一个地址（客户端简体也带 ?locale=zh-CN）。
+ * 浏览器和 CDN 都缓存 6 小时，这里清得掉 CDN 的，浏览器里的等到期
+ */
+const LYRICS_LINES_API = locales.map(
+  (locale) => `/api/public/songs/lyrics-lines?locale=${locale}`,
+);
+
+/**
  * 歌曲资料变了（审批上线、外部同步）：首页曲库、详情页、播放器的歌词、
- * 全文搜索的歌词索引和 sitemap。歌名、类型、日期等也进了意象索引，
+ * 曲库页搜歌词的数据和 sitemap。歌名、类型、日期等也进了意象索引，
  * 意象页的计数、寻曲候选池、别的歌的相关作品都会变，所以要失效标签；
  * 详情页之外受波及的页面在 CDN 上等到期。
  */
 export async function refreshSongs(songIds: number[]): Promise<PurgeReport> {
   return invalidate({
     pages: ["", "/imagery", "/quiz", ...songIds.map(songPage)],
-    paths: [
-      "/sitemap.xml",
-      "/api/public/songs/lyrics-index",
-      ...songIds.map(songLyricsApi),
-    ],
-    tags: [IMAGERY_INDEX_TAG],
+    paths: ["/sitemap.xml", ...LYRICS_LINES_API, ...songIds.map(songLyricsApi)],
+    tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
   });
 }
 
@@ -148,7 +154,7 @@ export async function refreshAudio(songIds: number[]): Promise<PurgeReport> {
  * 意象标注变了：详情页的意象与相关作品、意象词云、寻曲候选池都由标注聚合而来。
  *
  * 标签让 Next 上的全部详情页与母题页失效（相关作品、作品数会牵动别处）；CDN 上只清
- * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等 2 小时到期。
+ * 列出来的歌和母题：母题页与它的面板接口（简繁各一份）。其余的等 6 小时到期。
  */
 export async function refreshImagery({
   songIds = [],
@@ -185,6 +191,15 @@ export async function refreshSongEmotions(
   });
 }
 
+/**
+ * 「关于」里的维护团队变了：后台改了用户的展示、排序、简介，或者管理员改了自己的名字、简介。
+ * 普通用户改自己的资料不调这里：任何登录用户都能反复保存，每次都清 CDN 会被拿来刷爆清缓存的配额；
+ * 被展示的普通成员改名，最多 6 小时后更新。
+ */
+export async function refreshContributors(): Promise<PurgeReport> {
+  return invalidate({ paths: ["/api/public/contributors"] });
+}
+
 /** 校记变了：只显示在这首歌的详情页，不进意象索引 */
 export async function refreshCollations(songId: number): Promise<PurgeReport> {
   return invalidate({ pages: [songPage(songId)] });
@@ -194,8 +209,8 @@ export async function refreshCollations(songId: number): Promise<PurgeReport> {
 export async function refreshPublicPages(): Promise<PurgeReport> {
   return invalidate({
     pages: ["", "/imagery", "/story/qjtx", "/quiz"],
-    paths: ["/sitemap.xml", "/api/public/songs/lyrics-index"],
-    tags: [IMAGERY_INDEX_TAG],
+    paths: ["/sitemap.xml", ...LYRICS_LINES_API],
+    tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
   });
 }
 

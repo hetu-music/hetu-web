@@ -122,4 +122,5 @@ export default async function ImageryPage({ params }: Props) {
   );
 }
 
-export const revalidate = 7200;
+// 全站 ISR 统一 6 小时
+export const revalidate = 21600;

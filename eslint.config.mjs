@@ -29,7 +29,7 @@ export default defineConfig(
   ...tseslint.configs.recommended,
 
   // Next.js 完整配置（包含 jsx-a11y）
-  nextConfig,  // 直接使用，不拆分
+  nextConfig, // 直接使用，不拆分
 
   // React Hooks（手动注册）
   {
@@ -40,7 +40,7 @@ export default defineConfig(
       ...reactHooks.configs.recommended.rules,
     },
   },
-  
+
   {
     rules: {
       "jsx-a11y/alt-text": [
@@ -85,7 +85,11 @@ export default defineConfig(
 
       "@typescript-eslint/no-unused-vars": [
         "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-empty-function": "warn",
@@ -125,6 +129,55 @@ export default defineConfig(
           ].map((name) => ({
             name,
             message: `请直接导入具体文件（如 ${name}/xxx），不要使用目录聚合导入——barrel 会把服务端模块带进客户端依赖图。`,
+          })),
+        },
+      ],
+    },
+  },
+
+  // 曲库页首屏的代码不能直接引用第二档（docs/LIBRARY.md 阶段 4「2.」）：
+  // 搜索内核连着归一化和繁转简表，筛选面板连着 Base UI 的下拉框和滑轨。
+  // 静态引用一个值就会把它们拉回首屏（阶段 5 就因为引用了 TIER 常量多了 16 KB）。
+  // 只能引用类型；要用的值经 engine（src/lib/library/engine.ts）拿，它和筛选面板一起由
+  // src/components/library/deferred.ts 按需加载。
+  {
+    files: [
+      "src/components/library/**/*.{ts,tsx}",
+      "src/hooks/library/**/*.ts",
+      "src/lib/library/**/*.ts",
+    ],
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      // 第二档自己
+      "src/components/library/deferred.ts",
+      "src/components/library/SongFilters.tsx",
+      "src/components/library/CustomSelect.tsx",
+      "src/lib/library/engine.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            "@/lib/library/engine",
+            "@/lib/search/corpus",
+            "@/lib/search/fuzzy",
+            "@/lib/search/meta",
+            "@/lib/search/normalize",
+            "@/lib/search/rank",
+            "@/lib/search/snippet",
+            "@/components/library/SongFilters",
+            "@/components/library/deferred",
+            "@/components/ui/combobox",
+            "@/components/ui/slider",
+            "./SongFilters",
+            "./deferred",
+            "./engine",
+          ].map((name) => ({
+            name,
+            allowTypeImports: true,
+            message:
+              "曲库页首屏不能静态引用第二档（见 docs/LIBRARY.md 阶段 4「2.」）：只引用类型，值经 engine 拿。",
           })),
         },
       ],

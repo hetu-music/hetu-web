@@ -3,7 +3,7 @@
 import ProfileSectionHeading, {
   GroupHeading,
 } from "@/components/profile/ProfileSectionHeading";
-import { bumpNavDepth } from "@/components/profile/profile-ui";
+import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { TEXT_BUTTON_CLASS } from "@/components/shared/text-button";
 import { addToast } from "@/components/ui/toast";
 import { useUserContext } from "@/context/UserContext";

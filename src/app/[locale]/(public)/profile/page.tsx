@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Suspense } from "react";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { isProfileTab } from "@/components/profile/profile-ui";
 import { getPageUser } from "@/lib/server/server-auth";
 import { loginPathFor } from "@/lib/utils/safe-next";
+import { toSearchString } from "@/lib/utils/url-params";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ const MOVED_TO_ADMIN = new Set(["requests", "users", "logs"]);
 
 type Props = {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -27,7 +27,8 @@ export default async function ProfilePage({ params, searchParams }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const { tab } = await searchParams;
+  const query = await searchParams;
+  const { tab } = query;
   const tabValue = typeof tab === "string" ? tab : undefined;
   if (tabValue && MOVED_TO_ADMIN.has(tabValue)) {
     redirect(`/${locale}/admin/${tabValue}`);
@@ -43,10 +44,5 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     redirect(`/${locale}${loginPathFor(back)}`);
   }
 
-  return (
-    // nuqs 读取查询参数需要 Suspense 边界
-    <Suspense>
-      <ProfileClient />
-    </Suspense>
-  );
+  return <ProfileClient initialSearch={toSearchString(query)} />;
 }

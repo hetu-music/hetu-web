@@ -18,6 +18,7 @@ import {
   type CollationPayload,
   collationInputSchema,
   resolveCollations,
+  willSignAsReviser,
 } from "@/lib/utils/utils-collations";
 import {
   type AnchorContext,
@@ -70,7 +71,7 @@ export const collationsKey = (songId: number) =>
 type Editing = { id: number | null; line: number };
 
 /**
- * 一首歌的校记：整首歌词逐句列出，点「写校记」在句下就地写。
+ * 一首歌的校记：整首歌词逐句列出，点哪一句就在句下就地写。
  * 行的切分与详情页同一套（buildFolio），存下的原句才对得上前台那一行。
  * 歌词改过、原句找不回的校记列在最前，可以删掉，或改挂到新的一句。
  */
@@ -147,7 +148,7 @@ export default function SongCollationTab({
   return (
     <div className="space-y-6">
       <p className={META_CLASS}>
-        校记署名为你的用户名，在详情页用小字写在所校那一句下面。
+        点一句歌词，在句下写校记。署名为你的用户名，在详情页用小字写在所校那一句下面。
         歌词按官方歌词稿，实际唱的写在校记里。
       </p>
 
@@ -170,9 +171,7 @@ export default function SongCollationTab({
       )}
 
       {relinking && (
-        <p className={`text-sm ${WARN_TEXT_CLASS}`}>
-          点要挂到的那一句后面的「挂到这一句」
-        </p>
+        <p className={`text-sm ${WARN_TEXT_CLASS}`}>点要挂到的那一句</p>
       )}
 
       <section className={cn(PANEL_CLASS, "px-5 py-4")}>
@@ -183,25 +182,30 @@ export default function SongCollationTab({
             const editingHere = editing !== null && editing.line === i;
             return (
               <li key={i} className={cn(line.stanzaStart && i > 0 && "mt-4")}>
-                <div className="group flex items-baseline gap-3 rounded px-2 -mx-2 py-0.5 hover:bg-slate-100/60 dark:hover:bg-slate-900/60">
+                {/* 整行可点：手机上没有悬停，只靠悬停才露出的按钮点不到。
+                    桌面悬停时右侧露出提示，手机上按下时整行变底色作反馈 */}
+                <button
+                  type="button"
+                  onClick={() => pickLine(i)}
+                  disabled={editingHere}
+                  className="group flex w-full items-baseline gap-3 rounded px-2 -mx-2 py-0.5 text-left hover:bg-slate-100/60 active:bg-slate-100 dark:hover:bg-slate-900/60 dark:active:bg-slate-900 disabled:pointer-events-none"
+                >
                   <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">
                     {line.text}
                   </span>
                   {!editingHere && (
-                    <button
-                      type="button"
-                      onClick={() => pickLine(i)}
+                    <span
                       className={cn(
                         TEXT_BUTTON_CLASS,
-                        "shrink-0",
+                        "shrink-0 group-hover:text-slate-700 dark:group-hover:text-slate-200",
                         !relinking &&
-                          "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                          "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
                       )}
                     >
                       {relinking ? "挂到这一句" : "写校记"}
-                    </button>
+                    </span>
                   )}
-                </div>
+                </button>
                 {list.length > 0 && (
                   <div className="mt-1 mb-3 ml-4 space-y-3 border-l border-slate-200 dark:border-slate-800 pl-4">
                     {list.map((c) =>
@@ -239,8 +243,10 @@ export default function SongCollationTab({
   );
 }
 
+/** 后台列出全部订者，不缩写 */
 function signature(c: SongCollation) {
-  return `${c.collator || "佚名"} 校${c.reviser ? ` · ${c.reviser} 订` : ""}`;
+  const revisers = c.revisers.length ? ` · ${c.revisers.join("、")} 订` : "";
+  return `${c.collator || "佚名"} 校${revisers}`;
 }
 
 function CollationItem({
@@ -413,7 +419,7 @@ function CollationForm({
       <div className="flex flex-wrap items-center justify-end gap-3">
         <span className={cn(META_CLASS, "mr-auto")}>
           {initial
-            ? `${signature(initial)}${initial.collator !== user?.name ? `，保存后署你为订者` : ""}`
+            ? `${signature(initial)}${willSignAsReviser(initial, user?.name) ? "，保存后署你为订者" : ""}`
             : `署名：${user?.name ?? ""} 校`}
         </span>
         {error && <span className="text-xs text-rose-500">{error}</span>}

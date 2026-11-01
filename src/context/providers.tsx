@@ -2,7 +2,6 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { NuqsAdapter } from "nuqs/adapters/next/app";
 import React from "react";
 import { ChunkErrorHandler } from "@/components/shared/ChunkErrorHandler";
 import { BrowserChromeColor } from "@/components/ui/browser-chrome";
@@ -36,22 +35,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <NuqsAdapter>
-        <QueryClientProvider client={queryClient}>
-          <ChunkErrorHandler />
-          <BrowserChromeColor />
-          <UserProvider>
-            <FavoritesProvider>
-              {children}
-              {/* GlobalPlayer 在纯 Client 树内，zustand store 是模块级单例，
-                  跨路由导航时音频状态完全不受影响 */}
-              <GlobalPlayer />
-              {/* 操作结果提示，全站共用一个；用法见 components/ui/toast */}
-              <ToastViewport />
-            </FavoritesProvider>
-          </UserProvider>
-        </QueryClientProvider>
-      </NuqsAdapter>
+      <QueryClientProvider client={queryClient}>
+        <ChunkErrorHandler />
+        <BrowserChromeColor />
+        <UserProvider>
+          <FavoritesProvider>
+            {children}
+            {/* GlobalPlayer 在纯 Client 树内，zustand store 是模块级单例，
+                跨路由导航时音频状态完全不受影响 */}
+            <GlobalPlayer />
+            {/* 操作结果提示，全站共用一个；用法见 components/ui/toast */}
+            <ToastViewport />
+          </FavoritesProvider>
+        </UserProvider>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

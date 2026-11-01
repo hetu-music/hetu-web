@@ -22,6 +22,8 @@ import React, { useMemo, useState } from "react";
 interface Option {
   value: string;
   label: string;
+  /** 置灰、不能勾选（勾上之后一首都没有，见 docs/LIBRARY.md F5） */
+  disabled?: boolean;
 }
 
 interface CustomSelectProps {
@@ -79,6 +81,10 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     const map = new Map(options.map((o) => [o.value, o.label]));
     return (v: string) => map.get(v) ?? v;
   }, [options]);
+  const disabledValues = useMemo(
+    () => new Set(options.filter((o) => o.disabled).map((o) => o.value)),
+    [options],
+  );
 
   const query = searchValue.trim().toLowerCase();
   const filteredOptions = useMemo(
@@ -186,10 +192,12 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             <ComboboxItem
               key={optionValue}
               value={optionValue}
-              // 选中的只变颜色，停在上面也不变回灰
+              disabled={disabledValues.has(optionValue)}
+              // 选中的只变颜色，停在上面也不变回灰；置灰的颜色更浅，不能点
               className={cn(
                 isSelected &&
                   "text-(--tone) data-highlighted:text-(--tone) dark:text-(--tone) dark:data-highlighted:text-(--tone)",
+                "data-disabled:cursor-not-allowed data-disabled:text-slate-300 dark:data-disabled:text-slate-600",
               )}
             >
               <span className="min-w-0 flex-1 truncate">

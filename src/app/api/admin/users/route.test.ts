@@ -22,6 +22,15 @@ vi.mock("@/lib/db/supabase-auth", () => ({
   })),
 }));
 
+// 清缓存要 Next 的运行时，测试里只记下有没有调
+const refreshContributorsMock = vi.hoisted(() =>
+  vi.fn(async () => ({ failed: [] as string[] })),
+);
+vi.mock("@/lib/server/server-revalidate", () => ({
+  refreshContributors: refreshContributorsMock,
+  withPurgeStatus: <T>(response: T) => response,
+}));
+
 vi.mock("@/lib/server/server-utils", () => ({
   verifyCSRFToken: vi.fn(async () => mockCsrfValid),
 }));
@@ -106,7 +115,8 @@ describe("PUT /api/admin/users（防止超管权限被误撤销）", () => {
     expect(body.error).toBe("不能撤销超级管理员的管理权限");
   });
 
-  it("撤销普通管理员的 is_admin 时允许", async () => {
+  it("撤销普通管理员的 is_admin 时允许，改完清「关于」里的维护团队", async () => {
+    refreshContributorsMock.mockClear();
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({ data: { is_super: false }, error: null }), // 目标用户不是超管
@@ -117,6 +127,7 @@ describe("PUT /api/admin/users（防止超管权限被误撤销）", () => {
       jsonRequest("PUT", { id: VALID_UUID, is_admin: false }),
     );
     expect(res.status).toBe(200);
+    expect(refreshContributorsMock).toHaveBeenCalledTimes(1);
   });
 
   it("不再保存 Navidrome 密码：旧客户端传来的 navid_pw 被忽略", async () => {

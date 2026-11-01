@@ -10,7 +10,7 @@ import { IMAGERY_INDEX_TAG } from "@/lib/imagery/tags";
  * 标注取全部歌（资料存疑的歌自己的详情页也要标意象），歌曲只取计入曲库的；
  * 统计、推荐、候选池都以曲库为范围，各自按 songs 过滤标注。
  *
- * 跨请求缓存，2 小时刷新；其中任何数据变了由 server-revalidate 按标签失效。
+ * 跨请求缓存，6 小时刷新（与全站 ISR 一致）；其中任何数据变了由 server-revalidate 按标签失效。
  */
 
 export type IndexCategory = {
@@ -55,7 +55,7 @@ export type ImageryIndex = {
 export const loadImageryIndex = unstable_cache(
   async (): Promise<ImageryIndex> => {
     // 失败时抛错而不返回空数据：unstable_cache 不缓存异常，
-    // 否则一次查询失败会让残缺的数据被缓存 2 小时
+    // 否则一次查询失败会让残缺的数据被缓存 6 小时
     const supabase = getServiceClient();
     if (!supabase) throw new Error("Supabase 未配置");
     const [categories, imagery, occurrences, songs, songEmotions, emotions] =
@@ -103,5 +103,5 @@ export const loadImageryIndex = unstable_cache(
   },
   // 标签也放进 key：改了标签名，旧标签打的条目刷不到，换 key 让它们作废
   ["imagery-index-v1", IMAGERY_INDEX_TAG],
-  { revalidate: 7200, tags: [IMAGERY_INDEX_TAG] },
+  { revalidate: 21600, tags: [IMAGERY_INDEX_TAG] },
 );

@@ -19,14 +19,20 @@ const OPTIONS = [
 ];
 
 /** 受控包装：把选中值铺到 DOM 上，同时记下每次 onChange */
-function Harness({ onChange }: { onChange: (v: string[]) => void }) {
+function Harness({
+  onChange,
+  options = OPTIONS,
+}: {
+  onChange: (v: string[]) => void;
+  options?: { value: string; label: string; disabled?: boolean }[];
+}) {
   const [value, setValue] = useState<string[]>([]);
   return (
     <NextIntlClientProvider locale="zh-CN" messages={messages}>
       <CustomSelect
         label="类型"
         placeholder="全部类型"
-        options={OPTIONS}
+        options={options}
         value={value}
         onChange={(v) => {
           onChange(v);
@@ -108,5 +114,21 @@ describe("CustomSelect", () => {
     fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
     expect(valueText()).toBe("");
     expect(screen.queryByRole("option")).toBeNull();
+  });
+
+  it("置灰的选项点了不选上", async () => {
+    const onChange = vi.fn();
+    render(
+      <Harness
+        onChange={onChange}
+        options={OPTIONS.map((o) => ({ ...o, disabled: o.value === "合作" }))}
+      />,
+    );
+    await openPanel();
+    const disabled = screen.getByRole("option", { name: "合作" });
+    expect(disabled.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(disabled);
+    expect(valueText()).toBe("");
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

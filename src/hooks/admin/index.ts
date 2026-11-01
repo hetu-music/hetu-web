@@ -4,3 +4,4 @@ export type {
   AutoCompleteState,
   UseAutoCompleteReturn,
 } from "./useAutoComplete";
+export { useSongs } from "./useSongs";

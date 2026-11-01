@@ -24,11 +24,12 @@
   "reset": "重設",
   "advancedFilter": "高級篩選",
   "search": {
-    "placeholder": "搜尋歌名、專輯、作詞、作曲…",
-    "placeholderWithLyrics": "搜尋歌曲、創作者、歌詞...",
-    "placeholderNoLyrics": "搜尋歌曲、創作者...",
+    "placeholder": "搜尋歌曲、創作者、歌詞...",
     "noResults": "未找到匹配的歌曲",
-    "noResultsHint": "請嘗試其他關鍵詞或清除篩選條件"
+    "noResultsHint": "請嘗試其他關鍵詞或清除篩選條件",
+    "lyricsPending": "歌詞檢索準備中",
+    "approximate": "未見原句，以下是相近的句子",
+    "moreMatches": "等 {count} 處"
   },
   "listHeader": {
     "cover": "封面",

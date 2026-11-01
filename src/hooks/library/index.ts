@@ -1,4 +1,3 @@
-export { useFilteredSongs } from "./useFilteredSongs";
-export { extractLyricsSnippet, useLyricsIndex } from "./useLyricsIndex";
-export { useMusicLibraryState } from "./useMusicLibraryState";
-export { useSongs } from "./useSongs";
+export { useLibraryResults } from "./useLibraryResults";
+export { useLibraryState } from "./useLibraryState";
+export { useLyricsLines } from "./useLyricsLines";

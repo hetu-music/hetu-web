@@ -4,6 +4,10 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { getServiceClient, fetchAll, TABLES } from "@/lib/db/supabase-server";
 import type { UserRecord } from "@/lib/types";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import {
+  refreshContributors,
+  withPurgeStatus,
+} from "@/lib/server/server-revalidate";
 import { parseJsonBody } from "@/lib/server/parse-body";
 import {
   DISPLAY_NAME_TAKEN,
@@ -107,7 +111,10 @@ export const PUT = withAuth(
       return serverErrorResponse("PUT /api/admin/users", error, "更新失败");
     }
 
-    return NextResponse.json({ success: true });
+    return withPurgeStatus(
+      NextResponse.json({ success: true }),
+      await refreshContributors(),
+    );
   },
   { requireSuperAdmin: true, requireCSRF: true },
 );

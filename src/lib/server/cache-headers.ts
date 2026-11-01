@@ -41,6 +41,8 @@ export const API_PATHS_WITH_OWN_CACHE = [
   "public/songs/lyrics-index",
   // 意象词云的母题面板：CDN 6 小时
   "imagery/motifs/\\d+",
+  // 「关于」里的维护团队：CDN 6 小时
+  "public/contributors",
   // 曲库页搜歌词的数据：浏览器和 CDN 都 6 小时（docs/LIBRARY.md 阶段 5「2.」）
   "public/songs/lyrics-lines",
 ];

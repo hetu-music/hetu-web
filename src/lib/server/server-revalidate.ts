@@ -195,6 +195,15 @@ export async function refreshSongEmotions(
   });
 }
 
+/**
+ * 「关于」里的维护团队变了：后台改了用户的展示、排序、简介，或者管理员改了自己的名字、简介。
+ * 普通用户改自己的资料不调这里：任何登录用户都能反复保存，每次都清 CDN 会被拿来刷爆清缓存的配额；
+ * 被展示的普通成员改名，最多 6 小时后更新。
+ */
+export async function refreshContributors(): Promise<PurgeReport> {
+  return invalidate({ paths: ["/api/public/contributors"] });
+}
+
 /** 校记变了：只显示在这首歌的详情页，不进意象索引 */
 export async function refreshCollations(songId: number): Promise<PurgeReport> {
   return invalidate({ pages: [songPage(songId)] });

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { PUBLIC_API_CACHE, NO_STORE_HEADERS } from "@/lib/server/cache-headers";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { parseRouteId } from "@/lib/server/route-params";
 
 export const GET = async (
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) => {
   const { id } = await params;
-  const songId = parseInt(id, 10);
+  const songId = parseRouteId(id);
 
-  if (isNaN(songId)) {
+  if (songId === null) {
     return NextResponse.json(
       { error: "Invalid song id" },
       { status: 400, headers: NO_STORE_HEADERS },

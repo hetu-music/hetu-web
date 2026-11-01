@@ -219,5 +219,7 @@ describe("GET /api/public/songs/search", () => {
   it("limit 最小为 1，非法值回退到默认", async () => {
     await call("?q=倾&limit=0");
     expect(lastBuilder.limit).toHaveBeenCalledWith(1);
+    await call("?q=倾&limit=abc");
+    expect(lastBuilder.limit).toHaveBeenCalledWith(10);
   });
 });

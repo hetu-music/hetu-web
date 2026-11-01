@@ -10,6 +10,7 @@ import {
 } from "@/lib/forms/account-rules";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
+import { refreshContributors } from "@/lib/server/server-revalidate";
 
 const schema = z.object({
   displayName: displayNameField,
@@ -53,6 +54,10 @@ export const POST = withAuth(
         400,
       );
     }
+
+    // 维护团队名单里的人改了名字、简介，「关于」要跟着变。只有管理员会被列进去时才清：
+    // 普通用户也能调这个接口，每次都清 CDN 会被拿来刷爆清缓存的配额（见 refreshContributors）
+    if (user.app_metadata?.is_admin === true) await refreshContributors();
 
     return NextResponse.json({ success: true });
   },

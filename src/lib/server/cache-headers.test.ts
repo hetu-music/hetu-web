@@ -12,6 +12,7 @@ describe("/api 下统一加 no-store 的范围", () => {
       "/api/public/songs/lyrics-index",
       "/api/public/songs/lyrics-lines",
       "/api/imagery/motifs/7",
+      "/api/public/contributors",
     ]) {
       expect(noStore(path), path).toBe(false);
     }
@@ -21,7 +22,6 @@ describe("/api 下统一加 no-store 的范围", () => {
     for (const path of [
       "/api/public/songs/search",
       "/api/public/songs/42/comments",
-      "/api/public/contributors",
       "/api/public/csrf-token",
       "/api/auth/me",
       "/api/admin/songs/42",

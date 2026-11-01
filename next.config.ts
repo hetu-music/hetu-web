@@ -14,7 +14,9 @@ const nextConfig: NextConfig = {
         hostname: "cover.hetu-music.com",
       },
     ],
-    minimumCacheTTL: 3600,
+    // 优化后的封面在源站和 CDN 都存 6 小时，和全站统一（见 docs/CACHE.md）。
+    // 封面地址不随内容变，换了封面最多 6 小时后才显示新图
+    minimumCacheTTL: 21600,
     // 本地网络下 cover.hetu-music.com 会解析到内网地址，图片优化器默认拒绝；
     // 只在开发环境放开，生产环境保留 SSRF 防护
     dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",

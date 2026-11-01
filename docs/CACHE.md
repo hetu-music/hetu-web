@@ -4,14 +4,24 @@
 
 ## 一、各层缓存
 
-| 层              | 管什么                                                                | 时长                                                         | 在哪里设                                           |
-| --------------- | --------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------- |
-| Next 的 ISR     | 公开页面：首页、详情页、意象页、母题页、寻曲页、故事页、`sitemap.xml` | 全站统一 6 小时（`revalidate = 21600`）                      | 各页面的 `export const revalidate`，必须直接写数字 |
-| Next 的数据缓存 | 意象索引、寻曲候选池、登录页的摘句池                                  | 6 小时，另按标签失效                                         | `unstable_cache` 的 `revalidate`                   |
-|                 | 曲库页搜歌词的数据（`lyrics-lines`）                                  | 不按时间过期，只按标签失效                                   | `service-lyrics-lines.ts`                          |
-| CDN             | 页面和几个公开只读接口                                                | 看源站的 `Cache-Control`，CDN 上不另设时长                   | 页面由 Next 按 `revalidate` 生成；接口见下面「二」 |
-| 浏览器          | 只有 `lyrics-lines`                                                   | 6 小时（`max-age`）                                          | `BROWSER_CACHED_API_CACHE`                         |
-| Service Worker  | 白名单里的公开只读接口，只用来离线兜底                                | `NetworkFirst`，网络超过 5 秒或离线时返回最多 5 分钟前的副本 | `src/sw.ts` 的 `PUBLIC_CACHEABLE_API`              |
+| 层              | 管什么                                                                | 时长                                                                                                                                   | 在哪里设                                                           |
+| --------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Next 的 ISR     | 公开页面：首页、详情页、意象页、母题页、寻曲页、故事页、`sitemap.xml` | 全站统一 6 小时（`revalidate = 21600`）                                                                                                | 各页面的 `export const revalidate`，必须直接写数字                 |
+| Next 的数据缓存 | 意象索引、寻曲候选池、登录页的摘句池                                  | 6 小时，另按标签失效                                                                                                                   | `unstable_cache` 的 `revalidate`                                   |
+|                 | 曲库页搜歌词的数据（`lyrics-lines`）                                  | 不按时间过期，只按标签失效                                                                                                             | `service-lyrics-lines.ts`                                          |
+| Next 的图片优化 | 压好的封面（`/_next/image`），存在 `.next/cache/images`               | 6 小时；过期后先给旧图、后台重压。部署后是空的                                                                                         | `next.config.ts` 的 `images.minimumCacheTTL`                       |
+| CDN             | 页面、几个公开只读接口、压好的封面                                    | 看源站的 `Cache-Control`，CDN 上不另设时长                                                                                             | 页面由 Next 按 `revalidate` 生成；接口见下面「二」                 |
+| 浏览器          | 接口只有 `lyrics-lines`；另有压好的封面                               | 都是 6 小时（`max-age`）                                                                                                               | 接口：`BROWSER_CACHED_API_CACHE`；封面：同上面的 `minimumCacheTTL` |
+| Service Worker  | 白名单里的公开只读接口，只用来离线兜底；压好的封面                    | 接口：`NetworkFirst`，网络超过 5 秒或离线时返回最多 5 分钟前的副本。封面：`StaleWhileRevalidate`，先给存着的、后台取新的，最多存 30 天 | `src/sw.ts`                                                        |
+
+服务端和 CDN 上的时长全站统一 6 小时（21600 秒）；新加的缓存也用 6 小时，不另定。不在此列的：
+
+- **`stale-while-revalidate`**：这不是缓存多久，是过期以后还能先给旧内容多久、同时后台去取新的。页面是 7 天（`next.config.ts` 的 `expireTime`，万一清 CDN 失败，旧页面最多再挂 7 天），接口是 30 分钟（`cache-headers.ts`）。
+- **内容哈希命名的文件**：`/_next/static` 和字体分片永久缓存，内容变了名字就变。
+- **浏览器内存里的 React Query**：`staleTime` 管的是切回页面时要不要重新请求，大多是登录用户自己的数据（收藏、批注、反馈），按交互定，不跟着 6 小时。
+- **Service Worker**：接口只做离线兜底；封面的 30 天是最多存多久，每次显示后都会后台取新的，见上表。
+
+换封面时地址不变（`/cover/{id}.jpg`），上传流程也不清压好的图，新封面最多 6 小时后显示。
 
 数据变了，一律经 `src/lib/server/server-revalidate.ts` 失效：它同时失效 Next 的 ISR 条目、数据缓存的标签，并按地址清各家 CDN。不在别处直接调 `revalidatePath`。
 

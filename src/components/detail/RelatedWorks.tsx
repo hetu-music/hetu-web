@@ -21,6 +21,7 @@ export default function RelatedWorks({ songs }: { songs: RelatedSong[] }) {
           <li key={song.id}>
             <Link
               href={`/song/${song.id}`}
+              prefetch={false}
               onClick={bumpNavDepth}
               className="group block"
             >

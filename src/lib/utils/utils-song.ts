@@ -35,6 +35,19 @@ export function sortNamesOptimized(names: string[]): string[] {
 
 type TranslationFn = ReturnType<typeof useTranslations>;
 
+/**
+ * 类型、流派的显示名：enums 里有译名就用译名，没有的（库里新出现的值）照原样显示。
+ * tEnum 是 useTranslations("enums")
+ */
+export function enumLabel(
+  tEnum: TranslationFn,
+  kind: "type" | "genre",
+  value: string,
+): string {
+  const key = `${kind}.${value}`;
+  return tEnum.has(key) ? tEnum(key) : value;
+}
+
 // 计算歌曲信息
 export function calculateSongInfo(
   song: SongDetail,
@@ -119,9 +132,7 @@ export function calculateSongInfo(
         value:
           song.genre && song.genre.length > 0
             ? song.genre
-                .map((g) =>
-                  tEnum && tEnum.has(`genre.${g}`) ? tEnum(`genre.${g}`) : g,
-                )
+                .map((g) => (tEnum ? enumLabel(tEnum, "genre", g) : g))
                 .join(" ")
             : unknownStr,
       },
@@ -130,14 +141,10 @@ export function calculateSongInfo(
         value:
           song.type && song.type.length > 0
             ? song.type
-                .map((typeVal) =>
-                  tEnum && tEnum.has(`type.${typeVal}`)
-                    ? tEnum(`type.${typeVal}`)
-                    : typeVal,
-                )
+                .map((v) => (tEnum ? enumLabel(tEnum, "type", v) : v))
                 .join(" ")
-            : tEnum && tEnum.has("type.原创")
-              ? tEnum("type.原创")
+            : tEnum
+              ? enumLabel(tEnum, "type", "原创")
               : "原创",
       },
     ],
@@ -171,14 +178,15 @@ export function countCatalogSongs(
   return songs.filter((s) => !s.dispute_note).length;
 }
 
+/** 图床上封面的文件名：有封面用自己的；确定没有用占位图；还没核对过用默认图 */
+export function getCoverFilename(song: Pick<Song, "id" | "hascover">): string {
+  if (song.hascover === true) return `${song.id}.jpg`;
+  if (song.hascover === false) return "proto.jpg";
+  return "default.jpg";
+}
+
 export function getCoverUrl(song: Pick<Song, "id" | "hascover">): string {
-  if (song.hascover === true) {
-    return `https://cover.hetu-music.com/cover/${song.id}.jpg`;
-  } else if (song.hascover === false) {
-    return "https://cover.hetu-music.com/cover/proto.jpg";
-  } else {
-    return "https://cover.hetu-music.com/cover/default.jpg";
-  }
+  return `https://cover.hetu-music.com/cover/${getCoverFilename(song)}`;
 }
 
 // 获取乐谱图片 URL

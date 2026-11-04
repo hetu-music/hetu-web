@@ -1,3 +1,4 @@
+import { enumLabel } from "@/lib/utils/utils-song";
 import { useTranslations } from "next-intl";
 
 /** 最多列出几个，余下的记作「+N」 */
@@ -19,7 +20,7 @@ const MultiTagDisplay = ({
 
   const labels =
     tags && tags.length > 0
-      ? tags.map((v) => (tEnum.has(`${type}.${v}`) ? tEnum(`${type}.${v}`) : v))
+      ? tags.map((v) => enumLabel(tEnum, type, v))
       : [tCommon("unknown")];
   const rest = labels.length - MAX_SHOWN;
 

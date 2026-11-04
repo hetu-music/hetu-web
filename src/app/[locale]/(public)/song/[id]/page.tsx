@@ -7,6 +7,7 @@ import { getSongImagery } from "@/lib/server/service-song-imagery";
 import { getSongCollations } from "@/lib/server/service-collations";
 import { TABLES } from "@/lib/db/supabase-server";
 import { songExcerpt } from "@/lib/utils/utils-excerpt";
+import { getCoverFilename } from "@/lib/utils/utils-song";
 import { SITE_URL } from "@/lib/constants";
 import { parseRouteId } from "@/lib/server/route-params";
 
@@ -48,12 +49,7 @@ export async function generateMetadata({
   const description = descParts.join("｜") + t("meta.siteSuffix");
 
   // OG 封面走代理路径，确保爬虫可以访问
-  const coverFilename =
-    song.hascover === true
-      ? `${song.id}.jpg`
-      : song.hascover === false
-        ? "proto.jpg"
-        : "default.jpg";
+  const coverFilename = getCoverFilename(song);
 
   return {
     title: song.title,

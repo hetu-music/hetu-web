@@ -1,12 +1,12 @@
 "use client";
 
 import { LineCollations } from "@/components/detail/Collations";
+import AnnotateHandle from "@/components/detail/comments/AnnotateHandle";
 import CommentGutter from "@/components/detail/comments/CommentGutter";
 import { useComments } from "@/components/detail/comments/CommentsContext";
 import SlotMarker from "@/components/detail/comments/SlotMarker";
 import SectionHeading from "@/components/detail/SectionHeading";
 import { usePlayerTime } from "@/hooks/player/usePlayerTime";
-import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import type { SongCollation, SongImageryMark } from "@/lib/types";
 import { cn, toChineseNumeral } from "@/lib/utils/utils";
 import {
@@ -26,6 +26,21 @@ import React, {
   useRef,
   useState,
 } from "react";
+
+/**
+ * 把正文第 index 句滚到视口上方三成处。这一句不在页面上时（比如切到了 LRC 原文），滚到正文开头。
+ * 句号与 buildFolio 切出的句子一一对应，曲库片段跳到某一句（docs/LIBRARY.md 阶段 7）也用它。
+ */
+export function scrollToLine(index: number) {
+  const lyrics = document.getElementById("lyrics");
+  if (!lyrics) return;
+  const target = lyrics.querySelectorAll("[data-folio-line]")[index] ?? lyrics;
+  const top =
+    target.getBoundingClientRect().top +
+    window.scrollY -
+    window.innerHeight * 0.3;
+  window.scrollTo({ top, behavior: "smooth" });
+}
 
 interface LyricsFolioProps {
   songId: number;
@@ -55,8 +70,7 @@ export default function LyricsFolio({
   // 窄屏：点一句选中，句下展开操作栏；「夹批」开关把批注插在各句之下
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [inline, setInline] = useState(false);
-  const isLarge = useMediaQuery("(min-width: 1024px)");
-  const { threads, openSlot, setOpenSlot, setSheetSlot } = useComments();
+  const { threads, openSlot, wide, annotate: annotateSlot } = useComments();
   const bodyRef = useRef<HTMLDivElement>(null);
   const isCurrentTrack = usePlayerStore(
     (s) => s.currentTrack?.songId === songId,
@@ -105,20 +119,17 @@ export default function LyricsFolio({
   const tapLine = useCallback(
     (i: number) => {
       const time = lines[i].time;
-      if (isLarge) {
+      if (wide) {
         if (seekable && time !== null) seek(time);
         return;
       }
       setSelectedLine((prev) => (prev === i ? null : i));
     },
-    [isLarge, lines, seek, seekable],
+    [wide, lines, seek, seekable],
   );
   const annotate = useCallback(
-    (i: number) => {
-      if (isLarge) setOpenSlot(`lyrics:${i}`);
-      else setSheetSlot(lyricsSlot(i));
-    },
-    [isLarge, setOpenSlot, setSheetSlot],
+    (i: number) => annotateSlot(lyricsSlot(i)),
+    [annotateSlot],
   );
 
   // 意象的着重号是圆点（•）。Safari 找这个字形时不会去下载按字符分片的网页字体，
@@ -224,7 +235,7 @@ export default function LyricsFolio({
               isCurrent={isCurrentTrack && currentIndex === i}
               seekable={seekable && line.time !== null}
               seekHint={t("folio.seekHint")}
-              selected={!isLarge && selectedLine === i}
+              selected={!wide && selectedLine === i}
               inlineThreads={inline ? threads.get(slots[i].key) : undefined}
               onSeek={seek}
               onTap={tapLine}
@@ -300,7 +311,7 @@ const FolioRow = memo(function FolioRow({
   return (
     <div
       className={cn(
-        "group/row md:grid md:grid-cols-[minmax(0,1fr)_9rem] md:gap-x-10 lg:grid-cols-[22rem_minmax(0,1fr)_10rem] lg:gap-x-16",
+        "group/slot md:grid md:grid-cols-[minmax(0,1fr)_9rem] md:gap-x-10 lg:grid-cols-[22rem_minmax(0,1fr)_10rem] lg:gap-x-16",
         line.stanzaStart && "mt-9 md:mt-11",
       )}
     >
@@ -330,20 +341,11 @@ const FolioRow = memo(function FolioRow({
               "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
           )}
         >
-          {/* 宽屏：悬停时在句前浮出「批」，在左栏就地写批注 */}
-          <span className="absolute -left-12 top-0 hidden lg:flex h-[2.2em] items-center">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAnnotate(index);
-              }}
-              aria-label={t("annotateLine")}
-              className="font-kaiti text-sm text-(--tone) opacity-0 group-hover/row:opacity-60 hover:opacity-100! focus-visible:opacity-100 transition-opacity"
-            >
-              {t("add")}
-            </button>
-          </span>
+          <AnnotateHandle
+            slot={slot}
+            label={t("annotateLine")}
+            className="h-[2.2em]"
+          />
           <span
             aria-hidden
             className={cn(

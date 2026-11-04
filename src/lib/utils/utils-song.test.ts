@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   countCatalogSongs,
+  enumLabel,
+  getCoverFilename,
   getCoverUrl,
   getNmnUrl,
   mapAndSortSongs,
@@ -86,5 +88,36 @@ describe("getCoverUrl / getNmnUrl", () => {
     expect(getNmnUrl(makeSong({ id: 42 }))).toBe(
       "https://cover.hetu-music.com/nmn/42.png",
     );
+  });
+});
+
+describe("getCoverFilename", () => {
+  it("按 hascover 给出图床上的文件名", () => {
+    expect(getCoverFilename(makeSong({ id: 7, hascover: true }))).toBe("7.jpg");
+    expect(getCoverFilename(makeSong({ id: 7, hascover: false }))).toBe(
+      "proto.jpg",
+    );
+    expect(getCoverFilename(makeSong({ id: 7 }))).toBe("default.jpg");
+  });
+});
+
+describe("enumLabel", () => {
+  const messages: Record<string, string> = {
+    "type.原创": "原創",
+    "genre.古风": "古風",
+  };
+  const tEnum = Object.assign((key: string) => messages[key], {
+    has: (key: string) => key in messages,
+  }) as unknown as Parameters<typeof enumLabel>[0];
+
+  it("有译名时用译名", () => {
+    expect(enumLabel(tEnum, "type", "原创")).toBe("原創");
+    expect(enumLabel(tEnum, "genre", "古风")).toBe("古風");
+  });
+
+  it("没有译名时照原值显示", () => {
+    expect(enumLabel(tEnum, "genre", "新曲风")).toBe("新曲风");
+    // 同一个词在另一类里没有译名，也不借用
+    expect(enumLabel(tEnum, "type", "古风")).toBe("古风");
   });
 });

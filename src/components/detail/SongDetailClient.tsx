@@ -7,7 +7,7 @@ import { SupplementsSection } from "@/components/detail/Collations";
 import CreatorNotes from "@/components/detail/CreatorNotes";
 import DisputeNotice from "@/components/detail/DisputeNotice";
 import ImageryCaption from "@/components/detail/ImageryCaption";
-import LyricsFolio from "@/components/detail/LyricsFolio";
+import LyricsFolio, { scrollToLine } from "@/components/detail/LyricsFolio";
 import RelatedWorks from "@/components/detail/RelatedWorks";
 import ScoreSection from "@/components/detail/ScoreSection";
 import {
@@ -143,17 +143,9 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const selectFromStrip = useCallback(
     (id: number) => {
       setActiveImagery((prev) => (prev === id ? null : id));
-      const first = lineStats.get(id)?.first;
-      const lyrics = document.getElementById("lyrics");
-      if (first === undefined || !lyrics) return;
       // 滚到该意象第一次出现的那一句附近
-      const row = lyrics.querySelectorAll("[data-folio-line]")[first];
-      const target = row ?? lyrics;
-      const top =
-        target.getBoundingClientRect().top +
-        window.scrollY -
-        window.innerHeight * 0.3;
-      window.scrollTo({ top, behavior: "smooth" });
+      const first = lineStats.get(id)?.first;
+      if (first !== undefined) scrollToLine(first);
     },
     [lineStats],
   );

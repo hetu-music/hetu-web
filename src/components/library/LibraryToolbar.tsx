@@ -11,6 +11,7 @@ import {
   type MusicLibraryViewMode,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils/utils";
+import { enumLabel } from "@/lib/utils/utils-song";
 import {
   LayoutGrid,
   List,
@@ -166,9 +167,7 @@ export default function LibraryToolbar({
             const tabLabel = (() => {
               if (option === FILTER_OPTION_ALL) return tCommon("all");
               if (option === FILTER_OPTION_UNKNOWN) return tCommon("unknown");
-              return tEnum.has(`type.${option}`)
-                ? tEnum(`type.${option}`)
-                : option;
+              return enumLabel(tEnum, "type", option);
             })();
 
             return (

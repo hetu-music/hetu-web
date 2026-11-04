@@ -4,7 +4,7 @@ import NaviPlayer from "@/components/detail/NaviPlayer";
 import { SONG_TITLE_ID } from "@/components/detail/SectionNav";
 import type { SongDetail, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
-import { getCoverUrl } from "@/lib/utils/utils-song";
+import { enumLabel, getCoverUrl } from "@/lib/utils/utils-song";
 import { Disc } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -49,11 +49,9 @@ export default function SongHero({
 
   const eyebrow = [
     ...(song.type && song.type.length > 0 ? song.type : ["原创"]).map((v) =>
-      tEnum.has(`type.${v}`) ? tEnum(`type.${v}`) : v,
+      enumLabel(tEnum, "type", v),
     ),
-    ...(song.genre ?? []).map((g) =>
-      tEnum.has(`genre.${g}`) ? tEnum(`genre.${g}`) : g,
-    ),
+    ...(song.genre ?? []).map((g) => enumLabel(tEnum, "genre", g)),
     song.year ? String(song.year) : null,
   ].filter(Boolean);
 

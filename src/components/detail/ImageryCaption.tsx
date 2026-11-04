@@ -5,7 +5,8 @@ import type { SongImageryMark } from "@/lib/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect } from "react";
+import { cn } from "@/lib/utils/utils";
+import { useEffect, useState } from "react";
 
 interface ImageryCaptionProps {
   mark: SongImageryMark | null;
@@ -14,11 +15,12 @@ interface ImageryCaptionProps {
   onClose: () => void;
 }
 
-const EASE = [0.23, 1, 0.32, 1] as const;
-
 /**
  * 聚焦某个意象时，从顶栏下沿展开的一条书眉：意象名、分类、本曲与全库的数目。
  * 放在顶栏里而不是浮在底部，免得与右下角按钮、播放条和底部抽屉挤在一起。
+ *
+ * 展开收起用 CSS 的 grid 0fr → 1fr，不用 framer 的 height: auto：framer 量高度前会记下滚动位置、
+ * 量完滚回去，正好打断点题签时发起的平滑滚动（说明条一展开，页面就停在卷首不动）。
  */
 export default function ImageryCaption({
   mark,
@@ -26,6 +28,21 @@ export default function ImageryCaption({
   onClose,
 }: ImageryCaptionProps) {
   const t = useTranslations("song.folio");
+  const open = mark !== null;
+
+  // 收起时 mark 立刻变成 null，书眉还在往上收；留着上一个意象，收完之前内容不消失
+  const [shown, setShown] = useState({ mark, lineCount });
+  if (mark && (mark !== shown.mark || lineCount !== shown.lineCount)) {
+    setShown({ mark, lineCount });
+  }
+  // 每展开一次换一个 key，让里面的切换动画从头算：重新打开时直接显示新的意象，
+  // 不先把收起前留着的那个淡出一遍
+  const [openCount, setOpenCount] = useState(open ? 1 : 0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpenCount((n) => n + 1);
+  }
 
   useEffect(() => {
     if (!mark) return;
@@ -36,23 +53,23 @@ export default function ImageryCaption({
     return () => window.removeEventListener("keydown", onKey);
   }, [mark, onClose]);
 
+  const current = shown.mark;
   return (
-    <AnimatePresence initial={false}>
-      {mark && (
-        <motion.div
-          key="caption"
-          role="status"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.35, ease: EASE }}
-          className="overflow-hidden"
-        >
+    <div
+      role="status"
+      inert={!open}
+      className={cn(
+        "grid transition-[grid-template-rows,opacity] duration-350 ease-page",
+        open ? "grid-rows-[1fr]" : "grid-rows-[0fr] opacity-0",
+      )}
+    >
+      {current && (
+        <div className="min-h-0 overflow-hidden">
           <div className="border-t border-slate-200/50 dark:border-slate-800/50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
-              <AnimatePresence mode="wait" initial={false}>
+              <AnimatePresence key={openCount} mode="wait" initial={false}>
                 <motion.div
-                  key={mark.id}
+                  key={current.id}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
@@ -62,26 +79,26 @@ export default function ImageryCaption({
                   <span
                     aria-hidden
                     className="w-0.5 self-stretch rounded-full"
-                    style={{ backgroundColor: mark.accent }}
+                    style={{ backgroundColor: current.accent }}
                   />
                   <span
                     className="shrink-0 font-calligraphy text-3xl leading-none"
-                    style={{ color: mark.accent }}
+                    style={{ color: current.accent }}
                   >
-                    {mark.name}
+                    {current.name}
                   </span>
                   <div className="min-w-0 flex-1 space-y-1">
                     <p className="font-serif text-xs tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                      {mark.path.join(" · ")}
+                      {current.path.join(" · ")}
                     </p>
                     <p className="font-kaiti text-sm text-slate-600 dark:text-slate-300">
-                      {t("caption.lines", { count: lineCount })}
+                      {t("caption.lines", { count: shown.lineCount })}
                       <span className="mx-2 text-slate-300 dark:text-slate-600">
                         ·
                       </span>
-                      {t("caption.songs", { count: mark.songCount })}
+                      {t("caption.songs", { count: current.songCount })}
                       <Link
-                        href={`/imagery/${mark.motifId}?w=${mark.id}`}
+                        href={`/imagery/${current.motifId}?w=${current.id}`}
                         className="ml-3 inline-flex items-center gap-0.5 whitespace-nowrap font-sans text-xs tracking-wider text-(--tone) hover:underline underline-offset-4"
                       >
                         {t("caption.explore")}
@@ -101,8 +118,8 @@ export default function ImageryCaption({
               </button>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </div>
   );
 }

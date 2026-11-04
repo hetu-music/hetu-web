@@ -9,7 +9,6 @@ import { Song, SongDetail, SONG_LIST_VIEW_FIELDS } from "@/lib/types";
 import { mapAndSortSongs } from "@/lib/utils/utils-song";
 import { applyCreditAliases } from "@/lib/utils/utils-credits";
 import { getCreditAliases } from "@/lib/server/service-credit-aliases";
-import { processLyrics } from "@/lib/utils/utils-lyrics";
 import {
   toTraditional,
   toTraditionalArray,
@@ -231,21 +230,10 @@ export const getSongById = cache(async function getSongById(
     return null;
   }
 
-  let normalLyrics = "";
-  if (data.lyrics) {
-    try {
-      normalLyrics = processLyrics(data.lyrics).lyrics;
-    } catch {
-      console.error("[getSongById] Error processing lyrics for song", id);
-      normalLyrics = "歌词转换失败，请检查LRC格式";
-    }
-  }
-
-  const detail: SongDetail & { normalLyrics: string } = {
+  const detail = {
     ...data,
     year: data.date ? new Date(data.date).getFullYear() : null,
-    normalLyrics,
-  } as SongDetail & { normalLyrics: string };
+  } as SongDetail;
   // 公开页卷首用主名，原署留在 credited 里给版记；后台编辑看到的仍是原样
   const isPublic = table === TABLES.MUSIC && !accessToken;
   const result = isPublic
@@ -261,7 +249,6 @@ export const getSongById = cache(async function getSongById(
       comment: toTraditional(result.comment),
       dispute_note: toTraditional(result.dispute_note),
       lyrics: toTraditionalLrc(result.lyrics),
-      normalLyrics: toTraditional(result.normalLyrics) ?? result.normalLyrics,
       // 人名字段也转换
       artist: toTraditionalArray(result.artist),
       lyricist: toTraditionalArray(result.lyricist),

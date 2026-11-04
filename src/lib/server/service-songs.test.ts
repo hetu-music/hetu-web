@@ -108,22 +108,6 @@ describe("getSongById", () => {
     expect(await getSongById(1)).toBeNull();
   });
 
-  it("歌词解析失败时降级为提示文案，不影响其他字段返回", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: { id: 1, title: "标题", lyrics: "[bad" },
-          error: null,
-        }),
-      ]),
-    );
-    // processLyrics 对畸形输入本身是容错的（不会真的抛异常），
-    // 这里主要验证 normalLyrics 字段被正确填充、函数本身不会中断。
-    const song = await getSongById(1);
-    expect(song).not.toBeNull();
-    expect(typeof song?.normalLyrics).toBe("string");
-  });
-
   it("date 存在时计算 year 字段", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([

@@ -50,7 +50,6 @@ export type SongDetail = Song & {
   lyrics?: string | null;
   /** 歌词从哪个时间标签开始；自动识别署名区出错时由后台指定 */
   lyrics_start?: string | null;
-  normalLyrics?: string | null;
   track?: number | null;
   tracktotal?: number | null;
   kugolink?: string | null;

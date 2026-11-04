@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/constants";
+import { parseRouteId } from "@/lib/server/route-params";
 
 type Props = {
   params: Promise<{ locale: string; motif: string }>;
@@ -19,8 +20,8 @@ const DESCRIPTION_WORDS = 6;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, motif } = await params;
-  const id = parseInt(motif, 10);
-  if (isNaN(id)) return {};
+  const id = parseRouteId(motif);
+  if (id === null) return {};
   const detail = await getMotifDetail(id, locale).catch(() => null);
   if (!detail) return {};
   const t = await getTranslations({ locale, namespace: "common" });
@@ -58,8 +59,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function MotifPage({ params }: Props) {
   const { locale, motif } = await params;
   setRequestLocale(locale);
-  const id = parseInt(motif, 10);
-  if (isNaN(id)) notFound();
+  const id = parseRouteId(motif);
+  if (id === null) notFound();
 
   let cloud;
   let detail;

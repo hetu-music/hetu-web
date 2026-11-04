@@ -10,6 +10,14 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import React, { useState } from "react";
 
+/**
+ * 卷首封面的显示宽度，与下面的版式对应：宽屏是左栏的 22rem；
+ * 窄屏是 --cover，即内容区（视口减去 px-6 两侧）的 62%，最多 24rem，视口 668px 起就到顶了。
+ * 不写会按 1x/2x 取图，2 倍、3 倍屏上都要 1080px 的图，而手机上封面只有两百来像素宽
+ */
+const HERO_COVER_SIZES =
+  "(min-width: 1024px) 352px, (min-width: 668px) 384px, calc((100vw - 48px) * 0.62)";
+
 interface SongHeroProps {
   song: SongDetail;
   /** 题签展示的意象（已排序截断） */
@@ -87,6 +95,7 @@ export default function SongHero({
               alt={song.title}
               width={500}
               height={500}
+              sizes={HERO_COVER_SIZES}
               preload
               onLoad={(e) => onCoverLoad(e.currentTarget)}
               onError={() => setCoverFailed(true)}

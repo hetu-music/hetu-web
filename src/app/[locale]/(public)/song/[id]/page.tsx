@@ -8,6 +8,7 @@ import { getSongCollations } from "@/lib/server/service-collations";
 import { TABLES } from "@/lib/db/supabase-server";
 import { songExcerpt } from "@/lib/utils/utils-excerpt";
 import { SITE_URL } from "@/lib/constants";
+import { parseRouteId } from "@/lib/server/route-params";
 
 type PageProps = {
   params: Promise<{ id: string; locale: string }>;
@@ -18,8 +19,8 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { id, locale } = await params;
-  const songId = parseInt(id);
-  if (isNaN(songId)) return {};
+  const songId = parseRouteId(id);
+  if (songId === null) return {};
 
   const t = await getTranslations({ locale, namespace: "song" });
   const song = await getSongById(songId, TABLES.MUSIC, undefined, locale);
@@ -84,11 +85,9 @@ export default async function SongDetailPage({
   const { id, locale } = await params;
   setRequestLocale(locale);
 
-  const songId = parseInt(id);
-  if (isNaN(songId)) {
-    console.warn("Invalid song ID:", id);
-    notFound();
-  }
+  // 只认规范写法：「012」「12abc」会在 ISR 和 CDN 上各占一个地址（见 route-params.ts）
+  const songId = parseRouteId(id);
+  if (songId === null) notFound();
 
   let song;
   let imagery;

@@ -19,7 +19,6 @@ import SongColophon from "@/components/detail/SongColophon";
 import SongHero from "@/components/detail/SongHero";
 import FavoriteButton from "@/components/shared/FavoriteButton";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
-import ImageModal from "@/components/shared/ImageModal";
 import { addToast } from "@/components/ui/toast";
 import TopBar, { type TopBarAction } from "@/components/shared/topbar/TopBar";
 import { useUserContext } from "@/context/UserContext";
@@ -30,6 +29,7 @@ import {
   sortSupplements,
 } from "@/lib/utils/utils-collations";
 import { buildFolio, markLines, parseNotes } from "@/lib/utils/utils-folio";
+import { whenIdle } from "@/lib/utils/idle";
 import { sharePage } from "@/lib/utils/share";
 import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
 import {
@@ -39,7 +39,13 @@ import {
 } from "@/lib/utils/utils-tone";
 import { Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+
+// 看大图的面板（缩放、拖动、旋转）单独分包：只有点封面、乐谱才用得到，不放进首屏的包里。
+// 页面空闲时预先下载，第一次点开不用等
+const loadImageModal = () => import("@/components/shared/ImageModal");
+const ImageModal = dynamic(loadImageModal, { ssr: false });
 
 /** 题签最多展示的意象数 */
 const STRIP_LIMIT = 7;
@@ -63,6 +69,10 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     title: string;
     layout?: "fit" | "scroll";
   } | null>(null);
+  // 打开过一次才挂载；之后留着，关闭时才放得完退场动画
+  const [modalMounted, setModalMounted] = useState(false);
+  if (imageModal && !modalMounted) setModalMounted(true);
+  useEffect(() => whenIdle(() => void loadImageModal()), []);
 
   // ── 正文与意象 ──────────────────────────────────────────────────────────
   const folio = useMemo(
@@ -313,14 +323,16 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
       <ScrollFab />
 
-      <ImageModal
-        isOpen={imageModal !== null}
-        onClose={() => setImageModal(null)}
-        src={imageModal?.src ?? ""}
-        alt={imageModal?.alt ?? ""}
-        title={imageModal?.title ?? ""}
-        layout={imageModal?.layout}
-      />
+      {modalMounted && (
+        <ImageModal
+          isOpen={imageModal !== null}
+          onClose={() => setImageModal(null)}
+          src={imageModal?.src ?? ""}
+          alt={imageModal?.alt ?? ""}
+          title={imageModal?.title ?? ""}
+          layout={imageModal?.layout}
+        />
+      )}
     </div>
   );
 };

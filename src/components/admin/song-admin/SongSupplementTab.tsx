@@ -14,11 +14,13 @@ import { cn } from "@/lib/utils/utils";
 import {
   SUPPLEMENT_BODY_MAX,
   SUPPLEMENT_KINDS,
-  type SupplementPayload,
   sortSupplements,
-  supplementInputSchema,
   willSignAsReviser,
 } from "@/lib/utils/utils-collations";
+import {
+  type SupplementPayload,
+  supplementInputSchema,
+} from "@/lib/forms/collation-form";
 import {
   ConfirmButton,
   EmptyState,

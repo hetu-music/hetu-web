@@ -15,11 +15,13 @@ import {
   COLLATION_BODY_MAX,
   COLLATION_KINDS,
   COLLATION_QUOTE_MAX,
-  type CollationPayload,
-  collationInputSchema,
   resolveCollations,
   willSignAsReviser,
 } from "@/lib/utils/utils-collations";
+import {
+  type CollationPayload,
+  collationInputSchema,
+} from "@/lib/forms/collation-form";
 import {
   type AnchorContext,
   anchorForSlot,

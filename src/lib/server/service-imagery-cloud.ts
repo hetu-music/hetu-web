@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { PALETTE_FULL, sortLevel1Categories } from "@/lib/imagery/palette";
 import {
   loadImageryIndex,
@@ -82,7 +83,11 @@ function translator(locale: string) {
 
 // ─── 词云 ──────────────────────────────────────────────────────────────────
 
-export async function getImageryCloud(locale: string): Promise<ImageryCloud> {
+// cache()：同一次渲染里页面信息（generateMetadata）与页面各要一次，只算一次。
+// 每算一次都要从 unstable_cache 里解析整份意象索引（1 MB 多的 JSON）
+export const getImageryCloud = cache(async function getImageryCloud(
+  locale: string,
+): Promise<ImageryCloud> {
   const index = await loadImageryIndex();
   const d = derive(index);
   const tr = translator(locale);
@@ -101,15 +106,11 @@ export async function getImageryCloud(locale: string): Promise<ImageryCloud> {
       if (songs.size > topSize) [top, topSize] = [motifId, songs.size];
       wordCount.set(motifId, (wordCount.get(motifId) ?? 0) + 1);
     }
-    const [root, l2] = d.pathOf(top);
     words.push({
       id: wordId,
       name: tr(name),
       songCount: all.size,
       motif: top,
-      l1: root?.id ?? 0,
-      l2: l2?.id ?? 0,
-      palette: d.paletteOf(top),
     });
   }
   words.sort((a, b) => b.songCount - a.songCount || a.id - b.id);
@@ -166,7 +167,7 @@ export async function getImageryCloud(locale: string): Promise<ImageryCloud> {
     words,
     motifCount: d.songsByMotif.size,
   };
-}
+});
 
 // ─── 面板 ──────────────────────────────────────────────────────────────────
 
@@ -181,7 +182,7 @@ const COWRITE_MIN_LIFT = 1.8;
 const COWRITE_LIMIT = 10;
 
 /** 一个母题的面板内容；不是母题、或曲库里没有歌写到它时返回 null */
-export async function getMotifDetail(
+export const getMotifDetail = cache(async function getMotifDetail(
   motifId: number,
   locale: string,
 ): Promise<MotifDetail | null> {
@@ -233,7 +234,33 @@ export async function getMotifDetail(
     (a, b) => (b.year ?? "0").localeCompare(a.year ?? "0") || a.id - b.id,
   );
 
-  // 常与之同写：面板不展示，留给以后的母题关系图
+  return {
+    id: motifId,
+    name: tr(motif.name),
+    path: d
+      .pathOf(motifId)
+      .slice(0, -1)
+      .map((c) => tr(c.name)),
+    palette: d.paletteOf(motifId),
+    description: motif.description ? tr(motif.description) : null,
+    songCount: own.size,
+    words,
+    works,
+  };
+});
+
+/**
+ * 常与之同写的母题，按 lift 从高到低。面板不展示，不随面板内容发出去，
+ * 留给以后的母题关系图
+ */
+export async function getMotifCowritten(
+  motifId: number,
+  locale: string,
+): Promise<MotifLink[]> {
+  const d = derive(await loadImageryIndex());
+  const tr = translator(locale);
+  const own = d.songsByMotif.get(motifId);
+  if (!own) return [];
   const n = d.motifsBySong.size;
   const cowritten: MotifLink[] = [];
   for (const [otherId, songs] of d.songsByMotif) {
@@ -252,19 +279,5 @@ export async function getMotifDetail(
     });
   }
   cowritten.sort((a, b) => b.lift - a.lift);
-
-  return {
-    id: motifId,
-    name: tr(motif.name),
-    path: d
-      .pathOf(motifId)
-      .slice(0, -1)
-      .map((c) => tr(c.name)),
-    palette: d.paletteOf(motifId),
-    description: motif.description ? tr(motif.description) : null,
-    songCount: own.size,
-    words,
-    works,
-    cowritten: cowritten.slice(0, COWRITE_LIMIT),
-  };
+  return cowritten.slice(0, COWRITE_LIMIT);
 }

@@ -8,7 +8,7 @@ import { getSongCollations } from "@/lib/server/service-collations";
 import { TABLES } from "@/lib/db/supabase-server";
 import { songExcerpt } from "@/lib/utils/utils-excerpt";
 import { getCoverFilename } from "@/lib/utils/utils-song";
-import { SITE_URL } from "@/lib/constants";
+import { localeAlternates } from "@/lib/utils/site-url";
 import { parseRouteId } from "@/lib/server/route-params";
 
 type PageProps = {
@@ -54,16 +54,7 @@ export async function generateMetadata({
   return {
     title: song.title,
     description,
-    alternates: {
-      canonical:
-        locale === "zh-TW"
-          ? `${SITE_URL}/zh-TW/song/${song.id}`
-          : `${SITE_URL}/zh-CN/song/${song.id}`,
-      languages: {
-        "zh-CN": `${SITE_URL}/zh-CN/song/${song.id}`,
-        "zh-TW": `${SITE_URL}/zh-TW/song/${song.id}`,
-      },
-    },
+    alternates: localeAlternates(locale, `/song/${song.id}`),
     openGraph: {
       title: `${song.title}${t("ogSuffix")}`,
       description,

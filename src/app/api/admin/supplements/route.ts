@@ -1,6 +1,6 @@
 import { entryWriteHandlers } from "@/lib/server/collation-routes";
 import { songRow } from "@/lib/server/service-collations";
-import { supplementInputSchema } from "@/lib/utils/utils-collations";
+import { supplementInputSchema } from "@/lib/forms/collation-form";
 
 // 补遗与校记同表：读取、删除都走 /api/admin/collations，这里只管新增与修改
 const write = entryWriteHandlers(

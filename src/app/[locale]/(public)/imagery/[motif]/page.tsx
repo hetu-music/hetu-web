@@ -8,7 +8,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { SITE_URL } from "@/lib/constants";
+import { localeAlternates } from "@/lib/utils/site-url";
 import { parseRouteId } from "@/lib/server/route-params";
 
 type Props = {
@@ -35,17 +35,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       .map((w) => `「${w.name}」`)
       .join(""),
   });
-  const path = `/imagery/${detail.id}`;
   return {
     title,
     description,
-    alternates: {
-      canonical: `${SITE_URL}/${locale === "zh-TW" ? "zh-TW" : "zh-CN"}${path}`,
-      languages: {
-        "zh-CN": `${SITE_URL}/zh-CN${path}`,
-        "zh-TW": `${SITE_URL}/zh-TW${path}`,
-      },
-    },
+    alternates: localeAlternates(locale, `/imagery/${detail.id}`),
     openGraph: {
       title: `${title} - ${t("site.name")}`,
       description,

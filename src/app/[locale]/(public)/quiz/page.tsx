@@ -6,7 +6,7 @@ import {
 } from "@/lib/server/service-quiz";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
-import { SITE_URL } from "@/lib/constants";
+import { localeAlternates } from "@/lib/utils/site-url";
 import { getSongs } from "@/lib/server/service-songs";
 import { countCatalogSongs } from "@/lib/utils/utils-song";
 
@@ -30,13 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: {
-      canonical: `${SITE_URL}/${locale}/quiz`,
-      languages: {
-        "zh-CN": `${SITE_URL}/zh-CN/quiz`,
-        "zh-TW": `${SITE_URL}/zh-TW/quiz`,
-      },
-    },
+    alternates: localeAlternates(locale, "/quiz"),
     openGraph: {
       title: `${title} - ${tSite("site.name")}`,
       description,

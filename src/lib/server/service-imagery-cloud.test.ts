@@ -130,7 +130,8 @@ describe("getImageryCloud", () => {
       ["长剑", 1],
       ["风", 1],
     ]);
-    expect(words[0]).toMatchObject({ motif: 13, l1: 1, l2: 2, palette: 0 });
+    // 分类与配色不逐词带，随母题到 groups 里查
+    expect(words[0]).toEqual({ id: 23, name: "烟花", songCount: 3, motif: 13 });
   });
 
   it("繁体站点转换分类、母题与词", async () => {

@@ -1,15 +1,13 @@
 import type { CollationKind, SongCollation, SupplementKind } from "@/lib/types";
-import {
-  type AnchorContext,
-  COMMENT_QUOTE_MAX,
-  resolveSlot,
-} from "@/lib/utils/utils-comments";
-import { z } from "zod";
+import { type AnchorContext, resolveSlot } from "@/lib/utils/utils-comments";
 
 /**
  * 校记：管理员写在某句歌词上的勘误。位置与批注同一套存法，
  * 歌词改动后按原句找回那一行；找不回的不再写到句下，只在后台列出待处理。
  * 补遗：记在整首歌上的资料（版本、旧稿），与校记同表，anchor 为 song。
+ *
+ * 后台提交用的校验规则在 lib/forms/collation-form：这里的函数详情页也用，
+ * 不能把 zod 带进前台的包
  */
 
 /** 显示顺序；名字在文案 song.folio.collations.kinds 里 */
@@ -23,41 +21,6 @@ export const COLLATION_KINDS = [
 export const COLLATION_QUOTE_MAX = 100;
 export const COLLATION_BODY_MAX = 1000;
 
-const optionalText = (max: number, label: string) =>
-  z
-    .string()
-    .trim()
-    .max(max, `${label}不能超过 ${max} 个字`)
-    .nullish()
-    .transform((v) => v || null);
-
-/** 后台新增、修改一条歌词校记的内容 */
-export const collationInputSchema = z
-  .object({
-    kind: z.enum(COLLATION_KINDS),
-    anchor_index: z.number().int().min(0),
-    anchor_time: z.number().min(0).nullable(),
-    anchor_quote: z.string().min(1).max(COMMENT_QUOTE_MAX),
-    quote: optionalText(COLLATION_QUOTE_MAX, "原文"),
-    sung: optionalText(COLLATION_QUOTE_MAX, "实唱"),
-    body: z
-      .string()
-      .trim()
-      .max(COLLATION_BODY_MAX, `说明不能超过 ${COLLATION_BODY_MAX} 个字`),
-  })
-  .refine((v) => !v.sung || v.quote, {
-    message: "填了实唱，也要填原文",
-    path: ["quote"],
-  })
-  .refine((v) => v.body || v.sung, {
-    message: "实唱与说明至少填一项",
-    path: ["body"],
-  });
-
-export type CollationInput = z.infer<typeof collationInputSchema>;
-/** 后台发出的请求体，校验与去空白之前 */
-export type CollationPayload = z.input<typeof collationInputSchema>;
-
 export const SUPPLEMENT_KINDS = [
   "release",
   "draft",
@@ -66,29 +29,6 @@ export const SUPPLEMENT_KINDS = [
 
 /** 旧稿可能整段照录 */
 export const SUPPLEMENT_BODY_MAX = 4000;
-
-const DATE_PATTERN = /^\d{4}(-\d{2}(-\d{2})?)?$/;
-
-/** 后台新增、修改一条补遗的内容 */
-export const supplementInputSchema = z.object({
-  kind: z.enum(SUPPLEMENT_KINDS),
-  date: z
-    .string()
-    .trim()
-    .nullish()
-    .transform((v) => v || null)
-    .refine((v) => v === null || DATE_PATTERN.test(v), {
-      message: "日期写成 2019、2019-08 或 2019-08-15",
-    }),
-  body: z
-    .string()
-    .trim()
-    .min(1, "内容不能为空")
-    .max(SUPPLEMENT_BODY_MAX, `内容不能超过 ${SUPPLEMENT_BODY_MAX} 个字`),
-});
-
-export type SupplementInput = z.infer<typeof supplementInputSchema>;
-export type SupplementPayload = z.input<typeof supplementInputSchema>;
 
 /** 补遗按日期排，只到年的排在该年最前；没有日期的排最后，同日按录入先后 */
 export function sortSupplements(list: SongCollation[]): SongCollation[] {

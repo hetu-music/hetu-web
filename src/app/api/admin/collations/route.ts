@@ -5,7 +5,7 @@ import {
   entryWriteHandlers,
 } from "@/lib/server/collation-routes";
 import { getSongCollations, lyricRow } from "@/lib/server/service-collations";
-import { collationInputSchema } from "@/lib/utils/utils-collations";
+import { collationInputSchema } from "@/lib/forms/collation-form";
 
 const ROUTE = "/api/admin/collations";
 

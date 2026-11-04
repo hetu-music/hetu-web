@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { serializeJsonLd } from "@/lib/utils/utils-common";
 import { SITE_URL } from "@/lib/constants";
+import { localeAlternates, localeUrl } from "@/lib/utils/site-url";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -58,21 +59,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ],
     authors: [{ url: SITE_URL }],
     creator: siteName,
-    alternates: {
-      canonical:
-        locale === "zh-TW"
-          ? `${SITE_URL}/zh-TW/story/qjtx`
-          : `${SITE_URL}/zh-CN/story/qjtx`,
-      languages: {
-        "zh-CN": `${SITE_URL}/zh-CN/story/qjtx`,
-        "zh-TW": `${SITE_URL}/zh-TW/story/qjtx`,
-      },
-    },
+    alternates: localeAlternates(locale, "/story/qjtx"),
     openGraph: {
       title: `${title} - ${siteName}`,
       description,
       type: "article",
-      url: `${SITE_URL}/zh-CN/story/qjtx`,
+      url: localeUrl(locale, "/story/qjtx"),
       siteName: siteName,
       locale: locale.replace("-", "_"),
       images: [
@@ -125,7 +117,7 @@ export default async function QingJinTianXiaPage({ params }: Props) {
     },
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": `${SITE_URL}/zh-CN/story/qjtx`,
+      "@id": localeUrl(locale, "/story/qjtx"),
     },
   };
 

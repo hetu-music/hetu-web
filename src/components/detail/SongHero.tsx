@@ -1,6 +1,7 @@
 "use client";
 
 import NaviPlayer from "@/components/detail/NaviPlayer";
+import { SONG_TITLE_ID } from "@/components/detail/SectionNav";
 import type { SongDetail, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
@@ -11,7 +12,6 @@ import React, { useState } from "react";
 
 interface SongHeroProps {
   song: SongDetail;
-  titleRef?: React.Ref<HTMLHeadingElement>;
   /** 题签展示的意象（已排序截断） */
   stripMarks: SongImageryMark[];
   imageryTotal: number;
@@ -26,7 +26,6 @@ interface SongHeroProps {
 /** 卷首：封面、题名、署名、题签与竖排摘句 */
 export default function SongHero({
   song,
-  titleRef,
   stripMarks,
   imageryTotal,
   excerpt,
@@ -107,7 +106,7 @@ export default function SongHero({
         </p>
 
         <h1
-          ref={titleRef}
+          id={SONG_TITLE_ID}
           className="font-serif text-5xl md:text-6xl xl:text-7xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50 text-balance"
         >
           {song.title}

@@ -8,6 +8,7 @@ import SlotMarker from "@/components/detail/comments/SlotMarker";
 import SectionHeading from "@/components/detail/SectionHeading";
 import { usePlayerTime } from "@/hooks/player/usePlayerTime";
 import type { SongCollation, SongImageryMark } from "@/lib/types";
+import { loadFontStack } from "@/lib/utils/font-preload";
 import { cn, toChineseNumeral } from "@/lib/utils/utils";
 import {
   type CommentSlot,
@@ -134,20 +135,17 @@ export default function LyricsFolio({
 
   // 意象的着重号是圆点（•）。Safari 找这个字形时不会去下载按字符分片的网页字体，
   // 而 Noto Serif SC 里含圆点的那一片正文用不到、不会自己加载，结果一个点也画不出来。
-  // 须按字体逐个加载：整串字体一起传时，Safari 见 Playfair 的分片范围声称含圆点
+  // loadFontStack 按字体逐个加载：整串字体一起传时，Safari 见 Playfair 的分片范围声称含圆点
   // （其实没有这个字形）就不再往后加载
   const hasMarks = marked.some((m) => m.ids.length > 0);
   useEffect(() => {
     const mark = bodyRef.current?.querySelector(".imagery-mark");
-    if (!mark || !document.fonts) return;
+    if (!mark) return;
     const { fontWeight, fontSize, fontFamily } = getComputedStyle(mark);
-    for (const family of fontFamily.split(",")) {
-      const name = family.trim().replace(/^["']|["']$/g, "");
-      if (!name) continue;
-      document.fonts
-        .load(`${fontWeight} ${fontSize} "${name}"`, "•")
-        .catch(() => undefined);
-    }
+    loadFontStack(fontFamily, "•", {
+      weight: fontWeight,
+      size: fontSize,
+    }).catch(() => undefined);
   }, [hasMarks, mode]);
 
   if (!rawLyrics || lines.length === 0) {

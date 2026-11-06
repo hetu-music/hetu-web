@@ -60,9 +60,8 @@ async function buildServiceWorker(): Promise<void> {
       swDest: "public/sw.js",
       globDirectory: "public",
       // 扫描 public 目录下的静态资源
-      // 只预缓存 PWA 图标。不要加 fonts/：next/font/local 会把字体复制到
-      // /_next/static/media/<hash>.woff2，页面从不请求 /fonts/*，预缓存的副本
-      // 永远用不上，却让首次访问多下 24MB（由下方 /_next/static/ 运行时缓存兜底）。
+      // 只预缓存 PWA 图标。不要加 fonts/：那里是自切字体的分片，近 40MB，
+      // 页面用到哪片才下载哪片（靠 HTTP 长期缓存，见 next.config.ts），预缓存会让首次访问全下一遍。
       // source.png（2048² 原图）只给 OG 分享卡用，也不预缓存
       globPatterns: ["icons/icon-*.png"],
       globIgnores: [

@@ -23,7 +23,6 @@ interface GridCardProps {
   isActive?: boolean;
   lyricsSnippet?: Snippet;
   coverPriority?: CoverPriority;
-  onCoverSettled?: () => void;
 }
 
 /**
@@ -45,7 +44,6 @@ export default function GridCard({
   isActive,
   lyricsSnippet,
   coverPriority,
-  onCoverSettled,
 }: GridCardProps) {
   const { isFavorite, toggleFavorite, isLoggedIn } = useFavorites();
   const t = useTranslations("song");
@@ -75,7 +73,6 @@ export default function GridCard({
           song={song}
           sizes={GRID_COVER_SIZES}
           priority={coverPriority}
-          onSettled={onCoverSettled}
           isActive={isActive}
         />
 

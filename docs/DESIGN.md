@@ -54,6 +54,10 @@
 | `font-sans`        | Inter + Noto Sans SC             | 界面小字：按钮、标签、元信息                                         |
 | `font-mono`        | 等宽                             | LRC 原文等「原始数据」                                               |
 
+字体从两处来：Inter、Playfair 和两款思源走 next/font（`app/[locale]/layout.tsx`）；楷体、刻本、霞鹜等宽是自切分片（清单在 `lib/split-fonts`，放在 `public/fonts`），声明表由 `SplitFontStyles` 在水合后插入。
+
+字形一律等字出现在页面上才下载。不要给某个页面单独推迟字体、换字体栈，也不要另写 `document.fonts.load`。确实等不及时（翻页前下好下一屏的字、Canvas 作画）用 `lib/utils/font-preload` 的 `preloadFontText` 或 `loadFontStack`。
+
 歌词分两种：歌曲页里成篇排出的是正文，用 `font-serif`；播放条里随播放切换的当前句是摘句，用 `font-kaiti`，与歌名的衬线体拉开层次。
 
 字距是这套风格的主要层级手段：
@@ -159,7 +163,7 @@
 - 滚动条的位置由 `html` 上的 `scrollbar-gutter: stable` 留出。Base UI 锁滚动时不会再补右边距，所以浮层打开时页面不抖；不要换回会补边距的库（Radix、vaul）。
 - 服务端和客户端渲染出的结果必须一致：依赖运行环境的计算（如 `Intl.Segmenter` 分词）放到服务端，算好再作为 props 传下去；只在客户端才有的状态用 `useSyncExternalStore` 判断是否已挂载。
 - Tailwind v4 的 `scale-*`、`rotate-*`、`translate-*` 用的是独立的 CSS 属性，不会与内联的 `transform` 合并。需要由 JS 控制的变换，直接写内联 `style.transform`。
-- Safari 查找着重号字形时，不会去下载按字符分片的网页字体。用 `text-emphasis` 时，要按字体逐个 `document.fonts.load(…, "•")`（参考 `LyricsFolio`）。
+- Safari 查找着重号字形时，不会去下载按字符分片的网页字体。用 `text-emphasis` 时，要用 `loadFontStack` 主动加载 `"•"`（参考 `LyricsFolio`）。
 - 在 iPhone 上调试：用局域网 IP 启动 dev（`next dev -H <IP>`），`src/proxy.ts` 在开发环境已放开 https 升级与 `eval`。
 
 ## 十、代码习惯

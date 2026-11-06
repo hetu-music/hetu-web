@@ -165,7 +165,9 @@ describe("播放条", () => {
     expect(screen.getByText("0:12")).toBeTruthy();
     expect(slider.getAttribute("aria-valuenow")).toBe("12");
     const fill = slider.lastElementChild as HTMLElement;
-    expect(fill.style.transform).toBe(`scaleX(${12.3 / 245})`);
+    // 读回的 transform 是序列化结果，数字只保留 6 位有效数字，所以按数值比较
+    const scale = /^scaleX\((.+)\)$/.exec(fill.style.transform)?.[1];
+    expect(Number(scale)).toBeCloseTo(12.3 / 245, 5);
     expect(screen.getByText("第二句")).toBeTruthy();
   });
 

@@ -50,7 +50,6 @@ export type SongDetail = Song & {
   lyrics?: string | null;
   /** 歌词从哪个时间标签开始；自动识别署名区出错时由后台指定 */
   lyrics_start?: string | null;
-  normalLyrics?: string | null;
   track?: number | null;
   tracktotal?: number | null;
   kugolink?: string | null;
@@ -123,11 +122,11 @@ export interface CloudWord {
   name: string;
   /** 写到这个词的作品数，多义词各母题合计 */
   songCount: number;
-  /** 作品最多的那个母题：点这个词时打开它的面板 */
+  /**
+   * 作品最多的那个母题：点这个词时打开它的面板。
+   * 词的分类与配色随这个母题，到 groups 里查，不逐词再带一份（四千来个词，数据少三成）
+   */
   motif: number;
-  l1: number;
-  l2: number;
-  palette: number;
 }
 
 export interface CloudMotifGroup {
@@ -181,8 +180,6 @@ export interface MotifDetail {
   songCount: number;
   words: MotifWord[];
   works: MotifWork[];
-  /** 常与之同写；面板不展示，留给以后的母题关系图 */
-  cowritten: MotifLink[];
 }
 
 // 评点：详情页上的批注

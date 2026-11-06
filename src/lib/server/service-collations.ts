@@ -12,7 +12,7 @@ import type {
 import type {
   CollationInput,
   SupplementInput,
-} from "@/lib/utils/utils-collations";
+} from "@/lib/forms/collation-form";
 import { toTraditional } from "@/lib/utils/utils-convert";
 
 /**

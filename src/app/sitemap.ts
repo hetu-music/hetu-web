@@ -3,7 +3,7 @@ import { getImageryLastModified } from "@/lib/server/service-imagery";
 import { getImageryCloud } from "@/lib/server/service-imagery-cloud";
 import { getStoryLastModified } from "@/lib/server/service-story";
 import type { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/constants";
+import { localeUrl } from "@/lib/utils/site-url";
 
 /**
  * lastModified 一律取自真实数据，不用 new Date()。
@@ -28,81 +28,57 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ? new Date(Math.max(...[...lastModifiedMap.values()].map((d) => +d)))
       : undefined;
 
-  const staticRoutes: MetadataRoute.Sitemap = [
+  /** 一个页面的简繁两条；繁体比简体低 0.1 */
+  const both = (
+    path: string,
+    entry: Omit<MetadataRoute.Sitemap[number], "url">,
+  ): MetadataRoute.Sitemap => [
+    { url: localeUrl("zh-CN", path), ...entry },
     {
-      url: `${SITE_URL}/zh-CN`,
-      lastModified: newestSongModified,
-      changeFrequency: "weekly",
-      priority: 1.0,
-    },
-    {
-      url: `${SITE_URL}/zh-TW`,
-      lastModified: newestSongModified,
-      changeFrequency: "weekly",
-      priority: 0.9,
-    },
-    {
-      url: `${SITE_URL}/zh-CN/imagery`,
-      lastModified: imageryModified ?? undefined,
-      changeFrequency: "weekly",
-      priority: 0.9,
-    },
-    {
-      url: `${SITE_URL}/zh-TW/imagery`,
-      lastModified: imageryModified ?? undefined,
-      changeFrequency: "weekly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/zh-CN/story/qjtx`,
-      lastModified: storyModified ?? undefined,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${SITE_URL}/zh-TW/story/qjtx`,
-      lastModified: storyModified ?? undefined,
-      changeFrequency: "monthly",
-      priority: 0.8,
+      url: localeUrl("zh-TW", path),
+      ...entry,
+      priority: Math.round(((entry.priority ?? 0.5) - 0.1) * 10) / 10,
     },
   ];
 
+  const staticRoutes: MetadataRoute.Sitemap = [
+    ...both("", {
+      lastModified: newestSongModified,
+      changeFrequency: "weekly",
+      priority: 1.0,
+    }),
+    ...both("/imagery", {
+      lastModified: imageryModified ?? undefined,
+      changeFrequency: "weekly",
+      priority: 0.9,
+    }),
+    ...both("/story/qjtx", {
+      lastModified: storyModified ?? undefined,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    }),
+    // 题目写在代码里，没有可信的变更时间，不填
+    ...both("/quiz", { changeFrequency: "monthly", priority: 0.8 }),
+  ];
+
   // 动态歌曲详情页面
-  const songRoutes: MetadataRoute.Sitemap = songs.flatMap((song) => {
-    const lastModified = lastModifiedMap.get(song.id);
-    return [
-      {
-        url: `${SITE_URL}/zh-CN/song/${song.id}`,
-        lastModified,
-        changeFrequency: "weekly" as const,
-        priority: 0.8,
-      },
-      {
-        url: `${SITE_URL}/zh-TW/song/${song.id}`,
-        lastModified,
-        changeFrequency: "weekly" as const,
-        priority: 0.7,
-      },
-    ];
-  });
+  const songRoutes = songs.flatMap((song) =>
+    both(`/song/${song.id}`, {
+      lastModified: lastModifiedMap.get(song.id),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    }),
+  );
 
   // 意象词云里每个母题一页：打开即点亮该母题、展开面板
-  const motifRoutes: MetadataRoute.Sitemap = (cloud?.groups ?? []).flatMap(
-    (group) =>
-      group.motifs.flatMap((motif) => [
-        {
-          url: `${SITE_URL}/zh-CN/imagery/${motif.id}`,
-          lastModified: imageryModified ?? undefined,
-          changeFrequency: "monthly" as const,
-          priority: 0.6,
-        },
-        {
-          url: `${SITE_URL}/zh-TW/imagery/${motif.id}`,
-          lastModified: imageryModified ?? undefined,
-          changeFrequency: "monthly" as const,
-          priority: 0.5,
-        },
-      ]),
+  const motifRoutes = (cloud?.groups ?? []).flatMap((group) =>
+    group.motifs.flatMap((motif) =>
+      both(`/imagery/${motif.id}`, {
+        lastModified: imageryModified ?? undefined,
+        changeFrequency: "monthly",
+        priority: 0.6,
+      }),
+    ),
   );
 
   return [...staticRoutes, ...songRoutes, ...motifRoutes];

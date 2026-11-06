@@ -27,7 +27,7 @@ import type { CreditNameUsage } from "@/lib/utils/utils-credits";
 import type {
   CollationPayload,
   SupplementPayload,
-} from "@/lib/utils/utils-collations";
+} from "@/lib/forms/collation-form";
 
 /**
  * 没标返回类型的接口沿用原来 res.json() 的 any，调用方按各自的形状取用。

@@ -7,7 +7,9 @@ import { getSongImagery } from "@/lib/server/service-song-imagery";
 import { getSongCollations } from "@/lib/server/service-collations";
 import { TABLES } from "@/lib/db/supabase-server";
 import { songExcerpt } from "@/lib/utils/utils-excerpt";
-import { SITE_URL } from "@/lib/constants";
+import { getCoverFilename } from "@/lib/utils/utils-song";
+import { localeAlternates } from "@/lib/utils/site-url";
+import { parseRouteId } from "@/lib/server/route-params";
 
 type PageProps = {
   params: Promise<{ id: string; locale: string }>;
@@ -18,8 +20,8 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { id, locale } = await params;
-  const songId = parseInt(id);
-  if (isNaN(songId)) return {};
+  const songId = parseRouteId(id);
+  if (songId === null) return {};
 
   const t = await getTranslations({ locale, namespace: "song" });
   const song = await getSongById(songId, TABLES.MUSIC, undefined, locale);
@@ -47,26 +49,12 @@ export async function generateMetadata({
   const description = descParts.join("｜") + t("meta.siteSuffix");
 
   // OG 封面走代理路径，确保爬虫可以访问
-  const coverFilename =
-    song.hascover === true
-      ? `${song.id}.jpg`
-      : song.hascover === false
-        ? "proto.jpg"
-        : "default.jpg";
+  const coverFilename = getCoverFilename(song);
 
   return {
     title: song.title,
     description,
-    alternates: {
-      canonical:
-        locale === "zh-TW"
-          ? `${SITE_URL}/zh-TW/song/${song.id}`
-          : `${SITE_URL}/zh-CN/song/${song.id}`,
-      languages: {
-        "zh-CN": `${SITE_URL}/zh-CN/song/${song.id}`,
-        "zh-TW": `${SITE_URL}/zh-TW/song/${song.id}`,
-      },
-    },
+    alternates: localeAlternates(locale, `/song/${song.id}`),
     openGraph: {
       title: `${song.title}${t("ogSuffix")}`,
       description,
@@ -84,11 +72,9 @@ export default async function SongDetailPage({
   const { id, locale } = await params;
   setRequestLocale(locale);
 
-  const songId = parseInt(id);
-  if (isNaN(songId)) {
-    console.warn("Invalid song ID:", id);
-    notFound();
-  }
+  // 只认规范写法：「012」「12abc」会在 ISR 和 CDN 上各占一个地址（见 route-params.ts）
+  const songId = parseRouteId(id);
+  if (songId === null) notFound();
 
   let song;
   let imagery;

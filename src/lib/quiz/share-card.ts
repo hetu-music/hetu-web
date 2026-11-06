@@ -1,3 +1,4 @@
+import { loadFontStack } from "@/lib/utils/font-preload";
 import { encode } from "uqr";
 
 /**
@@ -130,7 +131,6 @@ function resolveFonts(): Fonts {
 
 /** Canvas 不会自己去下载字体：按要画的字逐个触发加载，按 unicode-range 分片的字体才会取到对应分片 */
 async function loadFonts(fonts: Fonts, input: ShareCardInput): Promise<Fonts> {
-  if (typeof document.fonts?.load !== "function") return fonts;
   const serifText = [
     input.eyebrow,
     input.secondary ?? "",
@@ -157,35 +157,18 @@ async function loadFonts(fonts: Fonts, input: ShareCardInput): Promise<Fonts> {
   };
   const loaded = { ...fonts };
   await Promise.all(
-    (Object.keys(texts) as (keyof Fonts)[]).map(
-      (key) =>
-        new Promise<void>((resolve) => {
-          let settled = false;
-          const finish = (error?: unknown) => {
-            if (settled) return;
-            settled = true;
-            window.clearTimeout(timer);
-            if (error) {
-              // 固定使用备用字体，避免超时后字体迟到导致两次排版的测量不同。
-              loaded[key] = key === "sans" ? "sans-serif" : "serif";
-              console.warn("[share-card] 字体未就绪，使用备用字体", key, error);
-            }
-            resolve();
-          };
-          const timer = window.setTimeout(
-            () => finish(new Error("字体加载超时")),
-            ASSET_TIMEOUT_MS,
-          );
-          try {
-            document.fonts.load(`48px ${fonts[key]}`, texts[key]).then(
-              () => finish(),
-              (error) => finish(error),
-            );
-          } catch (error) {
-            finish(error);
-          }
-        }),
-    ),
+    (Object.keys(texts) as (keyof Fonts)[]).map(async (key) => {
+      try {
+        await loadFontStack(fonts[key], texts[key], {
+          size: "48px",
+          timeoutMs: ASSET_TIMEOUT_MS,
+        });
+      } catch (error) {
+        // 固定使用备用字体，避免超时后字体迟到导致两次排版的测量不同。
+        loaded[key] = key === "sans" ? "sans-serif" : "serif";
+        console.warn("[share-card] 字体未就绪，使用备用字体", key, error);
+      }
+    }),
   );
   return loaded;
 }

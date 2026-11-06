@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { serializeJsonLd } from "@/lib/utils/utils-common";
 import { SITE_URL } from "@/lib/constants";
+import { localeAlternates, localeUrl } from "@/lib/utils/site-url";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -64,16 +65,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "歌曲鉴赏",
       "文学性",
     ],
-    alternates: {
-      canonical:
-        locale === "zh-TW"
-          ? `${SITE_URL}/zh-TW/imagery`
-          : `${SITE_URL}/zh-CN/imagery`,
-      languages: {
-        "zh-CN": `${SITE_URL}/zh-CN/imagery`,
-        "zh-TW": `${SITE_URL}/zh-TW/imagery`,
-      },
-    },
+    alternates: localeAlternates(locale, "/imagery"),
     openGraph: {
       title: `${t("imagery.title")} - ${siteName}`,
       description,
@@ -100,7 +92,7 @@ export default async function ImageryPage({ params }: Props) {
     "@type": "CollectionPage",
     name: `${t("imagery.title")} - ${t("site.name")}`,
     description: describe(t, cloud),
-    url: `${SITE_URL}/zh-CN/imagery`,
+    url: localeUrl(locale, "/imagery"),
     isPartOf: {
       "@type": "WebSite",
       name: t("site.name"),

@@ -50,8 +50,6 @@ interface SongResultsProps {
   approximate: boolean;
   /** 在搜，歌词还没搜上：列表末尾说一句，空状态也改说这个 */
   lyricsPending: boolean;
-  /** 网格第一张封面加载完（或失败）时调用 */
-  onFirstCoverSettled?: () => void;
   showFavoriteColumn: boolean;
 }
 
@@ -73,7 +71,6 @@ export default function SongResults({
   getLyricsSnippet,
   approximate,
   lyricsPending,
-  onFirstCoverSettled,
   showFavoriteColumn,
 }: SongResultsProps) {
   const t = useTranslations("library");
@@ -96,7 +93,6 @@ export default function SongResults({
                   key={song.id}
                   song={song}
                   coverPriority={gridCoverPriority(index)}
-                  onCoverSettled={index === 0 ? onFirstCoverSettled : undefined}
                   isActive={activeSongId === song.id}
                   lyricsSnippet={getLyricsSnippet(song.id)}
                   onClick={() => onSongClick(song.id)}

@@ -4,7 +4,6 @@ import TopBar from "@/components/shared/topbar/TopBar";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import { addToast } from "@/components/ui/toast";
 import { useFavorites } from "@/context/FavoritesContext";
-import { useDeferredCjkFonts } from "@/hooks/library/useDeferredCjkFonts";
 import { useLibraryDeferred } from "@/hooks/library/useLibraryDeferred";
 import { useLibraryResults } from "@/hooks/library/useLibraryResults";
 import { useLibraryState } from "@/hooks/library/useLibraryState";
@@ -138,10 +137,6 @@ export default function MusicLibraryClient({
     return results.slice(start, start + MUSIC_LIBRARY_ITEMS_PER_PAGE);
   }, [results, safePage]);
 
-  // 思源字体等首屏封面到了再加载；网格视图等第一张封面，其余情况等页面加载完
-  const { deferred: cjkDeferred, release: releaseCjkFonts } =
-    useDeferredCjkFonts(state.view === "grid" && pageSongs.length > 0);
-
   const handleShare = useCallback(async () => {
     // 与卷首那句同一句话，卷首在句末接「……」，这里也一样
     const outcome = await sharePage({
@@ -177,12 +172,7 @@ export default function MusicLibraryClient({
   );
 
   return (
-    <div
-      className={cn(
-        "min-h-screen bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]",
-        cjkDeferred && "cjk-deferred",
-      )}
-    >
+    <div className="min-h-screen bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
       <TopBar
         exit={{
           kind: "logo",
@@ -262,7 +252,6 @@ export default function MusicLibraryClient({
             getLyricsSnippet={getLyricsSnippet}
             approximate={approximate}
             lyricsPending={lyricsPending}
-            onFirstCoverSettled={releaseCjkFonts}
             showFavoriteColumn={isLoggedIn}
           />
         </div>

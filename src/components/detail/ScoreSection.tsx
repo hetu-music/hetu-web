@@ -1,5 +1,6 @@
 "use client";
 
+import AnnotateHandle from "@/components/detail/comments/AnnotateHandle";
 import CommentGutter from "@/components/detail/comments/CommentGutter";
 import { useComments } from "@/components/detail/comments/CommentsContext";
 import SectionHeading from "@/components/detail/SectionHeading";
@@ -57,7 +58,7 @@ export default function ScoreSection({
 }) {
   const t = useTranslations("song");
   const [failed, setFailed] = useState(false);
-  const { threads, setOpenSlot, setSheetSlot } = useComments();
+  const { threads, annotate } = useComments();
   const bodyRef = useRef<HTMLDivElement>(null);
   const count = countThreads(threads.get(SCORE_SLOT.key));
   // 服务端与水合时一律按收起渲染，挂载后再按记下的偏好展开
@@ -83,7 +84,7 @@ export default function ScoreSection({
       <SectionHeading label={t("sections.score")}>
         <button
           type="button"
-          onClick={() => setSheetSlot(SCORE_SLOT)}
+          onClick={() => annotate(SCORE_SLOT)}
           className="lg:hidden text-xs tracking-widest text-(--tone)"
         >
           {t("folio.comments.annotate")}
@@ -94,18 +95,12 @@ export default function ScoreSection({
         <CommentGutter slots={SLOTS} containerRef={bodyRef} />
         <div
           data-comment-slot={SCORE_SLOT.key}
-          className="group/score relative lg:ml-[26rem]"
+          className="group/slot relative lg:ml-[26rem]"
         >
-          <span className="absolute -left-12 top-0 hidden lg:block">
-            <button
-              type="button"
-              onClick={() => setOpenSlot(SCORE_SLOT.key)}
-              aria-label={t("folio.comments.annotateScore")}
-              className="font-kaiti text-sm text-(--tone) opacity-0 group-hover/score:opacity-60 hover:opacity-100! focus-visible:opacity-100 transition-opacity"
-            >
-              {t("folio.comments.add")}
-            </button>
-          </span>
+          <AnnotateHandle
+            slot={SCORE_SLOT}
+            label={t("folio.comments.annotateScore")}
+          />
           {failed ? (
             <p className="py-16 text-center text-sm text-slate-400">
               {t("scoreLoadError")}

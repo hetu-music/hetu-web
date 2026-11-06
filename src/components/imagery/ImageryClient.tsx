@@ -89,6 +89,10 @@ export default function ImageryClient({
   });
 
   const motifs = useMemo(() => cloud.groups.flatMap((g) => g.motifs), [cloud]);
+  const motifById = useMemo(
+    () => new Map(motifs.map((m) => [m.id, m])),
+    [motifs],
+  );
   const wordMotif = useMemo(
     () => new Map(cloud.words.map((w) => [w.id, w.motif])),
     [cloud.words],
@@ -162,12 +166,19 @@ export default function ImageryClient({
         ? x.l2 === deferredL2
         : deferredL1 === null || x.l1 === deferredL1;
     if (view === "words") {
-      return cloud.words.filter(inScope).map((w) => ({
-        id: w.id,
-        name: w.name,
-        count: w.songCount,
-        palette: w.palette,
-      }));
+      // 词的分类与配色随它的母题；母题不在词云里的（没有完整的三级分类）只在「全部」里，灰色
+      return cloud.words.flatMap((w) => {
+        const m = motifById.get(w.motif);
+        if (!inScope(m ?? { l1: 0, l2: 0 })) return [];
+        return [
+          {
+            id: w.id,
+            name: w.name,
+            count: w.songCount,
+            palette: m?.palette ?? -1,
+          },
+        ];
+      });
     }
     return motifs
       .filter(inScope)
@@ -178,7 +189,7 @@ export default function ImageryClient({
         count: m.songCount,
         palette: m.palette,
       }));
-  }, [cloud.words, motifs, view, deferredL1, deferredL2]);
+  }, [cloud.words, motifs, motifById, view, deferredL1, deferredL2]);
 
   const motifWordCount = useMemo(
     () => new Map(motifs.map((m) => [m.id, m.wordCount])),

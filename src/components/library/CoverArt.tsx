@@ -18,8 +18,6 @@ interface CoverArtProps {
   /** 封面实际显示的宽度，供浏览器从 srcset 里挑尺寸；不写会按整屏宽下载 */
   sizes: string;
   priority?: CoverPriority;
-  /** 图片加载完或加载失败时调用 */
-  onSettled?: () => void;
   className?: string;
   isActive?: boolean;
 }
@@ -28,7 +26,6 @@ export default function CoverArt({
   song,
   sizes,
   priority,
-  onSettled,
   className,
   isActive,
 }: CoverArtProps) {
@@ -49,8 +46,6 @@ export default function CoverArt({
         sizes={sizes}
         loading={priority ? "eager" : undefined}
         fetchPriority={priority === "high" ? "high" : undefined}
-        onLoad={onSettled}
-        onError={onSettled}
         className={cn(
           "h-full w-full object-cover transition-transform duration-500",
           isActive ? "scale-105" : "group-hover:scale-105",

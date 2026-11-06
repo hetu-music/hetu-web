@@ -7,26 +7,21 @@ import { SupplementsSection } from "@/components/detail/Collations";
 import CreatorNotes from "@/components/detail/CreatorNotes";
 import DisputeNotice from "@/components/detail/DisputeNotice";
 import ImageryCaption from "@/components/detail/ImageryCaption";
-import LyricsFolio from "@/components/detail/LyricsFolio";
+import LyricsFolio, { scrollToLine } from "@/components/detail/LyricsFolio";
 import RelatedWorks from "@/components/detail/RelatedWorks";
 import ScoreSection from "@/components/detail/ScoreSection";
 import {
-  jumpTo,
   type NavItem,
   ReadingProgress,
-  useActiveSection,
+  SectionPlaceNav,
 } from "@/components/detail/SectionNav";
 import SongColophon from "@/components/detail/SongColophon";
 import SongHero from "@/components/detail/SongHero";
 import FavoriteButton from "@/components/shared/FavoriteButton";
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
-import ImageModal from "@/components/shared/ImageModal";
-import { NAV_HEIGHT } from "@/components/shared/nav-button";
 import { addToast } from "@/components/ui/toast";
 import TopBar, { type TopBarAction } from "@/components/shared/topbar/TopBar";
-import { PlaceNav } from "@/components/shared/topbar/parts";
 import { useUserContext } from "@/context/UserContext";
-import { useIntersection } from "@/hooks/ui/useIntersection";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import type { SongDetailClientProps, SongImageryMark } from "@/lib/types";
 import {
@@ -34,6 +29,7 @@ import {
   sortSupplements,
 } from "@/lib/utils/utils-collations";
 import { buildFolio, markLines, parseNotes } from "@/lib/utils/utils-folio";
+import { whenIdle } from "@/lib/utils/idle";
 import { sharePage } from "@/lib/utils/share";
 import { getCoverUrl, getNmnUrl } from "@/lib/utils/utils-song";
 import {
@@ -43,7 +39,13 @@ import {
 } from "@/lib/utils/utils-tone";
 import { Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+
+// 看大图的面板（缩放、拖动、旋转）单独分包：只有点封面、乐谱才用得到，不放进首屏的包里。
+// 页面空闲时预先下载，第一次点开不用等
+const loadImageModal = () => import("@/components/shared/ImageModal");
+const ImageModal = dynamic(loadImageModal, { ssr: false });
 
 /** 题签最多展示的意象数 */
 const STRIP_LIMIT = 7;
@@ -59,7 +61,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const { user, loaded: userLoaded } = useUserContext();
   const hasBenefits = userLoaded && !!user?.hasBenefits;
 
-  const { showScrollTop, scrollToTop } = useScrollTop();
   const [tone, setTone] = useState<CoverTone | null>(null);
   const [activeImagery, setActiveImagery] = useState<number | null>(null);
   const [imageModal, setImageModal] = useState<{
@@ -68,6 +69,10 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     title: string;
     layout?: "fit" | "scroll";
   } | null>(null);
+  // 打开过一次才挂载；之后留着，关闭时才放得完退场动画
+  const [modalMounted, setModalMounted] = useState(false);
+  if (imageModal && !modalMounted) setModalMounted(true);
+  useEffect(() => whenIdle(() => void loadImageModal()), []);
 
   // ── 正文与意象 ──────────────────────────────────────────────────────────
   const folio = useMemo(
@@ -138,17 +143,9 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const selectFromStrip = useCallback(
     (id: number) => {
       setActiveImagery((prev) => (prev === id ? null : id));
-      const first = lineStats.get(id)?.first;
-      const lyrics = document.getElementById("lyrics");
-      if (first === undefined || !lyrics) return;
       // 滚到该意象第一次出现的那一句附近
-      const row = lyrics.querySelectorAll("[data-folio-line]")[first];
-      const target = row ?? lyrics;
-      const top =
-        target.getBoundingClientRect().top +
-        window.scrollY -
-        window.innerHeight * 0.3;
-      window.scrollTo({ top, behavior: "smooth" });
+      const first = lineStats.get(id)?.first;
+      if (first !== undefined) scrollToLine(first);
     },
     [lineStats],
   );
@@ -156,13 +153,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
   const closeCaption = useCallback(() => setActiveImagery(null), []);
   const activeMark: SongImageryMark | null =
     activeImagery !== null ? (markById.get(activeImagery) ?? null) : null;
-
-  // ── 导航栏标题：卷首的大标题滚出视口后才出现 ─────────────────────────────
-  const { ref: titleRef, entry: titleEntry } =
-    useIntersection<HTMLHeadingElement>({
-      rootMargin: `-${NAV_HEIGHT}px 0px 0px 0px`,
-    });
-  const titleOutOfView = titleEntry ? !titleEntry.isIntersecting : false;
 
   // ── 其他交互 ────────────────────────────────────────────────────────────
   const handleShare = useCallback(async () => {
@@ -194,9 +184,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
     return items;
   }, [song.nmn_status, imagery.related.length, notes, supplements.length, t]);
 
-  const activeSection = useActiveSection(tocItems);
-  // 窄屏放不下歌名：卷首时显示「目录」，滚过题名后显示当前章节
-  const activeLabel = tocItems.find((i) => i.id === activeSection)?.label;
   const topBarActions = useMemo<TopBarAction[]>(
     () => [
       {
@@ -234,13 +221,10 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
       <TopBar
         exit={{ kind: "back" }}
         nav={
-          <PlaceNav
+          <SectionPlaceNav
             title={song.title}
-            label={titleOutOfView && activeLabel ? activeLabel : t("folio.toc")}
             items={tocItems}
-            active={activeSection}
-            onSelect={(id) => jumpTo(tocItems, id)}
-            menuTitle={t("folio.toc")}
+            tocLabel={t("folio.toc")}
           />
         }
         pinned={<FavoriteButton songId={song.id} />}
@@ -268,7 +252,6 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
 
           <SongHero
             song={song}
-            titleRef={titleRef}
             stripMarks={stripMarks}
             imageryTotal={visibleImageryCount}
             excerpt={excerpt}
@@ -330,21 +313,31 @@ const SongDetailClient: React.FC<SongDetailClientProps> = ({
         <CommentSheet />
       </CommentsProvider>
 
-      <FloatingActionButtons
-        showScrollTop={showScrollTop}
-        onScrollToTop={scrollToTop}
-      />
+      <ScrollFab />
 
-      <ImageModal
-        isOpen={imageModal !== null}
-        onClose={() => setImageModal(null)}
-        src={imageModal?.src ?? ""}
-        alt={imageModal?.alt ?? ""}
-        title={imageModal?.title ?? ""}
-        layout={imageModal?.layout}
-      />
+      {modalMounted && (
+        <ImageModal
+          isOpen={imageModal !== null}
+          onClose={() => setImageModal(null)}
+          src={imageModal?.src ?? ""}
+          alt={imageModal?.alt ?? ""}
+          title={imageModal?.title ?? ""}
+          layout={imageModal?.layout}
+        />
+      )}
     </div>
   );
 };
 
 export default SongDetailClient;
+
+/** 回到顶部的显隐随滚动变化，放在这里，免得整页跟着重渲染 */
+function ScrollFab() {
+  const { showScrollTop, scrollToTop } = useScrollTop();
+  return (
+    <FloatingActionButtons
+      showScrollTop={showScrollTop}
+      onScrollToTop={scrollToTop}
+    />
+  );
+}

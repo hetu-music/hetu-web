@@ -4,6 +4,7 @@ import { FIELD_LABEL_CLASS } from "@/components/shared/form-field";
 import CustomSelect from "./CustomSelect";
 import { Slider } from "@/components/ui/slider";
 import { useTranslations } from "next-intl";
+import { enumLabel } from "@/lib/utils/utils-song";
 import {
   FACET_KEYS,
   type FacetKey,
@@ -62,10 +63,7 @@ const SongFilters: React.FC<SongFiltersProps> = ({
 
   const labelOf = (key: FacetKey, label: string) => {
     if (label === FILTER_OPTION_UNKNOWN) return tCommon("unknown");
-    if (key === "genre" && tEnum.has(`genre.${label}`)) {
-      return tEnum(`genre.${label}`);
-    }
-    return label;
+    return key === "genre" ? enumLabel(tEnum, "genre", label) : label;
   };
 
   // 年份还没算出来时先给个占位区间

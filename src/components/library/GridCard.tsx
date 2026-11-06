@@ -4,7 +4,7 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import type { Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
-import { getCoverUrl } from "@/lib/utils/utils-song";
+import { enumLabel, getCoverUrl } from "@/lib/utils/utils-song";
 import { Heart } from "lucide-react";
 import type React from "react";
 import CoverArt, { type CoverPriority } from "./CoverArt";
@@ -23,7 +23,6 @@ interface GridCardProps {
   isActive?: boolean;
   lyricsSnippet?: Snippet;
   coverPriority?: CoverPriority;
-  onCoverSettled?: () => void;
 }
 
 /**
@@ -45,7 +44,6 @@ export default function GridCard({
   isActive,
   lyricsSnippet,
   coverPriority,
-  onCoverSettled,
 }: GridCardProps) {
   const { isFavorite, toggleFavorite, isLoggedIn } = useFavorites();
   const t = useTranslations("song");
@@ -75,7 +73,6 @@ export default function GridCard({
           song={song}
           sizes={GRID_COVER_SIZES}
           priority={coverPriority}
-          onSettled={onCoverSettled}
           isActive={isActive}
         />
 
@@ -162,9 +159,7 @@ export default function GridCard({
               <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600" />
               {/* 类型只作文字说明，不再逐类上色（各类的解释见「关于」） */}
               <span className="shrink-0 text-sm font-normal tracking-wider text-slate-400 dark:text-slate-500">
-                {tEnum.has(`type.${song.type[0]}`)
-                  ? tEnum(`type.${song.type[0]}`)
-                  : song.type[0]}
+                {enumLabel(tEnum, "type", song.type[0])}
               </span>
             </>
           )}

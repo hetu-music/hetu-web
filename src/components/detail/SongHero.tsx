@@ -1,17 +1,25 @@
 "use client";
 
 import NaviPlayer from "@/components/detail/NaviPlayer";
+import { SONG_TITLE_ID } from "@/components/detail/SectionNav";
 import type { SongDetail, SongImageryMark } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
-import { getCoverUrl } from "@/lib/utils/utils-song";
+import { enumLabel, getCoverUrl } from "@/lib/utils/utils-song";
 import { Disc } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import React, { useState } from "react";
 
+/**
+ * 卷首封面的显示宽度，与下面的版式对应：宽屏是左栏的 22rem；
+ * 窄屏是 --cover，即内容区（视口减去 px-6 两侧）的 62%，最多 24rem，视口 668px 起就到顶了。
+ * 不写会按 1x/2x 取图，2 倍、3 倍屏上都要 1080px 的图，而手机上封面只有两百来像素宽
+ */
+const HERO_COVER_SIZES =
+  "(min-width: 1024px) 352px, (min-width: 668px) 384px, calc((100vw - 48px) * 0.62)";
+
 interface SongHeroProps {
   song: SongDetail;
-  titleRef?: React.Ref<HTMLHeadingElement>;
   /** 题签展示的意象（已排序截断） */
   stripMarks: SongImageryMark[];
   imageryTotal: number;
@@ -26,7 +34,6 @@ interface SongHeroProps {
 /** 卷首：封面、题名、署名、题签与竖排摘句 */
 export default function SongHero({
   song,
-  titleRef,
   stripMarks,
   imageryTotal,
   excerpt,
@@ -42,11 +49,9 @@ export default function SongHero({
 
   const eyebrow = [
     ...(song.type && song.type.length > 0 ? song.type : ["原创"]).map((v) =>
-      tEnum.has(`type.${v}`) ? tEnum(`type.${v}`) : v,
+      enumLabel(tEnum, "type", v),
     ),
-    ...(song.genre ?? []).map((g) =>
-      tEnum.has(`genre.${g}`) ? tEnum(`genre.${g}`) : g,
-    ),
+    ...(song.genre ?? []).map((g) => enumLabel(tEnum, "genre", g)),
     song.year ? String(song.year) : null,
   ].filter(Boolean);
 
@@ -88,6 +93,7 @@ export default function SongHero({
               alt={song.title}
               width={500}
               height={500}
+              sizes={HERO_COVER_SIZES}
               preload
               onLoad={(e) => onCoverLoad(e.currentTarget)}
               onError={() => setCoverFailed(true)}
@@ -107,7 +113,7 @@ export default function SongHero({
         </p>
 
         <h1
-          ref={titleRef}
+          id={SONG_TITLE_ID}
           className="font-serif text-5xl md:text-6xl xl:text-7xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50 text-balance"
         >
           {song.title}

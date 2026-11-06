@@ -8,7 +8,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { SITE_URL } from "@/lib/constants";
+import { localeAlternates } from "@/lib/utils/site-url";
+import { parseRouteId } from "@/lib/server/route-params";
 
 type Props = {
   params: Promise<{ locale: string; motif: string }>;
@@ -19,8 +20,8 @@ const DESCRIPTION_WORDS = 6;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, motif } = await params;
-  const id = parseInt(motif, 10);
-  if (isNaN(id)) return {};
+  const id = parseRouteId(motif);
+  if (id === null) return {};
   const detail = await getMotifDetail(id, locale).catch(() => null);
   if (!detail) return {};
   const t = await getTranslations({ locale, namespace: "common" });
@@ -34,17 +35,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       .map((w) => `「${w.name}」`)
       .join(""),
   });
-  const path = `/imagery/${detail.id}`;
   return {
     title,
     description,
-    alternates: {
-      canonical: `${SITE_URL}/${locale === "zh-TW" ? "zh-TW" : "zh-CN"}${path}`,
-      languages: {
-        "zh-CN": `${SITE_URL}/zh-CN${path}`,
-        "zh-TW": `${SITE_URL}/zh-TW${path}`,
-      },
-    },
+    alternates: localeAlternates(locale, `/imagery/${detail.id}`),
     openGraph: {
       title: `${title} - ${t("site.name")}`,
       description,
@@ -58,8 +52,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function MotifPage({ params }: Props) {
   const { locale, motif } = await params;
   setRequestLocale(locale);
-  const id = parseInt(motif, 10);
-  if (isNaN(id)) notFound();
+  const id = parseRouteId(motif);
+  if (id === null) notFound();
 
   let cloud;
   let detail;

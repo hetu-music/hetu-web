@@ -1,10 +1,10 @@
 "use client";
 
+import AnnotateHandle from "@/components/detail/comments/AnnotateHandle";
 import CommentGutter from "@/components/detail/comments/CommentGutter";
 import { useComments } from "@/components/detail/comments/CommentsContext";
 import SlotMarker from "@/components/detail/comments/SlotMarker";
 import SectionHeading from "@/components/detail/SectionHeading";
-import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import { cn } from "@/lib/utils/utils";
 import { notesSlot } from "@/lib/utils/utils-comments";
 import type { Notes } from "@/lib/utils/utils-folio";
@@ -24,19 +24,13 @@ export default function CreatorNotes({ notes }: { notes: Notes }) {
   const [expanded, setExpanded] = useState(false);
   const collapsed = collapsible && !expanded;
   const [selected, setSelected] = useState<number | null>(null);
-  const isLarge = useMediaQuery("(min-width: 1024px)");
-  const { setOpenSlot, setSheetSlot } = useComments();
+  const { wide, annotate } = useComments();
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const slots = useMemo(
     () => notes.paragraphs.map((_, i) => notesSlot(i)),
     [notes.paragraphs],
   );
-
-  const annotate = (i: number) => {
-    if (isLarge) setOpenSlot(slots[i].key);
-    else setSheetSlot(slots[i]);
-  };
 
   return (
     <section id="notes" className="py-16 md:py-20">
@@ -58,21 +52,15 @@ export default function CreatorNotes({ notes }: { notes: Notes }) {
                 key={i}
                 data-comment-slot={slots[i].key}
                 onClick={() =>
-                  !isLarge && setSelected((prev) => (prev === i ? null : i))
+                  !wide && setSelected((prev) => (prev === i ? null : i))
                 }
-                className="group/para relative max-lg:cursor-pointer"
+                className="group/slot relative max-lg:cursor-pointer"
               >
-                {/* 宽屏：悬停时在段前浮出「批」 */}
-                <span className="absolute -left-12 top-0 hidden lg:flex h-[2.05em] items-center">
-                  <button
-                    type="button"
-                    onClick={() => annotate(i)}
-                    aria-label={t("comments.annotateParagraph")}
-                    className="font-kaiti text-sm text-(--tone) opacity-0 group-hover/para:opacity-60 hover:opacity-100! focus-visible:opacity-100 transition-opacity"
-                  >
-                    {t("comments.add")}
-                  </button>
-                </span>
+                <AnnotateHandle
+                  slot={slots[i]}
+                  label={t("comments.annotateParagraph")}
+                  className="h-[2.05em]"
+                />
                 {lines.map((line, k) => (
                   <p
                     key={k}
@@ -91,7 +79,7 @@ export default function CreatorNotes({ notes }: { notes: Notes }) {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        annotate(i);
+                        annotate(slots[i]);
                       }}
                     >
                       {t("comments.annotateParagraph")}

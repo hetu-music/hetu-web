@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SPLIT_FONT_STYLESHEETS } from "@/lib/split-fonts";
 
 // stylesReady 是模块级缓存，每个用例重新载入模块，免得互相影响
-async function load() {
+async function importFresh() {
   vi.resetModules();
   return import("./font-preload");
 }
@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe("ensureSplitFontStyles", () => {
   it("每张表挂一个 link，全部载入后才 resolve", async () => {
-    const { ensureSplitFontStyles } = await load();
+    const { ensureSplitFontStyles } = await importFresh();
     let done = false;
     const ready = ensureSplitFontStyles().then(() => {
       done = true;
@@ -58,14 +58,14 @@ describe("ensureSplitFontStyles", () => {
   });
 
   it("载入失败也 resolve，不卡住调用方", async () => {
-    const { ensureSplitFontStyles } = await load();
+    const { ensureSplitFontStyles } = await importFresh();
     const ready = ensureSplitFontStyles();
     fire("error");
     await expect(ready).resolves.toBeUndefined();
   });
 
   it("重复调用只挂一次", async () => {
-    const { ensureSplitFontStyles } = await load();
+    const { ensureSplitFontStyles } = await importFresh();
     const first = ensureSplitFontStyles();
     expect(ensureSplitFontStyles()).toBe(first);
     expect(splitFontLinks()).toHaveLength(SPLIT_FONT_STYLESHEETS.length);
@@ -82,7 +82,7 @@ describe("ensureSplitFontStyles", () => {
     pending.href = pendingHref;
     document.head.append(loaded, pending);
 
-    const { ensureSplitFontStyles } = await load();
+    const { ensureSplitFontStyles } = await importFresh();
     const ready = ensureSplitFontStyles();
 
     expect(splitFontLinks()).toHaveLength(SPLIT_FONT_STYLESHEETS.length);
@@ -98,9 +98,70 @@ describe("ensureSplitFontStyles", () => {
   });
 });
 
+describe("loadFontStack", () => {
+  it("按字体逐个加载，字重和字号写进字体声明", async () => {
+    const load = vi.fn().mockResolvedValue([]);
+    stubFonts({ load });
+    const { loadFontStack } = await importFresh();
+    await loadFontStack(`"Noto Serif SC", 'Songti SC', serif`, "•", {
+      weight: "600",
+      size: "20px",
+    });
+    expect(load.mock.calls).toEqual([
+      ['600 20px "Noto Serif SC"', "•"],
+      ['600 20px "Songti SC"', "•"],
+      ['600 20px "serif"', "•"],
+    ]);
+  });
+
+  it("等所有字体结束才 reject，同步抛错也算失败", async () => {
+    let finishLast: () => void = () => undefined;
+    const load = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new SyntaxError("不支持的字体声明");
+      })
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (finishLast = () => resolve([]))),
+      );
+    stubFonts({ load });
+    const { loadFontStack } = await importFresh();
+
+    let settled = false;
+    const result = loadFontStack("A, B", "字").finally(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    finishLast();
+    await expect(result).rejects.toThrow("不支持的字体声明");
+  });
+
+  it("超时后 reject，不再等下去", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFonts({ load: () => new Promise(() => undefined) });
+      const { loadFontStack } = await importFresh();
+      const result = loadFontStack("A", "字", { timeoutMs: 100 });
+      const assertion = expect(result).rejects.toThrow("字体加载超时");
+      await vi.advanceTimersByTimeAsync(100);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("浏览器没有 document.fonts.load 时直接返回", async () => {
+    const { loadFontStack } = await importFresh();
+    await expect(loadFontStack("A", "字")).resolves.toBeUndefined();
+  });
+});
+
 describe("preloadFontText", () => {
   it("浏览器没有 document.fonts.load 时直接返回，不挂样式表", async () => {
-    const { preloadFontText } = await load();
+    const { preloadFontText } = await importFresh();
     await preloadFontText([{ cssVar: "--font-serif", text: "河图" }]);
     expect(splitFontLinks()).toHaveLength(0);
   });
@@ -118,7 +179,7 @@ describe("preloadFontText", () => {
     );
     document.documentElement.style.setProperty("--font-kaiti", "Hetu KaiTi,");
 
-    const { preloadFontText } = await load();
+    const { preloadFontText } = await importFresh();
     const done = preloadFontText([
       { cssVar: "--font-serif", text: "河图" },
       { cssVar: "--font-kaiti", text: "洛书" },

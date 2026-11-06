@@ -1,6 +1,7 @@
 "use client";
 
 import { useUserContext } from "@/context/UserContext";
+import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import { usePathname } from "@/i18n/navigation";
 import {
   type AnchorContext,
@@ -23,6 +24,10 @@ interface CommentsContextValue {
   anchorCtx: AnchorContext;
   loggedIn: boolean;
   loginHref: string;
+  /** 宽屏（lg 起）：批注写在左栏；窄屏：从底部面板写 */
+  wide: boolean;
+  /** 在某一处写批注：宽屏展开左栏，窄屏打开底部面板 */
+  annotate: (slot: CommentSlot) => void;
   /** 宽屏：左栏里展开的那一处 */
   openSlot: string | null;
   setOpenSlot: (key: string | null) => void;
@@ -72,6 +77,14 @@ export function CommentsProvider({
       setSheetSlotState(slot);
     },
     [onSheetOpen],
+  );
+  const wide = useMediaQuery("(min-width: 1024px)");
+  const annotate = useCallback(
+    (slot: CommentSlot) => {
+      if (wide) setOpenSlot(slot.key);
+      else setSheetSlot(slot);
+    },
+    [wide, setSheetSlot],
   );
 
   // 按赞排序用的是第一次看到这条批注时的赞数：在页面上点赞只改数字、不换位置，
@@ -134,6 +147,8 @@ export function CommentsProvider({
       anchorCtx,
       loggedIn: !!user,
       loginHref: `/login?next=${encodeURIComponent(pathname)}`,
+      wide,
+      annotate,
       openSlot,
       setOpenSlot,
       sheetSlot,
@@ -149,6 +164,8 @@ export function CommentsProvider({
       anchorCtx,
       user,
       pathname,
+      wide,
+      annotate,
       openSlot,
       sheetSlot,
       setSheetSlot,

@@ -128,6 +128,26 @@ describe("renderShareCard compatibility", () => {
     expect(console.warn).toHaveBeenCalled();
   });
 
+  it("字体栈按字体逐个加载，不整串传给 document.fonts.load", async () => {
+    const load = vi.fn(async () => []);
+    setFonts({ load });
+    document.documentElement.style.setProperty(
+      "--font-serif",
+      `"Noto Serif SC", Georgia, serif`,
+    );
+    try {
+      await renderShareCard(input, "light");
+      const specs = (load.mock.calls as unknown as [string, string][]).map(
+        ([spec]) => spec,
+      );
+      expect(specs).toContain('48px "Noto Serif SC"');
+      expect(specs).toContain('48px "Georgia"');
+      expect(specs.every((spec) => !spec.includes(","))).toBe(true);
+    } finally {
+      document.documentElement.style.removeProperty("--font-serif");
+    }
+  });
+
   it("没有 FontFaceSet API 时直接使用浏览器的可用字体", async () => {
     setFonts(undefined);
     await expect(renderShareCard(input, "light")).resolves.toBeTruthy();

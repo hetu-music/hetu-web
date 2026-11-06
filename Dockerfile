@@ -2,11 +2,7 @@ FROM node:26-alpine AS builder
 
 WORKDIR /app
 
-# 只 enable，不 prepare 指定版本：corepack 会读取 package.json 的
-# packageManager 字段（当前 pnpm@12.3.4）。此前写死 pnpm@latest 与该字段冲突，
-# 构建结果不可复现。
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable
+RUN npm install -g pnpm@12
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile

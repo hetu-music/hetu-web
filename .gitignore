@@ -45,3 +45,4 @@ next-env.d.ts
 # PWA build artifacts
 /public/sw.js
 /public/workbox-*.js
+map.csv

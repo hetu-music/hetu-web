@@ -85,6 +85,12 @@ describe("getPublishStatuses", () => {
       2: "changed",
       3: "published",
     });
+    // 也接受还没读完的暂存表
+    expect(await getPublishStatuses(Promise.resolve(drafts))).toEqual({
+      1: "unpublished",
+      2: "changed",
+      3: "published",
+    });
     expect(client.from).toHaveBeenCalledWith(TABLES.MUSIC);
     expect(builder.select).toHaveBeenCalledWith("*");
   });
@@ -98,12 +104,32 @@ describe("getPublishStatuses", () => {
 });
 
 describe("getOccurrenceCountsBySong", () => {
-  it("按歌汇总标注条数", async () => {
+  it("用库里的汇总函数，一次拿回每首歌的条数", async () => {
+    const client = withServiceClient([]);
+    client.rpc = vi.fn().mockResolvedValue({
+      data: [
+        { song_id: 1, n: 2 },
+        { song_id: "2", n: "1" },
+      ],
+      error: null,
+    });
+
+    expect(await getOccurrenceCountsBySong()).toEqual({ 1: 2, 2: 1 });
+    expect(client.rpc).toHaveBeenCalledWith("imagery_occurrence_counts");
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it("汇总函数不可用时退回整列读取，按歌计数", async () => {
     const builder = makeQueryBuilder({
       data: [{ song_id: 1 }, { song_id: 2 }, { song_id: 1 }],
       error: null,
     });
     const client = withServiceClient([builder]);
+    client.rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "function not found" },
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     expect(await getOccurrenceCountsBySong()).toEqual({ 1: 2, 2: 1 });
     expect(client.from).toHaveBeenCalledWith(TABLES.IMAGERY_OCC);

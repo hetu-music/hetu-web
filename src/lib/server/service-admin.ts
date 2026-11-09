@@ -27,20 +27,24 @@ export async function getPublishedSongRaw(
   return data;
 }
 
-/** 暂存表里每首歌的发布状态 */
+/**
+ * 暂存表里每首歌的发布状态。
+ *
+ * drafts 可以直接传读暂存表的 Promise：正式表不依赖它，两边同时读，
+ * 不必等暂存表读完再开始读正式表（两张表都是全字段，各要一两秒）。
+ */
 export async function getPublishStatuses(
-  drafts: Song[],
+  drafts: Song[] | Promise<Song[]>,
 ): Promise<Record<number, PublishStatus>> {
   const supabase = getServiceClient();
   if (!supabase) return {};
-  const published = await fetchAll<Record<string, unknown>>(
-    supabase,
-    TABLES.MUSIC,
-    "*",
-  );
+  const [songs, published] = await Promise.all([
+    drafts,
+    fetchAll<Record<string, unknown>>(supabase, TABLES.MUSIC, "*"),
+  ]);
   const byId = new Map(published.map((row) => [row.id as number, row]));
   return Object.fromEntries(
-    drafts.map((song) => [
+    songs.map((song) => [
       song.id,
       publishStatusOf(
         song as unknown as Record<string, unknown>,
@@ -56,6 +60,21 @@ export async function getOccurrenceCountsBySong(): Promise<
 > {
   const supabase = getServiceClient();
   if (!supabase) return {};
+
+  // 库里 group by，一次往返（见 migrations/20261109000000_imagery_occurrence_counts.sql）
+  const { data, error } = await supabase.rpc("imagery_occurrence_counts");
+  if (!error && Array.isArray(data)) {
+    return Object.fromEntries(
+      (data as { song_id: number | string; n: number | string }[]).map(
+        (row) => [Number(row.song_id), Number(row.n)],
+      ),
+    );
+  }
+  // 函数还没建（迁移未执行）时退回整列分页读取：一万多行要串行翻十几页，慢但结果相同
+  console.warn(
+    "[getOccurrenceCountsBySong] rpc unavailable, falling back to paging:",
+    error?.message,
+  );
   const rows = await fetchAll<{ song_id: number }>(
     supabase,
     TABLES.IMAGERY_OCC,

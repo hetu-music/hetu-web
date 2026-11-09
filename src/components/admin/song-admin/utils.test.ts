@@ -17,6 +17,7 @@ import {
   getInputValue,
   hasSongId,
   isSongIncomplete,
+  toListSong,
 } from "./utils";
 
 /**
@@ -202,6 +203,35 @@ describe("getMissingGroups", () => {
     for (const song of samples) {
       expect(getMissingGroups(song).length > 0).toBe(isSongIncomplete(song));
     }
+  });
+});
+
+describe("toListSong", () => {
+  it("去掉歌词、手记正文，但缺不缺的判断不变", () => {
+    const samples = [
+      makeCompleteSong(),
+      makeCompleteSong({ lyrics: "", comment: null }),
+      makeCompleteSong({ lyrics: "   ", comment: "  " }),
+      makeCompleteSong({ lyrics: null }),
+    ];
+    for (const song of samples) {
+      const row = toListSong(song);
+      expect(row.lyrics === song.lyrics || row.lyrics === "…").toBe(true);
+      expect(getMissingGroups(row)).toEqual(getMissingGroups(song));
+      expect(getMissingFields(row)).toEqual(getMissingFields(song));
+      for (const key of ["comment", "lyrics"] as const) {
+        expect(isFieldEmpty(row, fieldByKey(key))).toBe(
+          isFieldEmpty(song, fieldByKey(key)),
+        );
+      }
+    }
+    expect(toListSong(makeCompleteSong()).lyrics).toBe("…");
+  });
+
+  it("不改动传入的歌", () => {
+    const song = makeCompleteSong();
+    toListSong(song);
+    expect(song.lyrics).toBe("[00:01.00]词");
   });
 });
 

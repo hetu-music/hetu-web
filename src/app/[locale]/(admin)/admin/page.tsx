@@ -35,17 +35,20 @@ export default async function AdminOverviewPage({ params }: Props) {
   const session = await requireAdminPage(locale, "/admin");
   const isSuper = session.user.app_metadata?.is_super === true;
 
-  const songs = (await getSongs(TABLES.ADMIN, session.accessToken).catch(
+  // 几路查询互不依赖，一起发出（发布状态要等暂存表，但它读正式表不用等）
+  const songsPromise = getSongs(TABLES.ADMIN, session.accessToken).catch(
     (e) => {
       console.error("Fetch songs error:", e);
       return [];
     },
-  )) as SongDetail[];
-  const [statuses, occurrenceCounts, pendingRequests] = await Promise.all([
-    getPublishStatuses(songs),
-    getOccurrenceCountsBySong(),
-    getPendingRequestCount(isSuper),
-  ]);
+  ) as Promise<SongDetail[]>;
+  const [songs, statuses, occurrenceCounts, pendingRequests] =
+    await Promise.all([
+      songsPromise,
+      getPublishStatuses(songsPromise),
+      getOccurrenceCountsBySong(),
+      getPendingRequestCount(isSuper),
+    ]);
 
   const missingGroups = songs.map(getMissingGroups);
   const missingLinks = songs.map(getMissingLinks);

@@ -94,7 +94,14 @@ export const POST = withAuth(
       );
     }
 
-    const supabase = await createSupabaseServerClient();
+    // 写走 service 连接：库里不给 authenticated 插入 user_requests
+    const supabase = getServiceClient();
+    if (!supabase) {
+      return serverErrorResponse(
+        "POST /api/public/requests",
+        new Error("Supabase service client unavailable"),
+      );
+    }
 
     // 防止重复提交：同类型 pending 状态下只允许一条（benefit_apply / admin_apply）
     if (type === "benefit_apply" || type === "admin_apply") {

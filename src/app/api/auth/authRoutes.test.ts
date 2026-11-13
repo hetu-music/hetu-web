@@ -85,6 +85,21 @@ vi.mock("@/lib/db/supabase-auth", () => ({
   verifyPassword: vi.fn(async () => mockVerifyPasswordError),
 }));
 
+// 改资料走 service 连接（库里不给 authenticated 写 users）
+vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/db/supabase-server")>();
+  return {
+    ...actual,
+    getServiceClient: vi.fn(() => ({
+      from: vi.fn(() => {
+        lastBuilder = makeQueryBuilder({ data: null, error: mockUpdateError });
+        return lastBuilder;
+      }),
+    })),
+  };
+});
+
 // 清缓存要 Next 的运行时，测试里只记下有没有调
 const refreshContributorsMock = vi.hoisted(() =>
   vi.fn(async () => ({ failed: [] as string[] })),

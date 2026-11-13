@@ -15,6 +15,13 @@ vi.mock("@/lib/db/supabase-auth", () => ({
   })),
 }));
 
+// 写走 service 连接；读写函数都换成假的，连接本身用不到
+vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/db/supabase-server")>();
+  return { ...actual, getServiceClient: vi.fn(() => ({})) };
+});
+
 vi.mock("@/lib/server/server-utils", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/server/server-utils")>();

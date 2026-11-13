@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { getServiceClient } from "@/lib/db/supabase-server";
 import {
   CommentError,
   commentIdFromUrl,
@@ -17,8 +17,15 @@ async function handle(
 ) {
   const id = commentIdFromUrl(request);
   if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  // 走 service 连接：库里不给 authenticated 写 comment_likes，能不能赞在 likeComment 里查
+  const supabase = getServiceClient();
+  if (!supabase) {
+    return serverErrorResponse(
+      scope,
+      new Error("Supabase service client unavailable"),
+    );
+  }
   try {
-    const supabase = await createSupabaseServerClient();
     await action(supabase, user.id, id);
     return NextResponse.json({ success: true });
   } catch (error) {

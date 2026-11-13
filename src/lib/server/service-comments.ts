@@ -478,14 +478,23 @@ export async function likeComment(
   userId: string,
   id: number,
 ): Promise<void> {
+  // 用 service 连接写，不经 RLS：私批、待审、已删或不存在的批注不能赞，在这里查
+  const { data: target, error: findError } = await supabase
+    .from(TABLES.COMMENTS)
+    .select("id")
+    .eq("id", id)
+    .eq("status", STATUS.NORMAL)
+    .eq("visibility", VISIBILITY.PUBLIC)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (!target) throw new CommentError("批注不存在", 404);
+
   const { error } = await supabase
     .from(TABLES.COMMENT_LIKES)
     .insert({ comment_id: id, user_id: userId });
   if (!error || error.code === "23505") return; // 已赞过，视为成功
-  // 42501 RLS 拒绝：私批、已删或不存在的批注不能赞
-  if (error.code === "42501" || error.code === "23503") {
-    throw new CommentError("批注不存在", 404);
-  }
+  // 23503 查过之后批注刚好被删
+  if (error.code === "23503") throw new CommentError("批注不存在", 404);
   throw error;
 }
 

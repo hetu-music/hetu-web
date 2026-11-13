@@ -60,13 +60,13 @@ describe("getSongEmotions", () => {
 });
 
 describe("setSongEmotions", () => {
-  const published = () => makeQueryBuilder({ data: { id: 1 }, error: null });
+  const songExists = () => makeQueryBuilder({ data: { id: 1 }, error: null });
 
   it("整首替换：先删旧的，再按顺序写入 rank", async () => {
     const deleteBuilder = makeQueryBuilder({ data: null, error: null });
     const insertBuilder = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([published(), deleteBuilder, insertBuilder]),
+      createMockSupabaseClient([songExists(), deleteBuilder, insertBuilder]),
     );
     expect(await setSongEmotions(1, [6, 7], "token")).toEqual([6, 7]);
     expect(deleteBuilder.eq).toHaveBeenCalledWith("song_id", 1);
@@ -78,7 +78,7 @@ describe("setSongEmotions", () => {
 
   it("空数组只清空，不写入", async () => {
     const client = createMockSupabaseClient([
-      published(),
+      songExists(),
       makeQueryBuilder({ data: null, error: null }),
     ]);
     vi.mocked(getUserClient).mockReturnValue(client);
@@ -96,19 +96,21 @@ describe("setSongEmotions", () => {
     expect(getUserClient).not.toHaveBeenCalled();
   });
 
-  it("歌曲未发布时拒绝", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([makeQueryBuilder({ data: null, error: null })]),
-    );
+  it("歌曲不存在时拒绝；查的是暂存表，未发布的歌也能标", async () => {
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: null, error: null }),
+    ]);
+    vi.mocked(getUserClient).mockReturnValue(client);
     await expect(setSongEmotions(1, [6], "token")).rejects.toMatchObject({
-      code: "SONG_NOT_PUBLISHED",
+      code: "SONG_NOT_FOUND",
     });
+    expect(client.from).toHaveBeenCalledWith("temp");
   });
 
   it("词表里没有的基调（外键失败）报可读的错误", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        published(),
+        songExists(),
         makeQueryBuilder({ data: null, error: null }),
         makeQueryBuilder({ data: null, error: { code: "23503" } }),
       ]),

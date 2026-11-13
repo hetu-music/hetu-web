@@ -133,9 +133,9 @@ export async function createCollation(
     .insert({ song_id: songId, ...row })
     .select("id")
     .single();
-  // 外键失败：歌不在正式曲库
+  // 外键失败：歌不在暂存表（校记、补遗挂在暂存表上，未发布的歌也能录，见 docs/SONGS.md）
   if (error?.code === "23503") {
-    throw new CollationError("歌曲尚未发布，发布后才能录入", 400);
+    throw new CollationError("歌曲不存在", 404);
   }
   if (error) throw error;
   return (data as { id: number }).id;

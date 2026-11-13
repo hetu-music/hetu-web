@@ -23,7 +23,7 @@ export const POST = withAuth(
       const suggestion = await suggestSongEmotions(input.song_id);
       if (!suggestion) {
         return NextResponse.json(
-          { error: "歌曲尚未发布或没有歌词" },
+          { error: "歌曲不存在或没有歌词" },
           { status: 404 },
         );
       }

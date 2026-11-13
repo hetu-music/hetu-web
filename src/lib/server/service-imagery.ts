@@ -23,8 +23,13 @@ export type OccurrenceWithSong = {
 
 // ─── helper ───────────────────────────────────────────────────────────────────
 
-function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceWithSong {
-  const music = row.music as { title?: string; album?: string } | null;
+type SongTitle = { title: string; album: string | null };
+
+function mapOccurrenceRow(
+  row: Record<string, unknown>,
+  songs: ReadonlyMap<number, SongTitle>,
+): OccurrenceWithSong {
+  const song = songs.get(row.song_id as number);
   const imagery = row.imagery as { name?: string } | null;
   const imageryCategories = row.imagery_categories as { name?: string } | null;
   return {
@@ -33,12 +38,43 @@ function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceWithSong {
     imagery_id: row.imagery_id as number,
     category_id: row.category_id as number,
     lyric_timetag: (row.lyric_timetag as string[]) ?? [],
-    song_title: music?.title ?? "",
-    song_album: music?.album ?? null,
+    song_title: song?.title ?? "",
+    song_album: song?.album ?? null,
     imagery_name: imagery?.name,
     category_name: imageryCategories?.name,
   };
 }
+
+/**
+ * 标注所在歌曲的歌名与专辑，从暂存表取：标注挂在暂存表上，未发布的歌也有（见 docs/SONGS.md）。
+ * 不用 PostgREST 的外键关联（`temp(title)`）——那要求外键恰好指向那张表，单独查一次不受影响。
+ */
+async function songTitlesOf(
+  supabase: NonNullable<ReturnType<typeof getServiceClient>>,
+  rows: ReadonlyArray<Record<string, unknown>>,
+): Promise<Map<number, SongTitle>> {
+  const ids = [...new Set(rows.map((r) => r.song_id as number))];
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from(TABLES.ADMIN)
+    .select("id,title,album")
+    .in("id", ids);
+  if (error) throw error;
+  return new Map(
+    ((data ?? []) as Array<SongTitle & { id: number }>).map((r) => [r.id, r]),
+  );
+}
+
+/** 标注行连同歌名、词名、母题名 */
+async function withRelations(
+  supabase: NonNullable<ReturnType<typeof getServiceClient>>,
+  rows: ReadonlyArray<Record<string, unknown>>,
+): Promise<OccurrenceWithSong[]> {
+  const songs = await songTitlesOf(supabase, rows);
+  return rows.map((row) => mapOccurrenceRow(row, songs));
+}
+
+const OCCURRENCE_RELATIONS = "*, imagery(name), imagery_categories(name)";
 
 // ─── read functions ───────────────────────────────────────────────────────────
 
@@ -111,13 +147,16 @@ export async function getOccurrencesForImagery(
   try {
     const { data, error } = await supabase
       .from(TABLES.IMAGERY_OCC)
-      .select("*, music(title, album), imagery(name), imagery_categories(name)")
+      .select(OCCURRENCE_RELATIONS)
       .eq("imagery_id", imageryId);
     if (error) {
       console.error("[getOccurrencesForImagery]", error);
       return [];
     }
-    return ((data ?? []) as Record<string, unknown>[]).map(mapOccurrenceRow);
+    return await withRelations(
+      supabase,
+      (data ?? []) as Record<string, unknown>[],
+    );
   } catch (e) {
     console.error("[getOccurrencesForImagery]", e);
     return [];
@@ -132,13 +171,16 @@ export async function getOccurrencesForSong(
   try {
     const { data, error } = await supabase
       .from(TABLES.IMAGERY_OCC)
-      .select("*, music(title, album), imagery(name), imagery_categories(name)")
+      .select(OCCURRENCE_RELATIONS)
       .eq("song_id", songId);
     if (error) {
       console.error("[getOccurrencesForSong]", error);
       return [];
     }
-    return ((data ?? []) as Record<string, unknown>[]).map(mapOccurrenceRow);
+    return await withRelations(
+      supabase,
+      (data ?? []) as Record<string, unknown>[],
+    );
   } catch (e) {
     console.error("[getOccurrencesForSong]", e);
     return [];
@@ -330,11 +372,14 @@ async function getOccurrenceWithRelationsById(id: number, accessToken: string) {
   if (!supabase) throw new Error("Supabase client unavailable");
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_OCC)
-    .select("*, music(title, album), imagery(name), imagery_categories(name)")
+    .select(OCCURRENCE_RELATIONS)
     .eq("id", id)
     .single();
   if (error) throw error;
-  return mapOccurrenceRow(data as Record<string, unknown>);
+  const [occurrence] = await withRelations(supabase, [
+    data as Record<string, unknown>,
+  ]);
+  return occurrence;
 }
 
 // ─── 整理：删掉没有标注的母题 ─────────────────────────────────────────────────
@@ -622,7 +667,7 @@ async function loadSongWords(
   songId: number,
 ): Promise<SongWords> {
   const [song, occurrences] = await Promise.all([
-    supabase.from(TABLES.MUSIC).select("lyrics").eq("id", songId).maybeSingle(),
+    supabase.from(TABLES.ADMIN).select("lyrics").eq("id", songId).maybeSingle(),
     supabase
       .from(TABLES.IMAGERY_OCC)
       .select("id,imagery_id,category_id,lyric_timetag,imagery(name)")
@@ -711,7 +756,8 @@ export type TimetagSyncResult = { motifIds: number[]; notFound: string[] };
 
 /**
  * 歌词发布到正式表后调用：按新歌词重算这首歌全部标注的时间标签。
- * 标注只挂在正式表的歌上，暂存表里改歌词不影响，所以在发布而不是暂存时同步。
+ * 标注按暂存表的歌词算（见 docs/SONGS.md），但只在发布时整首重算、暂存时不算：
+ * 已发布的歌，线上显示的还是旧歌词，暂存时就重算会让线上的标签先对不齐。
  */
 export async function resyncSongTimetags(
   songId: number,
@@ -730,15 +776,13 @@ export type OccurrenceBatchItem = {
   category_id: number;
 } & ({ imagery_id: number } | { imagery_name: string });
 
-function songNotPublished() {
-  return Object.assign(new Error("歌曲尚未发布，发布后才能保存意象标注"), {
-    code: "SONG_NOT_PUBLISHED",
-  });
+function songNotFound() {
+  return Object.assign(new Error("歌曲不存在"), { code: "SONG_NOT_FOUND" });
 }
 
 /**
  * 词名 → id：词典里有同名的直接用，没有的创建。
- * 调用前要先确认歌曲已发布、词都在歌词里，免得留下没有标注的词。
+ * 调用前要先确认歌曲存在、词都在歌词里，免得留下没有标注的词。
  */
 async function resolveImageryNames(
   supabase: UserClient,
@@ -790,13 +834,14 @@ export async function createOccurrencesBatch(
     items.map((i) => i.category_id),
   );
 
+  // 标注挂在暂存表上，未发布的歌也能标（见 docs/SONGS.md）
   const { data: song, error: songError } = await supabase
-    .from(TABLES.MUSIC)
+    .from(TABLES.ADMIN)
     .select("id")
     .eq("id", songId)
     .maybeSingle();
   if (songError) throw songError;
-  if (!song) throw songNotPublished();
+  if (!song) throw songNotFound();
   await assertInLyrics(supabase, songId, items);
 
   const { idByName, created: newImagery } = await resolveImageryNames(
@@ -844,9 +889,9 @@ export async function createOccurrencesBatch(
 
   const { error } = await supabase.from(TABLES.IMAGERY_OCC).insert(rows);
   if (error) {
-    // 上面已确认歌曲存在；这里兜底发布状态在两次请求之间变化的情况
+    // 上面已确认歌曲存在；这里兜底歌在两次请求之间被删的情况
     if (error.code === "23503" && error.message.includes("song_id")) {
-      throw songNotPublished();
+      throw songNotFound();
     }
     throw error;
   }

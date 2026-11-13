@@ -31,7 +31,7 @@ const SetSongEmotionsSchema = z.object({
 
 const ERROR_STATUS: Record<SongEmotionErrorCode, number> = {
   INVALID_EMOTIONS: 400,
-  SONG_NOT_PUBLISHED: 400,
+  SONG_NOT_FOUND: 404,
 };
 
 /** 词表、一首歌已标的基调及其来源：GET /api/admin/song-emotions?song_id= */

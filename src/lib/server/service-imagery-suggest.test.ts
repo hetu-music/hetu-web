@@ -45,22 +45,22 @@ function mockUserSong(data: unknown) {
 }
 
 /**
- * getImagerySuggestions 的 fetchAll 按 imagery → occurrences → music → motifs 的顺序调用 .from()；
+ * getImagerySuggestions 的 fetchAll 按 imagery → occurrences → songs（暂存表）→ motifs 的顺序调用 .from()；
  * 校验（review）只取分类，放在第一个
  */
 function mockServiceTables(tables: {
   imagery?: unknown[];
   occurrences?: unknown[];
-  music?: unknown[];
+  songs?: unknown[];
   motifs?: unknown[];
 }) {
-  vi.mocked(getServiceClient).mockReturnValue(
-    createMockSupabaseClient(
-      [tables.imagery, tables.occurrences, tables.music, tables.motifs]
-        .filter((rows) => rows !== undefined)
-        .map((rows) => makeQueryBuilder({ data: rows, error: null })),
-    ),
+  const client = createMockSupabaseClient(
+    [tables.imagery, tables.occurrences, tables.songs, tables.motifs]
+      .filter((rows) => rows !== undefined)
+      .map((rows) => makeQueryBuilder({ data: rows, error: null })),
   );
+  vi.mocked(getServiceClient).mockReturnValue(client);
+  return client;
 }
 
 beforeEach(() => {
@@ -78,13 +78,13 @@ describe("getImagerySuggestions", () => {
 
   it("用其他歌的标注作先验生成候选，并排除该歌已标注的意象", async () => {
     mockUserSong({ id: 5, lyrics });
-    mockServiceTables({
+    const service = mockServiceTables({
       imagery: dictionary,
       occurrences: [
         { song_id: 7, imagery_id: 1, category_id: 10 },
         { song_id: 5, imagery_id: 2, category_id: 11 },
       ],
-      music: [
+      songs: [
         { id: 5, lyrics },
         { id: 7, lyrics: "[00:01.00]明月与人" },
       ],
@@ -92,11 +92,9 @@ describe("getImagerySuggestions", () => {
     });
 
     const result = await getImagerySuggestions(5, "token");
-    expect(result).toMatchObject({
-      published: true,
-      hasLyrics: true,
-      llmEnabled: true,
-    });
+    expect(result).toMatchObject({ hasLyrics: true, llmEnabled: true });
+    // 先验的歌词与标注同源：取暂存表（标注挂在暂存表上，未发布的歌也有）
+    expect(service.from.mock.calls[2][0]).toBe("temp");
     // 词典与母题不随结果返回，审核时用后台共用的那一份
     expect(result).not.toHaveProperty("dictionary");
     expect(result).not.toHaveProperty("categories");
@@ -111,16 +109,15 @@ describe("getImagerySuggestions", () => {
     expect(byName.get("人")).toMatchObject({ recommended: false, rate: 0 });
   });
 
-  it("歌曲只在暂存表中时标记为未发布", async () => {
+  it("没有歌词时不出候选", async () => {
     mockUserSong({ id: 5, lyrics: null });
     mockServiceTables({
       imagery: dictionary,
       occurrences: [],
-      music: [],
+      songs: [],
       motifs: [],
     });
     expect(await getImagerySuggestions(5, "token")).toMatchObject({
-      published: false,
       hasLyrics: false,
       suggestions: [],
     });
@@ -131,7 +128,7 @@ describe("getImagerySuggestions", () => {
     mockServiceTables({
       imagery: [],
       occurrences: [],
-      music: [],
+      songs: [],
       motifs: [],
     });
     await expect(getImagerySuggestions(5, "token")).rejects.toThrow(

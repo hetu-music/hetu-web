@@ -68,7 +68,8 @@ export async function getSongEmotions(songId: number): Promise<SongEmotions> {
 
 /**
  * 请模型为一首歌标基调，只返回建议、不写库。
- * 歌不在正式曲库或没有歌词时返回 null。
+ * 歌词取暂存表（基调挂在暂存表上，未发布的歌也能标，见 docs/SONGS.md）。
+ * 歌不存在或没有歌词时返回 null。
  */
 export async function suggestSongEmotions(
   songId: number,
@@ -76,7 +77,7 @@ export async function suggestSongEmotions(
   const supabase = getServiceClient();
   if (!supabase) throw new Error("Supabase client unavailable");
   const { data: song, error } = await supabase
-    .from(TABLES.MUSIC)
+    .from(TABLES.ADMIN)
     .select("title,lyrics")
     .eq("id", songId)
     .maybeSingle();
@@ -93,7 +94,7 @@ export async function suggestSongEmotions(
   return parseEmotionOutput(raw, emotions);
 }
 
-export type SongEmotionErrorCode = "INVALID_EMOTIONS" | "SONG_NOT_PUBLISHED";
+export type SongEmotionErrorCode = "INVALID_EMOTIONS" | "SONG_NOT_FOUND";
 
 function emotionError(code: SongEmotionErrorCode, message: string) {
   return Object.assign(new Error(message), { code });
@@ -102,7 +103,7 @@ function emotionError(code: SongEmotionErrorCode, message: string) {
 /**
  * 整首替换一首歌的基调：emotionIds 按主、副顺序排列，空数组表示清空。
  * 后台保存即视为人已确认，来源记为 human（原样保存 AI 预标也是确认）。
- * 基调挂在正式曲库的歌上，未发布的歌不能标。
+ * 基调挂在暂存表的歌上，未发布的歌也能标。
  */
 export async function setSongEmotions(
   songId: number,
@@ -122,14 +123,12 @@ export async function setSongEmotions(
   if (!supabase) throw new Error("Supabase client unavailable");
 
   const { data: song, error: songError } = await supabase
-    .from(TABLES.MUSIC)
+    .from(TABLES.ADMIN)
     .select("id")
     .eq("id", songId)
     .maybeSingle();
   if (songError) throw songError;
-  if (!song) {
-    throw emotionError("SONG_NOT_PUBLISHED", "歌曲尚未发布，发布后才能标基调");
-  }
+  if (!song) throw emotionError("SONG_NOT_FOUND", "歌曲不存在");
 
   const { error: deleteError } = await supabase
     .from(TABLES.SONG_EMOTIONS)

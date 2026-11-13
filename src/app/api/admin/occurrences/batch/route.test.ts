@@ -136,15 +136,13 @@ describe("POST /api/admin/occurrences/batch", () => {
     expect(createOccurrencesBatch).not.toHaveBeenCalled();
   });
 
-  it("歌曲未发布时返回 400 和可读的错误信息", async () => {
+  it("歌曲不存在时返回 404", async () => {
     vi.mocked(createOccurrencesBatch).mockRejectedValue(
-      Object.assign(new Error("歌曲尚未发布，发布后才能保存意象标注"), {
-        code: "SONG_NOT_PUBLISHED",
-      }),
+      Object.assign(new Error("歌曲不存在"), { code: "SONG_NOT_FOUND" }),
     );
     const res = await POST(post({ song_id: 5, items: [validItem] }));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toContain("尚未发布");
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe("歌曲不存在");
   });
 
   it("词不在歌词里时返回 400 和可读的错误信息", async () => {

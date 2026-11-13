@@ -1,0 +1,90 @@
+# 歌曲数据：暂存表与正式表
+
+歌曲存在两张表里。哪段代码读哪张、写哪张、别的数据挂在哪张上，按本文的规则来。
+新增或改动碰到 `temp` / `music` 的代码前先读这里。
+
+## 两张表各是什么
+
+|        | 暂存表 `temp`（`TABLES.ADMIN`）                                | 正式表 `music`（`TABLES.MUSIC`）       |
+| ------ | -------------------------------------------------------------- | -------------------------------------- |
+| 是什么 | 全部歌曲的**工作版本**，含未发布的歌。歌曲的身份（id）以它为准 | 已发布歌曲的**快照**                   |
+| 谁写   | 后台（管理员 JWT + RLS），含机器人账号                         | 只有发布（`approve_music_sync`）与下架 |
+| 谁读   | 后台                                                           | 公开端；后台只在下面第 3 条列的场合读  |
+
+「暂存」指后台的工作版本，不是临时数据：歌删了才会从暂存表里消失。
+
+`music_catalog` 是正式表上的视图，排除了 `dispute_note` 非空的歌。统计、推荐、寻曲、意象索引这类
+「以曲库为整体」的功能读它；单曲页、收藏这类「指名一首歌」的读 `music`。
+
+正式表独有 `has_audio`：由 `navid_song` 上的触发器维护，发布时不覆盖。
+
+## 规则
+
+1. **正式表只经发布与下架写入。** 应用代码不对 `music` 做 insert / update / delete；
+   唯一的例外是 `has_audio`（触发器维护）。发布是暂存表改动上线的唯一途径，没有定时同步。
+
+2. **公开端只读正式表。** `(public)` 下的页面、`/api/public/*`、sitemap、公开的缓存数据
+   一律读 `music` / `music_catalog`，从不读 `temp`。
+
+3. **后台读写歌曲内容一律用暂存表。** 后台读正式表只为三件事：
+   - 比对发布状态与改动（`service-admin` 的 `getPublishStatuses`、`getPublishedSongRaw`）；
+   - 算出哪些公开页面要刷新（如 `getPublishedSongIdsCreditedAs`）；
+   - 显示线上的样子。
+
+   不拿正式表判断「这首歌能不能编辑、能不能标注」——没发布的歌也能编辑和标注。
+
+4. **挂在歌上的数据按归属分两类：**
+
+   |          | 编校数据                                                                           | 读者与发布数据                              |
+   | -------- | ---------------------------------------------------------------------------------- | ------------------------------------------- |
+   | 包括     | 意象标注 `imagery_occurrences`、基调 `song_emotions`、校记与补遗 `song_collations` | 评论、收藏、用户请求、音频映射 `navid_song` |
+   | 外键指向 | `temp(id)`                                                                         | `music(id)`                                 |
+   | 何时能写 | 随时，发布与否都行                                                                 | 歌发布以后                                  |
+   | 歌词基准 | 暂存表的歌词（候选、校验、时间标签都按它）                                         | —                                           |
+
+   新加挂在歌上的表，先判断属于哪一类再定外键。
+
+5. **公开端读编校数据必须经正式表把关。** 编校数据里有未发布歌的条目：
+   - 按单曲读的（单曲页、单曲接口），入口先确认歌在正式表，不在就 404；
+   - 汇总类查询（意象云、母题页、寻曲、统计、gallery）必须用 `music` / `music_catalog` 过滤 `song_id`，
+     参照 `service-imagery-cloud.ts` 里的 `catalog.has(occ.song_id)`。
+
+6. **发布 = 整行复制 + 重算时间标签 + 刷新缓存**，三步都在 `handleApprove`（`src/app/actions/admin-actions.ts`）。
+   编校数据不经发布，保存后即刷新相关的公开页面；歌还没发布时刷新也无害。
+
+7. **服务端的写法：**
+   - 读写暂存表与编校数据用 `getUserClient(accessToken)`，token 取 `withAuth` 交给 handler 的
+     第三个参数，不要自己 `getSession()`（只带 `Authorization` 头的请求没有 cookie 会话）。
+   - 公开端读正式表用 `getServiceClient()`。
+   - 新代码按用途调函数，不要再往 `getSongs` / `getSongById` 的 `table` 参数里传表名（见待改）。
+
+8. **离线脚本：** 评估、统计类脚本（`scripts/*-eval.ts`、`quiz-*.ts`）衡量的是线上曲库，读正式表；
+   检查编校数据与歌词是否一致的脚本（`imagery-check.ts`、`imagery-llm-check.ts`）读暂存表。
+
+## 已知的取舍
+
+已发布的歌改了歌词、还没发布的这段时间，编校数据按新歌词算，线上显示的仍是旧歌词，时间标签
+可能对不齐，发布后恢复。后台的发布状态会标出「有改动」，改完歌词应尽快发布。
+
+## 现状与待改
+
+改完一项删一项。
+
+**发布流程**
+
+- [ ] 停掉每日同步：`cron.unschedule('Update music')`，删 `sync_music_from_temp`（停之前先比对两表，确认一致）
+- [ ] 下架：从正式表删除一首歌（评论、收藏随之级联，需二次确认）；暂存表删歌前要求先下架
+- [ ] 停掉同步后核对待发布列表：曲目页的「待发布」筛选与总览的「待发布的歌曲」已经按暂存表与正式表比对，
+      确认它们在没有每日同步时仍然准确
+
+**写法**
+
+- [ ] `service-songs.ts`：`getSongs` / `getSongById` 按 `table` 与有无 token 组合切换行为，拆成公开与后台两组函数；
+      `createSong` / `updateSong` 去掉 `table` 参数
+- [ ] `service-auth-gallery.ts`：自己按 `dispute_note` 过滤正式表，注释说视图缺 `lyrics_start`，
+      但视图现在已有这一列，改读 `music_catalog`
+
+**权限（纵深防御，RLS 已经拦住）**
+
+- [ ] `music`、`music_catalog` 收回 anon / authenticated 的 INSERT、UPDATE、DELETE
+- [ ] `temp` 收回 anon 的全部权限

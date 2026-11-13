@@ -58,7 +58,8 @@ async function main() {
       ["id"],
     ),
     fetchAll<{ id: number; title: string; lyrics: string | null }>(
-      "music",
+      // 标注按暂存表的歌词标（docs/SONGS.md），未发布的歌也有标注
+      "temp",
       "id,title,lyrics",
       ["id"],
     ),

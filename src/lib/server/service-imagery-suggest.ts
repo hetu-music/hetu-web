@@ -23,8 +23,6 @@ import {
 import { chatJson, isLlmConfigured, LlmError } from "@/lib/server/llm";
 
 export interface ImagerySuggestionsResult {
-  /** 歌曲是否已发布到正式曲库；未发布时标注无法保存 */
-  published: boolean;
   hasLyrics: boolean;
   /** 词典与母题不随结果返回：审核时用后台共用的那一份（含各词登记的母题） */
   suggestions: ImagerySuggestion[];
@@ -40,7 +38,7 @@ type CategoryRow = {
 
 /**
  * 为一首歌生成意象标注候选。歌词取自暂存表（管理员正在编辑的版本），
- * 历史先验取自正式曲库的全部已有标注。
+ * 历史先验取自全部已有标注，连同它们所在歌曲在暂存表里的歌词（标注按暂存表的歌词标，见 docs/SONGS.md）。
  *
  * 不做跨请求缓存：这是管理员手动触发的低频操作，而刚保存的标注应立即影响下一首歌的候选。
  * 全表读取约 7 千条标注和数百首歌词（共约 0.8MB），耗时主要是 fetchAll 的分页往返
@@ -73,7 +71,7 @@ export async function getImagerySuggestions(
     ),
     fetchAll<{ id: number; lyrics: string | null }>(
       service,
-      TABLES.MUSIC,
+      TABLES.ADMIN,
       "id,lyrics",
     ),
     fetchAll<MotifEntry>(
@@ -98,7 +96,6 @@ export async function getImagerySuggestions(
   );
 
   return {
-    published: songs.some((s) => s.id === songId),
     hasLyrics: Boolean(lyrics?.trim()),
     suggestions: suggestImagery({
       lyrics,

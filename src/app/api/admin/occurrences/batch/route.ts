@@ -63,11 +63,12 @@ export const POST = withAuth(
       return withPurgeStatus(NextResponse.json(result), purge);
     } catch (e) {
       const code = (e as { code?: string }).code;
+      if (e instanceof Error && code === "SONG_NOT_FOUND") {
+        return NextResponse.json({ error: e.message }, { status: 404 });
+      }
       if (
         e instanceof Error &&
-        (code === "NOT_MOTIF" ||
-          code === "SONG_NOT_PUBLISHED" ||
-          code === "IMAGERY_NOT_IN_LYRICS")
+        (code === "NOT_MOTIF" || code === "IMAGERY_NOT_IN_LYRICS")
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

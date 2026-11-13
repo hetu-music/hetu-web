@@ -107,27 +107,36 @@ describe("getImageryWithCounts", () => {
 });
 
 describe("getOccurrencesForImagery（数据行映射）", () => {
-  it("嵌套的 music/imagery/category 关联被拍平为 OccurrenceWithSong", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: [
-            {
-              id: 1,
-              song_id: 10,
-              imagery_id: 20,
-              category_id: 30,
-              lyric_timetag: ["01:00"],
-              music: { title: "标题", album: "专辑" },
-              imagery: { name: "明月" },
-              imagery_categories: { name: "自然" },
-            },
-          ],
-          error: null,
-        }),
-      ]),
-    );
+  it("歌名从暂存表单独查，与词、母题关联一起拍平为 OccurrenceWithSong", async () => {
+    const titles = makeQueryBuilder({
+      data: [{ id: 10, title: "标题", album: "专辑" }],
+      error: null,
+    });
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({
+        data: [
+          {
+            id: 1,
+            song_id: 10,
+            imagery_id: 20,
+            category_id: 30,
+            lyric_timetag: ["01:00"],
+            imagery: { name: "明月" },
+            imagery_categories: { name: "自然" },
+          },
+        ],
+        error: null,
+      }),
+      titles,
+    ]);
+    vi.mocked(getServiceClient).mockReturnValue(client);
     const result = await getOccurrencesForImagery(20);
+    // 未发布的歌也有标注，歌名只能从暂存表取
+    expect(client.from.mock.calls.map((c: unknown[]) => c[0])).toEqual([
+      "imagery_occurrences",
+      "temp",
+    ]);
+    expect(titles.in).toHaveBeenCalledWith("id", [10]);
     expect(result[0]).toMatchObject({
       id: 1,
       song_title: "标题",
@@ -304,7 +313,7 @@ describe("createOccurrencesBatch", () => {
       data: [10, 11, 12, 20].map((id) => ({ id, level: 3 })),
       error: null,
     });
-  const published = () => makeQueryBuilder({ data: { id: 5 }, error: null });
+  const songExists = () => makeQueryBuilder({ data: { id: 5 }, error: null });
   // 歌词没有时间轴：不拦、不重算，测的是其余逻辑。依次是歌词、已有标注、按 id 查的词名
   const lyricsCheck = (byId = true) => [
     makeQueryBuilder({ data: { lyrics: null }, error: null }),
@@ -321,7 +330,7 @@ describe("createOccurrencesBatch", () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         motifOk(),
-        published(),
+        songExists(),
         ...lyricsCheck(),
         makeQueryBuilder({ data: [{ imagery_id: 1 }], error: null }), // 已有标注
         motifs([{ imagery_id: 2, category_id: 10, role: "primary" }]),
@@ -350,7 +359,7 @@ describe("createOccurrencesBatch", () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         motifOk(),
-        published(),
+        songExists(),
         ...lyricsCheck(),
         makeQueryBuilder({ data: [{ id: 3, name: "月" }], error: null }), // 按名查找
         createBuilder,
@@ -405,10 +414,10 @@ describe("createOccurrencesBatch", () => {
     ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 
-  it("歌曲未发布时在创建意象之前就拒绝", async () => {
+  it("歌曲不存在时在创建意象之前就拒绝；查的是暂存表，未发布的歌也能标", async () => {
     const client = createMockSupabaseClient([
       motifOk(),
-      makeQueryBuilder({ data: null, error: null }), // 正式曲库中没有
+      makeQueryBuilder({ data: null, error: null }), // 暂存表中没有
     ]);
     vi.mocked(getUserClient).mockReturnValue(client);
     await expect(
@@ -417,14 +426,15 @@ describe("createOccurrencesBatch", () => {
         [{ imagery_name: "孤灯", category_id: 10 }],
         "token",
       ),
-    ).rejects.toMatchObject({ code: "SONG_NOT_PUBLISHED" });
+    ).rejects.toMatchObject({ code: "SONG_NOT_FOUND" });
     expect(client.from).toHaveBeenCalledTimes(2);
+    expect(client.from.mock.calls[1][0]).toBe("temp");
   });
 
   it("词不在歌词里时在创建意象之前就拒绝", async () => {
     const client = createMockSupabaseClient([
       motifOk(),
-      published(),
+      songExists(),
       makeQueryBuilder({ data: { lyrics: "[00:01.00]明月" }, error: null }),
       makeQueryBuilder({ data: [], error: null }),
     ]);
@@ -448,7 +458,7 @@ describe("createOccurrencesBatch", () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         motifOk(),
-        published(),
+        songExists(),
         ...lyricsCheck(),
         noExisting(),
         motifs([
@@ -475,11 +485,11 @@ describe("createOccurrencesBatch", () => {
     ]);
   });
 
-  it("插入时 song_id 外键失败也提示先发布歌曲", async () => {
+  it("插入时 song_id 外键失败（歌在两次请求之间被删）提示歌曲不存在", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         motifOk(),
-        published(),
+        songExists(),
         ...lyricsCheck(),
         noExisting(),
         motifs([
@@ -498,7 +508,7 @@ describe("createOccurrencesBatch", () => {
     );
     await expect(
       createOccurrencesBatch(5, items, "token"),
-    ).rejects.toMatchObject({ code: "SONG_NOT_PUBLISHED" });
+    ).rejects.toMatchObject({ code: "SONG_NOT_FOUND" });
   });
 
   it("空列表直接返回，不访问数据库", async () => {
@@ -512,6 +522,8 @@ describe("createOccurrencesBatch", () => {
 });
 
 describe("updateOccurrence / deleteOccurrence", () => {
+  // 返回标注时单独查歌名（暂存表）
+  const noTitles = () => makeQueryBuilder({ data: [], error: null });
   const relations = () =>
     makeQueryBuilder({
       data: {
@@ -520,7 +532,6 @@ describe("updateOccurrence / deleteOccurrence", () => {
         imagery_id: 2,
         category_id: 20,
         lyric_timetag: [],
-        music: null,
         imagery: null,
         imagery_categories: null,
       },
@@ -572,6 +583,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
         }), // 补写「同时算进」：这个词没有
         ...noTimeline(),
         relations(),
+        noTitles(),
       ]),
     );
     await updateOccurrence(1, { category_id: 20 }, "token");
@@ -608,10 +620,12 @@ describe("updateOccurrence / deleteOccurrence", () => {
       }),
       ...noTimeline(),
       relations(),
+      noTitles(),
     ]);
     vi.mocked(getUserClient).mockReturnValue(client);
     await updateOccurrence(1, { category_id: 20 }, "token");
-    expect(client.from).toHaveBeenCalledTimes(12);
+    // 最后一次是返回标注时查歌名
+    expect(client.from).toHaveBeenCalledTimes(13);
   });
 
   it("改挂到词的「通常算作」上时，补写它「同时算进」的各条", async () => {
@@ -647,6 +661,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
         parts,
         ...noTimeline(),
         relations(),
+        noTitles(),
       ]),
     );
     await updateOccurrence(1, { category_id: 10 }, "token");
@@ -683,6 +698,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
         }),
         ...noTimeline(),
         relations(),
+        noTitles(),
       ]),
     );
     await updateOccurrence(1, { imagery_name: "孤灯" }, "token");

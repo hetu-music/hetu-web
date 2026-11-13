@@ -221,7 +221,7 @@ describe("createCollation", () => {
     expect(builder.insert).toHaveBeenCalledWith({ song_id: 7, ...row });
   });
 
-  it("外键失败（歌未发布）转成 400 的 CollationError", async () => {
+  it("外键失败（歌不在暂存表）转成 404 的 CollationError", async () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({ data: null, error: { code: "23503" } }),
@@ -229,7 +229,7 @@ describe("createCollation", () => {
     );
     const err = await createCollation(7, row, "tok").catch((e) => e);
     expect(err).toBeInstanceOf(CollationError);
-    expect(err.status).toBe(400);
+    expect(err.status).toBe(404);
   });
 
   it("其它数据库错误原样抛出", async () => {

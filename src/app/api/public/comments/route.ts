@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { getServiceClient } from "@/lib/db/supabase-server";
 import {
   CommentError,
   createComment,
@@ -18,9 +18,18 @@ export const POST = withAuth(
     );
     if (invalid) return invalid;
 
+    // 用 service 连接写：库里不给 authenticated 插入评论的权限。限流和内容校验
+    // 都在这个接口里，绕过接口直连 PostgREST 写不进去
+    const db = getServiceClient();
+    if (!db) {
+      return serverErrorResponse(
+        "POST /api/public/comments",
+        new Error("Supabase service client unavailable"),
+      );
+    }
+
     try {
-      const supabase = await createSupabaseServerClient();
-      const id = await createComment(supabase, user.id, input);
+      const id = await createComment(db, user.id, input);
       return NextResponse.json({ id }, { status: 201 });
     } catch (error) {
       if (error instanceof CommentError) {

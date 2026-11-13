@@ -3,6 +3,7 @@ import { z } from "zod";
 import { PRIVATE_NO_STORE } from "@/lib/server/cache-headers";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { getServiceClient } from "@/lib/db/supabase-server";
 import { parseJsonBody } from "@/lib/server/parse-body";
 import { localeFromRequest } from "@/lib/server/request-locale";
 import { serverErrorResponse } from "@/lib/server/server-utils";
@@ -64,8 +65,16 @@ export const POST = withAuth(
       return NextResponse.json({ error: "结果链接无效" }, { status: 400 });
     }
 
+    // 写走 service 连接：库里不给 authenticated 写 quiz_results
+    const supabase = getServiceClient();
+    if (!supabase) {
+      return serverErrorResponse(
+        "POST /api/public/quiz-results",
+        new Error("Supabase service client unavailable"),
+      );
+    }
+
     try {
-      const supabase = await createSupabaseServerClient();
       const id = await saveQuizRecord(supabase, user.id, answers);
       if (!id) {
         return NextResponse.json(
@@ -90,8 +99,15 @@ export const DELETE = withAuth(
     );
     if (invalid) return invalid;
 
+    const supabase = getServiceClient();
+    if (!supabase) {
+      return serverErrorResponse(
+        "DELETE /api/public/quiz-results",
+        new Error("Supabase service client unavailable"),
+      );
+    }
+
     try {
-      const supabase = await createSupabaseServerClient();
       await deleteQuizRecord(supabase, user.id, input.id);
       return NextResponse.json({ success: true });
     } catch (error) {

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getSongsByIds } from "@/lib/server/service-songs";
-import { TABLES } from "@/lib/db/supabase-server";
+import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 import { localeFromRequest } from "@/lib/server/request-locale";
 import { z } from "zod";
@@ -68,7 +69,14 @@ export const POST = withAuth(
     if (invalid) return invalid;
     const { songId } = input;
 
-    const supabase = await createSupabaseServerClient();
+    // 写走 service 连接：库里不给 authenticated 写收藏
+    const supabase = getServiceClient();
+    if (!supabase) {
+      return serverErrorResponse(
+        "POST /api/public/collections",
+        new Error("Supabase service client unavailable"),
+      );
+    }
     const { error } = await supabase.from(TABLES.COLLECTIONS).insert({
       user_id: user.id,
       song_id: songId,
@@ -98,7 +106,13 @@ export const DELETE = withAuth(
     if (invalid) return invalid;
     const { songId } = input;
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = getServiceClient();
+    if (!supabase) {
+      return serverErrorResponse(
+        "DELETE /api/public/collections",
+        new Error("Supabase service client unavailable"),
+      );
+    }
     const { error } = await supabase
       .from(TABLES.COLLECTIONS)
       .delete()

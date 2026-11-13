@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { TABLES } from "@/lib/db/supabase-server";
+import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import {
   DISPLAY_NAME_TAKEN,
   displayNameField,
@@ -35,7 +34,15 @@ export const POST = withAuth(
       update.display = data.display;
     }
 
-    const supabase = await createSupabaseServerClient();
+    // 用 service 连接写：库里不给 authenticated 改 users 的权限，哪些列能改、
+    // 谁能开「公开展示」只在这里判断，绕过接口直连 PostgREST 改不了
+    const supabase = getServiceClient();
+    if (!supabase) {
+      return serverErrorResponse(
+        "POST /api/auth/account",
+        new Error("Supabase service client unavailable"),
+      );
+    }
     const { error } = await supabase
       .from(TABLES.USERS)
       .update(update)

@@ -397,32 +397,36 @@ describe("editComment / deleteComment", () => {
 });
 
 describe("likeComment", () => {
-  it("重复点赞视为成功，赞不了的批注返回 404", async () => {
+  const found = () => makeQueryBuilder({ data: { id: 1 }, error: null });
+
+  it("只查公开、正常的批注；查不到返回 404，不写入", async () => {
+    const lookup = makeQueryBuilder({ data: null, error: null });
+    const insert = makeQueryBuilder({ data: null, error: null });
+    await expect(
+      likeComment(createMockSupabaseClient([lookup, insert]), "me", 1),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(lookup.eq).toHaveBeenCalledWith("id", 1);
+    expect(lookup.eq).toHaveBeenCalledWith("status", 0);
+    expect(lookup.eq).toHaveBeenCalledWith("visibility", 0);
+    expect(insert.insert).not.toHaveBeenCalled();
+  });
+
+  it("重复点赞视为成功", async () => {
     await expect(
       likeComment(
         createMockSupabaseClient([
+          found(),
           makeQueryBuilder({ data: null, error: { code: "23505" } }),
         ]),
         "me",
         1,
       ),
     ).resolves.toBeUndefined();
-    await expect(
-      likeComment(
-        createMockSupabaseClient([
-          makeQueryBuilder({ data: null, error: { code: "42501" } }),
-        ]),
-        "me",
-        1,
-      ),
-    ).rejects.toMatchObject({ status: 404 });
   });
-});
 
-describe("likeComment 边界", () => {
-  it("写入成功；批注不存在返回 404；其余错误原样抛出", async () => {
+  it("写入成功；查过之后批注被删返回 404；其余错误原样抛出", async () => {
     const insert = makeQueryBuilder({ data: null, error: null });
-    await likeComment(createMockSupabaseClient([insert]), "me", 3);
+    await likeComment(createMockSupabaseClient([found(), insert]), "me", 3);
     expect(insert.insert).toHaveBeenCalledWith({
       comment_id: 3,
       user_id: "me",
@@ -431,6 +435,7 @@ describe("likeComment 边界", () => {
     await expect(
       likeComment(
         createMockSupabaseClient([
+          found(),
           makeQueryBuilder({ data: null, error: { code: "23503" } }),
         ]),
         "me",
@@ -440,6 +445,7 @@ describe("likeComment 边界", () => {
 
     const err = await likeComment(
       createMockSupabaseClient([
+        found(),
         makeQueryBuilder({ data: null, error: { code: "XX000" } }),
       ]),
       "me",

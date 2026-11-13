@@ -1,8 +1,12 @@
 name: db
 
 # 数据库迁移：supabase/migrations/ 下的文件即线上表结构的全部改动来源。
-#   PR    在 runner 上起一个空库，从基线开始执行全部迁移，SQL 有错在这里就失败
+#   PR    在 runner 上起一个空库，从基线开始执行全部迁移，SQL 有错在这里就失败；
+#         再把执行完的完整结构导出成 supabase/schema.sql，有变化就提交回 PR 分支
 #   main  合并后把尚未执行的迁移推到线上（CLI 按 supabase_migrations 记录跳过已执行的）
+#
+# 新迁移：在 supabase/migrations/ 下新建 <UTC 时间戳 14 位>_<名字>.sql，时间戳要比已有的都晚。
+# 看表结构全貌读 supabase/schema.sql，它由 CI 生成，不要手改。
 
 on:
   pull_request:
@@ -20,16 +24,22 @@ permissions:
   contents: read
 
 env:
-  # 与本地 CLI 版本保持一致
   SUPABASE: pnpm dlx --allow-build=supabase supabase@3.1.0
 
 jobs:
   validate:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: db-validate-${{ github.head_ref }}
+      cancel-in-progress: true
     steps:
-      - name: Checkout repository
+      - name: Checkout PR branch
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
@@ -41,6 +51,26 @@ jobs:
 
       - name: Apply all migrations to an empty database
         run: $SUPABASE db reset
+
+      - name: Export schema snapshot
+        run: $SUPABASE db dump -f supabase/schema.sql
+
+      - name: Show snapshot diff
+        run: git diff --stat -- supabase/schema.sql; git diff -- supabase/schema.sql | head -500
+
+      # 来自 fork 的 PR 推不回去，只看上面的 diff
+      - name: Commit snapshot to PR branch
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git add supabase/schema.sql
+          if git diff --cached --quiet; then
+            echo "schema.sql is up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update supabase/schema.sql"
+          git push
 
   deploy:
     if: github.event_name != 'pull_request'

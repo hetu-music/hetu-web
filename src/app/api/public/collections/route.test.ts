@@ -10,6 +10,14 @@ let mockCsrfValid = true;
 let mockFromBuilders: any[] = [];
 let fromCallIndex = 0;
 
+// 用户连接（读）和 service 连接（写）共用一个按调用顺序出队的 from
+function mockFrom() {
+  const builder =
+    mockFromBuilders[Math.min(fromCallIndex, mockFromBuilders.length - 1)];
+  fromCallIndex += 1;
+  return builder;
+}
+
 vi.mock("@/lib/db/supabase-auth", () => ({
   createSupabaseServerClient: vi.fn(async () => ({
     auth: {
@@ -18,18 +26,21 @@ vi.mock("@/lib/db/supabase-auth", () => ({
       })),
       getUser: vi.fn(async () => ({ data: { user: mockUser } })),
     },
-    from: vi.fn(() => {
-      const builder =
-        mockFromBuilders[Math.min(fromCallIndex, mockFromBuilders.length - 1)];
-      fromCallIndex += 1;
-      return builder;
-    }),
+    from: vi.fn(mockFrom),
   })),
 }));
 
-vi.mock("@/lib/server/server-utils", () => ({
-  verifyCSRFToken: vi.fn(async () => mockCsrfValid),
-}));
+vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/db/supabase-server")>();
+  return { ...actual, getServiceClient: vi.fn(() => ({ from: mockFrom })) };
+});
+
+vi.mock("@/lib/server/server-utils", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/server/server-utils")>();
+  return { ...actual, verifyCSRFToken: vi.fn(async () => mockCsrfValid) };
+});
 
 vi.mock("@/lib/server/service-songs", () => ({
   getSongsByIds: vi.fn(async () => []),

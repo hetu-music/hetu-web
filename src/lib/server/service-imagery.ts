@@ -23,13 +23,8 @@ export type OccurrenceWithSong = {
 
 // ─── helper ───────────────────────────────────────────────────────────────────
 
-type SongTitle = { title: string; album: string | null };
-
-function mapOccurrenceRow(
-  row: Record<string, unknown>,
-  songs: ReadonlyMap<number, SongTitle>,
-): OccurrenceWithSong {
-  const song = songs.get(row.song_id as number);
+function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceWithSong {
+  const song = row.temp as { title?: string; album?: string } | null;
   const imagery = row.imagery as { name?: string } | null;
   const imageryCategories = row.imagery_categories as { name?: string } | null;
   return {
@@ -45,36 +40,9 @@ function mapOccurrenceRow(
   };
 }
 
-/**
- * 标注所在歌曲的歌名与专辑，从暂存表取：标注挂在暂存表上，未发布的歌也有（见 docs/SONGS.md）。
- * 不用 PostgREST 的外键关联（`temp(title)`）——那要求外键恰好指向那张表，单独查一次不受影响。
- */
-async function songTitlesOf(
-  supabase: NonNullable<ReturnType<typeof getServiceClient>>,
-  rows: ReadonlyArray<Record<string, unknown>>,
-): Promise<Map<number, SongTitle>> {
-  const ids = [...new Set(rows.map((r) => r.song_id as number))];
-  if (ids.length === 0) return new Map();
-  const { data, error } = await supabase
-    .from(TABLES.ADMIN)
-    .select("id,title,album")
-    .in("id", ids);
-  if (error) throw error;
-  return new Map(
-    ((data ?? []) as Array<SongTitle & { id: number }>).map((r) => [r.id, r]),
-  );
-}
-
-/** 标注行连同歌名、词名、母题名 */
-async function withRelations(
-  supabase: NonNullable<ReturnType<typeof getServiceClient>>,
-  rows: ReadonlyArray<Record<string, unknown>>,
-): Promise<OccurrenceWithSong[]> {
-  const songs = await songTitlesOf(supabase, rows);
-  return rows.map((row) => mapOccurrenceRow(row, songs));
-}
-
-const OCCURRENCE_RELATIONS = "*, imagery(name), imagery_categories(name)";
+/** 标注连同歌名、词名、母题名。歌名取暂存表：标注挂在暂存表上，未发布的歌也有（见 docs/SONGS.md） */
+const OCCURRENCE_RELATIONS =
+  "*, temp(title, album), imagery(name), imagery_categories(name)";
 
 // ─── read functions ───────────────────────────────────────────────────────────
 
@@ -153,10 +121,7 @@ export async function getOccurrencesForImagery(
       console.error("[getOccurrencesForImagery]", error);
       return [];
     }
-    return await withRelations(
-      supabase,
-      (data ?? []) as Record<string, unknown>[],
-    );
+    return ((data ?? []) as Record<string, unknown>[]).map(mapOccurrenceRow);
   } catch (e) {
     console.error("[getOccurrencesForImagery]", e);
     return [];
@@ -177,10 +142,7 @@ export async function getOccurrencesForSong(
       console.error("[getOccurrencesForSong]", error);
       return [];
     }
-    return await withRelations(
-      supabase,
-      (data ?? []) as Record<string, unknown>[],
-    );
+    return ((data ?? []) as Record<string, unknown>[]).map(mapOccurrenceRow);
   } catch (e) {
     console.error("[getOccurrencesForSong]", e);
     return [];
@@ -376,10 +338,7 @@ async function getOccurrenceWithRelationsById(id: number, accessToken: string) {
     .eq("id", id)
     .single();
   if (error) throw error;
-  const [occurrence] = await withRelations(supabase, [
-    data as Record<string, unknown>,
-  ]);
-  return occurrence;
+  return mapOccurrenceRow(data as Record<string, unknown>);
 }
 
 // ─── 整理：删掉没有标注的母题 ─────────────────────────────────────────────────

@@ -1,0 +1,70 @@
+name: db
+
+# 数据库迁移：supabase/migrations/ 下的文件即线上表结构的全部改动来源。
+#   PR    在 runner 上起一个空库，从基线开始执行全部迁移，SQL 有错在这里就失败
+#   main  合并后把尚未执行的迁移推到线上（CLI 按 supabase_migrations 记录跳过已执行的）
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/db.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # 与本地 CLI 版本保持一致
+  SUPABASE: pnpm dlx --allow-build=supabase supabase@3.1.0
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+
+      - name: Start local database
+        run: $SUPABASE db start
+
+      - name: Apply all migrations to an empty database
+        run: $SUPABASE db reset
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: db-deploy
+      cancel-in-progress: false
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+
+      - name: Show pending migrations
+        run: $SUPABASE db push --remote="$SUPABASE_DB_URL" --dry-run
+
+      - name: Push migrations
+        run: $SUPABASE db push --remote="$SUPABASE_DB_URL" --yes
+
+      - name: Show migration history
+        run: $SUPABASE migration list --remote="$SUPABASE_DB_URL"

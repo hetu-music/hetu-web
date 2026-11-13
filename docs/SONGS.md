@@ -1,5 +1,8 @@
 # 歌曲数据：暂存表与正式表
 
+> 这是迁移完成前的**现行**规则。目标结构（`songs` + `song_revisions`，取代这两张表）与迁移计划见 `DATABASE.md`；
+> 原来的待改清单已并入那里的第八节。迁移第一段完成后删除本文件。
+
 歌曲存在两张表里。哪段代码读哪张、写哪张、别的数据挂在哪张上，按本文的规则来。
 新增或改动碰到 `temp` / `music` 的代码前先读这里。
 
@@ -65,26 +68,3 @@
 
 已发布的歌改了歌词、还没发布的这段时间，编校数据按新歌词算，线上显示的仍是旧歌词，时间标签
 可能对不齐，发布后恢复。后台的发布状态会标出「有改动」，改完歌词应尽快发布。
-
-## 现状与待改
-
-改完一项删一项。
-
-**发布流程**
-
-- [ ] 停掉每日同步：`cron.unschedule('Update music')`，删 `sync_music_from_temp`（停之前先比对两表，确认一致）
-- [ ] 下架：从正式表删除一首歌（评论、收藏随之级联，需二次确认）；暂存表删歌前要求先下架
-- [ ] 停掉同步后核对待发布列表：曲目页的「待发布」筛选与总览的「待发布的歌曲」已经按暂存表与正式表比对，
-      确认它们在没有每日同步时仍然准确
-
-**写法**
-
-- [ ] `service-songs.ts`：`getSongs` / `getSongById` 按 `table` 与有无 token 组合切换行为，拆成公开与后台两组函数；
-      `createSong` / `updateSong` 去掉 `table` 参数
-- [ ] `service-auth-gallery.ts`：自己按 `dispute_note` 过滤正式表，注释说视图缺 `lyrics_start`，
-      但视图现在已有这一列，改读 `music_catalog`
-
-**权限（纵深防御，RLS 已经拦住）**
-
-- [ ] `music`、`music_catalog` 收回 anon / authenticated 的 INSERT、UPDATE、DELETE
-- [ ] `temp` 收回 anon 的全部权限

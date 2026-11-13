@@ -54,6 +54,22 @@ export function isFieldEmpty(
   return false;
 }
 
+/** 列表只要知道有没有，不要正文的长字段 */
+const LIST_ELIDED_KEYS = ["lyrics", "comment"] as const;
+
+/**
+ * 后台歌曲列表用的精简行：歌词、创作手记占整表数据的一大半，列表既不显示也不搜，
+ * 只拿来判断「缺不缺」。有内容的换成一个占位字符，空的原样保留，isFieldEmpty 结果不变。
+ */
+export function toListSong(song: SongDetail): SongDetail {
+  const row = { ...song };
+  for (const key of LIST_ELIDED_KEYS) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim() !== "") row[key] = "…";
+  }
+  return row;
+}
+
 /** 列出所有缺失的关键字段（用于待完善标签） */
 export function getMissingFields(song: SongDetail): string[] {
   return songFields

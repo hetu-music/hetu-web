@@ -234,23 +234,29 @@ anchor_revision_id  bigint references song_revisions   -- 锚定时的那一版
 
 ## 八、迁移计划
 
-分四段，前一段完成再开始下一段。公开页面在每一步都不能中断；只影响后台的，允许短暂不可用，写明上线顺序即可。
+这次重构**允许整站中断**，不做无缝迁移：每一段都是「批准 migration → 立即部署代码」，两步之间站点可能报错，
+不写兼容旧结构的过渡代码，旧表在同一个 migration 里删掉。
+
+分段只是为了每次改动能看得过来。各段的 migration 与代码一起审、一起上；相邻两段也可以合并成一次停机。
+
+上线前：备份数据库（Supabase 的时间点恢复或手动导出），并在 PR 的 CI 里用空库重放全部 migration 确认能跑通。
+回填类的 migration 在末尾用断言核对行数（如「`songs` 行数 = 原 `temp` 行数」），对不上就整体回滚。
 
 ### 第一段：歌曲与编校（agent 依赖这一段）
 
 内容：第三节全部；第四节的来源各列与 `song_imagery` 改名（时间标签与「同时算进」仍照旧存，第二段再改）；`song_audio`。
 
-1. **migration A（只加不删）**
-   - 建 `songs`、`song_revisions`、`song_external_ids`、`song_audio` 与三个视图。
-   - 回填：每首 `temp` 里的歌建一行 `songs`，id 不变；`music` 里有的，以 `music` 的内容建第一版并设为已发布；
-     `temp` 与 `music` 内容不同或不在 `music` 里的，以 `temp` 的内容再追加一版作为草稿。
-     三个链接字段拆进 `song_external_ids`；`navid_song` 复制进 `song_audio`。
-   - 编校表、读者表的外键改指 `songs`（id 不变，回填后直接改约束）。
-   - 停掉每日同步（`cron.unschedule('Update music')`）。回填之后旧表不再写入。
-   - 旧表 `temp`、`music`、`navid_song` 暂时保留，公开端此时仍读 `music`，内容与回填一致。
-2. **部署代码**：公开端改读 `published_songs` / `catalog`；后台改走 `song_drafts` 与生命周期函数；发布、下架、删除的界面；agent 用的接口。
-   migration A 与部署之间，后台不要编辑歌曲。
-3. **migration B**：删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
+**migration**
+
+- 建 `songs`、`song_revisions`、`song_external_ids`、`song_audio` 与三个视图。
+- 回填：每首 `temp` 里的歌建一行 `songs`，id 不变；`music` 里有的，以 `music` 的内容建第一版并设为已发布；
+  `temp` 与 `music` 内容不同或不在 `music` 里的，以 `temp` 的内容再追加一版作为草稿。
+  三个链接字段拆进 `song_external_ids`；`navid_song` 搬进 `song_audio`。
+- 编校表、读者表的外键改指 `songs`（id 不变，直接改约束）。
+- 停掉每日同步（`cron.unschedule('Update music')`）。
+- 删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
+
+**代码**：公开端改读 `published_songs` / `catalog`；后台改走 `song_drafts` 与生命周期函数；发布、下架、删除的界面；agent 用的接口。
 
 已写好、未上线的「编校数据改挂 `temp`」（`20261113140000_editorial_on_temp.sql` 及配套代码）不再单独上线：
 代码里去掉「必须已发布」的那部分并入这一段，migration 作废。
@@ -277,8 +283,14 @@ anchor_revision_id  bigint references song_revisions   -- 锚定时的那一版
 
 ## 九、待讨论
 
-1. **未确认的 AI 数据公开端显不显示？** 显示：agent 填完就上线，确认只是后台的质量流程；不显示：公开端多一层过滤，
-   未确认的标注、基调对读者不可见。也可以按表分别定（比如基调显示、补遗不显示）。
+1. **未确认的 AI 数据公开端显不显示？** agent 给一首歌写了意象标注、基调、补遗（记为 `ai`、未确认），
+   这首歌发布后，这些条目在人逐条看过之前，要不要出现在公开页面上：单曲页的意象高亮、相关作品、意象云与母题页的计数、
+   寻曲的候选池、补遗一栏。
+   - 现状是显示：批量预标的基调（`source = 'ai'`）公开端照用，没有过滤。
+   - 显示：agent 填完、人点发布就全部上线，确认只是后台的质量流程，不确认也不影响读者。
+   - 不显示：公开端每个读编校数据的地方都加「已确认」过滤（第三节规则 3 的把关多一个条件），没确认的对读者不存在。
+   - 也可以按表分别定，比如意象、基调显示，补遗（直接给读者看的文字）不显示。
+   - 与「发布」的关系：发布前人本来就要看一遍这首歌；如果发布时把这首歌上未确认的条目一并记为确认，这个问题就退化为「发布即确认」。
 2. **外部链接要不要随发布？** 现在链接在资料里，暂存后要发布才上线。设计里外部 id 是身份信息，保存即上线（对已发布的歌）。
 3. **机器人能不能发布？** 目前设计为只写不发布，发布由人来。
 4. **「下架」之后是回到 `draft` 还是单独的 `unpublished`？** 设计里单独一个状态，后台能区分「从没发布过」与「下架了」。

@@ -13,16 +13,18 @@
    确有性能理由要存的，标明是缓存、由谁维护，写进第七节的缓存清单。
 3. **状态一列，转换走函数。** 有生命周期的东西用一列文本表示状态；状态只经数据库函数转换，函数里检查前置条件与权限。
 4. **引用必有外键，类型一致。** 唯一的例外是快照（记录某一时刻的结果，事后不随源头变），在表注释里写明。
-5. **编校数据都记来源。** 谁写的、人写的还是 AI 写的、谁在何时确认的，所有编校表一个写法。
+5. **审核以整首歌为单位。** 编校数据不分人写的、AI 写的，也没有逐条确认：人审核一首歌就是审核它的全部，发布就是一起发布。
+   谁在何时改了什么，由审计日志与版本记录。
 6. **同类问题一种写法。** 主键、枚举、时间戳、审计、视图各有约定（第七节），新表照着来。
 
 ## 二、全貌
 
 ```
-歌曲 ─┬─ 版本（内容）            songs ─ song_revisions
+歌曲 ─┬─ 版本：资料 + 编校        songs ─ song_versions ─┬─ song_imagery    意象标注
+      │                                                  ├─ song_emotions   基调
+      │                                                  └─ song_collations 校记与补遗
       ├─ 外部平台 id              song_external_ids
       ├─ 音频                    song_audio
-      ├─ 编校：意象、基调、校记      song_imagery · song_emotions · song_collations
       └─ 读者：评论、收藏、反馈      comments · collections · user_requests
 
 意象体系   imagery（词） · imagery_categories（分类树） · imagery_motifs（词 → 母题）
@@ -32,31 +34,44 @@
 独立内容   story_qjtx · quiz_results · stream_grants · audit_logs
 ```
 
-所有「挂在歌上」的表，外键一律指向 `songs.id`。公开端能不能看到它们，跟着歌的状态走（第三节）。
+挂在歌上的数据分两类，挂的地方不同：
 
-## 三、歌曲
+|                                                 | 挂在哪               | 随发布吗                           |
+| ----------------------------------------------- | -------------------- | ---------------------------------- |
+| 资料、编校数据（意象、基调、校记与补遗）        | 版本 `song_versions` | 随：在草稿上改，发布时一起上线     |
+| 读者数据（评论、收藏、反馈）、音频、外部平台 id | 歌 `songs`           | 不随：属于这首歌本身，与哪一版无关 |
+
+## 三、歌曲与版本
+
+### 模型
+
+- 一首歌有**至多一个草稿**和**若干已发布的版本**，线上用其中最新发布的那个。
+- 草稿可以随便改：保存就是覆盖草稿，不留历史。填一项存一下也不会多出数据。
+- 发布时草稿**冻结**成版本，此后不能再改；再要修改，就从线上版本复制出一份新草稿。
+- 版本包含这首歌的**资料与全部编校数据**：审核一首歌就是审核它的全部，发布就是一起发布（原则 5）。
+  agent 不论给新歌还是老歌写东西，都写在草稿上，人看过、发布了才上线。
 
 ### 表
 
 ```sql
 songs                                -- 身份与状态
   id                     bigint identity primary key
-  status                 text  check (status in ('draft', 'published', 'unpublished'))
-  published_revision_id  bigint references song_revisions   -- 线上用哪一版
-  published_at           timestamptz
+  status                 text check (status in ('draft', 'published', 'unpublished'))
+  published_version_id   bigint references song_versions   -- 线上的版本；从没发布过为空
+  draft_version_id       bigint references song_versions   -- 正在改的草稿；没有为空
   created_at, created_by
-  check (status <> 'published' or published_revision_id is not null)
+  check ((status = 'draft') = (published_version_id is null))
 
-song_revisions                       -- 内容：每次保存追加一行，只增不改
+song_versions                        -- 资料
   id                     bigint identity primary key
   song_id                bigint not null references songs on delete cascade
-  base_revision_id       bigint references song_revisions   -- 基于哪一版改的
   title, date, album, track, tracktotal, discnumber, disctotal,
   artist[], lyricist[], composer[], arranger[], albumartist[],
   genre[], type[], length, lyrics, lyrics_start, comment, dispute_note,
   hascover, nmn_status
-  source                 text check (source in ('human', 'ai'))
+  published_at           timestamptz    -- 空 = 草稿；非空 = 已冻结
   created_at, created_by
+  updated_at, updated_by                -- 草稿最后一次保存
 
 song_external_ids                    -- 各平台上的这首歌
   platform               text check (platform in ('netease', 'qq', 'kugou'))
@@ -70,100 +85,93 @@ song_audio                           -- 原 navid_song
   suffix, duration
 ```
 
-- 资料字段只在 `song_revisions` 定义一次。现在 `temp`、`music` 两份列清单加上 `approve_music_sync` 里手抄的一份，三处要同步改，这个问题随之消失。
-- 草稿就是每首歌最新的一版，不单独存。「有未发布的改动」= 最新一版不是 `published_revision_id`，不用逐字段比对。
+- **冻结由数据库保证**：`published_at` 非空的版本，以及挂在它上面的编校数据，触发器拒绝修改。
+- **「有未发布的改动」= `draft_version_id` 非空**，不用逐字段比对。草稿只在真有写入时才开（见下），打开看看不会开出草稿。
+- 资料字段只在 `song_versions` 定义一次。现在 `temp`、`music` 两份列清单加上 `approve_music_sync` 里手抄的一份，三处要同步改，这个问题随之消失。
 - 外部平台 id 是身份信息，不进版本。平台 id 唯一，agent 盯新发布时按它去重，不会重复建歌；链接由视图按平台与 id 拼出来。
 - `has_audio` 不存：视图里按 `song_audio` 有没有这首歌算出来。触发器 `update_music_has_audio` 与音频同步里写 `has_audio` 的代码一起删掉。
 - `hascover`、`nmn_status` 是「有没有封面、简谱」的标记，现在靠表单里手勾，与实际上传的文件可能对不上。
   先原样放进版本；以后要做素材表时再改成由文件算出（第九节）。
 
+### 生命周期
+
+所有写操作都经数据库函数，函数里检查前置条件与权限。
+
+| 操作     | 函数                                           | 前置条件                               | 结果                                                               | 权限               |
+| -------- | ---------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ | ------------------ |
+| 新建     | `create_song(资料)`                            | —                                      | 一首 `draft` 的歌 + 它的草稿                                       | 管理员（含机器人） |
+| 开草稿   | `ensure_draft(song_id)`                        | —                                      | 已有草稿就返回它；没有就复制线上版本的资料与编校数据，开一份新草稿 | 管理员（含机器人） |
+| 保存资料 | `save_draft(song_id, 资料, 基于的 updated_at)` | `updated_at` 与草稿一致，否则冲突      | 覆盖草稿                                                           | 管理员（含机器人） |
+| 放弃草稿 | `discard_draft(song_id)`                       | 已发布过（从没发布过的歌要用「删除」） | 删掉草稿及其编校数据，回到线上版本                                 | 管理员             |
+| 发布     | `publish_song(song_id)`                        | 有草稿；或已下架（直接重新上线原版本） | 草稿冻结并成为线上版本，`published`                                | 管理员             |
+| 下架     | `unpublish_song(song_id)`                      | `published`                            | `unpublished`；版本、草稿、读者数据都保留                          | 超管               |
+| 删除     | `delete_song(song_id)`                         | 不是 `published`                       | 歌及挂在上面的一切级联删除                                         | 超管               |
+
+- 写编校数据（加一条标注、改基调、写补遗）的函数都先调 `ensure_draft`，写在草稿上。
+- 保存用「基于哪一次保存」（`updated_at`）做乐观锁：两个人（或人与 agent）同时改同一份草稿时，后存的会收到冲突。
+- 历史：发布过的版本全部保留，可以看每次发布的样子、比对两次发布的差别。草稿期间的保存不留历史。
+- 状态转换（发布、下架、删除、放弃草稿）由函数写一条审计日志。
+
 ### 视图
 
 视图一律写明列名，不用 `select *`：`select *` 的视图在建立时就固定了列，表加列后视图不会跟着变。
 
-| 视图              | 内容                                                                  | 谁读                                           |
-| ----------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
-| `song_drafts`     | 每首歌 + 最新一版 + 状态                                              | 后台                                           |
-| `published_songs` | `status = 'published'` 的歌 + 发布的那一版 + `has_audio` + 各平台链接 | 公开端                                         |
-| `catalog`         | `published_songs` 去掉 `dispute_note` 非空的                          | 以曲库为整体的功能：统计、推荐、寻曲、意象索引 |
+| 视图                        | 内容                                                                    | 谁读                                           |
+| --------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- |
+| `published_songs`           | `status = 'published'` 的歌 + 线上版本的资料 + `has_audio` + 各平台链接 | 公开端                                         |
+| `catalog`                   | `published_songs` 去掉 `dispute_note` 非空的                            | 以曲库为整体的功能：统计、推荐、寻曲、意象索引 |
+| `published_song_imagery` 等 | 线上版本的编校数据，带上 `song_id`                                      | 公开端                                         |
+| `working_songs`             | 每首歌的工作版本（有草稿用草稿，否则用线上版本）+ 状态 + 有无未发布改动 | 后台                                           |
+| `working_song_imagery` 等   | 工作版本的编校数据，带上 `song_id`                                      | 后台                                           |
 
 `published_songs` 的列与现在的 `music` 保持一致，公开端的代码只换表名。
 
-### 生命周期
-
-| 操作 | 函数                                                     | 前置条件                                    | 结果                        | 权限               |
-| ---- | -------------------------------------------------------- | ------------------------------------------- | --------------------------- | ------------------ |
-| 保存 | `save_song_revision(song_id, base_revision_id, content)` | `base_revision_id` 是当前最新一版，否则冲突 | 追加一版                    | 管理员（含机器人） |
-| 新建 | `create_song(content)`                                   | —                                           | 一首 `draft` 的歌 + 第一版  | 管理员（含机器人） |
-| 发布 | `publish_song(song_id)`                                  | 有版本                                      | 指向最新一版，`published`   | 管理员             |
-| 下架 | `unpublish_song(song_id)`                                | `published`                                 | `unpublished`，所有数据保留 | 超管               |
-| 删除 | `delete_song(song_id)`                                   | 不是 `published`                            | 歌及挂在上面的一切级联删除  | 超管               |
-
-- 下架后再发布，就是普通的发布：评论、收藏、标注都还在。
-- 保存用「基于哪一版」做乐观锁，取代现在比对 `updated_at` 的做法。
-- 版本表本身就是修改历史，歌曲内容不再走 `audit_logs`；状态转换由函数写一条审计。
-
 ### 规则（取代 `SONGS.md` 的两张表规则）
 
-1. 公开端只读 `published_songs` 与 `catalog`。
-2. 后台读 `song_drafts`；写只经上表的函数。
-3. 新增挂在歌上的表，外键指向 `songs.id`。公开端读它时必须经 `published_songs` 把关：
-   按单曲读的，入口先确认歌已发布；汇总类（意象云、母题页、寻曲、统计）按 `catalog` 过滤 `song_id`。
+1. 公开端只读 `published_*` 视图与 `catalog`，不碰表。编校数据的视图已经只含线上版本，不用再自己过滤「歌发布了没有」。
+2. 后台读 `working_*` 视图；写只经上表的函数。
+3. 新增挂在歌上的表，先判断属于哪一类（第二节）：随发布的挂 `song_versions`，并在开草稿时一起复制、补上两种视图；
+   不随发布的挂 `songs`，公开端读它时经 `published_songs` 把关。
 
 ## 四、编校数据
 
-意象标注、基调、校记与补遗。人写也好，agent 写也好，都在草稿阶段就能写，不必等发布。
+意象标注、基调、校记与补遗。都挂在版本上，在草稿里写，随发布上线。
 
-### 来源
-
-三张表统一加：
-
-```sql
-source        text not null check (source in ('human', 'ai'))
-created_by    uuid references users
-created_at    timestamptz
-confirmed_by  uuid references users     -- 人确认过的；human 写的在写入时即确认
-confirmed_at  timestamptz
-```
-
-- agent 写的记 `ai`、未确认。后台按「未确认」统一筛出来逐条过，改了或点确认都记为确认。
-- 现在只有 `song_emotions` 有 `source`，确认与「改为 human」是一回事；新写法把「谁写的」和「谁确认的」分开记。
-- 未确认的 AI 数据公开端显不显示：**待定**（第九节）。
+- 不分来源：人写的、agent 写的同样对待，表里不记 `human` / `ai`，也不逐条确认。
+- 去掉现有的区分：`song_emotions.source` 列，以及后台基调栏「AI 预标待确认」的提示与「确认」按钮。
+- 谁写的：各表有 `created_by`（agent 写的就是机器人账号）。
 
 ### 意象标注：`imagery_occurrences` → `song_imagery`
 
 ```sql
 song_imagery
-  song_id      bigint references songs on delete cascade
+  version_id   bigint references song_versions on delete cascade
   imagery_id   bigint references imagery
   category_id  bigint references imagery_categories    -- 母题
-  + 来源各列
-  primary key (song_id, imagery_id, category_id)
+  created_by, created_at
+  primary key (version_id, imagery_id, category_id)
 ```
 
 - **时间标签不存。** 按 `IMAGERY.md`，时间标签就是「词字面出现的那几行」，由歌词与同曲各词算出（`songTimetags`）。
-  公开端按发布那一版的歌词算，后台按草稿算。「改了歌词还没发布，标签对不齐」与「发布时重算标签」都随之消失。
+  标注和它对应的歌词在同一个版本里，读的时候按这一版的歌词算，永远对得上；「发布时重算标签」也不需要了。
 - **「同时算进」不存。** 一条标注挂在词的「通常算作」上时，它的「同时算进」各母题由 `imagery_motifs` 决定，读的时候展开。
   现在 `addParts` 补写的那几行，以及改词、改母题、删除时的连带维护，都不需要了。
 - 主键用自然键，去掉代理 id；后台按 (歌, 词) 定位一行。
 
 ### 基调 `song_emotions`
 
-结构不变，补齐来源各列。
+`song_id` 改为 `version_id`；去掉 `source`，加 `created_by`。
 
 ### 校记与补遗 `song_collations`
 
-结构不变，补齐来源各列；锚点见下。订者名单 `song_collation_revisers` 不变。
+`song_id` 改为 `version_id`，其余不变。订者名单 `song_collation_revisers` 跟着校记走，开草稿时一起复制。
 
-### 锚点
+校记锚在同一版本的歌词上，版本冻结后不会错位。草稿里改了歌词，后台按引文核对，标出对不上的校记，发布前处理。
 
-评点（`comments`）与校记都用「第几行 + 引文」锚在歌词上，锚的是写下时那一版歌词；歌词改了行号就可能错位。
+### 评点的锚点
 
-```sql
-anchor_revision_id  bigint references song_revisions   -- 锚定时的那一版
-```
-
-显示时：锚定的版本就是当前显示的版本，直接用行号；不是，按引文在当前版本里找行，找不到的归到整首歌。
+评点挂在歌上（不随发布），锚的是写下时线上那一版的歌词。加 `anchor_version_id`：
+显示时锚定的版本就是线上版本，直接用行号；不是，按引文在线上版本里找行，找不到的归到整首歌。
 
 ## 五、意象体系
 
@@ -188,7 +196,7 @@ anchor_revision_id  bigint references song_revisions   -- 锚定时的那一版
 
 - `status`（0–3）、`visibility`（0–1）改为文本：`'normal' | 'pending' | 'hidden' | 'deleted'`、`'public' | 'private'`。
 - `like_count` 是计数缓存，由 `comment_likes` 上的触发器维护，保留。
-- 锚点加 `anchor_revision_id`（第四节）。
+- 锚点加 `anchor_version_id`（第四节「评点的锚点」）。
 
 ### 其他
 
@@ -210,10 +218,11 @@ anchor_revision_id  bigint references song_revisions   -- 锚定时的那一版
 
 **时间戳。** 每张表有 `created_at`。行会被修改、且有人读修改时间的，才加 `updated_at`，由触发器维护。
 
-**来源与审计。**
+**审计。**
 
-- 歌曲内容：版本表即历史。
-- 编校数据与意象体系、署名别名：`record_audit_log` 触发器，全部挂上。
+- 歌曲的资料与编校数据：发布过的版本即历史；草稿期间的保存不留历史，也不审计（开草稿时整份复制，逐行审计只是噪音）。
+- 歌曲的状态转换：由生命周期函数各写一条审计。
+- 意象体系（词、分类、母题登记）与署名别名：`record_audit_log` 触发器，全部挂上。
 - 用户产生的内容（评点、收藏、测试结果）：不审计。
 
 **视图。** 写明列名，不用 `select *`；公开端读的视图用 `security_invoker`。
@@ -242,63 +251,67 @@ anchor_revision_id  bigint references song_revisions   -- 锚定时的那一版
 上线前：备份数据库（Supabase 的时间点恢复或手动导出），并在 PR 的 CI 里用空库重放全部 migration 确认能跑通。
 回填类的 migration 在末尾用断言核对行数（如「`songs` 行数 = 原 `temp` 行数」），对不上就整体回滚。
 
-### 第一段：歌曲与编校（agent 依赖这一段）
+### 第一段：歌曲、版本与编校（agent 依赖这一段）
 
-内容：第三节全部；第四节的来源各列与 `song_imagery` 改名（时间标签与「同时算进」仍照旧存，第二段再改）；`song_audio`。
+内容：第二至四节全部，包括时间标签与「同时算进」改为读时计算（编校表本来就要重建，一并做掉，免得迁两遍）。
 
 **migration**
 
-- 建 `songs`、`song_revisions`、`song_external_ids`、`song_audio` 与三个视图。
-- 回填：每首 `temp` 里的歌建一行 `songs`，id 不变；`music` 里有的，以 `music` 的内容建第一版并设为已发布；
-  `temp` 与 `music` 内容不同或不在 `music` 里的，以 `temp` 的内容再追加一版作为草稿。
-  三个链接字段拆进 `song_external_ids`；`navid_song` 搬进 `song_audio`。
-- 编校表、读者表的外键改指 `songs`（id 不变，直接改约束）。
+- 建 `songs`、`song_versions`、`song_external_ids`、`song_audio`，重建三张编校表（外键改指版本），建全部视图与生命周期函数、冻结触发器。
+- 回填，id 沿用 `temp` 的：
+  - 每首 `temp` 里的歌建一行 `songs`。
+  - `music` 里有的：以 `music` 的内容建一个已冻结的版本，设为线上版本；现有的编校数据挂到这个版本上。
+    `temp` 与 `music` 内容不同的，再以 `temp` 的内容开一份草稿，编校数据复制一份过去。
+  - 不在 `music` 里的：以 `temp` 的内容建草稿，状态 `draft`。
+  - 三个链接字段拆进 `song_external_ids`；`navid_song` 搬进 `song_audio`。
+  - 意象标注只搬「主条」：`addParts` 补写的「同时算进」各行、`lyric_timetag` 都不搬。
+- 读者表（评论、收藏、反馈）的外键改指 `songs`（id 不变，直接改约束）。
 - 停掉每日同步（`cron.unschedule('Update music')`）。
-- 删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
+- 删 `temp`、`music`、`navid_song`、`imagery_occurrences`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
+- 末尾断言：`songs` 行数 = 原 `temp` 行数；线上版本数 = 原 `music` 行数；标注主条数一致。
 
-**代码**：公开端改读 `published_songs` / `catalog`；后台改走 `song_drafts` 与生命周期函数；发布、下架、删除的界面；agent 用的接口。
+**代码**
 
-已写好、未上线的「编校数据改挂 `temp`」（`20261113140000_editorial_on_temp.sql` 及配套代码）不再单独上线：
-代码里去掉「必须已发布」的那部分并入这一段，migration 作废。
+- 公开端改读 `published_*` 视图与 `catalog`；时间标签与「同时算进」改为读时计算。
+- 后台改读 `working_*` 视图，写走生命周期函数；发布、下架、放弃草稿、删除的界面；去掉基调的「待确认」。
+- 删 `syncSongTimetags`、`resyncSongTimetags`、`addParts` 及发布时重算标签的步骤。
+- agent 用的接口。
 
-### 第二段：意象派生
+已写好、未上线的「编校数据改挂 `temp`」（`20261113140000_editorial_on_temp.sql` 及配套代码）作废，不上线。
 
-- 时间标签改为读时计算，删 `lyric_timetag`、`syncSongTimetags`、`resyncSongTimetags`。
-- 「同时算进」改为读时展开，删 `addParts` 及连带维护，删已存的补写行。
+### 第二段：小项（各自独立，顺序随意）
+
 - `imagery_categories` 加父外键，`level` 改由视图算。
-- 锚点加 `anchor_revision_id`（评点与校记）。
-
-### 第三段：小项（各自独立，顺序随意）
-
+- 评点：状态与可见性改文本，锚点加 `anchor_version_id`。
 - `users.role` 取代 `is_admin` / `is_super`。
-- `comments` 的状态与可见性改文本。
 - `collections` 改主键。
 - `stream_grants.song_id` 改类型。
-- 补审计触发器。
+- 补审计触发器（`imagery_motifs`、`credit_aliases`）。
 - 公开端读的表与视图收回 anon / authenticated 的写权限（纵深防御）。
 
-### 第四段：按需
+### 第三段：按需
 
 第九节里定下来要做的。
 
 ## 九、待讨论
 
-1. **未确认的 AI 数据公开端显不显示？** agent 给一首歌写了意象标注、基调、补遗（记为 `ai`、未确认），
-   这首歌发布后，这些条目在人逐条看过之前，要不要出现在公开页面上：单曲页的意象高亮、相关作品、意象云与母题页的计数、
-   寻曲的候选池、补遗一栏。
-   - 现状是显示：批量预标的基调（`source = 'ai'`）公开端照用，没有过滤。
-   - 显示：agent 填完、人点发布就全部上线，确认只是后台的质量流程，不确认也不影响读者。
-   - 不显示：公开端每个读编校数据的地方都加「已确认」过滤（第三节规则 3 的把关多一个条件），没确认的对读者不存在。
-   - 也可以按表分别定，比如意象、基调显示，补遗（直接给读者看的文字）不显示。
-   - 与「发布」的关系：发布前人本来就要看一遍这首歌；如果发布时把这首歌上未确认的条目一并记为确认，这个问题就退化为「发布即确认」。
-2. **外部链接要不要随发布？** 现在链接在资料里，暂存后要发布才上线。设计里外部 id 是身份信息，保存即上线（对已发布的歌）。
-3. **机器人能不能发布？** 目前设计为只写不发布，发布由人来。
-4. **「下架」之后是回到 `draft` 还是单独的 `unpublished`？** 设计里单独一个状态，后台能区分「从没发布过」与「下架了」。
-5. **人与署名。** 署名现在是五个名字数组，`credit_aliases` 在读取时把别名归到主名，是在弥补「人」没有身份。
+已定（2026-11-13）：
+
+- 编校数据不分人写、AI 写，不逐条确认；审核以整首歌为单位，发布就是一起发布（原则 5）。
+- 编校数据随版本：草稿可改、发布即冻结；保存覆盖草稿，不留历史（第三节）。
+- 这次重构允许整站中断，不做无缝迁移（第八节）。
+
+还没定：
+
+1. **外部链接要不要随发布？** 现在链接在资料里，要发布才上线。设计里外部 id 是身份信息、挂在歌上，保存即上线（对已发布的歌）；
+   要随发布的话就挂到版本上，代价是按平台 id 去重时要看「任一版本」。
+2. **机器人能不能发布？** 目前设计为只写不发布，发布由人来。
+3. **「下架」之后是回到 `draft` 还是单独的 `unpublished`？** 设计里单独一个状态，后台能区分「从没发布过」与「下架了」。
+4. **人与署名。** 署名现在是五个名字数组，`credit_aliases` 在读取时把别名归到主名，是在弥补「人」没有身份。
    完整的设计是「人」一张表，「哪一版、什么角色、谁、原署作什么」一张表，别名即同一人的不同原署。
    要不要做，取决于有没有按人浏览、人物页这类需求。
-6. **专辑。** 曲序、碟号、专辑艺人、日期都在每首歌上重复存。要做专辑页时值得建表，否则不必。
-7. **素材表。** 封面、简谱是哪个文件、何时上传，记一张表，`hascover` / `nmn_status` 由它算出，不再手勾。
-8. **拆 `user_requests`。** 歌曲反馈是关于歌的，播放权限、管理员申请是关于权限的，流程也不同。
-9. **贡献者资料拆出 `users`。**
-10. **版本留多久？** 全部保留（数据量小：几百首歌、每次保存一行）；要不要做版本对比、回退的界面。
+5. **专辑。** 曲序、碟号、专辑艺人、日期都在每首歌上重复存。要做专辑页时值得建表，否则不必。
+6. **素材表。** 封面、简谱是哪个文件、何时上传，记一张表，`hascover` / `nmn_status` 由它算出，不再手勾。
+7. **拆 `user_requests`。** 歌曲反馈是关于歌的，播放权限、管理员申请是关于权限的，流程也不同。
+8. **贡献者资料拆出 `users`。**
+9. **版本对比与回退的界面要不要做？** 发布过的版本全部保留（每发布一次一行，数据量很小），界面上看不看、能不能回退到旧版本，可以以后再定。

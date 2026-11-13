@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import {
   getImageryCategories,
   createMotif,
@@ -8,7 +12,6 @@ import {
   refreshImagery,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -36,7 +39,11 @@ export const GET = withAuth(
 );
 
 export const POST = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     try {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
@@ -44,15 +51,7 @@ export const POST = withAuth(
       );
       if (invalid) return invalid;
 
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-
-      const created = await createMotif(input, session.access_token);
+      const created = await createMotif(input, accessToken);
       const purge = await refreshImagery();
       return withPurgeStatus(NextResponse.json(created), purge);
     } catch (e) {

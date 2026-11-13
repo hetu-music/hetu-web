@@ -115,11 +115,17 @@ describe("POST /api/admin/imagery/categories", () => {
     expect(res.status).toBe(500);
   });
 
-  it("经 Authorization header 鉴权通过、但 cookie session 缺失时返回 401（不会带着空 token 调用 service 层）", async () => {
-    // withAuth 支持用 Authorization header 鉴权（不依赖 cookie session）。
-    // 这条路径下，路由自己再查一次 supabase.auth.getSession() 时可能拿不到
-    // cookie session —— 这里验证这种不一致场景会被安全地拦截。
+  it("只带 Authorization header、没有 cookie session 时，以 header 里的 token 写库", async () => {
+    // 脚本、agent 只带 Bearer 头：token 由 withAuth 交给路由，不再从 cookie 取，
+    // 也不要求 CSRF（mockCsrfValid 置 false 验证这一点）
     mockSessionAccessToken = null;
+    mockCsrfValid = false;
+    vi.mocked(createMotif).mockResolvedValue({
+      id: 9,
+      name: "新母题",
+      parent_id: 2,
+      level: 3,
+    } as never);
     const request = new NextRequest(
       "http://localhost/api/admin/imagery/categories",
       {
@@ -132,8 +138,8 @@ describe("POST /api/admin/imagery/categories", () => {
       },
     );
     const res = await POST(request);
-    expect(res.status).toBe(401);
-    expect(createMotif).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(createMotif).toHaveBeenCalledWith(valid, "valid.header.token");
   });
 
   it("创建成功返回新母题", async () => {

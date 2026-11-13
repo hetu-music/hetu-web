@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import {
   createCreditAlias,
   deleteCreditAlias,
@@ -28,14 +31,6 @@ const ERROR_STATUS: Record<CreditAliasErrorCode, number> = {
   INVALID_ALIAS: 400,
 };
 
-async function getAccessToken(): Promise<string | null> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session?.access_token ?? null;
-}
-
 /** 别名只影响署有它的歌；主名没署过的歌不用动 */
 async function refreshPagesCreditedAs(alias: string) {
   const ids = await getPublishedSongIdsCreditedAs(alias);
@@ -43,11 +38,11 @@ async function refreshPagesCreditedAs(alias: string) {
 }
 
 export const GET = withAuth(
-  async (_request: NextRequest, _user: AuthenticatedUser) => {
-    const token = await getAccessToken();
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  async (
+    _request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken: token }: AuthContext,
+  ) => {
     try {
       const [aliases, names] = await Promise.all([
         listCreditAliases(token),
@@ -66,17 +61,16 @@ export const GET = withAuth(
 );
 
 export const POST = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken: token }: AuthContext,
+  ) => {
     const { data: input, response: invalid } = await parseJsonBody(
       request,
       CreateAliasSchema,
     );
     if (invalid) return invalid;
-
-    const token = await getAccessToken();
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     try {
       const created = await createCreditAlias(input.alias, input.name, token);
@@ -101,17 +95,16 @@ export const POST = withAuth(
 );
 
 export const DELETE = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken: token }: AuthContext,
+  ) => {
     const parsed = CreditNameSchema.safeParse(
       request.nextUrl.searchParams.get("alias") ?? "",
     );
     if (!parsed.success) {
       return NextResponse.json({ error: "缺少别名" }, { status: 400 });
-    }
-
-    const token = await getAccessToken();
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     try {

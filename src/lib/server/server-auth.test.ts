@@ -138,6 +138,57 @@ describe("withAuth 权限矩阵", () => {
   });
 });
 
+describe("withAuth — Authorization header 与 accessToken", () => {
+  beforeEach(() => {
+    mockUser = { id: "u1", app_metadata: { is_admin: true } };
+    mockCsrfValid = false;
+    mockThrowOnSupabaseCall = false;
+    mockThrowOnCsrfCheck = false;
+  });
+
+  /** 跑一遍 withAuth，返回响应与 handler 收到的 accessToken（没进 handler 为 undefined） */
+  async function run(headers: Record<string, string>) {
+    let received: string | undefined;
+    const handler = withAuth(
+      async (_req, _user, { accessToken }) => {
+        received = accessToken;
+        return NextResponse.json({ ok: true });
+      },
+      { requireCSRF: true, requireAdmin: true },
+    );
+    const res = await handler(
+      new NextRequest("http://localhost/api/test", { method: "POST", headers }),
+    );
+    return { status: res.status, received };
+  }
+
+  it("带合法 Bearer 头时免 CSRF，handler 拿到的是头里的 token", async () => {
+    const { status, received } = await run({
+      authorization: "Bearer abc.def-ghi_123",
+    });
+    expect(status).toBe(200);
+    expect(received).toBe("abc.def-ghi_123");
+  });
+
+  it("Authorization 头格式不对时判未登录，不会退回 cookie 会话绕过 CSRF", async () => {
+    const { status, received } = await run({ authorization: "Basic xyz" });
+    expect(status).toBe(401);
+    expect(received).toBeUndefined();
+  });
+
+  it("没有 Authorization 头时仍要 CSRF", async () => {
+    const { status } = await run({});
+    expect(status).toBe(403);
+  });
+
+  it("cookie 会话通过 CSRF 后，handler 拿到会话里的 token", async () => {
+    mockCsrfValid = true;
+    const { status, received } = await run({});
+    expect(status).toBe(200);
+    expect(received).toBe("test-token");
+  });
+});
+
 describe("getUserFromRequest — Authorization header 分支", () => {
   beforeEach(() => {
     mockUser = null;

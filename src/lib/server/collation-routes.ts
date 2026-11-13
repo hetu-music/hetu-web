@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import {
   CollationError,
   createCollation,
@@ -23,23 +26,12 @@ import { parseJsonBody } from "@/lib/server/parse-body";
 
 const id = z.number().int().positive();
 
-async function accessToken(): Promise<string | null> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session?.access_token ?? null;
-}
-
 function failed(route: string, e: unknown) {
   if (e instanceof CollationError) {
     return NextResponse.json({ error: e.message }, { status: e.status });
   }
   return serverErrorResponse(route, e, "保存失败");
 }
-
-const unauthorized = () =>
-  NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
 export function entryWriteHandlers<T>(
   route: string,
@@ -50,14 +42,16 @@ export function entryWriteHandlers<T>(
   const UpdateSchema = z.object({ id, entry: schema });
 
   const POST = withAuth(
-    async (request: NextRequest, _user: AuthenticatedUser) => {
+    async (
+      request: NextRequest,
+      _user: AuthenticatedUser,
+      { accessToken: token }: AuthContext,
+    ) => {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
         CreateSchema,
       );
       if (invalid) return invalid;
-      const token = await accessToken();
-      if (!token) return unauthorized();
       try {
         const newId = await createCollation(
           input.song_id,
@@ -74,14 +68,16 @@ export function entryWriteHandlers<T>(
   );
 
   const PUT = withAuth(
-    async (request: NextRequest, _user: AuthenticatedUser) => {
+    async (
+      request: NextRequest,
+      _user: AuthenticatedUser,
+      { accessToken: token }: AuthContext,
+    ) => {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
         UpdateSchema,
       );
       if (invalid) return invalid;
-      const token = await accessToken();
-      if (!token) return unauthorized();
       try {
         const songId = await updateCollation(
           input.id,
@@ -103,14 +99,16 @@ export function entryWriteHandlers<T>(
 /** 删除不分校记、补遗 */
 export const deleteEntryHandler = (route: string) =>
   withAuth(
-    async (request: NextRequest, _user: AuthenticatedUser) => {
+    async (
+      request: NextRequest,
+      _user: AuthenticatedUser,
+      { accessToken: token }: AuthContext,
+    ) => {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
         z.object({ id }),
       );
       if (invalid) return invalid;
-      const token = await accessToken();
-      if (!token) return unauthorized();
       try {
         const songId = await deleteCollation(input.id, token);
         const purge = await refreshCollations(songId);

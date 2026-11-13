@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import { setWordMotifs } from "@/lib/server/service-imagery";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
 const id = z.number().int().positive();
@@ -24,7 +27,11 @@ function getIdFromUrl(request: NextRequest): number | null {
  * imagery_motifs 只在后台用（标注时的候选、检查、整理），公开页面不读，不用刷新缓存
  */
 export const PUT = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const imageryId = getIdFromUrl(request);
     if (!imageryId) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -35,14 +42,7 @@ export const PUT = withAuth(
         WordMotifsSchema,
       );
       if (invalid) return invalid;
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const saved = await setWordMotifs(imageryId, input, session.access_token);
+      const saved = await setWordMotifs(imageryId, input, accessToken);
       return NextResponse.json(saved);
     } catch (e) {
       const code = (e as { code?: string }).code;

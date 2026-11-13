@@ -22,7 +22,6 @@ vi.mock("@/lib/db/supabase-auth", () => ({
       })),
       getUser: vi.fn(async () => ({ data: { user: mockUser } })),
     },
-    from: vi.fn(() => makeQueryBuilder({ data: null, error: mockUpdateError })),
   })),
 }));
 
@@ -43,6 +42,12 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
           data: mockExistingRequest,
           error: mockExistingError,
         }),
+      ),
+    })),
+    // 回复以管理员本人身份写库（RLS）
+    getUserClient: vi.fn(() => ({
+      from: vi.fn(() =>
+        makeQueryBuilder({ data: null, error: mockUpdateError }),
       ),
     })),
   };

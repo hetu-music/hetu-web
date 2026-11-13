@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import {
   getEmotions,
   getSongEmotions,
@@ -58,24 +61,21 @@ export const GET = withAuth(
 
 /** 整首替换一首歌的基调：PUT /api/admin/song-emotions */
 export const PUT = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const { data: input, response: invalid } = await parseJsonBody(
       request,
       SetSongEmotionsSchema,
     );
     if (invalid) return invalid;
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     try {
       const selected = await setSongEmotions(
         input.song_id,
         input.emotion_ids,
-        session.access_token,
+        accessToken,
       );
       const purge = await refreshSongEmotions(input.song_id);
       return withPurgeStatus(NextResponse.json({ selected }), purge);

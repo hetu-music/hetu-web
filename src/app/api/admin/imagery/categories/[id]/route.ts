@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import { updateMotif } from "@/lib/server/service-imagery";
 import {
   refreshImagery,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -28,7 +31,11 @@ function getIdFromUrl(request: NextRequest): number | null {
 }
 
 export const PUT = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const categoryId = getIdFromUrl(request);
     if (!categoryId) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -40,19 +47,7 @@ export const PUT = withAuth(
       );
       if (invalid) return invalid;
 
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-
-      const updated = await updateMotif(
-        categoryId,
-        input,
-        session.access_token,
-      );
+      const updated = await updateMotif(categoryId, input, accessToken);
       // 母题名与归属牵动全部详情页，CDN 上的副本等 s-maxage 到期
       const purge = await refreshImagery({ motifIds: [categoryId] });
       return withPurgeStatus(NextResponse.json(updated), purge);

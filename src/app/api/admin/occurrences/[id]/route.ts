@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import {
   updateOccurrence,
   deleteOccurrence,
@@ -9,7 +13,6 @@ import {
   refreshImagery,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -31,7 +34,11 @@ function getIdFromUrl(request: NextRequest): number | null {
 }
 
 export const PUT = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const id = getIdFromUrl(request);
     if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     try {
@@ -40,15 +47,9 @@ export const PUT = withAuth(
         UpdateOccurrenceSchema,
       );
       if (invalid) return invalid;
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token)
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       // 换了母题的话，原母题也要刷新
       const before = await getOccurrenceRefs(id);
-      const updated = await updateOccurrence(id, input, session.access_token);
+      const updated = await updateOccurrence(id, input, accessToken);
       const purge = await refreshImagery({
         songIds: [updated.song_id],
         motifIds: [
@@ -77,18 +78,16 @@ export const PUT = withAuth(
 );
 
 export const DELETE = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const id = getIdFromUrl(request);
     if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     try {
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token)
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       // 连同补写的「同时算进」一起删，它们挂的母题都要刷新
-      const deleted = await deleteOccurrence(id, session.access_token);
+      const deleted = await deleteOccurrence(id, accessToken);
       const purge = deleted
         ? await refreshImagery({
             songIds: [deleted.songId],

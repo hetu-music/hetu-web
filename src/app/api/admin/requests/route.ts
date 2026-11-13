@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
+import {
+  getServiceClient,
+  getUserClient,
+  TABLES,
+} from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -117,7 +124,11 @@ export const GET = withAuth(
 // ─── PUT: 管理员回复/处理请求 ─────────────────────────────────────────────────
 
 export const PUT = withAuth(
-  async (request: NextRequest, user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const { data: input, response: invalid } = await parseJsonBody(
       request,
       replySchema,
@@ -149,8 +160,12 @@ export const PUT = withAuth(
       return NextResponse.json({ error: "权限不足" }, { status: 403 });
     }
 
-    // 使用用户权限客户端（受 RLS 约束，确保安全）
-    const supabase = await createSupabaseServerClient();
+    // 使用用户权限客户端（受 RLS 约束，确保安全）。token 取 withAuth 验过的那个，
+    // 不读 cookie：只带 Authorization 头的请求没有 cookie 会话
+    const supabase = getUserClient(accessToken);
+    if (!supabase) {
+      return NextResponse.json({ error: "服务暂不可用" }, { status: 503 });
+    }
 
     const { error } = await supabase
       .from(TABLES.USER_REQUESTS)

@@ -46,7 +46,8 @@ interface CollationRow {
   body: string;
   created_by: string | null;
   collator: { name: string | null } | null;
-  revisers: { first_at: string; user: { name: string | null } | null }[] | null;
+  revisers:
+    { created_at: string; user: { name: string | null } | null }[] | null;
 }
 
 export class CollationError extends Error {
@@ -87,7 +88,7 @@ export async function getSongCollations(
   const { data, error } = await db
     .from(TABLES.SONG_COLLATIONS)
     .select(
-      `${FIELDS}, collator:${TABLES.USERS}!created_by(name), revisers:${TABLES.SONG_COLLATION_REVISERS}(first_at, user:${TABLES.USERS}(name))`,
+      `${FIELDS}, collator:${TABLES.USERS}!created_by(name), revisers:${TABLES.SONG_COLLATION_REVISERS}(created_at, user:${TABLES.USERS}(name))`,
     )
     .eq("version_id", versionId)
     .order("id");
@@ -112,7 +113,7 @@ export async function getSongCollations(
     body: tr(r.body) ?? "",
     collator: r.created_by ? (r.collator?.name ?? null) : null,
     revisers: [...(r.revisers ?? [])]
-      .sort((a, b) => Date.parse(a.first_at) - Date.parse(b.first_at))
+      .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
       .flatMap((v) => (v.user?.name ? [v.user.name] : [])),
   }));
 }

@@ -55,7 +55,7 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
 
 import { PUT } from "./route";
 
-const VALID_ID = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
+const VALID_ID = 7;
 
 function makeRequest(body: unknown) {
   return new NextRequest("http://localhost/api/admin/requests", {
@@ -96,7 +96,7 @@ describe("PUT /api/admin/requests — 鉴权", () => {
 
 describe("PUT /api/admin/requests — 参数校验", () => {
   it("id 非 UUID 返回 400", async () => {
-    expect((await PUT(makeRequest(validBody({ id: "123" })))).status).toBe(400);
+    expect((await PUT(makeRequest(validBody({ id: "7" })))).status).toBe(400);
   });
 
   it("回复内容为空返回 400", async () => {

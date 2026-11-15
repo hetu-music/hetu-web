@@ -42,6 +42,11 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
   return { ...actual, getServiceClient: vi.fn(() => ({ from: mockFrom })) };
 });
 
+let mockPublished = true;
+vi.mock("@/lib/server/service-songs", () => ({
+  isSongPublished: vi.fn(async () => mockPublished),
+}));
+
 import { POST } from "./route";
 
 function makeRequest(body: unknown) {
@@ -57,6 +62,7 @@ beforeEach(() => {
   mockCsrfValid = true;
   mockFromBuilders = [];
   fromCallIndex = 0;
+  mockPublished = true;
 });
 
 describe("POST /api/public/requests — 校验", () => {
@@ -124,6 +130,15 @@ describe("POST /api/public/requests — 重复申请守卫", () => {
       makeRequest({ type: "benefit_apply", content: "申请试听权限" }),
     );
     expect(res.status).toBe(201);
+  });
+
+  it("纠错的歌不在线上时返回 404，不写库", async () => {
+    mockPublished = false;
+    const res = await POST(
+      makeRequest({ type: "song_feedback", song_id: 7, content: "有错字" }),
+    );
+    expect(res.status).toBe(404);
+    expect(fromCallIndex).toBe(0);
   });
 
   // 纠错可以提多条，不受待处理申请限制

@@ -458,7 +458,7 @@ function RequestList({
   onRefresh: () => void;
 }) {
   const t = useTranslations("profile.feedback");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const refreshButton = (
     <button

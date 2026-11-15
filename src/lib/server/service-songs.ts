@@ -166,6 +166,22 @@ export async function getSongsByIds(
 }
 
 /**
+ * 这首歌在不在线上。读者数据（收藏、评点、反馈、试听）挂在 songs 上，
+ * 没上线或已下架的歌也有 id，写之前用它确认（DATABASE.md 第六节）。
+ */
+export async function isSongPublished(songId: number): Promise<boolean> {
+  const supabase = getServiceClient();
+  if (!supabase) throw new Error("Supabase service client unavailable");
+  const { data, error } = await supabase
+    .from(TABLES.PUBLISHED_SONGS)
+    .select("id")
+    .eq("id", songId)
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
+}
+
+/**
  * 获取每首歌的最后修改时间，供 sitemap 的 lastModified 使用。
  *
  * 数据来源是 published_songs.updated_at，即线上版本的发布时间。

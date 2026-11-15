@@ -3,7 +3,8 @@
 本站数据库的目标结构、约定与迁移计划。新建表、改表结构、新增挂在别的数据上的表之前先读本文件。
 
 本文写的是**目标**（2026-11-15 定稿）。现状以 `supabase/schema.sql` 为准。
-三段都已上线（2026-11-15，`20261115120000_songs_versions.sql`、`20261116120000_motifs.sql`、`20261117120000_reader_grants_audit.sql`）。
+前三段都已上线（2026-11-15，`20261115120000_songs_versions.sql`、`20261116120000_motifs.sql`、`20261117120000_reader_grants_audit.sql`）；
+第四段（老表补齐第八节的约定）的迁移与代码已写好、尚未上线（`20261118120000_conventions.sql`）。
 各段上线后在第九节打勾。
 讨论中定下来的事项记在第十节。
 
@@ -204,10 +205,12 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 | `collections`   | 去掉 uuid 主键，主键改为 `(user_id, song_id)`                                                          |
 | `stream_grants` | `song_id` 改 `bigint`，加外键指 `songs`                                                                |
 | 用户外键        | `collections`、`user_requests`、`quiz_results` 的 `user_id` 由 `auth.users` 改指 `public.users`        |
-| `user_requests` | `varchar` 改 `text`，其余不变                                                                          |
-| `quiz_results`  | 不变；`song_ids` 是测试结果的快照，不加外键，表注释里写明                                              |
+| `user_requests` | `varchar` 改 `text`；主键由 uuid 改 `bigint` identity；去掉没人读的 `updated_at`（回复时间看 `replied_at`） |
+| `quiz_results`  | `song_ids` 是测试结果的快照，不加外键，列注释里写明；类型改 `bigint[]`，与 `songs.id` 一致             |
+| `users`         | 补 `created_at`，按 `auth.users` 的注册时间回填                                                        |
 
-读者数据挂在 `songs` 上，歌没上线或下架后数据仍在。公开端读写它们时经 `published_songs` 确认歌在线。
+读者数据挂在 `songs` 上，歌没上线或下架后数据仍在。公开端读写它们时经 `published_songs` 确认歌在线：
+收藏、批注、纠错、领取试听写之前都调 `isSongPublished`（`service-songs.ts`），不在线返回 404。
 
 `role` 的四个值逐级包含：`bot` 能做后台的读写但不能发布、下架、删除，也不处理用户请求；`admin` 再加发布与放弃草稿；`super` 再加下架、删除与用户管理。
 改 `role` 后旧的登录令牌里没有新字段，上线后管理员需要重新登录一次。
@@ -222,17 +225,22 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 | 专辑表                 | 专辑名、曲序、碟号、出品发行存在每首歌上    | 要做专辑页时     |
 | 拆 `user_requests`     | 歌曲反馈与两种权限申请共用一张表            | 流程明显分叉时   |
 | 评点记锚定的版本       | 按行号 + 引文重定位                         | 重定位不够准时   |
-| 改列名                 | `albumartist`、`comment`、`nmn_status` 等沿用 | 不做，改名只是折腾 |
+| 改列名                 | `albumartist`、`comment`、`nmn_status` 等沿用 | 不做，改名只是折腾（创建时间统一叫 `created_at` 是例外，第四段） |
 
 ## 八、约定
 
-**主键。** 实体用 `bigint` identity；关系表用自然的复合主键，不另加代理键；`users` 跟 `auth.users` 用 uuid；出现在分享链接里的用短文本 id。
+**主键。** 实体用 `bigint` identity；关系表用自然的复合主键，不另加代理键；`users` 跟 `auth.users` 用 uuid；出现在分享链接里的用短文本 id（`quiz_results`）。
+`credit_aliases` 以别名本身为主键（一个别名只归到一个主名）。
 
 **枚举。** `text` + `check`。代码值用英文小写；领域词汇本身是中文的（门类、基调的明暗扬抑）照用中文。不用数字代码，不用 enum 类型。
+例外：`song_versions.hascover` 是可空的 boolean，三个值各表示一种封面（第三节「附属表」）。它在每个冻结的版本里，公开端处处在用，改成文本不值。
 
-**时间戳。** 每张表有 `created_at`；行会被修改且有人读修改时间的才加 `updated_at`，由触发器维护。
+**时间戳。** 每张表有非空的 `created_at`，行是什么时候建的就记什么时候（订者名单里是这个人第一次订正的时间，试听记录里是领取的时间）；
+行会被修改且有人读修改时间的才加 `updated_at`，由触发器维护（`song_versions`、`song_collations`）。
+记某件事发生的时间另起有意义的名字：`published_at`、`replied_at`、`edited_at`。
 
-**外键。** 引用必有外键，类型与被引用的列一致。例外只有快照，在表注释里写明。
+**外键。** 引用必有外键，类型与被引用的列一致。例外只有快照，在注释里写明（`quiz_results.song_ids`）。
+指向用户的「谁做的」一律 `on delete set null`（`created_by`、`updated_by`、`replied_by`、`audit_logs.user_id`）：人删了，记录留着。
 
 **权限。**
 
@@ -314,6 +322,23 @@ PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
 - [x] 补审计触发器：`imagery_motifs`、`emotions`、`credit_aliases`。
 - [x] 代码：评论的状态值改用文本；几处说明「谁用哪个客户端」的注释改成与实际一致。接口不变。
 
+### 第四段：老表补齐约定（`20261118120000_conventions.sql`，已写好、未上线）
+
+三段上线后对照第八节查出的出入，一次补齐。
+
+- [ ] 主键：`user_requests`、`audit_logs` 由 uuid 改 `bigint` identity，按创建时间编号；`emotions.id` 由 `smallint` 改 `bigint` identity，
+  `song_emotions.emotion_id` 跟着改（视图 `published_song_emotions` 先删后建）。
+- [ ] 时间戳：`users`（按注册时间回填）、`emotions`（已有的十一行记作迁移时间）补 `created_at`；
+  `audit_logs.changed_at`、`stream_grants.issued_at`、`song_collation_revisers.first_at` 改名 `created_at`，
+  引用它们的 `claim_stream_grant`、`ensure_draft`、定时任务 `cleanup-audit-logs` 一并重建。
+  `user_requests.updated_at` 删掉（没人读，回复时间看 `replied_at`）；没人用的 `updated_at()` 函数删掉。
+- [ ] 外键：`audit_logs.user_id` 指 `users`（`on delete set null`），加按时间、按人的索引；`quiz_results.song_ids` 改 `bigint[]`。
+  - 预检：审计日志里的用户都还在，`users` 都在 `auth.users` 里。生产数据已只读核对过（2026-11-15）。
+  - 断言：行数不变；每张表都有非空的 `created_at`；除 `users` 外没有 uuid 单列主键；`anon` 仍然没有权限。
+- [ ] 代码：后台的请求、审计日志改用数字 id 与 `created_at`；订者名单读 `created_at`。
+  收藏、批注、纠错、领取试听写之前确认歌在线（第六节），不在线返回 404。
+  - 后台接口：`PUT /api/admin/requests` 的 `id` 改为数字。
+
 ## 十、已定事项
 
 | 日期       | 定了什么                                                                                           |
@@ -332,5 +357,8 @@ PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
 | 2026-11-15 | `temp` 与 `music` 的内容已确认一致，回填不开草稿                                                   |
 | 2026-11-15 | 封面与简谱留在版本里，不建 `song_assets`：`hascover` 是三选一的封面，按文件在不在算不出来            |
 | 2026-11-15 | `motifs.description` 允许空：拆表前建的母题大多没写；新建时后台仍要求必填                           |
+| 2026-11-15 | 老表补齐第八节的约定（第四段）；`hascover` 的三值 boolean 保留，记为约定的例外                     |
+| 2026-11-15 | `user_requests.updated_at` 删掉而不改触发器：没人读，回复时间已有 `replied_at`                      |
+| 2026-11-15 | 审计日志的操作人删号后置空，日志保留                                                               |
 
 目前没有待定的事项。新出现的写在这里，定了再挪进上表。

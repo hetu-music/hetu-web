@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
+import { isSongPublished } from "@/lib/server/service-songs";
 
 // ─── 创建请求 schema ──────────────────────────────────────────────────────────
 
@@ -92,6 +93,10 @@ export const POST = withAuth(
         { error: "歌曲纠错必须指定歌曲" },
         { status: 400 },
       );
+    }
+    // 只能给在线的歌纠错：没上线、已下架的歌也有 id
+    if (song_id && !(await isSongPublished(song_id))) {
+      return NextResponse.json({ error: "歌曲不存在" }, { status: 404 });
     }
 
     // 写走 service 连接：库里不给 authenticated 插入 user_requests

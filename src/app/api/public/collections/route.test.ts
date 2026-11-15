@@ -44,9 +44,10 @@ vi.mock("@/lib/server/server-utils", async (importOriginal) => {
 
 vi.mock("@/lib/server/service-songs", () => ({
   getSongsByIds: vi.fn(async () => []),
+  isSongPublished: vi.fn(async () => true),
 }));
 
-import { getSongsByIds } from "@/lib/server/service-songs";
+import { getSongsByIds, isSongPublished } from "@/lib/server/service-songs";
 import { DELETE, GET, POST } from "./route";
 
 function makeRequest(
@@ -78,6 +79,8 @@ beforeEach(() => {
   fromCallIndex = 0;
   vi.mocked(getSongsByIds).mockReset();
   vi.mocked(getSongsByIds).mockResolvedValue([]);
+  vi.mocked(isSongPublished).mockReset();
+  vi.mocked(isSongPublished).mockResolvedValue(true);
 });
 
 describe("GET /api/public/collections", () => {
@@ -145,6 +148,13 @@ describe("POST /api/public/collections", () => {
   it("songId 非数字时返回 400", async () => {
     const res = await POST(makeRequest("POST", { songId: "abc" }));
     expect(res.status).toBe(400);
+  });
+
+  it("歌不在线上时返回 404，不写库", async () => {
+    vi.mocked(isSongPublished).mockResolvedValue(false);
+    const res = await POST(makeRequest("POST", { songId: 1 }));
+    expect(res.status).toBe(404);
+    expect(fromCallIndex).toBe(0);
   });
 
   it("重复收藏（唯一约束冲突 23505）时视为成功，而不是报错", async () => {

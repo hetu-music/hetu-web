@@ -394,7 +394,7 @@ export type RequestType = "song_feedback" | "benefit_apply" | "admin_apply";
 export type RequestStatus = "pending" | "replied" | "approved" | "rejected";
 
 export type UserRequest = {
-  id: string;
+  id: number;
   user_id: string;
   type: RequestType;
   song_id: number | null;
@@ -405,7 +405,6 @@ export type UserRequest = {
   replied_by: string | null;
   replied_at: string | null;
   created_at: string;
-  updated_at: string;
   // 关联数据（管理员视图）
   user_name?: string | null;
   song_title?: string | null;
@@ -419,7 +418,7 @@ export type CreateRequestPayload = {
 };
 
 export type ReplyRequestPayload = {
-  id: string;
+  id: number;
   reply: string;
   status: RequestStatus;
 };

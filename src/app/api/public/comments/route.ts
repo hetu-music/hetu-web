@@ -7,6 +7,7 @@ import {
   createCommentSchema,
 } from "@/lib/server/service-comments";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { isSongPublished } from "@/lib/server/service-songs";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
 // POST /api/public/comments — 写批注或回复
@@ -17,6 +18,11 @@ export const POST = withAuth(
       createCommentSchema,
     );
     if (invalid) return invalid;
+
+    // 只能在线的歌下批注：没上线、已下架的歌也有 id
+    if (!(await isSongPublished(input.songId))) {
+      return NextResponse.json({ error: "歌曲不存在" }, { status: 404 });
+    }
 
     // 用 service 连接写：库里不给 authenticated 插入评论的权限。限流和内容校验
     // 都在这个接口里，绕过接口直连 PostgREST 写不进去

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { getSongsByIds } from "@/lib/server/service-songs";
+import { getSongsByIds, isSongPublished } from "@/lib/server/service-songs";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
@@ -68,6 +68,11 @@ export const POST = withAuth(
     );
     if (invalid) return invalid;
     const { songId } = input;
+
+    // 只能收藏在线的歌：没上线、已下架的歌也有 id
+    if (!(await isSongPublished(songId))) {
+      return NextResponse.json({ error: "歌曲不存在" }, { status: 404 });
+    }
 
     // 写走 service 连接：库里不给 authenticated 写收藏
     const supabase = getServiceClient();

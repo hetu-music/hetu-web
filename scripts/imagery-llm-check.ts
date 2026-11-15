@@ -51,22 +51,22 @@ async function main() {
 
   const [dictionary, occurrences, songs, categoryRows, motifRows] =
     await Promise.all([
-    fetchAll<{ id: number; name: string }>("imagery", "id,name"),
-    fetchAll<{ song_id: number; imagery_id: number; motif_id: number }>(
-      "working_song_imagery",
-      "song_id,imagery_id,motif_id",
-    ),
-    fetchAll<{ id: number; title: string; lyrics: string | null }>(
-      // 标注按同一版本的歌词标：都取工作版本（有草稿用草稿）
-      "working_songs",
-      "id,title,lyrics",
-    ),
-    fetchAll<ImageryCategory>(
-      "imagery_categories",
-      "id,name,domain,description",
-    ),
-    fetchAll<Motif>("motifs", "id,name,category_id,description"),
-  ]);
+      fetchAll<{ id: number; name: string }>("imagery", "id,name"),
+      fetchAll<{ song_id: number; imagery_id: number; motif_id: number }>(
+        "working_song_imagery",
+        "song_id,imagery_id,motif_id",
+      ),
+      fetchAll<{ id: number; title: string; lyrics: string | null }>(
+        // 标注按同一版本的歌词标：都取工作版本（有草稿用草稿）
+        "working_songs",
+        "id,title,lyrics",
+      ),
+      fetchAll<ImageryCategory>(
+        "imagery_categories",
+        "id,name,domain,description",
+      ),
+      fetchAll<Motif>("motifs", "id,name,category_id,description"),
+    ]);
 
   const categories = motifOptions({
     categories: categoryRows,

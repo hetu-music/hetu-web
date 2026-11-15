@@ -6,7 +6,7 @@ import {
   apiGetImageryTaxonomy,
   apiGetImageryItems,
 } from "@/lib/api/client-api";
-import type { ImageryItem, ImageryTaxonomy } from "@/lib/types";
+import type { ImageryItem, ImageryTaxonomy, Motif } from "@/lib/types";
 
 /**
  * 意象词典、分类的查询：意象库各页与歌曲工作台的「意象」一栏共用同一份缓存，
@@ -35,6 +35,20 @@ export function useImageryTaxonomyQuery(initialData?: ImageryTaxonomy) {
     staleTime: STALE_MS,
     initialData,
   });
+}
+
+/** 新增、改名、整理母题后就地改缓存里的母题表 */
+export function useUpdateMotifs() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (update: (current: Motif[]) => Motif[]) =>
+      queryClient.setQueryData<ImageryTaxonomy>(
+        IMAGERY_KEYS.categories,
+        (current) =>
+          current ? { ...current, motifs: update(current.motifs) } : current,
+      ),
+    [queryClient],
+  );
 }
 
 /** 写操作成功后就地改缓存，不再整表重取 */

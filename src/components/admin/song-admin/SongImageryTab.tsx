@@ -10,13 +10,13 @@ import {
 } from "@/lib/api/client-api";
 import { MIN_OCCURRENCES } from "@/lib/quiz/pool";
 import type { OccurrenceWithSong } from "@/lib/server/service-imagery";
-import { categoryPath, motifOptions } from "@/lib/imagery/word-motifs";
+import { motifOptions, motifPaths } from "@/lib/imagery/word-motifs";
 import SongAnnotationWorkbench, {
   type AnnotationDraft,
 } from "../imagery-admin/SongAnnotationWorkbench";
 import {
   IMAGERY_KEYS,
-  useImageryCategoriesQuery,
+  useImageryTaxonomyQuery,
   useImageryItemsQuery,
 } from "../imagery-admin/queries";
 import { EmptyState, ErrorState, LoadingState } from "../kit/parts";
@@ -44,19 +44,18 @@ export default function SongImageryTab({
   const [submitting, setSubmitting] = useState(false);
 
   const items = useImageryItemsQuery();
-  const categories = useImageryCategoriesQuery();
+  const categories = useImageryTaxonomyQuery();
   const occurrences = useQuery<OccurrenceWithSong[]>({
     queryKey: songOccurrencesKey(song.id),
     queryFn: () => apiGetOccurrencesForSong(song.id),
   });
 
-  const categoryList = useMemo(() => categories.data ?? [], [categories.data]);
-  const motifs = useMemo(() => motifOptions(categoryList), [categoryList]);
-  const pathOf = useCallback(
-    (id: number) =>
-      categoryPath(id, new Map(categoryList.map((c) => [c.id, c]))),
-    [categoryList],
+  const taxonomy = useMemo(
+    () => categories.data ?? { categories: [], motifs: [] },
+    [categories.data],
   );
+  const motifs = useMemo(() => motifOptions(taxonomy), [taxonomy]);
+  const pathOf = useMemo(() => motifPaths(taxonomy), [taxonomy]);
 
   /** 标注变了，这首歌的标注与词典（用量、登记的母题）都要重取 */
   const reload = useCallback(

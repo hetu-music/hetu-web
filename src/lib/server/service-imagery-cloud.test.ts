@@ -20,16 +20,17 @@ import { getImageryCloud, getMotifDetail } from "./service-imagery-cloud";
 // 9 号歌不在曲库里（资料存疑），不计入任何统计
 
 const categories = [
-  { id: 1, name: "自然", parent_id: null, level: 1, description: null },
-  { id: 2, name: "天象", parent_id: 1, level: 2, description: null },
-  { id: 3, name: "月", parent_id: 2, level: 3, description: "月亮与月光" },
-  { id: 4, name: "风", parent_id: 2, level: 3, description: null },
-  { id: 13, name: "焰火", parent_id: 2, level: 3, description: null },
-  { id: 16, name: "时令", parent_id: 1, level: 2, description: null },
-  { id: 15, name: "春", parent_id: 16, level: 3, description: null },
-  { id: 10, name: "人文", parent_id: null, level: 1, description: null },
-  { id: 11, name: "器物", parent_id: 10, level: 2, description: null },
-  { id: 12, name: "剑", parent_id: 11, level: 3, description: null },
+  { id: 2, name: "天象", domain: "自然", description: null },
+  { id: 16, name: "时令", domain: "自然", description: null },
+  { id: 11, name: "器物", domain: "人文", description: null },
+];
+
+const motifs = [
+  { id: 3, name: "月", category_id: 2, description: "月亮与月光" },
+  { id: 4, name: "风", category_id: 2, description: null },
+  { id: 13, name: "焰火", category_id: 2, description: null },
+  { id: 15, name: "春", category_id: 16, description: null },
+  { id: 12, name: "剑", category_id: 11, description: null },
 ];
 
 const imagery = [
@@ -48,8 +49,10 @@ const songs = [
 
 const occ = (song_id: number, imagery_id: number, motif_id: number) => ({
   song_id,
+  version_id: song_id,
   imagery_id,
   motif_id,
+  part_motif_ids: [],
 });
 
 const occurrences = [
@@ -67,6 +70,9 @@ const occurrences = [
 function mockClient() {
   const byTable: Record<string, unknown[]> = {
     [TABLES.IMAGERY_CAT]: categories,
+    [TABLES.MOTIFS]: motifs,
+    // 词云不看时间标签，歌词给空
+    [TABLES.PUBLISHED_SONGS]: [],
     [TABLES.IMAGERY]: imagery,
     [TABLES.PUBLISHED_SONG_IMAGERY]: occurrences,
     [TABLES.CATALOG]: songs,
@@ -95,8 +101,9 @@ describe("getImageryCloud", () => {
     const cloud = await getImageryCloud("zh-CN");
 
     expect(cloud.l1).toEqual([
-      { id: 1, name: "自然", palette: 0 },
-      { id: 10, name: "人文", palette: 1 },
+      { id: "自然", name: "自然", palette: 0 },
+      { id: "人文", name: "人文", palette: 1 },
+      { id: "情志", name: "情志", palette: 2 },
     ]);
     expect(
       cloud.groups.map((g) => [g.name, g.motifs.map((m) => m.name)]),
@@ -110,7 +117,7 @@ describe("getImageryCloud", () => {
     expect(cloud.groups[0].motifs[0]).toEqual({
       id: 3,
       name: "月",
-      l1: 1,
+      l1: "自然",
       l2: 2,
       palette: 0,
       songCount: 2,

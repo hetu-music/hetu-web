@@ -114,12 +114,12 @@ function shortPath(path: string): string {
 }
 
 /**
- * 一个词在这首歌里的标注。挂「通常算作」的词会补写「同时算进」的各条（「风雨」写风、雨两条），
- * 它们是一次标注写出来的：界面上合成一行，编辑、删除都按主条
+ * 一个词在这首歌里的标注：一个词一条。挂「通常算作」时它「同时算进」的母题由服务端读时展开
+ *（part_motif_ids，「风雨」挂风时也算雨），跟着这一条显示
  */
 interface WordAnnotation {
   main: OccurrenceWithSong;
-  parts: OccurrenceWithSong[];
+  parts: number[];
 }
 
 function firstSecond(o: OccurrenceWithSong): number {
@@ -176,21 +176,14 @@ export default function SongAnnotationWorkbench({
     () => new Map(items.map((i) => [i.name.toLowerCase(), i])),
     [items],
   );
-  /** 按词合并的标注，主条是不在这个词「同时算进」里的那条，按首次出现排 */
-  const annotations = useMemo(() => {
-    const partsOf = new Map(items.map((i) => [i.id, new Set(i.parts)]));
-    const byWord = new Map<number, OccurrenceWithSong[]>();
-    for (const o of occurrences) {
-      byWord.set(o.imagery_id, [...(byWord.get(o.imagery_id) ?? []), o]);
-    }
-    return [...byWord.values()]
-      .map((rows): WordAnnotation => {
-        const parts = partsOf.get(rows[0].imagery_id) ?? new Set<number>();
-        const main = rows.find((r) => !parts.has(r.motif_id)) ?? rows[0];
-        return { main, parts: rows.filter((r) => r !== main) };
-      })
-      .sort((a, b) => firstSecond(a.main) - firstSecond(b.main));
-  }, [items, occurrences]);
+  /** 这首歌的标注，按首次出现排 */
+  const annotations = useMemo(
+    () =>
+      occurrences
+        .map((o): WordAnnotation => ({ main: o, parts: o.part_motif_ids }))
+        .sort((a, b) => firstSecond(a.main) - firstSecond(b.main)),
+    [occurrences],
+  );
   /** 歌词行上的标注，一个词只算一次 */
   const occurrencesByTag = useMemo(() => {
     const map = new Map<string, OccurrenceWithSong[]>();
@@ -629,9 +622,7 @@ export default function SongAnnotationWorkbench({
                   candidateIds={resolvedItem ? wordMotifIds(resolvedItem) : []}
                   value={editor.motifId}
                   motifs={motifs}
-                  onChange={(motifId) =>
-                    setEditor({ ...editor, motifId })
-                  }
+                  onChange={(motifId) => setEditor({ ...editor, motifId })}
                   placeholder="— 选择母题 —"
                   hint
                   className={SELECT_CLASS}
@@ -744,11 +735,7 @@ export default function SongAnnotationWorkbench({
                           {shortPath(getMotifPath(o.motif_id))}
                           {parts.length > 0 &&
                             ` · ${WORD_ROLE.part.label} ${parts
-                              .map((p) =>
-                                getMotifPath(p.motif_id)
-                                  .split(" / ")
-                                  .pop(),
-                              )
+                              .map((p) => getMotifPath(p).split(" / ").pop())
                               .join("、")}`}
                         </span>
                       </div>

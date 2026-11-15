@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createMotifFormValues, motifFormSchema } from "./imagery-form";
 
 describe("motifFormSchema", () => {
-  const valid = { name: "汗", parent_id: 2, description: "汗水、汗珠" };
+  const valid = { name: "汗", category_id: 2, description: "汗水、汗珠" };
 
   it("名称、类别、说明齐全时通过，并去掉首尾空白", () => {
     const result = motifFormSchema.safeParse({ ...valid, name: " 汗 " });
@@ -29,9 +29,9 @@ describe("motifFormSchema", () => {
   });
 
   it("必须选类别", () => {
-    expect(motifFormSchema.safeParse({ ...valid, parent_id: 0 }).success).toBe(
-      false,
-    );
+    expect(
+      motifFormSchema.safeParse({ ...valid, category_id: 0 }).success,
+    ).toBe(false);
   });
 });
 
@@ -39,7 +39,7 @@ describe("createMotifFormValues", () => {
   it("新增时给空值，类别为 0（未选）", () => {
     expect(createMotifFormValues()).toEqual({
       name: "",
-      parent_id: 0,
+      category_id: 0,
       description: "",
     });
   });
@@ -49,10 +49,9 @@ describe("createMotifFormValues", () => {
       createMotifFormValues({
         id: 9,
         name: "汗",
-        parent_id: 2,
-        level: 3,
+        category_id: 2,
         description: null,
       }),
-    ).toEqual({ name: "汗", parent_id: 2, description: "" });
+    ).toEqual({ name: "汗", category_id: 2, description: "" });
   });
 });

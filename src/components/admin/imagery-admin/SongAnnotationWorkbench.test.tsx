@@ -55,8 +55,10 @@ function occurrence(
 ): OccurrenceWithSong {
   return {
     song_id: 7,
+    version_id: 70,
     imagery_id: 1,
     motif_id: 100,
+    part_motif_ids: [],
     lyric_timetag: [],
     song_title: "测试",
     song_album: null,
@@ -236,8 +238,8 @@ describe("SongAnnotationWorkbench", () => {
     expect(screen.getByText("编辑标注 #1")).toBeTruthy();
   });
 
-  it("补写了「同时算进」的词合成一行，编辑、删除都按主条", () => {
-    // 假设「天涯」通常算作区域（200），同时算进星相（100）：库里是两条
+  it("「同时算进」跟着它的标注显示（服务端读时展开），编辑、删除都按这一条", () => {
+    // 假设「天涯」通常算作区域（200），同时算进星相（100）：库里只有一条
     const withPart = items.map((i) =>
       i.id === 2 ? { ...i, parts: [100] } : i,
     );
@@ -246,17 +248,11 @@ describe("SongAnnotationWorkbench", () => {
         song={song}
         occurrences={[
           occurrence({
-            id: 5,
-            imagery_id: 2,
-            imagery_name: "天涯",
-            motif_id: 100,
-            lyric_timetag: ["00:10.00", "01:10.00"],
-          }),
-          occurrence({
             id: 4,
             imagery_id: 2,
             imagery_name: "天涯",
             motif_id: 200,
+            part_motif_ids: [100],
             lyric_timetag: ["00:10.00", "01:10.00"],
           }),
         ]}

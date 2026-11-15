@@ -161,10 +161,7 @@ export default function ImageryClient({
   );
 
   const items: CloudItem[] = useMemo(() => {
-    const inScope = (x: {
-      l1: ImageryDomain | null;
-      l2: number | null;
-    }) =>
+    const inScope = (x: { l1: ImageryDomain | null; l2: number | null }) =>
       deferredL2 !== null
         ? x.l2 === deferredL2
         : deferredL1 === null || x.l1 === deferredL1;

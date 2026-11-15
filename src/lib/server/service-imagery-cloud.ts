@@ -1,11 +1,10 @@
 import { cache } from "react";
 import { domainPalette } from "@/lib/imagery/palette";
-import { loadImageryIndex, type ImageryIndex } from "@/lib/server/imagery-index";
 import {
-  IMAGERY_DOMAINS,
-  type ImageryCategory,
-  type Motif,
-} from "@/lib/types";
+  loadImageryIndex,
+  type ImageryIndex,
+} from "@/lib/server/imagery-index";
+import { IMAGERY_DOMAINS, type ImageryCategory, type Motif } from "@/lib/types";
 import type {
   CloudMotif,
   CloudMotifGroup,

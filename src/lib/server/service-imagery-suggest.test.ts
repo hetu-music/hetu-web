@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createMockSupabaseClient,
+  createTableMockClient,
   makeQueryBuilder,
 } from "@/test/mockSupabase";
 
@@ -33,9 +34,12 @@ const dictionary = [
   { id: 3, name: "人" },
 ];
 const categoryRows = [
-  { id: 1, name: "自然", parent_id: null },
-  { id: 10, name: "天象", parent_id: 1 },
-  { id: 11, name: "地理", parent_id: 1 },
+  { id: 10, name: "天象", domain: "自然", description: null },
+  { id: 20, name: "地域", domain: "人文", description: null },
+];
+const motifRows = [
+  { id: 12, name: "月", category_id: 10, description: null },
+  { id: 11, name: "江湖", category_id: 20, description: null },
 ];
 
 function mockUserSong(data: unknown) {
@@ -46,7 +50,7 @@ function mockUserSong(data: unknown) {
 
 /**
  * getImagerySuggestions 的 fetchAll 按 imagery → occurrences → songs（暂存表）→ motifs 的顺序调用 .from()；
- * 校验（review）只取分类，放在第一个
+ * 校验（review）另取类别与母题，见 mockReviewTables
  */
 function mockServiceTables(tables: {
   imagery?: unknown[];
@@ -61,6 +65,16 @@ function mockServiceTables(tables: {
   );
   vi.mocked(getServiceClient).mockReturnValue(client);
   return client;
+}
+
+/** 校验（review）读类别与母题，拼出可选母题的完整路径 */
+function mockReviewTables() {
+  vi.mocked(getServiceClient).mockReturnValue(
+    createTableMockClient({
+      imagery_categories: makeQueryBuilder({ data: categoryRows, error: null }),
+      motifs: makeQueryBuilder({ data: motifRows, error: null }),
+    }),
+  );
 }
 
 beforeEach(() => {
@@ -151,15 +165,15 @@ describe("reviewImagerySuggestions", () => {
     { imageryId: 3, name: "人", rate: 0.01, recommended: false },
   ];
 
-  it("把歌词、候选和叶子分类发给模型，并还原输出", async () => {
+  it("把歌词、候选和可选母题（完整路径）发给模型，并还原输出", async () => {
     mockUserSong({ id: 5, title: "测试", lyrics });
-    mockServiceTables({ imagery: categoryRows });
+    mockReviewTables();
     vi.mocked(chatJson).mockResolvedValue({
       verdicts: [
         { id: 1, keep: true, reason: "景物" },
         { id: 2, keep: false, reason: "泛指" },
       ],
-      additions: [{ name: "江湖", lines: [2], motifId: 11, reason: "地理" }],
+      additions: [{ name: "江湖", lines: [2], motifId: 11, reason: "地域" }],
     });
 
     const result = await reviewImagerySuggestions(5, candidates, "token");
@@ -174,14 +188,15 @@ describe("reviewImagerySuggestions", () => {
           timetags: ["00:20.00"],
           lines: ["人在江湖"],
           motifId: 11,
-          reason: "地理",
+          reason: "地域",
         },
       ],
     });
     const { user } = vi.mocked(chatJson).mock.calls[0][0];
     expect(user).toContain("歌名：测试");
     expect(user).toContain("2. 人（默认不勾选，历史标注率 1%）");
-    expect(user).toContain("11: 自然 / 地理");
+    expect(user).toContain("11: 人文 / 地域 / 江湖");
+    expect(user).toContain("12: 自然 / 天象 / 月");
   });
 
   it("歌曲不存在时返回 null，不调用模型", async () => {

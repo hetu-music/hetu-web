@@ -31,9 +31,7 @@ export const motifFormSchema = z.object({
 export type MotifFormValues = z.input<typeof motifFormSchema>;
 export type MotifPayload = z.output<typeof motifFormSchema>;
 
-export function createMotifFormValues(
-  motif?: Partial<Motif>,
-): MotifFormValues {
+export function createMotifFormValues(motif?: Partial<Motif>): MotifFormValues {
   return {
     name: motif?.name ?? "",
     category_id: typeof motif?.category_id === "number" ? motif.category_id : 0,

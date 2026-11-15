@@ -4,10 +4,7 @@ import {
   type AuthenticatedUser,
   type AuthContext,
 } from "@/lib/server/server-auth";
-import {
-  getImageryTaxonomy,
-  createMotif,
-} from "@/lib/server/service-imagery";
+import { getImageryTaxonomy, createMotif } from "@/lib/server/service-imagery";
 import {
   refreshImagery,
   withPurgeStatus,

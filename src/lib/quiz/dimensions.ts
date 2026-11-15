@@ -3,7 +3,7 @@ import type { Dimension, DimensionKey, SignatureImagery } from "./types";
 /**
  * 意象维度定义。
  *
- * 由数据库中的 17 个意象二级分类合并而来（分类体系见 IMAGERY.md）：过于稀疏的分类
+ * 由数据库中的 17 个意象类别合并而来（分类体系见 IMAGERY.md）：过于稀疏的分类
  *（世事、饮食等）并入相近维度，避免单独成维带来噪声。分类改名时需同步这里。
  */
 export const DIMENSIONS: readonly Dimension[] = [
@@ -84,7 +84,7 @@ export function getDimension(key: DimensionKey): Dimension {
   return dim;
 }
 
-/** 二级分类名 → 维度 */
+/** 类别名 → 维度 */
 export const CATEGORY_TO_DIMENSION: ReadonlyMap<string, DimensionKey> = new Map(
   DIMENSIONS.flatMap((d) => d.categories.map((c) => [c, d.key])),
 );

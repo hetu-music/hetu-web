@@ -6,13 +6,13 @@ import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import { Link } from "@/i18n/navigation";
 import { apiCreateMotif, apiUpdateMotif } from "@/lib/api/client-api";
 import type { MotifPayload } from "@/lib/forms/imagery-form";
+import { motifOptions, motifPaths, WORD_ROLE } from "@/lib/imagery/word-motifs";
 import {
-  categoryPath,
-  isMotif,
-  motifOptions,
-  WORD_ROLE,
-} from "@/lib/imagery/word-motifs";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
+  IMAGERY_DOMAINS,
+  type ImageryItem,
+  type ImageryTaxonomy,
+  type Motif,
+} from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import AdminShell from "../kit/AdminShell";
 import {
@@ -33,10 +33,9 @@ import { notify, notifyError } from "../kit/toast";
 import { CleanupMotifsDialog } from "./CleanupMotifsDialog";
 import MotifFormDialog, { type MotifFormTarget } from "./MotifFormDialog";
 import {
-  IMAGERY_KEYS,
-  useImageryCategoriesQuery,
   useImageryItemsQuery,
-  useUpdateCache,
+  useImageryTaxonomyQuery,
+  useUpdateMotifs,
 } from "./queries";
 import WordPanel from "./WordPanel";
 
@@ -69,17 +68,16 @@ function extraNote(
  * 词在标注时按歌词原文创建，不单独新建或改名。界面上的叫法见 WordPanel 的 WORD_ROLE。
  */
 export default function MotifsClient({
-  initialCategories,
+  initialTaxonomy,
 }: {
-  initialCategories: ImageryCategory[];
+  initialTaxonomy: ImageryTaxonomy;
 }) {
-  const categoriesQuery = useImageryCategoriesQuery(initialCategories);
-  const categories = categoriesQuery.data ?? initialCategories;
+  const taxonomyQuery = useImageryTaxonomyQuery(initialTaxonomy);
+  const taxonomy = taxonomyQuery.data ?? initialTaxonomy;
+  const { categories, motifs: allMotifs } = taxonomy;
   const itemsQuery = useImageryItemsQuery();
   const items = useMemo(() => itemsQuery.data ?? [], [itemsQuery.data]);
-  const setCategories = useUpdateCache<ImageryCategory>(
-    IMAGERY_KEYS.categories,
-  );
+  const setMotifs = useUpdateMotifs();
   const wide = useMediaQuery("(min-width: 1024px)");
 
   const [group, setGroup] = useState<string>(ALL);
@@ -90,25 +88,30 @@ export default function MotifsClient({
   const [submitting, setSubmitting] = useState(false);
   const [cleaning, setCleaning] = useState(false);
 
-  const byId = useMemo(
+  const motifById = useMemo(
+    () => new Map(allMotifs.map((m) => [m.id, m])),
+    [allMotifs],
+  );
+  const categoryById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
     [categories],
   );
-  const nameOf = (id: number) => byId.get(id)?.name ?? `母题 #${id}`;
-  const motifs = useMemo(() => motifOptions(categories), [categories]);
+  const nameOf = (id: number) => motifById.get(id)?.name ?? `母题 #${id}`;
+  /** 类别的路径「门类 / 类别」 */
+  const categoryLabel = (id: number) => {
+    const c = categoryById.get(id);
+    return c ? `${c.domain} / ${c.name}` : `类别 #${id}`;
+  };
+  const pathOf = useMemo(() => motifPaths(taxonomy), [taxonomy]);
+  const motifs = useMemo(() => motifOptions(taxonomy), [taxonomy]);
 
   /** 类别栏：按门类分行，门类只是行首的小字 */
   const groupRows = useMemo(
     () =>
-      categories
-        .filter((c) => c.level === 1)
-        .sort(byName)
-        .map((top) => ({
-          top,
-          groups: categories
-            .filter((c) => c.level === 2 && c.parent_id === top.id)
-            .sort(byName),
-        })),
+      IMAGERY_DOMAINS.map((domain) => ({
+        domain,
+        groups: categories.filter((c) => c.domain === domain).sort(byName),
+      })),
     [categories],
   );
 
@@ -141,7 +144,6 @@ export default function MotifsClient({
     query !== "" && item.name.toLowerCase().includes(query);
 
   /** 列表里要显示的母题：搜索时跨类别找母题名或词，否则按类别（React Compiler 负责记忆化） */
-  const allMotifs = categories.filter(isMotif);
   const shown = query
     ? allMotifs
         .filter(
@@ -153,13 +155,8 @@ export default function MotifsClient({
         )
         .sort(byName)
     : allMotifs
-        .filter((m) => group === ALL || m.parent_id === Number(group))
-        .sort((a, b) =>
-          categoryPath(a.id, byId).localeCompare(
-            categoryPath(b.id, byId),
-            "zh-CN",
-          ),
-        );
+        .filter((m) => group === ALL || m.category_id === Number(group))
+        .sort((a, b) => pathOf(a.id).localeCompare(pathOf(b.id), "zh-CN"));
 
   const unassigned = items
     .filter((i) => i.primary === null)
@@ -172,12 +169,12 @@ export default function MotifsClient({
     try {
       if (form.type === "add") {
         const created = await apiCreateMotif(values);
-        setCategories((current) => [...current, created]);
+        setMotifs((current) => [...current, created]);
         notify({ type: "success", text: `母题「${created.name}」已创建` });
       } else {
         const updated = await apiUpdateMotif(form.motif.id, values);
-        setCategories((current) =>
-          current.map((c) => (c.id === updated.id ? updated : c)),
+        setMotifs((current) =>
+          current.map((m) => (m.id === updated.id ? updated : m)),
         );
         notify({ type: "success", text: "母题已更新" });
       }
@@ -215,7 +212,7 @@ export default function MotifsClient({
     );
   };
 
-  const renderMotif = (motif: ImageryCategory) => {
+  const renderMotif = (motif: Motif) => {
     const { main = [], other = [] } = wordsOf.get(motif.id) ?? {};
     const open = expanded.has(motif.id) || query !== "";
     const visible = open ? main : main.slice(0, WORDS_SHOWN);
@@ -244,9 +241,9 @@ export default function MotifsClient({
             {main.length} 个词
           </span>
         </div>
-        {(query || group === ALL) && motif.parent_id !== null && (
+        {(query || group === ALL) && (
           <p className={cn(META_CLASS, "mt-0.5")}>
-            {categoryPath(motif.parent_id, byId)}
+            {categoryLabel(motif.category_id)}
           </p>
         )}
         {main.length > 0 ? (
@@ -277,12 +274,12 @@ export default function MotifsClient({
     );
   };
 
-  const failed = [categoriesQuery, itemsQuery].find((q) => q.isError);
+  const failed = [taxonomyQuery, itemsQuery].find((q) => q.isError);
   const panel = word ? (
     <WordPanel
       key={word.id}
       word={word}
-      categories={categories}
+      taxonomy={taxonomy}
       motifs={motifs}
       onClose={() => setWordId(null)}
     />
@@ -325,7 +322,7 @@ export default function MotifsClient({
             onClick={() =>
               setForm({
                 type: "add",
-                parentId: group === ALL ? 0 : Number(group),
+                categoryId: group === ALL ? 0 : Number(group),
               })
             }
             className={SOLID_BUTTON_CLASS}
@@ -352,10 +349,10 @@ export default function MotifsClient({
             active={group}
             onSelect={setGroup}
           />
-          {groupRows.map(({ top, groups }) => (
-            <div key={top.id} className="flex items-baseline gap-3">
+          {groupRows.map(({ domain, groups }) => (
+            <div key={domain} className="flex items-baseline gap-3">
               <span className="w-8 shrink-0 text-xs text-slate-400">
-                {top.name}
+                {domain}
               </span>
               <AdminOptions
                 items={groups.map((g) => ({ id: String(g.id), label: g.name }))}
@@ -398,12 +395,10 @@ export default function MotifsClient({
                     {!query &&
                       group === ALL &&
                       (i === 0 ||
-                        shown[i - 1].parent_id !== motif.parent_id) && (
+                        shown[i - 1].category_id !== motif.category_id) && (
                         <li className="pt-6 first:pt-0">
                           <h2 className="font-serif text-sm text-slate-500 dark:text-slate-400">
-                            {motif.parent_id === null
-                              ? ""
-                              : categoryPath(motif.parent_id, byId)}
+                            {categoryLabel(motif.category_id)}
                           </h2>
                         </li>
                       )}
@@ -472,10 +467,10 @@ export default function MotifsClient({
       <CleanupMotifsDialog
         open={cleaning}
         onClose={() => setCleaning(false)}
-        getMotifPath={(id) => categoryPath(id, byId)}
+        categoryLabel={categoryLabel}
         onDeleted={(ids) => {
           const gone = new Set(ids);
-          setCategories((current) => current.filter((c) => !gone.has(c.id)));
+          setMotifs((current) => current.filter((m) => !gone.has(m.id)));
           void itemsQuery.refetch();
         }}
       />

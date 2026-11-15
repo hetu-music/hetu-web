@@ -10,7 +10,7 @@
  */
 
 export interface LrcLine {
-  /** 原始时间标签，如 "01:26.04"，与 song_imagery.lyric_timetag 格式一致 */
+  /** 原始时间标签，如 "01:26.04"，与标注读出来的 lyric_timetag 格式一致 */
   tag: string;
   text: string;
 }
@@ -39,7 +39,7 @@ export interface ImageryPrior {
   motifIds: number[];
 }
 
-/** 每个词的候选母题：默认母题在前，其后是多义候选。并列词的其余组成不在其中，保存时由服务端补写 */
+/** 每个词的候选母题：默认母题在前，其后是多义候选。并列词的其余组成不在其中，读时展开（见 DATABASE.md 第四节） */
 export function motifCandidates(
   motifs: readonly MotifEntry[],
 ): Map<number, number[]> {
@@ -292,8 +292,7 @@ export function suggestImagery(input: {
       annotated,
       rate,
       // 从未在其他歌里出现过、但已标注过的意象（只在个别歌里用过的专名等）也默认勾选
-      recommended:
-        motifIds.length > 0 && (rate === null || rate >= threshold),
+      recommended: motifIds.length > 0 && (rate === null || rate >= threshold),
     });
   }
 

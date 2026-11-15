@@ -9,11 +9,11 @@ import {
   apiSetWordMotifs,
 } from "@/lib/api/client-api";
 import {
-  categoryPath,
+  motifPaths,
   type MotifOption,
   WORD_ROLE,
 } from "@/lib/imagery/word-motifs";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import type { ImageryItem, ImageryTaxonomy } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { ErrorState, LoadingState } from "../kit/parts";
 import {
@@ -34,19 +34,20 @@ type WordMotifs = { primary: number; alternatives: number[]; parts: number[] };
  */
 export default function WordPanel({
   word,
-  categories,
+  taxonomy,
   motifs,
   onClose,
 }: {
   word: ImageryItem;
-  categories: ImageryCategory[];
+  taxonomy: ImageryTaxonomy;
   motifs: MotifOption[];
   onClose?: () => void;
 }) {
   const byId = useMemo(
-    () => new Map(categories.map((c) => [c.id, c])),
-    [categories],
+    () => new Map(taxonomy.motifs.map((m) => [m.id, m])),
+    [taxonomy],
   );
+  const pathOf = useMemo(() => motifPaths(taxonomy), [taxonomy]);
   const setItems = useUpdateCache<ImageryItem>(IMAGERY_KEYS.items);
   const occurrences = useQuery({
     queryKey: ["admin", "imagery", "word-occurrences", word.id],
@@ -219,7 +220,7 @@ export default function WordPanel({
           saving={saving}
           disabled={word.primary === null}
           nameOf={nameOf}
-          pathOf={(id) => categoryPath(id, byId)}
+          pathOf={pathOf}
           onAdd={(id) => add(role, id)}
           onRemove={(id) => remove(role, id)}
         />

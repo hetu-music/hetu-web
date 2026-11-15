@@ -3,13 +3,14 @@ import { checkCoverage } from "./coverage";
 import { MIN_OCCURRENCES, type PoolRows } from "./pool";
 
 const categories: PoolRows["categories"] = [
-  { id: 1, name: "自然", parent_id: null, level: 1 },
-  { id: 10, name: "天象", parent_id: 1, level: 2 },
-  { id: 11, name: "光阴", parent_id: 1, level: 2 },
-  { id: 12, name: "新分类", parent_id: 1, level: 2 },
-  { id: 100, name: "月", parent_id: 10, level: 3 },
-  { id: 110, name: "岁月", parent_id: 11, level: 3 },
-  { id: 120, name: "其他", parent_id: 12, level: 3 },
+  { id: 10, name: "天象" },
+  { id: 11, name: "光阴" },
+  { id: 12, name: "新分类" },
+];
+const motifs: PoolRows["motifs"] = [
+  { id: 100, name: "月", category_id: 10 },
+  { id: 110, name: "岁月", category_id: 11 },
+  { id: 120, name: "其他", category_id: 12 },
 ];
 
 const imagery = [
@@ -22,11 +23,7 @@ const imagery = [
 ];
 
 type Occ = PoolRows["occurrences"][number];
-const occ = (
-  song_id: number,
-  imagery_id: number,
-  motif_id: number,
-): Occ => ({
+const occ = (song_id: number, imagery_id: number, motif_id: number): Occ => ({
   song_id,
   imagery_id,
   motif_id,
@@ -65,6 +62,7 @@ const occurrences: Occ[] = songIds.flatMap((id) => [
 
 const report = checkCoverage({
   categories,
+  motifs,
   imagery,
   occurrences: [...occurrences, occ(1, 6, 120)],
   songs: [

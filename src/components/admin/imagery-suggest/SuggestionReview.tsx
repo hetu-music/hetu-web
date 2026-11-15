@@ -138,9 +138,7 @@ function SuggestionRow({
 }) {
   const renamed = draft.name !== suggestion.name;
   // 词典里有的词用它登记的母题（与手动标注同一份）；AI 补充的新词只有模型挑的那个
-  const candidateIds = resolved
-    ? wordMotifIds(resolved)
-    : suggestion.motifIds;
+  const candidateIds = resolved ? wordMotifIds(resolved) : suggestion.motifIds;
 
   return (
     <div

@@ -3,7 +3,8 @@
 本站数据库的目标结构、约定与迁移计划。新建表、改表结构、新增挂在别的数据上的表之前先读本文件。
 
 本文写的是**目标**（2026-11-15 定稿）。现状以 `supabase/schema.sql` 为准。
-第一段的迁移与代码已写好、尚未上线（`20261115120000_songs_versions.sql`）；各段上线后在第九节打勾。
+第一段已上线（2026-11-15，`20261115120000_songs_versions.sql`）；第二段的迁移与代码已写好、尚未上线（`20261116120000_motifs.sql`）。
+各段上线后在第九节打勾。
 讨论中定下来的事项记在第十节。
 
 ## 一、原则
@@ -126,11 +127,11 @@ song_audio                                -- 原 navid_song
 | --------------------------- | --------------------------------------------------------------------------------- | ------------------------------------ |
 | `published_songs`           | 在线的歌 + 线上版本的资料 + `has_audio` + 三个链接列 + `version_id`；`updated_at` 是发布时间 | 公开端                               |
 | `catalog`                   | `published_songs` 去掉 `dispute_note` 非空的（取代 `music_catalog`）              | 统计、推荐、寻曲、意象索引、登录画廊 |
-| `published_song_imagery`    | 线上版本的意象标注，带 `song_id`                                                  | 公开端                               |
+| `published_song_imagery`    | 线上版本的意象标注，一条标注一行，带 `song_id`、读时展开的 `part_motif_ids`       | 公开端                               |
 | `published_song_emotions`   | 线上版本的基调，带 `song_id`                                                      | 公开端（意象索引、寻曲）             |
 | `working_songs`             | 每首歌的工作版本（有草稿用草稿，否则用最新冻结版本）+ `version_id` + `is_live`、`has_draft`、`ever_published` | 后台、agent                          |
-| `working_song_imagery`      | 工作版本的意象标注，带 `song_id`、歌名、词名、母题名                              | 后台意象库的跨歌查询                 |
-| `imagery_summary_all`       | 全部词及次数，按工作版本统计（已有，改定义）                                      | 后台词典                             |
+| `working_song_imagery`      | 工作版本的意象标注，带 `song_id`、歌名、词名、母题名、`part_motif_ids`            | 后台意象库的跨歌查询                 |
+| `imagery_summary_all`       | 全部词及标注条数，按工作版本统计                                                  | 后台词典                             |
 
 - `published_songs` 的列名与现在的 `music` 一致，公开端代码基本只换表名。
 - 按单首歌读基调、校记时（公开页与后台都是），先从 `published_songs` 或 `working_songs` 拿到版本 id，再按 `version_id` 直接查表，不另设视图。
@@ -149,10 +150,9 @@ song_imagery                              -- 原 imagery_occurrences
   version_id  bigint references song_versions on delete cascade
   id          bigint identity             -- 各版本间不变
   imagery_id  bigint references imagery on delete cascade
-  category_id bigint references imagery_categories   -- 第二段改为 motif_id → motifs
-  lyric_timetag jsonb[]                   -- 第二段去掉
+  motif_id    bigint references motifs on delete cascade
   created_at, created_by
-  primary key (version_id, id);  unique (version_id, imagery_id, category_id)
+  primary key (version_id, id);  unique (version_id, imagery_id)   -- 一个版本里一个词一条
 
 song_emotions
   version_id, emotion_id, rank, created_at, created_by       -- 去掉 source
@@ -163,12 +163,12 @@ song_collations                           -- song_id 改为 version_id，其余�
 song_collation_revisers                   -- (version_id, collation_id, user_id)，跟着校记一起复制
 ```
 
-第一段原样搬过时间标签与「同时算进」补写的行，下面两条在第二段做：
+时间标签与「同时算进」都不存（第二段起）：
 
 - **时间标签不存，读时在服务端算。** 标签就是「词在本曲字面出现的那几行」（`IMAGERY.md` 第三节），由 `songTimetags` 按同一版本的歌词算出，
-  返回给前端的数据里仍叫 `lyric_timetag`。`syncSongTimetags`、`resyncSongTimetags`、发布后重算的那一步都删掉。
-- **「同时算进」不存，读时展开。** 一条标注挂在词的 `primary` 母题上时，它的 `part` 各母题由 `imagery_motifs` 决定。
-  `addParts` 补写的行，以及改词、改母题、删除时的连带维护都删掉。
+  返回给前端的数据里仍叫 `lyric_timetag`。公开端在意象索引（`imagery-index`）里算好再缓存，歌词不进缓存；后台读标注时按版本现算。
+- **「同时算进」不存，读时展开。** 一条标注挂在词的 `primary` 母题上时，它的 `part` 各母题由 `imagery_motifs` 决定，
+  两个视图算成一列 `part_motif_ids`（一条标注仍是一行，id 唯一）。挂在 `alternative` 上的不展开。
 - 草稿里改了歌词，后台按引文核对校记、按字面核对标注，标出对不上的，发布前处理。
 - 评点（`comments`）挂在歌上，锚点照旧按行号 + 引文重定位，不记版本。
 
@@ -184,13 +184,13 @@ imagery_categories                        -- 只剩十七个类别
 motifs                                    -- 原分类树第三级，id 沿用（/imagery/[id] 的地址不变）
   id, name unique, created_at
   category_id  bigint not null references imagery_categories
-  description  text not null
+  description  text                       -- 后台新建时必填；拆表前建的 312 个大多没写，所以库里允许空
 
 imagery                                   -- 词，不变
-imagery_motifs                            -- category_id 改名 motif_id，指向 motifs；其余不变
+imagery_motifs                            -- category_id 改名 motif_id，指向 motifs（on delete restrict）；其余不变
 ```
 
-门类改成一列后，原来的三行门类不再存在。代码里门类只按名字用（配色顺序、后台类别栏的行首、分类路径），
+类别固定，后台只读（没有 insert、update、delete 的策略），增减走 migration。门类改成一列后，原来的三行门类不再存在。代码里门类只按名字用（配色顺序、后台类别栏的行首、分类路径），
 id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也没有地方显示，所以不需要保留成表。
 涉及的代码：`palette.ts` 的 `sortLevel1Categories`、`service-imagery-cloud.ts` 与 `service-song-imagery.ts` 的 `pathOf`、
 `MotifsClient.tsx` 的类别栏、`word-motifs.ts` 的 `categoryPath`、`quiz/pool.ts` 与 `quiz/coverage.ts`。
@@ -255,7 +255,7 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 
 ## 九、迁移计划
 
-**本地验证。** 没有 Docker，第一段的迁移在 PGlite（WebAssembly 版 Postgres 17）里重放过：桩出 Supabase 的 `auth`、`cron`、角色，
+**本地验证。** 没有 Docker，第一、二段的迁移都在 PGlite（WebAssembly 版 Postgres 17）里重放过：桩出 Supabase 的 `auth`、`cron`、角色，
 跑 baseline 与全部迁移，塞样本数据后逐项核对回填、视图、各角色的权限、冻结、草稿复制、发布、下架、删歌与审计。
 PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
 
@@ -264,34 +264,41 @@ PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
 
 ### 开始之前
 
-- [ ] `20261113130000_revoke_definer_rpc.sql`（生产还没执行）与第一段一起上线（2026-11-15 定）。
+- [x] `20261113130000_revoke_definer_rpc.sql` 与第一段一起上线。
 - [x] 删掉 `supabase/migrations/20261113140000_editorial_on_temp.sql`（本方案取代了它）。
 - [x] `fix` 分支上配套的代码（编校数据读 `temp`）在第一段里重写。
 
 ### 第一段：歌曲、版本、编校与角色
 
-- [ ] 建 `songs`、`song_versions`、`song_links`、`song_audio`，三张编校表改挂版本，建视图、生命周期函数、冻结触发器。
-- [ ] 回填，id 沿用 `temp` 的：
+- [x] 建 `songs`、`song_versions`、`song_links`、`song_audio`，三张编校表改挂版本，建视图、生命周期函数、冻结触发器。
+- [x] 回填，id 沿用 `temp` 的：
   - `temp` 里每首歌建一行 `songs`。
   - `music` 里有的：建一个冻结版本并设为线上版本，现有编校数据挂到它上面。两张表的内容已确认一致，不另开草稿；
     migration 开头逐列比对资料字段（不含 `updated_at`、`has_audio`），发现不一致就停下，不猜该用哪一份。
   - `music` 里没有的（当天新建、还没被每日同步带过去的）：以 `temp` 的内容建草稿。
   - 链接拆进 `song_links`；`hascover`、`nmn_status` 原样进版本；`navid_song` 搬进 `song_audio`。
-- [ ] `users.role` 取代 `is_admin` / `is_super`，RLS 策略与同步到 JWT 的触发器一并改。
+- [x] `users.role` 取代 `is_admin` / `is_super`，RLS 策略与同步到 JWT 的触发器一并改。
 - [ ] 上线后：在后台「用户」里把 agent 的账号设为「机器人」（迁移按原来的 `is_admin` 把它回填成了 admin）；管理员各重新登录一次。
-- [ ] 读者表的外键改指 `songs`。
-- [ ] 停掉每日同步（`cron.unschedule('Update music')`），删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
-- [ ] 断言：`songs` 行数 = 原 `temp` 行数；在线的歌数 = 原 `music` 行数；线上版本的标注、基调、校记行数与原表一致。
-- [ ] 代码：公开端改读 `published_*` 与 `catalog`；后台改读 `working_*`、写走函数；发布、下架、放弃草稿、删除的界面；去掉基调的「待确认」；
+- [x] 读者表的外键改指 `songs`。
+- [x] 停掉每日同步（`cron.unschedule('Update music')`），删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
+- [x] 断言：`songs` 行数 = 原 `temp` 行数；在线的歌数 = 原 `music` 行数；线上版本的标注、基调、校记行数与原表一致。
+- [x] 代码：公开端改读 `published_*` 与 `catalog`；后台改读 `working_*`、写走函数；发布、下架、放弃草稿、删除的界面；去掉基调的「待确认」；
       `withAuth` 改读 `role`；agent 用的接口。
 
-这一段里 `song_imagery` 暂时保留 `lyric_timetag` 列与补写的 `part` 行，原样搬过去，沿用现有的重算；重算要挪到冻结之前（冻结后改不了）。
+这一段里 `song_imagery` 暂时保留了 `lyric_timetag` 列与补写的 `part` 行，第二段去掉。
+上线时预检拦下了一处数据：353、355 两首歌挂着同一条 QQ、酷狗链接（355 的是从 353 复制来的），清掉 355 的两条后重跑通过。
 
-### 第二段：意象
+### 第二段：意象（`20261116120000_motifs.sql`，已写好、未上线）
 
-- [ ] `motifs` 拆表，`imagery_categories` 改为类别 + `domain`，`imagery_motifs`、`song_imagery` 的外键改指 `motifs`。
-- [ ] 去掉 `lyric_timetag` 列，删掉 `part` 补写行（只留主条）。
-- [ ] 代码：读标注的地方改为读时算标签、展开「同时算进」；删 `syncSongTimetags`、`resyncDraftTimetags`、`addParts`；`imagery:check` 去掉修标签的部分。
+- [ ] `motifs` 拆表，`imagery_categories` 改为类别 + `domain`，`imagery_motifs`、`song_imagery` 的外键改指 `motifs`（列名 `category_id` 改 `motif_id`）。
+- [ ] 去掉 `lyric_timetag` 列，删掉 `part` 补写行（只留主条）；`song_imagery` 加 `unique (version_id, imagery_id)`。
+  - 预检：分类树恰好三层、门类只有三个、标注与登记只挂在第三级上。生产数据已只读核对过（2026-11-15）：391 条补写行都有主条，删后每个版本一个词一条。
+  - 删补写行会改到冻结的版本：补写行与标签都是派生数据，删掉不改变任何版本的内容；迁移里临时关掉守卫与审计触发器。
+  - 断言：类别、母题、登记行数不变；标注数 = 原数 − 补写行数；每条删掉的补写行都能由视图展开回来。
+- [ ] 代码：读标注的地方改为读时算标签、展开「同时算进」；删 `syncSongTimetags`、`resyncDraftTimetags`、`addParts`；`imagery:check` 去掉修标签的部分（`--fix` 没有了）。
+  - 发布时只核对歌词里找不到的标注词并提示，不再重算。
+  - 后台接口：`GET /api/admin/imagery/categories` 改为返回 `{ categories, motifs }`；新建、修改母题用 `category_id`（原 `parent_id`）；标注的写入用 `motif_id`（原 `category_id`）。
+  - 改登记里的「同时算进」不再被已有标注拦住（它是读时展开的）；一首歌里重复标同一个词返回 400。
 
 ### 第三段：小项（各自独立）
 
@@ -315,8 +322,7 @@ PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
 | 2026-11-15 | 门类改成 `imagery_categories.domain` 一列，不保留成表（已查过代码，只按名字用）                    |
 | 2026-11-15 | `revoke_definer_rpc` 与第一段一起上线                                                                |
 | 2026-11-15 | `temp` 与 `music` 的内容已确认一致，回填不开草稿                                                   |
+| 2026-11-15 | 封面与简谱留在版本里，不建 `song_assets`：`hascover` 是三选一的封面，按文件在不在算不出来            |
+| 2026-11-15 | `motifs.description` 允许空：拆表前建的母题大多没写；新建时后台仍要求必填                           |
 
-待定（新出现的写在这里，定了再挪进上表）：
-
-1. **封面与简谱留在版本里，不建 `song_assets`。** 写第一段时发现 `hascover` 是三选一的封面（见第三节「附属表」），
-   按文件在不在算不出来；已按「留在版本里」实现，与原来的行为一致。待确认。
+目前没有待定的事项。新出现的写在这里，定了再挪进上表。

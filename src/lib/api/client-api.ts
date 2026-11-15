@@ -4,7 +4,8 @@ import { editorialWrite } from "@/lib/api/editorial-events";
 import type {
   CreateRequestPayload,
   Emotion,
-  ImageryCategory,
+  ImageryTaxonomy,
+  Motif,
   ImageryItem,
   ReplyRequestPayload,
   Song,

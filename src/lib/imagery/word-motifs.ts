@@ -24,7 +24,7 @@ export const WORD_ROLE = {
   },
 } as const;
 
-/** 标注这个词时可选的母题：默认母题在前，其后是多义候选（并列组成由服务端补写，不在其中） */
+/** 标注这个词时可选的母题：默认母题在前，其后是多义候选（并列组成读时展开，不在其中） */
 export function wordMotifIds(
   item: Pick<ImageryItem, "primary" | "alternatives">,
 ): number[] {
@@ -46,12 +46,10 @@ export function motifPaths(
   const categoryById = new Map(taxonomy.categories.map((c) => [c.id, c]));
   const paths = new Map(
     taxonomy.motifs.map((m) => {
-      const category = categoryById.get(m.motif_id);
+      const category = categoryById.get(m.category_id);
       return [
         m.id,
-        category
-          ? `${category.domain} / ${category.name} / ${m.name}`
-          : m.name,
+        category ? `${category.domain} / ${category.name} / ${m.name}` : m.name,
       ];
     }),
   );

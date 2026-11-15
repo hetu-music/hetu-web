@@ -90,7 +90,7 @@ export interface SongImageryMark {
   motifId: number;
   /** 一级 → 末级分类名 */
   path: string[];
-  /** 一级分类配色 */
+  /** 门类配色 */
   accent: string;
   timetags: string[];
   /** 曲库里写到这个词的作品数（含本曲）；按词不按母题，与意象页一致 */

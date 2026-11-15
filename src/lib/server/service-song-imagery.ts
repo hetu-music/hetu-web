@@ -3,7 +3,10 @@ import {
   GRAY_PALETTE,
   PALETTE_FULL,
 } from "@/lib/imagery/palette";
-import { loadImageryIndex, type ImageryIndex } from "@/lib/server/imagery-index";
+import {
+  loadImageryIndex,
+  type ImageryIndex,
+} from "@/lib/server/imagery-index";
 import type {
   RelatedSong,
   SongImageryMark,
@@ -111,9 +114,12 @@ export async function getSongImagery(
       ...mark,
       name: tr(mark.name),
       motifId,
+      // 母题查不到类别时只列母题名，配色用灰
       path: (category && motif
         ? [category.domain, category.name, motif.name]
-        : []
+        : motif
+          ? [motif.name]
+          : []
       ).map(tr),
       accent: category
         ? PALETTE_FULL[domainPalette(category.domain)].accent

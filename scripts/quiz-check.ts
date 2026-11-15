@@ -50,12 +50,12 @@ async function main() {
         "published_songs",
         "version_id,lyrics",
       ),
-    fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
-      // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池
-      "catalog",
-      "id,title,artist,album,hascover,has_audio,type,date,lyrics",
-    ),
-  ]);
+      fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
+        // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池
+        "catalog",
+        "id,title,artist,album,hascover,has_audio,type,date,lyrics",
+      ),
+    ]);
   // 与站内的意象索引一样：「同时算进」展开成行，时间标签按歌词算
   const occurrences = expandAnnotations(
     annotations,
@@ -75,7 +75,7 @@ async function main() {
 
   section("意象分类与测验维度（dimensions.ts）");
   if (report.unmappedCategories.length === 0) {
-    console.log("  ✓ 所有二级分类都已映射到维度");
+    console.log("  ✓ 所有类别都已映射到维度");
   }
   for (const c of report.unmappedCategories) {
     problems += 1;

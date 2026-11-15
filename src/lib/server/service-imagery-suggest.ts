@@ -6,7 +6,6 @@ import {
 } from "@/lib/db/supabase-server";
 import {
   buildReviewPrompt,
-  toLeafCategories,
   parseReviewOutput,
   REVIEW_OUTPUT_SCHEMA,
   REVIEW_SYSTEM_PROMPT,
@@ -20,7 +19,9 @@ import {
   suggestImagery,
   type ImagerySuggestion,
 } from "@/lib/imagery/suggest";
+import { motifOptions } from "@/lib/imagery/word-motifs";
 import { chatJson, isLlmConfigured, LlmError } from "@/lib/server/llm";
+import type { ImageryCategory, Motif } from "@/lib/types";
 
 export interface ImagerySuggestionsResult {
   hasLyrics: boolean;
@@ -29,12 +30,6 @@ export interface ImagerySuggestionsResult {
   /** 是否配置了 LLM，决定界面是否提供 AI 校验 */
   llmEnabled: boolean;
 }
-
-type CategoryRow = {
-  id: number;
-  name: string;
-  parent_id: number | null;
-};
 
 /**
  * 为一首歌生成意象标注候选。歌词取自工作版本（管理员正在编辑的版本），
@@ -64,10 +59,10 @@ export async function getImagerySuggestions(
 
   const [dictionary, occurrences, songs, motifs] = await Promise.all([
     fetchAll<{ id: number; name: string }>(service, TABLES.IMAGERY, "id,name"),
-    fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
+    fetchAll<{ song_id: number; imagery_id: number; motif_id: number }>(
       service,
       TABLES.WORKING_SONG_IMAGERY,
-      "song_id,imagery_id,category_id",
+      "song_id,imagery_id,motif_id",
     ),
     fetchAll<{ id: number; lyrics: string | null }>(
       service,
@@ -77,7 +72,7 @@ export async function getImagerySuggestions(
     fetchAll<MotifEntry>(
       service,
       TABLES.IMAGERY_MOTIFS,
-      "imagery_id,category_id,role",
+      "imagery_id,motif_id,role",
     ),
   ]);
   // fetchAll 出错时只记日志并返回部分数据；词典为空时生成的候选毫无意义
@@ -133,13 +128,18 @@ export async function reviewImagerySuggestions(
   if (lines.length === 0) {
     throw new LlmError("这首歌没有可用的歌词", "BAD_RESPONSE");
   }
-  const categories = toLeafCategories(
-    await fetchAll<CategoryRow>(
+  const [categoryRows, motifRows] = await Promise.all([
+    fetchAll<ImageryCategory>(
       service,
       TABLES.IMAGERY_CAT,
-      "id,name,parent_id",
+      "id,name,domain,description",
     ),
-  );
+    fetchAll<Motif>(service, TABLES.MOTIFS, "id,name,category_id,description"),
+  ]);
+  const categories = motifOptions({
+    categories: categoryRows,
+    motifs: motifRows,
+  });
 
   const raw = await chatJson({
     system: REVIEW_SYSTEM_PROMPT,

@@ -115,7 +115,9 @@ export interface SongImageryView {
 export interface CloudMotif {
   id: number;
   name: string;
-  l1: number;
+  /** 门类 */
+  l1: ImageryDomain;
+  /** 类别 id */
   l2: number;
   palette: number;
   songCount: number;
@@ -136,16 +138,17 @@ export interface CloudWord {
 }
 
 export interface CloudMotifGroup {
-  /** 二级分类 */
+  /** 类别 */
   id: number;
   name: string;
-  l1: number;
+  l1: ImageryDomain;
   palette: number;
   motifs: CloudMotif[];
 }
 
 export interface ImageryCloud {
-  l1: Array<{ id: number; name: string; palette: number }>;
+  /** 门类：id 是门类名（库里的值），name 是按语言转换后显示的 */
+  l1: Array<{ id: ImageryDomain; name: string; palette: number }>;
   groups: CloudMotifGroup[];
   words: CloudWord[];
   motifCount: number;
@@ -179,7 +182,7 @@ export interface MotifLink {
 export interface MotifDetail {
   id: number;
   name: string;
-  /** 一级、二级分类名 */
+  /** 门类、类别名 */
   path: string[];
   palette: number;
   description: string | null;
@@ -279,13 +282,33 @@ export interface SongInfo {
   basicInfo: SongInfoRow[];
 }
 
-// 意象相关类型
+// 意象相关类型（见 IMAGERY.md、DATABASE.md 第五节）
+
+/** 门类：库里是 imagery_categories.domain 一列 */
+export const IMAGERY_DOMAINS = ["自然", "人文", "情志"] as const;
+export type ImageryDomain = (typeof IMAGERY_DOMAINS)[number];
+
+/** 类别：十七个，固定，后台只读 */
 export type ImageryCategory = {
   id: number;
   name: string;
-  parent_id: number | null;
-  level: number | null;
+  domain: ImageryDomain;
   description: string | null;
+};
+
+/** 母题：标注与词登记挂的那一层 */
+export type Motif = {
+  id: number;
+  name: string;
+  category_id: number;
+  /** 后台新建时必填；拆表前建的大多没写 */
+  description: string | null;
+};
+
+/** 类别与母题，后台意象库与标注一起用 */
+export type ImageryTaxonomy = {
+  categories: ImageryCategory[];
+  motifs: Motif[];
 };
 
 export type ImageryItem = {
@@ -297,16 +320,8 @@ export type ImageryItem = {
   primary: number | null;
   /** 多义词的其他候选，标注时按语境与默认母题二选一 */
   alternatives: number[];
-  /** 并列词的其余组成（「风雨」的雨），标注默认母题时一并写入 */
+  /** 并列词的其余组成（「风雨」的雨）：标注挂默认母题时一并算进，读时展开，不另存 */
   parts: number[];
-};
-
-export type ImageryOccurrence = {
-  id: number;
-  song_id: number;
-  imagery_id: number;
-  category_id: number;
-  lyric_timetag: string[];
 };
 
 /** 歌曲基调词表的一项（见 IMAGERY.md） */

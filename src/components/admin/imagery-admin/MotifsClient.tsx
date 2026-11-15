@@ -472,7 +472,7 @@ export default function MotifsClient({
       <CleanupMotifsDialog
         open={cleaning}
         onClose={() => setCleaning(false)}
-        getCategoryPath={(id) => categoryPath(id, byId)}
+        getMotifPath={(id) => categoryPath(id, byId)}
         onDeleted={(ids) => {
           const gone = new Set(ids);
           setCategories((current) => current.filter((c) => !gone.has(c.id)));

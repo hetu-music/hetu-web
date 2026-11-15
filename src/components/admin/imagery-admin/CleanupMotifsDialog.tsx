@@ -43,12 +43,12 @@ function describeWord(word: UnusedMotifWord): string {
 export function CleanupMotifsDialog({
   open,
   onClose,
-  getCategoryPath,
+  getMotifPath,
   onDeleted,
 }: {
   open: boolean;
   onClose: () => void;
-  getCategoryPath: (categoryId: number) => string;
+  getMotifPath: (motifId: number) => string;
   onDeleted: (ids: number[]) => void;
 }) {
   const unused = useQuery({
@@ -71,11 +71,11 @@ export function CleanupMotifsDialog({
     }
     return [...byParent]
       .map(([parentId, motifs]) => ({
-        path: parentId === null ? "（无上级）" : getCategoryPath(parentId),
+        path: parentId === null ? "（无上级）" : getMotifPath(parentId),
         motifs: motifs.sort((a, b) => a.name.localeCompare(b.name, "zh")),
       }))
       .sort((a, b) => a.path.localeCompare(b.path, "zh"));
-  }, [getCategoryPath, unused.data]);
+  }, [getMotifPath, unused.data]);
 
   const selected = (unused.data ?? [])
     .map((m) => m.id)

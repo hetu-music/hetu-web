@@ -3,10 +3,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
-  apiGetImageryCategories,
+  apiGetImageryTaxonomy,
   apiGetImageryItems,
 } from "@/lib/api/client-api";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import type { ImageryItem, ImageryTaxonomy } from "@/lib/types";
 
 /**
  * 意象词典、分类的查询：意象库各页与歌曲工作台的「意象」一栏共用同一份缓存，
@@ -27,11 +27,11 @@ export function useImageryItemsQuery() {
   });
 }
 
-/** initialData：分类页由服务端先取好一份，不必在客户端再取 */
-export function useImageryCategoriesQuery(initialData?: ImageryCategory[]) {
-  return useQuery<ImageryCategory[]>({
+/** 类别与母题。initialData：意象库页由服务端先取好一份，不必在客户端再取 */
+export function useImageryTaxonomyQuery(initialData?: ImageryTaxonomy) {
+  return useQuery<ImageryTaxonomy>({
     queryKey: IMAGERY_KEYS.categories,
-    queryFn: apiGetImageryCategories,
+    queryFn: apiGetImageryTaxonomy,
     staleTime: STALE_MS,
     initialData,
   });

@@ -55,6 +55,7 @@ function poolRows(index: ImageryIndex): PoolRows {
   const emotionById = new Map(index.emotions.map((e) => [e.id, e]));
   return {
     categories: index.categories,
+    motifs: index.motifs,
     imagery: index.imagery,
     occurrences: index.occurrences.filter((o) => catalog.has(o.song_id)),
     songs: index.songs,

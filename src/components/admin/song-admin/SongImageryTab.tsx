@@ -87,7 +87,7 @@ export default function SongImageryTab({
           : { imagery_id: draft.imageryId };
       if (occurrenceId === null) {
         const { created } = await apiCreateOccurrencesBatch(song.id, [
-          { ...word, category_id: draft.categoryId },
+          { ...word, motif_id: draft.motifId },
         ]);
         if (created === 0) {
           notify({ type: "error", text: "这首歌已经标过这个词" });
@@ -97,7 +97,7 @@ export default function SongImageryTab({
       } else {
         await apiUpdateOccurrence(occurrenceId, {
           ...word,
-          category_id: draft.categoryId,
+          motif_id: draft.motifId,
         });
       }
       await reload();
@@ -167,7 +167,7 @@ export default function SongImageryTab({
         items={items.data ?? []}
         motifs={motifs}
         submitting={submitting}
-        getCategoryPath={pathOf}
+        getMotifPath={pathOf}
         onReload={reload}
         onSave={save}
         onDelete={(id, label) => void remove(id, label)}

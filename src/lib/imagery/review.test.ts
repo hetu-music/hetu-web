@@ -55,9 +55,9 @@ describe("parseReviewOutput", () => {
       {
         verdicts: [],
         additions: [
-          { name: "宝塔", lines: [3], categoryId: 200, reason: "建筑" },
-          { name: "天涯", lines: [1], categoryId: 100, reason: "已是候选" },
-          { name: "照亮", lines: [1], categoryId: 999, reason: "分类无效" },
+          { name: "宝塔", lines: [3], motifId: 200, reason: "建筑" },
+          { name: "天涯", lines: [1], motifId: 100, reason: "已是候选" },
+          { name: "照亮", lines: [1], motifId: 999, reason: "分类无效" },
         ],
       },
       input,
@@ -67,14 +67,14 @@ describe("parseReviewOutput", () => {
         name: "宝塔",
         timetags: ["00:30.00"],
         lines: ["登上九重宝塔"],
-        categoryId: 200,
+        motifId: 200,
         reason: "建筑",
       },
       {
         name: "照亮",
         timetags: ["00:10.00", "01:10.00"],
         lines: ["明月照亮天涯", "明月照亮天涯"],
-        categoryId: null,
+        motifId: null,
         reason: "分类无效",
       },
     ]);
@@ -85,8 +85,8 @@ describe("parseReviewOutput", () => {
       {
         verdicts: [],
         additions: [
-          { name: "九龙塔", lines: [3], categoryId: 200, reason: "编造" },
-          { name: "宝塔", lines: [99], categoryId: 200, reason: "行号越界" },
+          { name: "九龙塔", lines: [3], motifId: 200, reason: "编造" },
+          { name: "宝塔", lines: [99], motifId: 200, reason: "行号越界" },
         ],
       },
       input,
@@ -98,7 +98,7 @@ describe("parseReviewOutput", () => {
     const many = Array.from({ length: MAX_ADDITIONS + 5 }, (_, i) => ({
       name: String.fromCharCode(0x4e00 + i),
       lines: [1],
-      categoryId: 100,
+      motifId: 100,
       reason: "",
     }));
     const text = many.map((a) => a.name).join("");

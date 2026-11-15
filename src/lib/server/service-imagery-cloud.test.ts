@@ -46,10 +46,10 @@ const songs = [
   { id: 3, title: "丙", date: "2021-03-03", lyricist: ["丙"] },
 ];
 
-const occ = (song_id: number, imagery_id: number, category_id: number) => ({
+const occ = (song_id: number, imagery_id: number, motif_id: number) => ({
   song_id,
   imagery_id,
-  category_id,
+  motif_id,
 });
 
 const occurrences = [

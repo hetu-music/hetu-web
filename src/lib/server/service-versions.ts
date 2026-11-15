@@ -109,20 +109,25 @@ export async function deleteSong(db: Db, songId: number): Promise<void> {
   if (error) throw fromRpcError(error);
 }
 
-/** 一个版本的标注挂在哪些母题上，发布、下架时据此刷新母题页 */
+/**
+ * 线上版本的标注算进哪些母题（含「同时算进」），发布、下架时据此刷新母题页。
+ * 只对线上版本有意义：读的是 published_song_imagery，调用时这个版本得还在线上
+ */
 export async function motifIdsOfVersion(
   db: Db,
   versionId: number | null,
 ): Promise<number[]> {
   if (versionId === null) return [];
   const { data, error } = await db
-    .from(TABLES.SONG_IMAGERY)
-    .select("category_id")
+    .from(TABLES.PUBLISHED_SONG_IMAGERY)
+    .select("motif_id,part_motif_ids")
     .eq("version_id", versionId);
   if (error) throw error;
   return [
     ...new Set(
-      ((data ?? []) as { category_id: number }[]).map((r) => r.category_id),
+      (
+        (data ?? []) as { motif_id: number; part_motif_ids: number[] | null }[]
+      ).flatMap((r) => [r.motif_id, ...(r.part_motif_ids ?? [])]),
     ),
   ];
 }

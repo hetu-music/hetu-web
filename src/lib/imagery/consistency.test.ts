@@ -53,10 +53,10 @@ describe("checkConsistency", () => {
     { id: 4, name: "新词" },
   ];
   const motifs = [
-    { imagery_id: 1, category_id: 10, role: "primary" as const },
-    { imagery_id: 1, category_id: 11, role: "part" as const },
-    { imagery_id: 2, category_id: 20, role: "primary" as const },
-    { imagery_id: 3, category_id: 30, role: "primary" as const },
+    { imagery_id: 1, motif_id: 10, role: "primary" as const },
+    { imagery_id: 1, motif_id: 11, role: "part" as const },
+    { imagery_id: 2, motif_id: 20, role: "primary" as const },
+    { imagery_id: 3, motif_id: 30, role: "primary" as const },
   ];
   const songs = [
     {
@@ -68,9 +68,9 @@ describe("checkConsistency", () => {
   const occ = (
     id: number,
     imagery_id: number,
-    category_id: number,
+    motif_id: number,
     lyric_timetag: string[],
-  ) => ({ id, song_id: 100, imagery_id, category_id, lyric_timetag });
+  ) => ({ id, song_id: 100, imagery_id, motif_id, lyric_timetag });
 
   const report = checkConsistency({
     imagery,
@@ -90,7 +90,7 @@ describe("checkConsistency", () => {
     expect(report.noPrimary).toEqual([{ id: 4, name: "新词" }]);
     expect(report.offCandidate).toEqual([3]);
     expect(report.missingParts).toEqual([
-      { songId: 100, imageryId: 1, categoryId: 11 },
+      { songId: 100, imageryId: 1, motifId: 11 },
     ]);
   });
 

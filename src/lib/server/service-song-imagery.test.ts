@@ -63,10 +63,10 @@ const songs = [
 function occ(
   song_id: number,
   imagery_id: number,
-  category_id: number,
+  motif_id: number,
   lyric_timetag: string[] | null = null,
 ) {
-  return { song_id, imagery_id, category_id, lyric_timetag };
+  return { song_id, imagery_id, motif_id, lyric_timetag };
 }
 
 const occurrences = [

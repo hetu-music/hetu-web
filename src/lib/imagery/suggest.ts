@@ -23,7 +23,7 @@ export interface DictionaryEntry {
 /** imagery_motifs 的一行：词可取的母题（见 IMAGERY.md） */
 export interface MotifEntry {
   imagery_id: number;
-  category_id: number;
+  motif_id: number;
   role: "primary" | "alternative" | "part";
 }
 
@@ -36,7 +36,7 @@ export interface ImageryPrior {
    * 可选的母题，第一个为默认：登记过母题的词取默认母题与多义候选；
    * 未登记的词（新词）退回历史上用过的分类，按使用次数从多到少
    */
-  categoryIds: number[];
+  motifIds: number[];
 }
 
 /** 每个词的候选母题：默认母题在前，其后是多义候选。并列词的其余组成不在其中，保存时由服务端补写 */
@@ -48,8 +48,8 @@ export function motifCandidates(
     if (m.role === "part") continue;
     let list = byImagery.get(m.imagery_id);
     if (!list) byImagery.set(m.imagery_id, (list = []));
-    if (m.role === "primary") list.unshift(m.category_id);
-    else list.push(m.category_id);
+    if (m.role === "primary") list.unshift(m.motif_id);
+    else list.push(m.motif_id);
   }
   return byImagery;
 }
@@ -62,7 +62,7 @@ export interface ImagerySuggestion {
   /** 时间标签对应的歌词文本，与 timetags 一一对应 */
   lines: string[];
   /** 可选母题，第一个为默认值；为空表示该意象既未登记母题也从未被标注过，需要人工选择 */
-  categoryIds: number[];
+  motifIds: number[];
   seen: number;
   annotated: number;
   /** 历史标注率 annotated / seen；seen 为 0 时为 null */
@@ -190,7 +190,7 @@ export function buildPriors(input: {
   occurrences: ReadonlyArray<{
     song_id: number;
     imagery_id: number;
-    category_id: number;
+    motif_id: number;
   }>;
   songs: ReadonlyArray<{ id: number; lyrics: string | null }>;
   /** 词的候选母题；省略时只用历史分类 */
@@ -207,7 +207,7 @@ export function buildPriors(input: {
 
     let counts = categoryCounts.get(occ.imagery_id);
     if (!counts) categoryCounts.set(occ.imagery_id, (counts = new Map()));
-    counts.set(occ.category_id, (counts.get(occ.category_id) ?? 0) + 1);
+    counts.set(occ.motif_id, (counts.get(occ.motif_id) ?? 0) + 1);
   }
 
   const match = createMatcher(input.dictionary);
@@ -229,7 +229,7 @@ export function buildPriors(input: {
     priors.set(entry.id, {
       seen: seen.get(entry.id) ?? 0,
       annotated: annotated.get(entry.id) ?? 0,
-      categoryIds:
+      motifIds:
         candidates.get(entry.id) ??
         (counts
           ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)
@@ -280,20 +280,20 @@ export function suggestImagery(input: {
     const prior = input.priors.get(imageryId);
     const seen = prior?.seen ?? 0;
     const annotated = prior?.annotated ?? 0;
-    const categoryIds = prior?.categoryIds ?? [];
+    const motifIds = prior?.motifIds ?? [];
     const rate = seen > 0 ? annotated / seen : null;
     suggestions.push({
       imageryId,
       name: nameById.get(imageryId) ?? "",
       timetags: hits.map((l) => l.tag),
       lines: hits.map((l) => l.text),
-      categoryIds,
+      motifIds,
       seen,
       annotated,
       rate,
       // 从未在其他歌里出现过、但已标注过的意象（只在个别歌里用过的专名等）也默认勾选
       recommended:
-        categoryIds.length > 0 && (rate === null || rate >= threshold),
+        motifIds.length > 0 && (rate === null || rate >= threshold),
     });
   }
 

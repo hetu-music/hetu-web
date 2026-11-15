@@ -169,13 +169,8 @@ export function useSongWorkspace(
       void queryClient.invalidateQueries({
         queryKey: songOccurrencesKey(saved.id),
       });
-      // 意象时间标签随歌词重算；歌词里已找不到的词，标注要到意象页签里删掉或改标
-      if (res.imagerySyncFailed) {
-        notify({
-          type: "error",
-          text: "意象时间标签没同步成功，可在意象页签改动任一标注触发重算",
-        });
-      } else if (res.imageryNotFound?.length) {
+      // 歌词里已找不到的词，标注要到意象页签里删掉或改标
+      if (res.imageryNotFound?.length) {
         notify({
           type: "error",
           text: `新歌词里找不到意象「${res.imageryNotFound.join("」「")}」，请到意象页签删掉或改标`,

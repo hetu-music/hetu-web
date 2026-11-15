@@ -2,7 +2,7 @@
 
 import { isHumanAdmin, isSuperRole } from "@/lib/auth/roles";
 import { assertAdmin } from "@/lib/server/server-auth";
-import { resyncDraftTimetags } from "@/lib/server/service-imagery";
+import { wordsMissingFromLyrics } from "@/lib/server/service-imagery";
 import {
   deleteSong,
   discardDraft,
@@ -41,14 +41,13 @@ async function refreshLive(songId: number, motifIds: number[]) {
 /**
  * 发布：草稿冻结并上线；没有草稿而已下架时，重新上线最新的冻结版本。
  *
- * 冻结前先按草稿的歌词重算意象时间标签（冻结以后就改不了）。重算出错不拦发布，
- * 只提示：标签可能与歌词对不上，要到意象页签改动任一标注、再发布一次。
+ * 意象的时间标签读时按歌词算，发布不用管；只把歌词里已找不到的标注词告诉调用方，
+ * 要到意象页签删掉或改标。核对出错不拦发布。
  */
 export async function handleApprove(id: number): Promise<
   | {
       success: true;
       cdnPurgeFailed: string[];
-      imagerySyncFailed: boolean;
       imageryNotFound: string[];
     }
   | { success: false; error: string }
@@ -58,10 +57,12 @@ export async function handleApprove(id: number): Promise<
     const db = userDb(accessToken);
 
     const before = await motifIdsOfVersion(db, await liveVersionId(db, id));
-    const imagery = await resyncDraftTimetags(id, accessToken).catch((err) => {
-      console.error("[handleApprove] 意象时间标签同步失败:", err);
-      return null;
-    });
+    const imageryNotFound = await wordsMissingFromLyrics(id, accessToken).catch(
+      (err) => {
+        console.error("[handleApprove] 核对意象标注失败:", err);
+        return [];
+      },
+    );
 
     const live = await publishSong(db, id);
     const after = await motifIdsOfVersion(db, live);
@@ -73,8 +74,7 @@ export async function handleApprove(id: number): Promise<
     return {
       success: true,
       cdnPurgeFailed,
-      imagerySyncFailed: imagery === null,
-      imageryNotFound: imagery?.notFound ?? [],
+      imageryNotFound,
     };
   } catch (err) {
     return failure(err);

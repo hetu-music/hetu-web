@@ -15,12 +15,12 @@ const BatchSchema = z.object({
       z.union([
         z.object({
           imagery_id: z.number().int().positive(),
-          category_id: z.number().int().positive(),
+          motif_id: z.number().int().positive(),
         }),
         // 词典里没有的词（歌词原文），保存时创建
         z.object({
           imagery_name: z.string().trim().min(1).max(50),
-          category_id: z.number().int().positive(),
+          motif_id: z.number().int().positive(),
         }),
       ]),
     )
@@ -55,7 +55,9 @@ export const POST = withAuth(
       }
       if (
         e instanceof Error &&
-        (code === "NOT_MOTIF" || code === "IMAGERY_NOT_IN_LYRICS")
+        (code === "NOT_MOTIF" ||
+          code === "IMAGERY_NOT_IN_LYRICS" ||
+          code === "DUPLICATE_OCCURRENCE")
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

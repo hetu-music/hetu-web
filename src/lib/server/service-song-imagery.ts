@@ -1,13 +1,9 @@
 import {
+  domainPalette,
   GRAY_PALETTE,
   PALETTE_FULL,
-  sortLevel1Categories,
 } from "@/lib/imagery/palette";
-import {
-  loadImageryIndex,
-  type ImageryIndex,
-  type IndexCategory,
-} from "@/lib/server/imagery-index";
+import { loadImageryIndex, type ImageryIndex } from "@/lib/server/imagery-index";
 import type {
   RelatedSong,
   SongImageryMark,
@@ -73,21 +69,7 @@ export async function getSongImagery(
       : (s: string) => s;
 
   const catById = new Map(index.categories.map((c) => [c.id, c]));
-  const l1Color = new Map(
-    sortLevel1Categories(index.categories).map((c, i) => [
-      c.id,
-      PALETTE_FULL[i % PALETTE_FULL.length].accent,
-    ]),
-  );
-  const pathOf = (categoryId: number): IndexCategory[] => {
-    const path: IndexCategory[] = [];
-    let cat = catById.get(categoryId);
-    while (cat && path.length < 5) {
-      path.unshift(cat);
-      cat = cat.parent_id !== null ? catById.get(cat.parent_id) : undefined;
-    }
-    return path;
-  };
+  const motifById = new Map(index.motifs.map((m) => [m.id, m]));
 
   // 每首歌的母题集合，以及每个母题覆盖的作品数。相关作品按母题而非词聚合：
   // 写「明月」与写「月光」的歌算作写了同一个东西（见 IMAGERY.md）
@@ -99,7 +81,7 @@ export async function getSongImagery(
     if (!songIds.has(occ.song_id)) continue;
     let set = imageryBySong.get(occ.song_id);
     if (!set) imageryBySong.set(occ.song_id, (set = new Set()));
-    set.add(occ.category_id);
+    set.add(occ.motif_id);
     let songs = songsByWord.get(occ.imagery_id);
     if (!songs) songsByWord.set(occ.imagery_id, (songs = new Set()));
     songs.add(occ.song_id);
@@ -112,24 +94,30 @@ export async function getSongImagery(
   // ── 本曲意象：一个词一处高亮。分组规则与登录页封面墙共用（groupMarks），
   // 卷首摘句才挑得出同一句。并列词（「风雨」）有几条标注，取第一条的母题作说明 ──
   const ownOccurrences = index.occurrences.filter((o) => o.song_id === songId);
-  const own = new Set(ownOccurrences.map((o) => o.category_id));
+  const own = new Set(ownOccurrences.map((o) => o.motif_id));
   const motifOf = new Map<number, number>();
   for (const occ of ownOccurrences) {
     if (!motifOf.has(occ.imagery_id)) {
-      motifOf.set(occ.imagery_id, occ.category_id);
+      motifOf.set(occ.imagery_id, occ.motif_id);
     }
   }
   const marks: SongImageryMark[] = (
     groupMarks(ownOccurrences, index.imagery).get(songId) ?? []
   ).map((mark) => {
     const motifId = motifOf.get(mark.id) as number;
-    const path = pathOf(motifId);
+    const motif = motifById.get(motifId);
+    const category = motif && catById.get(motif.category_id);
     return {
       ...mark,
       name: tr(mark.name),
       motifId,
-      path: path.map((c) => tr(c.name)),
-      accent: (path[0] && l1Color.get(path[0].id)) ?? GRAY_PALETTE.accent,
+      path: (category && motif
+        ? [category.domain, category.name, motif.name]
+        : []
+      ).map(tr),
+      accent: category
+        ? PALETTE_FULL[domainPalette(category.domain)].accent
+        : GRAY_PALETTE.accent,
       songCount: songsByWord.get(mark.id)?.size ?? 1,
     };
   });
@@ -188,7 +176,7 @@ export async function getSongImagery(
         shared: shared
           .sort((a, b) => idf(b) - idf(a))
           .slice(0, SHARED_LIMIT)
-          .map((sid) => tr(catById.get(sid)?.name ?? ""))
+          .map((sid) => tr(motifById.get(sid)?.name ?? ""))
           .filter(Boolean),
       });
       if (related.length >= RELATED_LIMIT) break;

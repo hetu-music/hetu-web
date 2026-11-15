@@ -15,7 +15,7 @@ import { parseJsonBody } from "@/lib/server/parse-body";
 /** 只能改母题：名称、说明，或移到别的类别下 */
 const UpdateMotifSchema = z.object({
   name: z.string().trim().min(1).max(50).optional(),
-  parent_id: z.number().int().positive().optional(),
+  category_id: z.number().int().positive().optional(),
   description: z
     .string()
     .trim()
@@ -36,8 +36,8 @@ export const PUT = withAuth(
     _user: AuthenticatedUser,
     { accessToken }: AuthContext,
   ) => {
-    const categoryId = getIdFromUrl(request);
-    if (!categoryId) {
+    const motifId = getIdFromUrl(request);
+    if (!motifId) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
     try {
@@ -47,15 +47,15 @@ export const PUT = withAuth(
       );
       if (invalid) return invalid;
 
-      const updated = await updateMotif(categoryId, input, accessToken);
+      const updated = await updateMotif(motifId, input, accessToken);
       // 母题名与归属牵动全部详情页，CDN 上的副本等 s-maxage 到期
-      const purge = await refreshImagery({ motifIds: [categoryId] });
+      const purge = await refreshImagery({ motifIds: [motifId] });
       return withPurgeStatus(NextResponse.json(updated), purge);
     } catch (e) {
       const code = (e as Error & { code?: string }).code;
       if (
         e instanceof Error &&
-        (code === "INVALID_PARENT" || code === "NOT_MOTIF")
+        (code === "INVALID_CATEGORY" || code === "NOT_MOTIF")
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

@@ -1,66 +1,143 @@
 import { cache } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getServiceClient,
   getUserClient,
   fetchAll,
   TABLES,
 } from "@/lib/db/supabase-server";
-import { songTimetags } from "@/lib/imagery/consistency";
+import {
+  songTimetags,
+  withTimetags,
+  type VersionWords,
+} from "@/lib/imagery/consistency";
 import {
   ensureDraft,
   SongVersionError,
   workingVersionId,
 } from "@/lib/server/service-versions";
 import type { MotifEntry } from "@/lib/imagery/suggest";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import type {
+  ImageryCategory,
+  ImageryItem,
+  ImageryTaxonomy,
+  Motif,
+} from "@/lib/types";
 
+/**
+ * 后台的意象标注：一条标注一行（工作版本，有草稿用草稿）。
+ * part_motif_ids 是读时展开的「同时算进」，lyric_timetag 按同一版本的歌词算，都不存（DATABASE.md 第四节）。
+ * 行的 id 在各版本间不变，开草稿前后都能用来定位（见 service-versions）
+ */
 export type OccurrenceWithSong = {
   id: number;
   song_id: number;
+  version_id: number;
   imagery_id: number;
-  category_id: number;
+  motif_id: number;
+  /** 挂在词的默认母题上时一并算进的母题（「风雨」的雨） */
+  part_motif_ids: number[];
   lyric_timetag: string[];
   song_title: string;
   song_album: string | null;
   imagery_name?: string;
-  category_name?: string;
+  motif_name?: string;
 };
 
-// ─── helper ───────────────────────────────────────────────────────────────────
+type UserClient = NonNullable<ReturnType<typeof getUserClient>>;
 
-function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceWithSong {
+const OCCURRENCE_FIELDS =
+  "id,song_id,version_id,imagery_id,motif_id,part_motif_ids,song_title,song_album,imagery_name,motif_name";
+
+type OccurrenceRow = Omit<OccurrenceWithSong, "lyric_timetag">;
+
+function mapOccurrenceRow(row: Record<string, unknown>): OccurrenceRow {
   return {
     id: row.id as number,
     song_id: row.song_id as number,
+    version_id: row.version_id as number,
     imagery_id: row.imagery_id as number,
-    category_id: row.category_id as number,
-    lyric_timetag: (row.lyric_timetag as string[]) ?? [],
+    motif_id: row.motif_id as number,
+    part_motif_ids: (row.part_motif_ids as number[] | null) ?? [],
     song_title: (row.song_title as string | null) ?? "",
     song_album: (row.song_album as string | null) ?? null,
     imagery_name: (row.imagery_name as string | null) ?? undefined,
-    category_name: (row.category_name as string | null) ?? undefined,
+    motif_name: (row.motif_name as string | null) ?? undefined,
   };
 }
 
-/**
- * 后台读的标注：每首歌的工作版本（有草稿用草稿），视图里已带歌名、词名、母题名。
- * 行的 id 在各版本间不变，开草稿前后都能用来定位（见 service-versions）
- */
-const OCCURRENCE_FIELDS =
-  "id,song_id,imagery_id,category_id,lyric_timetag,song_title,song_album,imagery_name,category_name";
+// ─── 时间标签 ─────────────────────────────────────────────────────────────────
+
+/** 各版本的歌词与它标注的全部词名：算时间标签时要排除被同曲更长词覆盖的行 */
+async function loadVersionWords(
+  supabase: SupabaseClient,
+  versionIds: readonly number[],
+): Promise<Map<number, VersionWords>> {
+  const ids = [...new Set(versionIds)];
+  if (ids.length === 0) return new Map();
+  const [versions, words] = await Promise.all([
+    fetchAll<{ id: number; lyrics: string | null }>(
+      supabase,
+      TABLES.SONG_VERSIONS,
+      "id,lyrics",
+      (q) => q.in("id", ids).order("id"),
+    ),
+    fetchAll<{ version_id: number; imagery: { name?: string } | null }>(
+      supabase,
+      TABLES.SONG_IMAGERY,
+      "version_id,imagery(name)",
+      (q) => q.in("version_id", ids).order("version_id").order("id"),
+    ),
+  ]);
+  const names = new Map<number, string[]>();
+  for (const w of words) {
+    const name = w.imagery?.name;
+    if (!name) continue;
+    names.set(w.version_id, [...(names.get(w.version_id) ?? []), name]);
+  }
+  return new Map(
+    versions.map((v) => [
+      v.id,
+      { lyrics: v.lyrics, names: names.get(v.id) ?? [] },
+    ]),
+  );
+}
+
+/** 给后台读到的标注补上时间标签 */
+async function attachTimetags(
+  supabase: SupabaseClient,
+  rows: OccurrenceRow[],
+): Promise<OccurrenceWithSong[]> {
+  const versions = await loadVersionWords(
+    supabase,
+    rows.map((r) => r.version_id),
+  );
+  return withTimetags(
+    rows.map((r) => ({ ...r, imagery_name: r.imagery_name ?? "" })),
+    versions,
+  );
+}
 
 // ─── read functions ───────────────────────────────────────────────────────────
 
-// cache(): 同一次请求内 generateMetadata 与页面组件各调一次，去重成一次查询
-export const getImageryCategories = cache(
-  async function getImageryCategories(): Promise<ImageryCategory[]> {
+/** 类别与母题。cache(): 同一次请求内 generateMetadata 与页面组件各调一次，去重成一次查询 */
+export const getImageryTaxonomy = cache(
+  async function getImageryTaxonomy(): Promise<ImageryTaxonomy> {
     const supabase = getServiceClient();
-    if (!supabase) return [];
-    return fetchAll(
-      supabase,
-      TABLES.IMAGERY_CAT,
-      "id,name,parent_id,level,description",
-    ) as Promise<ImageryCategory[]>;
+    if (!supabase) return { categories: [], motifs: [] };
+    const [categories, motifs] = await Promise.all([
+      fetchAll<ImageryCategory>(
+        supabase,
+        TABLES.IMAGERY_CAT,
+        "id,name,domain,description",
+      ),
+      fetchAll<Motif>(
+        supabase,
+        TABLES.MOTIFS,
+        "id,name,category_id,description",
+      ),
+    ]);
+    return { categories, motifs };
   },
 );
 
@@ -83,7 +160,7 @@ export const getImageryWithCounts = cache(
         fetchAll<MotifEntry>(
           supabase,
           TABLES.IMAGERY_MOTIFS,
-          "imagery_id,category_id,role",
+          "imagery_id,motif_id,role",
         ),
       ]);
       const byWord = new Map<number, MotifEntry[]>();
@@ -95,7 +172,7 @@ export const getImageryWithCounts = cache(
       return rows.map((item) => {
         const entries = byWord.get(item.id) ?? [];
         const of = (role: MotifEntry["role"]) =>
-          entries.filter((m) => m.role === role).map((m) => m.category_id);
+          entries.filter((m) => m.role === role).map((m) => m.motif_id);
         return {
           id: item.id,
           name: item.name,
@@ -112,8 +189,9 @@ export const getImageryWithCounts = cache(
   },
 );
 
-export async function getOccurrencesForImagery(
-  imageryId: number,
+async function readOccurrences(
+  label: string,
+  filter: { column: "imagery_id" | "song_id"; value: number },
 ): Promise<OccurrenceWithSong[]> {
   const supabase = getServiceClient();
   if (!supabase) return [];
@@ -121,60 +199,83 @@ export async function getOccurrencesForImagery(
     const { data, error } = await supabase
       .from(TABLES.WORKING_SONG_IMAGERY)
       .select(OCCURRENCE_FIELDS)
-      .eq("imagery_id", imageryId);
+      .eq(filter.column, filter.value);
     if (error) {
-      console.error("[getOccurrencesForImagery]", error);
+      console.error(`[${label}]`, error);
       return [];
     }
-    return ((data ?? []) as Record<string, unknown>[]).map(mapOccurrenceRow);
+    return await attachTimetags(
+      supabase,
+      ((data ?? []) as Record<string, unknown>[]).map(mapOccurrenceRow),
+    );
   } catch (e) {
-    console.error("[getOccurrencesForImagery]", e);
+    console.error(`[${label}]`, e);
     return [];
   }
 }
 
-export async function getOccurrencesForSong(
+export function getOccurrencesForImagery(
+  imageryId: number,
+): Promise<OccurrenceWithSong[]> {
+  return readOccurrences("getOccurrencesForImagery", {
+    column: "imagery_id",
+    value: imageryId,
+  });
+}
+
+export function getOccurrencesForSong(
   songId: number,
 ): Promise<OccurrenceWithSong[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return [];
-  try {
-    const { data, error } = await supabase
-      .from(TABLES.WORKING_SONG_IMAGERY)
-      .select(OCCURRENCE_FIELDS)
-      .eq("song_id", songId);
-    if (error) {
-      console.error("[getOccurrencesForSong]", error);
-      return [];
-    }
-    return ((data ?? []) as Record<string, unknown>[]).map(mapOccurrenceRow);
-  } catch (e) {
-    console.error("[getOccurrencesForSong]", e);
-    return [];
-  }
+  return readOccurrences("getOccurrencesForSong", {
+    column: "song_id",
+    value: songId,
+  });
+}
+
+async function getOccurrenceWithRelationsById(
+  supabase: UserClient,
+  id: number,
+): Promise<OccurrenceWithSong> {
+  const { data, error } = await supabase
+    .from(TABLES.WORKING_SONG_IMAGERY)
+    .select(OCCURRENCE_FIELDS)
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  const [row] = await attachTimetags(supabase, [
+    mapOccurrenceRow(data as Record<string, unknown>),
+  ]);
+  return row;
 }
 
 // ─── 在用的标注 ───────────────────────────────────────────────────────────────
 
+type AnnotationInUse = {
+  imagery_id: number;
+  motif_id: number;
+  part_motif_ids: number[] | null;
+};
+
 /**
- * 判断母题、词登记还有没有标注在用：看每首歌的工作版本与线上版本。
+ * 母题、词登记还有没有标注在用：看每首歌的工作版本与线上版本。
  * 只看工作版本的话，草稿里改掉了、线上还在用的母题会被当成空的删掉；历史版本不算。
+ * 按母题筛时只看标注直接挂的母题，不看「同时算进」。
  */
 async function annotationsInUse(
   supabase: UserClient,
-  filter?: { imageryId?: number; categoryId?: number },
-): Promise<Array<{ imagery_id: number; category_id: number }>> {
+  filter?: { imageryId?: number; motifId?: number },
+): Promise<AnnotationInUse[]> {
   const read = (table: string) =>
-    fetchAll<{ imagery_id: number; category_id: number }>(
+    fetchAll<AnnotationInUse>(
       supabase,
       table,
-      "imagery_id,category_id",
+      "imagery_id,motif_id,part_motif_ids",
       (q) => {
         let query = q;
         if (filter?.imageryId !== undefined)
           query = query.eq("imagery_id", filter.imageryId);
-        if (filter?.categoryId !== undefined)
-          query = query.eq("category_id", filter.categoryId);
+        if (filter?.motifId !== undefined)
+          query = query.eq("motif_id", filter.motifId);
         return query;
       },
     );
@@ -186,61 +287,60 @@ async function annotationsInUse(
 }
 
 // ─── write functions: 母题 ────────────────────────────────────────────────────
-// 门类（第一级）与类别（第二级）固定，增减要先讨论（见 IMAGERY.md），后台只增改母题（第三级）。
+// 门类与类别固定，增减要先讨论（见 IMAGERY.md），后台只增改母题。
 // 词不单独新建或改名：词在标注时按歌词原文创建，改名会让它的标注全部对不上歌词。
 
 function badRequest(message: string, code: string) {
   return Object.assign(new Error(message), { code });
 }
 
-/** 母题只能挂在类别（第二级）下 */
-async function assertCategoryParent(supabase: UserClient, parentId: number) {
+const MOTIF_FIELDS = "id,name,category_id,description";
+
+async function assertCategory(supabase: UserClient, categoryId: number) {
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_CAT)
-    .select("level")
-    .eq("id", parentId)
+    .select("id")
+    .eq("id", categoryId)
     .maybeSingle();
   if (error) throw error;
-  if ((data as { level: number | null } | null)?.level !== 2) {
-    throw badRequest("母题只能放在类别（第二级）下", "INVALID_PARENT");
-  }
+  if (!data) throw badRequest("没有这个类别", "INVALID_CATEGORY");
 }
 
 export async function createMotif(
-  data: { name: string; parent_id: number; description: string },
+  data: { name: string; category_id: number; description: string },
   accessToken: string,
-): Promise<ImageryCategory> {
+): Promise<Motif> {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
-  await assertCategoryParent(supabase, data.parent_id);
+  await assertCategory(supabase, data.category_id);
   const { data: created, error } = await supabase
-    .from(TABLES.IMAGERY_CAT)
-    .insert({ ...data, level: 3 })
-    .select("id,name,parent_id,level,description")
+    .from(TABLES.MOTIFS)
+    .insert(data)
+    .select(MOTIF_FIELDS)
     .single();
   if (error) throw error;
-  return created as ImageryCategory;
+  return created as Motif;
 }
 
 export async function updateMotif(
   id: number,
-  data: { name?: string; parent_id?: number; description?: string },
+  data: { name?: string; category_id?: number; description?: string },
   accessToken: string,
-): Promise<ImageryCategory> {
+): Promise<Motif> {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
   await assertMotifs(supabase, [id]);
-  if (data.parent_id !== undefined) {
-    await assertCategoryParent(supabase, data.parent_id);
+  if (data.category_id !== undefined) {
+    await assertCategory(supabase, data.category_id);
   }
   const { data: updated, error } = await supabase
-    .from(TABLES.IMAGERY_CAT)
+    .from(TABLES.MOTIFS)
     .update(data)
     .eq("id", id)
-    .select("id,name,parent_id,level,description")
+    .select(MOTIF_FIELDS)
     .single();
   if (error) throw error;
-  return updated as ImageryCategory;
+  return updated as Motif;
 }
 
 // ─── write functions: 词的候选母题 ────────────────────────────────────────────
@@ -254,7 +354,8 @@ export type WordMotifs = {
 /**
  * 整体改写一个词登记的母题（imagery_motifs）。
  *
- * 去掉的母题下若还有这个词的标注，拒绝：那些标注会落到候选之外。
+ * 去掉的默认母题或多义候选下若还有这个词的标注，拒绝：那些标注会落到候选之外。
+ * 「同时算进」是读时展开的，增删随时生效，不拦。
  * 写入顺序照顾「每词一个 primary」的唯一索引：先删去掉的、再把旧默认降为多义、最后写新的。
  */
 export async function setWordMotifs(
@@ -277,20 +378,18 @@ export async function setWordMotifs(
   const [current, occurrences] = await Promise.all([
     supabase
       .from(TABLES.IMAGERY_MOTIFS)
-      .select("category_id,role")
+      .select("motif_id,role")
       .eq("imagery_id", imageryId),
     annotationsInUse(supabase, { imageryId }),
   ]);
   if (current.error) throw current.error;
   const rows = (current.data ?? []) as Array<{
-    category_id: number;
+    motif_id: number;
     role: MotifEntry["role"];
   }>;
-  const annotated = new Set(occurrences.map((o) => o.category_id));
+  const annotated = new Set(occurrences.map((o) => o.motif_id));
 
-  const removed = rows
-    .map((r) => r.category_id)
-    .filter((id) => !wanted.has(id));
+  const removed = rows.map((r) => r.motif_id).filter((id) => !wanted.has(id));
   const blocked = removed.filter((id) => annotated.has(id));
   if (blocked.length > 0) {
     throw badRequest(
@@ -303,10 +402,10 @@ export async function setWordMotifs(
       .from(TABLES.IMAGERY_MOTIFS)
       .delete()
       .eq("imagery_id", imageryId)
-      .in("category_id", removed);
+      .in("motif_id", removed);
     if (error) throw error;
   }
-  const oldPrimary = rows.find((r) => r.role === "primary")?.category_id;
+  const oldPrimary = rows.find((r) => r.role === "primary")?.motif_id;
   if (
     oldPrimary !== undefined &&
     oldPrimary !== next.primary &&
@@ -316,36 +415,20 @@ export async function setWordMotifs(
       .from(TABLES.IMAGERY_MOTIFS)
       .update({ role: "alternative" })
       .eq("imagery_id", imageryId)
-      .eq("category_id", oldPrimary);
+      .eq("motif_id", oldPrimary);
     if (error) throw error;
   }
-  // 主键 (imagery_id, category_id)：已有的行改 role，新的行插入；primary 放最后写
+  // 主键 (imagery_id, motif_id)：已有的行改 role，新的行插入；primary 放最后写
   const upserts = [...wanted]
-    .map(([category_id, role]) => ({
-      imagery_id: imageryId,
-      category_id,
-      role,
-    }))
+    .map(([motif_id, role]) => ({ imagery_id: imageryId, motif_id, role }))
     .sort(
       (a, b) => Number(a.role === "primary") - Number(b.role === "primary"),
     );
   const { error } = await supabase
     .from(TABLES.IMAGERY_MOTIFS)
-    .upsert(upserts, { onConflict: "imagery_id,category_id" });
+    .upsert(upserts, { onConflict: "imagery_id,motif_id" });
   if (error) throw error;
   return next;
-}
-
-async function getOccurrenceWithRelationsById(id: number, accessToken: string) {
-  const supabase = getUserClient(accessToken);
-  if (!supabase) throw new Error("Supabase client unavailable");
-  const { data, error } = await supabase
-    .from(TABLES.WORKING_SONG_IMAGERY)
-    .select(OCCURRENCE_FIELDS)
-    .eq("id", id)
-    .single();
-  if (error) throw error;
-  return mapOccurrenceRow(data as Record<string, unknown>);
 }
 
 // ─── 整理：删掉没有标注的母题 ─────────────────────────────────────────────────
@@ -362,37 +445,34 @@ export type UnusedMotifWord = {
 };
 
 /** 可以整理掉的母题，连同登记了它的词（删母题时这些登记一并删掉） */
-export type UnusedMotif = ImageryCategory & { words: UnusedMotifWord[] };
+export type UnusedMotif = Motif & { words: UnusedMotifWord[] };
 
 /**
- * 没用上的母题：第三级、没有子分类、没有标注指向它（任一首歌的工作版本、线上版本都算，见 annotationsInUse）。
+ * 没用上的母题：没有标注挂在它上面，也没有标注「同时算进」它（任一首歌的工作版本、线上版本都算，见 annotationsInUse）。
  * 词登记不算用上：标注改挂别的母题后，原来自动登记的默认母题会留在 imagery_motifs 里
  * （「汗」先标了母题汗、后改成身躯，汗仍是它的默认母题），整理时把登记一并处理掉。
- * 第一、二级是门类与类别，增减要先讨论（见 IMAGERY.md），不在整理范围内。
+ * 类别固定（见 IMAGERY.md），不在整理范围内。
  */
 async function findUnusedMotifs(supabase: UserClient): Promise<UnusedMotif[]> {
-  const [categories, motifs, occurrences] = await Promise.all([
-    fetchAll<ImageryCategory>(
-      supabase,
-      TABLES.IMAGERY_CAT,
-      "id,name,parent_id,level,description",
-    ),
+  const [motifRows, registrationsAll, occurrences] = await Promise.all([
+    fetchAll<Motif>(supabase, TABLES.MOTIFS, MOTIF_FIELDS),
     fetchAll<MotifEntry>(
       supabase,
       TABLES.IMAGERY_MOTIFS,
-      "imagery_id,category_id,role",
+      "imagery_id,motif_id,role",
     ),
     annotationsInUse(supabase),
   ]);
-  const annotated = new Set(occurrences.map((o) => o.category_id));
-  const parents = new Set(categories.map((c) => c.parent_id));
-  const unused = categories.filter(
-    (c) => c.level === 3 && !annotated.has(c.id) && !parents.has(c.id),
+  const annotated = new Set(
+    occurrences.flatMap((o) => [o.motif_id, ...(o.part_motif_ids ?? [])]),
   );
+  const unused = motifRows.filter((m) => !annotated.has(m.id));
   if (unused.length === 0) return [];
 
-  const unusedIds = new Set(unused.map((c) => c.id));
-  const registrations = motifs.filter((m) => unusedIds.has(m.category_id));
+  const unusedIds = new Set(unused.map((m) => m.id));
+  const registrations = registrationsAll.filter((m) =>
+    unusedIds.has(m.motif_id),
+  );
   const wordIds = [...new Set(registrations.map((m) => m.imagery_id))];
   const wordName = new Map<number, string>();
   if (wordIds.length > 0) {
@@ -406,37 +486,39 @@ async function findUnusedMotifs(supabase: UserClient): Promise<UnusedMotif[]> {
     }
   }
 
-  const catName = new Map(categories.map((c) => [c.id, c.name]));
+  const motifName = new Map(motifRows.map((m) => [m.id, m.name]));
   const promoteTo = (wordId: number) => {
     const counts = new Map<number, number>();
     for (const o of occurrences) {
       if (o.imagery_id !== wordId) continue;
-      counts.set(o.category_id, (counts.get(o.category_id) ?? 0) + 1);
+      counts.set(o.motif_id, (counts.get(o.motif_id) ?? 0) + 1);
     }
-    const alternatives = motifs
+    const alternatives = registrationsAll
       .filter(
         (m) =>
           m.imagery_id === wordId &&
           m.role === "alternative" &&
-          !unusedIds.has(m.category_id),
+          !unusedIds.has(m.motif_id),
       )
-      .map((m) => m.category_id);
+      .map((m) => m.motif_id);
     const pool = alternatives.length > 0 ? alternatives : [...counts.keys()];
     const [id] = pool.sort(
       (a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0),
     );
-    return id === undefined ? null : { id, name: catName.get(id) ?? `#${id}` };
+    return id === undefined
+      ? null
+      : { id, name: motifName.get(id) ?? `#${id}` };
   };
 
-  return unused.map((c) => ({
-    ...c,
+  return unused.map((m) => ({
+    ...m,
     words: registrations
-      .filter((m) => m.category_id === c.id)
-      .map((m) => ({
-        id: m.imagery_id,
-        name: wordName.get(m.imagery_id) ?? `#${m.imagery_id}`,
-        role: m.role,
-        ...(m.role === "primary" ? { promoteTo: promoteTo(m.imagery_id) } : {}),
+      .filter((r) => r.motif_id === m.id)
+      .map((r) => ({
+        id: r.imagery_id,
+        name: wordName.get(r.imagery_id) ?? `#${r.imagery_id}`,
+        role: r.role,
+        ...(r.role === "primary" ? { promoteTo: promoteTo(r.imagery_id) } : {}),
       })),
   }));
 }
@@ -452,7 +534,7 @@ export async function getUnusedMotifs(
 /**
  * 删掉选中的空母题。删之前按当前数据重查一遍：列表打开后又有了标注的母题不删。
  *
- * 顺序：先删这些母题的词登记（category_id 是 on delete restrict），再给默认母题被删的词
+ * 顺序：先删这些母题的词登记（motif_id 是 on delete restrict），再给默认母题被删的词
  * 换上新的默认母题（每词只能有一个 primary，所以要在删之后），最后删母题。
  * 返回实际删掉的 id（权限不够时 RLS 会静默不删，这里能看出来）与换了默认母题的词。
  */
@@ -466,22 +548,22 @@ export async function deleteUnusedMotifs(
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
   const wanted = new Set(ids);
-  const targets = (await findUnusedMotifs(supabase)).filter((c) =>
-    wanted.has(c.id),
+  const targets = (await findUnusedMotifs(supabase)).filter((m) =>
+    wanted.has(m.id),
   );
   if (targets.length === 0) return { deleted: [], promoted: [] };
-  const targetIds = targets.map((c) => c.id);
+  const targetIds = targets.map((m) => m.id);
 
-  if (targets.some((c) => c.words.length > 0)) {
+  if (targets.some((m) => m.words.length > 0)) {
     const { error } = await supabase
       .from(TABLES.IMAGERY_MOTIFS)
       .delete()
-      .in("category_id", targetIds);
+      .in("motif_id", targetIds);
     if (error) throw error;
   }
 
-  const promotions = targets.flatMap((c) =>
-    c.words.flatMap((w) =>
+  const promotions = targets.flatMap((m) =>
+    m.words.flatMap((w) =>
       w.role === "primary" && w.promoteTo
         ? [{ imagery_id: w.id, word: w.name, motif: w.promoteTo }]
         : [],
@@ -492,16 +574,16 @@ export async function deleteUnusedMotifs(
     const { error } = await supabase.from(TABLES.IMAGERY_MOTIFS).upsert(
       promotions.map((p) => ({
         imagery_id: p.imagery_id,
-        category_id: p.motif.id,
+        motif_id: p.motif.id,
         role: "primary" as const,
       })),
-      { onConflict: "imagery_id,category_id" },
+      { onConflict: "imagery_id,motif_id" },
     );
     if (error) throw error;
   }
 
   const { data, error } = await supabase
-    .from(TABLES.IMAGERY_CAT)
+    .from(TABLES.MOTIFS)
     .delete()
     .in("id", targetIds)
     .select("id");
@@ -514,144 +596,73 @@ export async function deleteUnusedMotifs(
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * 标注与词登记只能挂在母题（第三级分类）上（见 IMAGERY.md）。
- * 原先按「没有子分类」判断，空着的二级分类也会被当成母题。
- */
+/** 标注与词登记只能挂在母题上（外键也会拦，这里给出能看懂的错误） */
 async function assertMotifs(
   supabase: UserClient,
-  categoryIds: readonly number[],
+  motifIds: readonly number[],
 ): Promise<void> {
-  const ids = [...new Set(categoryIds)];
+  const ids = [...new Set(motifIds)];
   if (ids.length === 0) return;
   const { data, error } = await supabase
-    .from(TABLES.IMAGERY_CAT)
-    .select("id,level")
+    .from(TABLES.MOTIFS)
+    .select("id")
     .in("id", ids);
   if (error) throw error;
-  const motifs = new Set(
-    ((data ?? []) as { id: number; level: number | null }[])
-      .filter((c) => c.level === 3)
-      .map((c) => c.id),
-  );
-  if (ids.some((id) => !motifs.has(id))) {
-    throw badRequest("只能挂到母题（第三级分类）上", "NOT_MOTIF");
+  const found = new Set(((data ?? []) as { id: number }[]).map((m) => m.id));
+  if (ids.some((id) => !found.has(id))) {
+    throw badRequest("只能挂到母题上", "NOT_MOTIF");
   }
 }
 
 // ─── write functions: occurrences ─────────────────────────────────────────────
 
-type UserClient = NonNullable<ReturnType<typeof getUserClient>>;
-type MotifInfo = { primary: number | null; parts: number[] };
-
 /**
  * 保证标注挂的母题登记在该词的候选里（见 IMAGERY.md）：
  * 从未登记母题的新词，以这次选的母题为默认；已登记的词选了候选之外的母题，登记为多义候选。
- *
- * 返回各词的默认母题与并列组成，供 withParts 为挂默认母题的标注补写并列组成。
  */
 async function registerMotifs(
   supabase: UserClient,
-  pairs: ReadonlyArray<{ imagery_id: number; category_id: number }>,
-): Promise<Map<number, MotifInfo>> {
+  pairs: ReadonlyArray<{ imagery_id: number; motif_id: number }>,
+): Promise<void> {
   const ids = [...new Set(pairs.map((p) => p.imagery_id))];
   const { data, error } = await supabase
     .from(TABLES.IMAGERY_MOTIFS)
-    .select("imagery_id,category_id,role")
+    .select("imagery_id,motif_id,role")
     .in("imagery_id", ids);
   if (error) throw error;
 
-  const known = new Map<number, MotifInfo & { all: Set<number> }>(
-    ids.map((id) => [id, { primary: null, parts: [], all: new Set() }]),
+  const known = new Map<number, { primary: number | null; all: Set<number> }>(
+    ids.map((id) => [id, { primary: null, all: new Set() }]),
   );
-  for (const row of (data ?? []) as Array<{
-    imagery_id: number;
-    category_id: number;
-    role: string;
-  }>) {
+  for (const row of (data ?? []) as MotifEntry[]) {
     const entry = known.get(row.imagery_id);
     if (!entry) continue;
-    entry.all.add(row.category_id);
-    if (row.role === "primary") entry.primary = row.category_id;
-    if (row.role === "part") entry.parts.push(row.category_id);
+    entry.all.add(row.motif_id);
+    if (row.role === "primary") entry.primary = row.motif_id;
   }
 
   const additions: Array<{
     imagery_id: number;
-    category_id: number;
+    motif_id: number;
     role: "primary" | "alternative";
   }> = [];
-  for (const { imagery_id, category_id } of pairs) {
+  for (const { imagery_id, motif_id } of pairs) {
     const entry = known.get(imagery_id);
-    if (!entry || entry.all.has(category_id)) continue;
+    if (!entry || entry.all.has(motif_id)) continue;
     const role = entry.primary === null ? "primary" : "alternative";
-    if (role === "primary") entry.primary = category_id;
-    entry.all.add(category_id);
-    additions.push({ imagery_id, category_id, role });
+    if (role === "primary") entry.primary = motif_id;
+    entry.all.add(motif_id);
+    additions.push({ imagery_id, motif_id, role });
   }
   if (additions.length > 0) {
     const { error: insertError } = await supabase
       .from(TABLES.IMAGERY_MOTIFS)
       .upsert(additions, {
-        onConflict: "imagery_id,category_id",
+        onConflict: "imagery_id,motif_id",
         ignoreDuplicates: true,
       });
     if (insertError) throw insertError;
   }
-  return known;
-}
-
-/** 挂默认母题的标注，补上并列词其余组成的行（「风雨」标了风，再写一条雨） */
-function withParts<T extends { imagery_id: number; category_id: number }>(
-  rows: T[],
-  motifs: ReadonlyMap<number, MotifInfo>,
-): T[] {
-  return rows.flatMap((row) => {
-    const entry = motifs.get(row.imagery_id);
-    if (!entry || entry.primary !== row.category_id) return [row];
-    return [row, ...entry.parts.map((id) => ({ ...row, category_id: id }))];
-  });
-}
-
-type SongWords = {
-  lyrics: string | null;
-  rows: Array<{
-    id: number;
-    imagery_id: number;
-    category_id: number;
-    name: string;
-    lyric_timetag: string[];
-  }>;
-};
-
-/** 一个版本的歌词与标注（连词名） */
-async function loadSongWords(
-  supabase: UserClient,
-  versionId: number,
-): Promise<SongWords> {
-  const [song, occurrences] = await Promise.all([
-    supabase
-      .from(TABLES.SONG_VERSIONS)
-      .select("lyrics")
-      .eq("id", versionId)
-      .maybeSingle(),
-    supabase
-      .from(TABLES.SONG_IMAGERY)
-      .select("id,imagery_id,category_id,lyric_timetag,imagery(name)")
-      .eq("version_id", versionId),
-  ]);
-  if (song.error) throw song.error;
-  if (occurrences.error) throw occurrences.error;
-  return {
-    lyrics: (song.data as { lyrics: string | null } | null)?.lyrics ?? null,
-    rows: ((occurrences.data ?? []) as Record<string, unknown>[]).map((r) => ({
-      id: r.id as number,
-      imagery_id: r.imagery_id as number,
-      category_id: r.category_id as number,
-      name: (r.imagery as { name?: string } | null)?.name ?? "",
-      lyric_timetag: (r.lyric_timetag as string[] | null) ?? [],
-    })),
-  };
 }
 
 /**
@@ -664,18 +675,22 @@ async function assertInLyrics(
   words: ReadonlyArray<{ imagery_id: number } | { imagery_name: string }>,
 ): Promise<void> {
   const ids = words.flatMap((w) => ("imagery_id" in w ? [w.imagery_id] : []));
-  const [{ lyrics, rows }, found] = await Promise.all([
-    loadSongWords(supabase, versionId),
+  const [versions, found] = await Promise.all([
+    loadVersionWords(supabase, [versionId]),
     ids.length > 0
       ? supabase.from(TABLES.IMAGERY).select("name").in("id", ids)
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (found.error) throw found.error;
+  const version = versions.get(versionId);
   const names = [
     ...((found.data ?? []) as { name: string }[]).map((r) => r.name),
     ...words.flatMap((w) => ("imagery_name" in w ? [w.imagery_name] : [])),
   ];
-  const expected = songTimetags(lyrics, [...rows.map((r) => r.name), ...names]);
+  const expected = songTimetags(version?.lyrics, [
+    ...(version?.names ?? []),
+    ...names,
+  ]);
   if (!expected) return;
   const absent = names.filter((n) => (expected.get(n) ?? []).length === 0);
   if (absent.length > 0) {
@@ -689,70 +704,41 @@ async function assertInLyrics(
 }
 
 /**
- * 按歌词重算一首歌全部标注的时间标签：恰好是词字面出现的行。
- * 增删一个词会改变同曲短词被覆盖的行（加了「岁月」，「月」就让出那几行），所以整首重算。
- * 歌词没有时间轴时不动。
- *
- * 返回标签有变动的标注所挂的母题，以及在歌词里一处都找不到的词（标签被清空，标注要人工处理）。
+ * 发布前的核对：工作版本里歌词找不到的标注词（改了歌词后常见）。
+ * 只提示，不拦发布；要到意象页签删掉或改标。
  */
-async function syncSongTimetags(
-  supabase: UserClient,
-  versionId: number,
-): Promise<TimetagSyncResult> {
-  const { lyrics, rows } = await loadSongWords(supabase, versionId);
-  const expected = songTimetags(lyrics, [...new Set(rows.map((r) => r.name))]);
-  if (!expected) return { motifIds: [], notFound: [] };
-  const motifIds = new Set<number>();
-  for (const row of rows) {
-    const tags = expected.get(row.name) ?? [];
-    if (tags.join() === row.lyric_timetag.join()) continue;
-    const { error } = await supabase
-      .from(TABLES.SONG_IMAGERY)
-      .update({ lyric_timetag: tags })
-      .eq("version_id", versionId)
-      .eq("id", row.id);
-    if (error) throw error;
-    motifIds.add(row.category_id);
-  }
-  const notFound = [...expected]
-    .filter(([, tags]) => tags.length === 0)
-    .map(([name]) => name);
-  return { motifIds: [...motifIds], notFound };
-}
-
-export type TimetagSyncResult = { motifIds: number[]; notFound: string[] };
-
-/**
- * 发布前调用：按草稿的歌词重算草稿里全部标注的时间标签（冻结以后就改不了）。
- * 改歌词不会触发重算，所以要在发布这一步补上。没有草稿时什么也不做。
- */
-export async function resyncDraftTimetags(
+export async function wordsMissingFromLyrics(
   songId: number,
   accessToken: string,
-): Promise<TimetagSyncResult> {
+): Promise<string[]> {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
-  const { data, error } = await supabase
-    .from(TABLES.WORKING_SONGS)
-    .select("version_id,has_draft")
-    .eq("id", songId)
-    .maybeSingle();
-  if (error) throw error;
-  const row = data as { version_id: number; has_draft: boolean } | null;
-  if (!row?.has_draft) return { motifIds: [], notFound: [] };
-  return syncSongTimetags(supabase, row.version_id);
+  const versionId = await workingVersionId(supabase, songId);
+  if (versionId === null) return [];
+  const version = (await loadVersionWords(supabase, [versionId])).get(
+    versionId,
+  );
+  const expected = songTimetags(version?.lyrics, version?.names ?? []);
+  if (!expected) return [];
+  return [...expected]
+    .filter(([, tags]) => tags.length === 0)
+    .map(([name]) => name);
 }
 
 /**
  * 新增标注的单项：imagery_id 指向已有的词，或 imagery_name 给出歌词里的原文（词典里没有时保存时创建）。
- * 手动添加与预标注审核都走 createOccurrencesBatch。时间标签由服务端按歌词算出
+ * 手动添加与预标注审核都走 createOccurrencesBatch。时间标签读时按歌词算，不用给
  */
 export type OccurrenceBatchItem = {
-  category_id: number;
+  motif_id: number;
 } & ({ imagery_id: number } | { imagery_name: string });
 
 function songNotFound() {
   return Object.assign(new Error("歌曲不存在"), { code: "SONG_NOT_FOUND" });
+}
+
+function duplicateWord() {
+  return badRequest("这首歌已经标注过这个词", "DUPLICATE_OCCURRENCE");
 }
 
 /** 写之前先按工作版本校验，过了再开草稿：校验不过不留下空草稿 */
@@ -813,9 +799,9 @@ async function resolveImageryNames(
  *
  * - 词名若已存在同名的词则直接复用，否则创建；创建前先确认歌曲存在、词都在歌词里，避免留下孤立的词
  * - 写在这首歌的草稿上（没有就开一份），发布后才上线
- * - 解析后指向同一个词的多项合并为一条（母题取第一项）；写入后按歌词重算整首的时间标签
- * - 所选母题不在该词的候选里时登记为候选；挂默认母题的并列词补写其余组成
- * - 该歌已标注过的词会被跳过，避免重复提交或并发编辑产生重复行
+ * - 解析后指向同一个词的多项合并为一条（母题取第一项）
+ * - 所选母题不在该词的候选里时登记为候选；「同时算进」读时展开，不另写
+ * - 该歌已标注过的词会被跳过（一个版本里一个词只有一条，库里有唯一约束）
  */
 export async function createOccurrencesBatch(
   songId: number,
@@ -827,7 +813,7 @@ export async function createOccurrencesBatch(
   if (!supabase) throw new Error("Supabase client unavailable");
   await assertMotifs(
     supabase,
-    items.map((i) => i.category_id),
+    items.map((i) => i.motif_id),
   );
 
   const working = await workingVersionOrThrow(supabase, songId);
@@ -839,20 +825,13 @@ export async function createOccurrencesBatch(
   );
 
   // ── 按词合并 ──
-  const merged = new Map<
-    number,
-    { imagery_id: number; category_id: number; lyric_timetag: string[] }
-  >();
+  const merged = new Map<number, { imagery_id: number; motif_id: number }>();
   for (const item of items) {
     const imageryId =
       "imagery_id" in item ? item.imagery_id : idByName.get(item.imagery_name);
     if (imageryId === undefined) throw new Error("意象创建失败");
     if (!merged.has(imageryId)) {
-      merged.set(imageryId, {
-        imagery_id: imageryId,
-        category_id: item.category_id,
-        lyric_timetag: [],
-      });
+      merged.set(imageryId, { imagery_id: imageryId, motif_id: item.motif_id });
     }
   }
 
@@ -871,21 +850,19 @@ export async function createOccurrencesBatch(
   const skipped = merged.size - fresh.length;
   if (fresh.length === 0) return { created: 0, skipped, newImagery };
 
-  const motifs = await registerMotifs(supabase, fresh);
-  const rows = withParts(
-    fresh.map((item) => ({ ...item, version_id: draft })),
-    motifs,
-  );
-
-  const { error } = await supabase.from(TABLES.SONG_IMAGERY).insert(rows);
+  await registerMotifs(supabase, fresh);
+  const { error } = await supabase
+    .from(TABLES.SONG_IMAGERY)
+    .insert(fresh.map((item) => ({ ...item, version_id: draft })));
   if (error) {
     // 草稿在两次请求之间被放弃或歌被删了
     if (error.code === "23503" && error.message.includes("version_id")) {
       throw songNotFound();
     }
+    // 两个请求同时给这首歌标了同一个词
+    if (error.code === "23505") throw duplicateWord();
     throw error;
   }
-  await syncSongTimetags(supabase, draft);
   return { created: fresh.length, skipped, newImagery };
 }
 
@@ -906,9 +883,9 @@ async function followPrimary(
       .from(TABLES.IMAGERY_MOTIFS)
       .select("role")
       .eq("imagery_id", imageryId)
-      .eq("category_id", from)
+      .eq("motif_id", from)
       .maybeSingle(),
-    annotationsInUse(supabase, { imageryId, categoryId: from }),
+    annotationsInUse(supabase, { imageryId, motifId: from }),
   ]);
   if (registration.error) throw registration.error;
   if ((registration.data as { role?: string } | null)?.role !== "primary") {
@@ -919,38 +896,38 @@ async function followPrimary(
     .from(TABLES.IMAGERY_MOTIFS)
     .delete()
     .eq("imagery_id", imageryId)
-    .eq("category_id", from);
+    .eq("motif_id", from);
   if (deleteError) throw deleteError;
   const { error } = await supabase
     .from(TABLES.IMAGERY_MOTIFS)
     .upsert(
-      { imagery_id: imageryId, category_id: to, role: "primary" },
-      { onConflict: "imagery_id,category_id" },
+      { imagery_id: imageryId, motif_id: to, role: "primary" },
+      { onConflict: "imagery_id,motif_id" },
     );
   if (error) throw error;
 }
 
 /**
  * 改一条标注的词或母题。词可以给 imagery_id，也可以给 imagery_name（词典里没有时创建）。
- * 时间标签不由调用方给出：改动后按歌词重算整首。改在草稿上（没有就开一份）
+ * 改在草稿上（没有就开一份）。时间标签与「同时算进」都是读时算的，改完自然跟着变
  */
 export async function updateOccurrence(
   id: number,
   data: {
     imagery_id?: number;
     imagery_name?: string;
-    category_id?: number;
+    motif_id?: number;
   },
   accessToken: string,
-) {
+): Promise<OccurrenceWithSong> {
   const supabase = getUserClient(accessToken);
   if (!supabase) throw new Error("Supabase client unavailable");
-  if (data.category_id !== undefined) {
-    await assertMotifs(supabase, [data.category_id]);
+  if (data.motif_id !== undefined) {
+    await assertMotifs(supabase, [data.motif_id]);
   }
   const { data: current, error: currentError } = await supabase
     .from(TABLES.WORKING_SONG_IMAGERY)
-    .select("song_id,version_id,imagery_id,category_id")
+    .select("song_id,version_id,imagery_id,motif_id")
     .eq("id", id)
     .single();
   if (currentError) throw currentError;
@@ -958,7 +935,7 @@ export async function updateOccurrence(
     song_id: number;
     version_id: number;
     imagery_id: number;
-    category_id: number;
+    motif_id: number;
   };
 
   let imageryId = data.imagery_id ?? before.imagery_id;
@@ -977,80 +954,35 @@ export async function updateOccurrence(
       { imagery_id: imageryId },
     ]);
   }
-  const categoryId = data.category_id ?? before.category_id;
-  if (categoryId === before.category_id && imageryId === before.imagery_id) {
-    return getOccurrenceWithRelationsById(id, accessToken);
+  const motifId = data.motif_id ?? before.motif_id;
+  if (motifId === before.motif_id && imageryId === before.imagery_id) {
+    return getOccurrenceWithRelationsById(supabase, id);
   }
   await registerMotifs(supabase, [
-    { imagery_id: imageryId, category_id: categoryId },
+    { imagery_id: imageryId, motif_id: motifId },
   ]);
 
   const draft = await draftOf(supabase, before.song_id);
-
-  // 这条标注补写过的「同时算进」随它走：先删掉（免得改挂到其中某个母题时撞上唯一约束），
-  // 改完再按改后的词与母题重新补
-  const { error: siblingsError } = await supabase
-    .from(TABLES.SONG_IMAGERY)
-    .delete()
-    .eq("version_id", draft)
-    .eq("imagery_id", before.imagery_id)
-    .neq("id", id);
-  if (siblingsError) throw siblingsError;
-
   const { error } = await supabase
     .from(TABLES.SONG_IMAGERY)
-    .update({ imagery_id: imageryId, category_id: categoryId })
+    .update({ imagery_id: imageryId, motif_id: motifId })
     .eq("version_id", draft)
     .eq("id", id)
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) {
+    if (error.code === "23505") throw duplicateWord();
+    throw error;
+  }
   if (imageryId === before.imagery_id) {
-    await followPrimary(supabase, imageryId, before.category_id, categoryId);
+    await followPrimary(supabase, imageryId, before.motif_id, motifId);
   }
-  await addParts(supabase, draft, imageryId, categoryId);
-  await syncSongTimetags(supabase, draft);
-  return getOccurrenceWithRelationsById(id, accessToken);
-}
-
-/** 标注挂在词的「通常算作」上时，补写它「同时算进」的各条（时间标签随后统一重算） */
-async function addParts(
-  supabase: UserClient,
-  versionId: number,
-  imageryId: number,
-  categoryId: number,
-): Promise<void> {
-  const { data, error } = await supabase
-    .from(TABLES.IMAGERY_MOTIFS)
-    .select("category_id,role")
-    .eq("imagery_id", imageryId);
-  if (error) throw error;
-  const rows = (data ?? []) as Array<{ category_id: number; role: string }>;
-  if (!rows.some((r) => r.role === "primary" && r.category_id === categoryId)) {
-    return;
-  }
-  const parts = rows.filter((r) => r.role === "part");
-  if (parts.length === 0) return;
-  const { error: insertError } = await supabase
-    .from(TABLES.SONG_IMAGERY)
-    .upsert(
-      parts.map((p) => ({
-        version_id: versionId,
-        imagery_id: imageryId,
-        category_id: p.category_id,
-        lyric_timetag: [] as string[],
-      })),
-      {
-        onConflict: "version_id,imagery_id,category_id",
-        ignoreDuplicates: true,
-      },
-    );
-  if (insertError) throw insertError;
+  return getOccurrenceWithRelationsById(supabase, id);
 }
 
 /**
- * 删掉一条标注，连同它补写的「同时算进」：一首歌里同一个词的各条是一次标注写出来的。
- * 删在草稿上（没有就开一份）。返回删掉的各条所挂的母题；标注不存在时返回 null
+ * 删掉一条标注，删在草稿上（没有就开一份）。
+ * 返回它算进的母题（含「同时算进」）；标注不存在时返回 null
  */
 export async function deleteOccurrence(
   id: number,
@@ -1060,30 +992,26 @@ export async function deleteOccurrence(
   if (!supabase) throw new Error("Supabase client unavailable");
   const { data: row, error: rowError } = await supabase
     .from(TABLES.WORKING_SONG_IMAGERY)
-    .select("song_id,imagery_id")
+    .select("song_id,motif_id,part_motif_ids")
     .eq("id", id)
     .maybeSingle();
   if (rowError) throw rowError;
   if (!row) return null;
-  const { song_id: songId, imagery_id: imageryId } = row as {
+  const found = row as {
     song_id: number;
-    imagery_id: number;
+    motif_id: number;
+    part_motif_ids: number[] | null;
   };
-  const draft = await draftOf(supabase, songId);
-  const { data, error } = await supabase
+  const draft = await draftOf(supabase, found.song_id);
+  const { error } = await supabase
     .from(TABLES.SONG_IMAGERY)
     .delete()
     .eq("version_id", draft)
-    .eq("imagery_id", imageryId)
-    .select("category_id");
+    .eq("id", id);
   if (error) throw error;
-  // 删掉长词后，被它覆盖的短词要拿回那几行
-  await syncSongTimetags(supabase, draft);
   return {
-    songId,
-    motifIds: ((data ?? []) as { category_id: number }[]).map(
-      (r) => r.category_id,
-    ),
+    songId: found.song_id,
+    motifIds: [found.motif_id, ...(found.part_motif_ids ?? [])],
   };
 }
 

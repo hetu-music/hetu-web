@@ -9,6 +9,10 @@
  * - 从未进入前五的歌曲数：过多说明部分歌曲在测验中永远不可见
  */
 import { createClient } from "@supabase/supabase-js";
+import {
+  expandAnnotations,
+  type PublishedAnnotation,
+} from "../src/lib/imagery/consistency";
 import { buildPool, type PoolRows } from "../src/lib/quiz/pool";
 import { buildModel, evaluate } from "../src/lib/quiz/model";
 import { QUESTIONS } from "../src/lib/quiz/questions";
@@ -35,12 +39,29 @@ async function main() {
     }
   }
 
+  const imagery = await fetchAll<{ id: number; name: string }>(
+    "imagery",
+    "id,name",
+  );
   const rows: PoolRows = {
-    categories: await fetchAll("imagery_categories", "id,name,parent_id,level"),
-    imagery: await fetchAll("imagery", "id,name"),
-    occurrences: await fetchAll(
-      "published_song_imagery",
-      "song_id,category_id,imagery_id,lyric_timetag",
+    categories: await fetchAll("imagery_categories", "id,name"),
+    motifs: await fetchAll("motifs", "id,name,category_id"),
+    imagery,
+    // 与站内的意象索引一样：「同时算进」展开成行，时间标签按歌词算
+    occurrences: expandAnnotations(
+      await fetchAll<PublishedAnnotation>(
+        "published_song_imagery",
+        "song_id,version_id,imagery_id,motif_id,part_motif_ids",
+      ),
+      new Map(
+        (
+          await fetchAll<{ version_id: number; lyrics: string | null }>(
+            "published_songs",
+            "version_id,lyrics",
+          )
+        ).map((l) => [l.version_id, l.lyrics]),
+      ),
+      new Map(imagery.map((i) => [i.id, i.name])),
     ),
     songs: await fetchAll(
       // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池

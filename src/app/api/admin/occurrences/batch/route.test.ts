@@ -45,7 +45,7 @@ function post(body: unknown) {
 
 const validItem = {
   imagery_id: 1,
-  category_id: 10,
+  motif_id: 10,
 };
 
 beforeEach(() => {
@@ -99,13 +99,13 @@ describe("POST /api/admin/occurrences/batch", () => {
     const res = await POST(
       post({
         song_id: 5,
-        items: [{ imagery_name: " 孤灯 ", category_id: 10 }],
+        items: [{ imagery_name: " 孤灯 ", motif_id: 10 }],
       }),
     );
     expect(res.status).toBe(200);
     expect(createOccurrencesBatch).toHaveBeenCalledWith(
       5,
-      [{ imagery_name: "孤灯", category_id: 10 }],
+      [{ imagery_name: "孤灯", motif_id: 10 }],
       "test-token",
     );
   });
@@ -114,11 +114,11 @@ describe("POST /api/admin/occurrences/batch", () => {
     ["空列表", { song_id: 5, items: [] }],
     [
       "新意象名为空",
-      { song_id: 5, items: [{ imagery_name: "  ", category_id: 10 }] },
+      { song_id: 5, items: [{ imagery_name: "  ", motif_id: 10 }] },
     ],
     [
       "既无 imagery_id 也无 imagery_name",
-      { song_id: 5, items: [{ category_id: 10 }] },
+      { song_id: 5, items: [{ motif_id: 10 }] },
     ],
   ])("%s 时返回 400", async (_, body) => {
     const res = await POST(post(body));

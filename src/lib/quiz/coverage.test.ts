@@ -25,11 +25,11 @@ type Occ = PoolRows["occurrences"][number];
 const occ = (
   song_id: number,
   imagery_id: number,
-  category_id: number,
+  motif_id: number,
 ): Occ => ({
   song_id,
   imagery_id,
-  category_id,
+  motif_id,
   lyric_timetag: null,
 });
 

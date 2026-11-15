@@ -81,8 +81,8 @@ describe("getImagerySuggestions", () => {
     const service = mockServiceTables({
       imagery: dictionary,
       occurrences: [
-        { song_id: 7, imagery_id: 1, category_id: 10 },
-        { song_id: 5, imagery_id: 2, category_id: 11 },
+        { song_id: 7, imagery_id: 1, motif_id: 10 },
+        { song_id: 5, imagery_id: 2, motif_id: 11 },
       ],
       songs: [
         { id: 5, lyrics },
@@ -102,7 +102,7 @@ describe("getImagerySuggestions", () => {
     expect(byName.has("天涯")).toBe(false); // 已标注
     expect(byName.get("明月")).toMatchObject({
       recommended: true,
-      categoryIds: [10],
+      motifIds: [10],
       seen: 1,
       annotated: 1,
     });
@@ -159,7 +159,7 @@ describe("reviewImagerySuggestions", () => {
         { id: 1, keep: true, reason: "景物" },
         { id: 2, keep: false, reason: "泛指" },
       ],
-      additions: [{ name: "江湖", lines: [2], categoryId: 11, reason: "地理" }],
+      additions: [{ name: "江湖", lines: [2], motifId: 11, reason: "地理" }],
     });
 
     const result = await reviewImagerySuggestions(5, candidates, "token");
@@ -173,7 +173,7 @@ describe("reviewImagerySuggestions", () => {
           name: "江湖",
           timetags: ["00:20.00"],
           lines: ["人在江湖"],
-          categoryId: 11,
+          motifId: 11,
           reason: "地理",
         },
       ],

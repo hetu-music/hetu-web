@@ -4,7 +4,7 @@ import SiteMark from "@/components/shared/SiteMark";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useIntersection } from "@/hooks/ui/useIntersection";
 import { GRAY_PALETTE } from "@/lib/imagery/palette";
-import type { ImageryCloud, MotifDetail } from "@/lib/types";
+import type { ImageryCloud, ImageryDomain, MotifDetail } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -61,7 +61,7 @@ export default function ImageryClient({
   const t = useTranslations("common.imagery");
   const locale = useLocale();
   const [view, setView] = useState<View>("motifs");
-  const [l1, setL1] = useState<number | null>(null);
+  const [l1, setL1] = useState<ImageryDomain | null>(null);
   const [l2, setL2] = useState<number | null>(null);
   const deferredL1 = useDeferredValue(l1);
   const deferredL2 = useDeferredValue(l2);
@@ -161,7 +161,10 @@ export default function ImageryClient({
   );
 
   const items: CloudItem[] = useMemo(() => {
-    const inScope = (x: { l1: number; l2: number }) =>
+    const inScope = (x: {
+      l1: ImageryDomain | null;
+      l2: number | null;
+    }) =>
       deferredL2 !== null
         ? x.l2 === deferredL2
         : deferredL1 === null || x.l1 === deferredL1;
@@ -169,7 +172,7 @@ export default function ImageryClient({
       // 词的分类与配色随它的母题；母题不在词云里的（没有完整的三级分类）只在「全部」里，灰色
       return cloud.words.flatMap((w) => {
         const m = motifById.get(w.motif);
-        if (!inScope(m ?? { l1: 0, l2: 0 })) return [];
+        if (!inScope(m ?? { l1: null, l2: null })) return [];
         return [
           {
             id: w.id,

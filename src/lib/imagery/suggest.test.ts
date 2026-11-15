@@ -88,41 +88,41 @@ describe("buildPriors", () => {
         { id: 12, lyrics: "[00:01.00]风中人" }, // 未标注，不计入
       ],
       occurrences: [
-        { song_id: 10, imagery_id: 1, category_id: 100 },
-        { song_id: 11, imagery_id: 1, category_id: 101 },
-        { song_id: 13, imagery_id: 1, category_id: 101 },
+        { song_id: 10, imagery_id: 1, motif_id: 100 },
+        { song_id: 11, imagery_id: 1, motif_id: 101 },
+        { song_id: 13, imagery_id: 1, motif_id: 101 },
       ],
     });
     expect(priors.get(1)).toEqual({
       seen: 2,
       annotated: 2,
-      categoryIds: [101, 100],
+      motifIds: [101, 100],
     });
-    expect(priors.get(2)).toEqual({ seen: 2, annotated: 0, categoryIds: [] });
+    expect(priors.get(2)).toEqual({ seen: 2, annotated: 0, motifIds: [] });
   });
 
   it("登记了母题的词用登记的候选：默认在前、多义候选在后，并列组成不列入", () => {
     const priors = buildPriors({
       dictionary,
       songs: [{ id: 10, lyrics: "[00:01.00]风里的人" }],
-      occurrences: [{ song_id: 10, imagery_id: 1, category_id: 100 }],
+      occurrences: [{ song_id: 10, imagery_id: 1, motif_id: 100 }],
       motifs: [
-        { imagery_id: 1, category_id: 300, role: "alternative" },
-        { imagery_id: 1, category_id: 200, role: "primary" },
-        { imagery_id: 1, category_id: 400, role: "part" },
+        { imagery_id: 1, motif_id: 300, role: "alternative" },
+        { imagery_id: 1, motif_id: 200, role: "primary" },
+        { imagery_id: 1, motif_id: 400, role: "part" },
       ],
     });
     // 历史上用过的 100 不再出现：分类以登记为准
-    expect(priors.get(1)?.categoryIds).toEqual([200, 300]);
+    expect(priors.get(1)?.motifIds).toEqual([200, 300]);
     // 未登记的词退回历史分类（这里没有）
-    expect(priors.get(2)?.categoryIds).toEqual([]);
+    expect(priors.get(2)?.motifIds).toEqual([]);
   });
 
   it("excludeSongId 排除当前歌曲", () => {
     const priors = buildPriors({
       dictionary,
       songs: [{ id: 10, lyrics: "[00:01.00]风" }],
-      occurrences: [{ song_id: 10, imagery_id: 1, category_id: 100 }],
+      occurrences: [{ song_id: 10, imagery_id: 1, motif_id: 100 }],
       excludeSongId: 10,
     });
     expect(priors.get(1)?.seen).toBe(0);
@@ -140,8 +140,8 @@ describe("suggestImagery", () => {
   const prior = (
     seen: number,
     annotated: number,
-    categoryIds: number[] = [100],
-  ): ImageryPrior => ({ seen, annotated, categoryIds });
+    motifIds: number[] = [100],
+  ): ImageryPrior => ({ seen, annotated, motifIds });
   const priors = new Map<number, ImageryPrior>([
     [1, prior(10, 8)],
     [2, prior(10, 1)],
@@ -167,7 +167,7 @@ describe("suggestImagery", () => {
     // 从未标注过的意象没有默认分类，不默认勾选
     expect(byName.get("孤城")).toMatchObject({
       rate: null,
-      categoryIds: [],
+      motifIds: [],
       recommended: false,
     });
   });

@@ -102,19 +102,20 @@ export function apiSetWordMotifs(
   });
 }
 
-export function apiGetImageryCategories() {
-  return apiRequest<ImageryCategory[]>("/api/admin/imagery/categories", {
+/** 类别与母题 */
+export function apiGetImageryTaxonomy() {
+  return apiRequest<ImageryTaxonomy>("/api/admin/imagery/categories", {
     fallback: "获取母题失败",
   });
 }
 
-/** 只能新建母题：挂在类别（第二级）下，说明必填 */
+/** 只能新建母题：挂在某个类别下，说明必填 */
 export function apiCreateMotif(data: {
   name: string;
-  parent_id: number;
+  category_id: number;
   description: string;
 }) {
-  return apiRequest<ImageryCategory>("/api/admin/imagery/categories", {
+  return apiRequest<Motif>("/api/admin/imagery/categories", {
     method: "POST",
     body: data,
     fallback: "新增母题失败",
@@ -124,9 +125,9 @@ export function apiCreateMotif(data: {
 
 export function apiUpdateMotif(
   id: number,
-  data: { name?: string; parent_id?: number; description?: string },
+  data: { name?: string; category_id?: number; description?: string },
 ) {
-  return apiRequest<ImageryCategory>(`/api/admin/imagery/categories/${id}`, {
+  return apiRequest<Motif>(`/api/admin/imagery/categories/${id}`, {
     method: "PUT",
     body: data,
     fallback: "更新母题失败",
@@ -216,7 +217,7 @@ export function apiUpdateOccurrence(
   data: {
     imagery_id?: number;
     imagery_name?: string;
-    category_id?: number;
+    motif_id?: number;
   },
 ) {
   return editorialWrite(

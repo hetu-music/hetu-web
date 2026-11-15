@@ -16,40 +16,10 @@ export interface ReviewCandidate {
   recommended: boolean;
 }
 
+/** 可挂标注的母题，标签是完整路径「门类 / 类别 / 母题」（见 word-motifs 的 motifOptions） */
 export interface ReviewCategory {
   id: number;
-  /** 完整路径，如「天象 / 星相」 */
   label: string;
-}
-
-/** 可挂载意象的叶子分类，标签为从根到叶的完整路径 */
-export function toLeafCategories(
-  categories: ReadonlyArray<{
-    id: number;
-    name: string;
-    parent_id: number | null;
-  }>,
-): ReviewCategory[] {
-  type Row = (typeof categories)[number];
-  const byId = new Map(categories.map((c) => [c.id, c]));
-  const parents = new Set(categories.map((c) => c.parent_id));
-  const pathOf = (cat: Row): string => {
-    const names: string[] = [];
-    const visited = new Set<number>();
-    for (
-      let c: Row | undefined = cat;
-      c && !visited.has(c.id);
-      c = c.parent_id === null ? undefined : byId.get(c.parent_id)
-    ) {
-      visited.add(c.id);
-      names.unshift(c.name);
-    }
-    return names.join(" / ");
-  };
-  return categories
-    .filter((c) => !parents.has(c.id))
-    .map((c) => ({ id: c.id, label: pathOf(c) }))
-    .sort((a, b) => a.label.localeCompare(b.label, "zh-CN"));
 }
 
 export interface ReviewVerdict {
@@ -62,7 +32,7 @@ export interface ReviewAddition {
   name: string;
   timetags: string[];
   lines: string[];
-  categoryId: number | null;
+  motifId: number | null;
   reason: string;
 }
 
@@ -117,10 +87,10 @@ export const REVIEW_OUTPUT_SCHEMA = {
             items: { type: "integer" },
             description: "出现的行号",
           },
-          categoryId: { type: "integer", description: "分类列表中的 id" },
+          motifId: { type: "integer", description: "分类列表中的 id" },
           reason: { type: "string" },
         },
-        required: ["name", "lines", "categoryId", "reason"],
+        required: ["name", "lines", "motifId", "reason"],
         additionalProperties: false,
       },
     },
@@ -141,7 +111,7 @@ const outputSchema = z.object({
     z.object({
       name: z.string(),
       lines: z.array(z.number().int()),
-      categoryId: z.number().int(),
+      motifId: z.number().int(),
       reason: z.string(),
     }),
   ),
@@ -241,7 +211,7 @@ export function parseReviewOutput(
       name,
       timetags: pairs.map((p) => p.tag),
       lines: pairs.map((p) => p.text),
-      categoryId: leafIds.has(a.categoryId) ? a.categoryId : null,
+      motifId: leafIds.has(a.motifId) ? a.motifId : null,
       reason: a.reason.trim().slice(0, 60),
     });
     if (additions.length >= MAX_ADDITIONS) break;

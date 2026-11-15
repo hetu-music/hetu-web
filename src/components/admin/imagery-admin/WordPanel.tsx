@@ -58,7 +58,7 @@ export default function WordPanel({
   const annotated = useMemo(() => {
     const counts = new Map<number, number>();
     for (const o of occurrences.data ?? []) {
-      counts.set(o.category_id, (counts.get(o.category_id) ?? 0) + 1);
+      counts.set(o.motif_id, (counts.get(o.motif_id) ?? 0) + 1);
     }
     return counts;
   }, [occurrences.data]);
@@ -73,7 +73,7 @@ export default function WordPanel({
         title: o.song_title,
         motifIds: new Set<number>(),
       };
-      entry.motifIds.add(o.category_id);
+      entry.motifIds.add(o.motif_id);
       bySong.set(o.song_id, entry);
     }
     return [...bySong.values()].sort((a, b) =>

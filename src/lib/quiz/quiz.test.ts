@@ -68,7 +68,7 @@ function makeRows(): PoolRows {
       for (let c = 0; c < n; c += 1) {
         occurrences.push({
           song_id: songId,
-          category_id: leafOf(k),
+          motif_id: leafOf(k),
           imagery_id: dim.key === "tianxiang" && k === i ? 1 : 2,
           lyric_timetag: [`00:${String(10 + c).padStart(2, "0")}.00`],
         });
@@ -110,7 +110,7 @@ function makeRows(): PoolRows {
     for (let c = 0; c < 12; c += 1) {
       occurrences.push({
         song_id: songId,
-        category_id: leafOf(0),
+        motif_id: leafOf(0),
         imagery_id: 2,
         lyric_timetag: null,
       });
@@ -118,7 +118,7 @@ function makeRows(): PoolRows {
   }
   occurrences.push({
     song_id: 902,
-    category_id: leafOf(0),
+    motif_id: leafOf(0),
     imagery_id: 2,
     lyric_timetag: null,
   });
@@ -230,7 +230,7 @@ describe("buildPool", () => {
       for (let c = 0; c < 12; c += 1) {
         rows.occurrences.push({
           song_id: id,
-          category_id: leaf,
+          motif_id: leaf,
           imagery_id: 2,
           lyric_timetag: null,
         });

@@ -1,6 +1,8 @@
+import { IMAGERY_DOMAINS, type ImageryDomain } from "@/lib/types";
+
 /**
- * 意象一级分类配色。意象页与歌曲详情页共用，保证同一类别在全站是同一种颜色。
- * 颜色按一级分类在 IMAGERY_L1_ORDER 中的位置分配，不在表内的分类排在其后。
+ * 意象门类配色。意象页与歌曲详情页共用，保证同一门类在全站是同一种颜色。
+ * 颜色按门类在 IMAGERY_DOMAINS 中的位置分配。
  */
 
 export interface PaletteEntry {
@@ -89,20 +91,7 @@ export const GRAY_PALETTE: PaletteEntry = {
   accent: "#94a3b8",
 };
 
-const IMAGERY_L1_ORDER = ["自然", "人文", "情志"];
-
-/** 一级分类按固定顺序排列，决定各自的配色下标 */
-export function sortLevel1Categories<
-  T extends { name: string; level: number | null },
->(categories: T[]): T[] {
-  return categories
-    .filter((c) => c.level === 1)
-    .sort((a, b) => {
-      const idxA = IMAGERY_L1_ORDER.indexOf(a.name);
-      const idxB = IMAGERY_L1_ORDER.indexOf(b.name);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.name.localeCompare(b.name, "zh");
-    });
+/** 门类的配色：PALETTE_FULL 的下标 */
+export function domainPalette(domain: ImageryDomain): number {
+  return IMAGERY_DOMAINS.indexOf(domain) % PALETTE_FULL.length;
 }

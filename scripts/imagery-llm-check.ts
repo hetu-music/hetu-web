@@ -17,14 +17,15 @@ import {
   parseReviewOutput,
   REVIEW_OUTPUT_SCHEMA,
   REVIEW_SYSTEM_PROMPT,
-  toLeafCategories,
 } from "../src/lib/imagery/review";
 import {
   buildPriors,
   parseLrcLines,
   suggestImagery,
 } from "../src/lib/imagery/suggest";
+import { motifOptions } from "../src/lib/imagery/word-motifs";
 import { chatJson, isLlmConfigured } from "../src/lib/server/llm";
+import type { ImageryCategory, Motif } from "../src/lib/types";
 
 const PAGE_SIZE = 1000;
 
@@ -48,24 +49,29 @@ async function main() {
     }
   }
 
-  const [dictionary, occurrences, songs, categoryRows] = await Promise.all([
+  const [dictionary, occurrences, songs, categoryRows, motifRows] =
+    await Promise.all([
     fetchAll<{ id: number; name: string }>("imagery", "id,name"),
-    fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
+    fetchAll<{ song_id: number; imagery_id: number; motif_id: number }>(
       "working_song_imagery",
-      "song_id,imagery_id,category_id",
+      "song_id,imagery_id,motif_id",
     ),
     fetchAll<{ id: number; title: string; lyrics: string | null }>(
       // 标注按同一版本的歌词标：都取工作版本（有草稿用草稿）
       "working_songs",
       "id,title,lyrics",
     ),
-    fetchAll<{ id: number; name: string; parent_id: number | null }>(
+    fetchAll<ImageryCategory>(
       "imagery_categories",
-      "id,name,parent_id",
+      "id,name,domain,description",
     ),
+    fetchAll<Motif>("motifs", "id,name,category_id,description"),
   ]);
 
-  const categories = toLeafCategories(categoryRows);
+  const categories = motifOptions({
+    categories: categoryRows,
+    motifs: motifRows,
+  });
   const nameById = new Map(dictionary.map((d) => [d.id, d.name]));
   const truthBySong = new Map<number, Set<string>>();
   for (const o of occurrences) {

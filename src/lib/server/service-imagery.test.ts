@@ -62,9 +62,9 @@ describe("getImageryWithCounts", () => {
         }),
         makeQueryBuilder({
           data: [
-            { imagery_id: 1, category_id: 5, role: "alternative" },
-            { imagery_id: 1, category_id: 9, role: "primary" },
-            { imagery_id: 1, category_id: 7, role: "part" },
+            { imagery_id: 1, motif_id: 5, role: "alternative" },
+            { imagery_id: 1, motif_id: 9, role: "primary" },
+            { imagery_id: 1, motif_id: 7, role: "part" },
           ],
           error: null,
         }),
@@ -116,12 +116,12 @@ describe("getOccurrencesForImagery（数据行映射）", () => {
         id: 1,
         song_id: 10,
         imagery_id: 20,
-        category_id: 30,
+        motif_id: 30,
         lyric_timetag: ["01:00"],
         song_title: "标题",
         song_album: "专辑",
         imagery_name: "明月",
-        category_name: "自然",
+        motif_name: "自然",
       },
     ]);
     const client = createMockSupabaseClient([builder]);
@@ -135,7 +135,7 @@ describe("getOccurrencesForImagery（数据行映射）", () => {
       song_title: "标题",
       song_album: "专辑",
       imagery_name: "明月",
-      category_name: "自然",
+      motif_name: "自然",
     });
   });
 
@@ -221,17 +221,17 @@ describe("setWordMotifs（改写词的候选母题）", () => {
         imagery_categories: motifRows([10, 20]),
         imagery_motifs: [
           ok([
-            { category_id: 10, role: "primary" },
-            { category_id: 20, role: "alternative" },
-            { category_id: 30, role: "alternative" },
+            { motif_id: 10, role: "primary" },
+            { motif_id: 20, role: "alternative" },
+            { motif_id: 30, role: "alternative" },
           ]),
           remove,
           demote,
           upsert,
         ],
         // 在用的标注：工作版本挂 10，线上版本挂 20；30 哪儿都没用
-        working_song_imagery: ok([{ imagery_id: 7, category_id: 10 }]),
-        published_song_imagery: ok([{ imagery_id: 7, category_id: 20 }]),
+        working_song_imagery: ok([{ imagery_id: 7, motif_id: 10 }]),
+        published_song_imagery: ok([{ imagery_id: 7, motif_id: 20 }]),
       }),
     );
     await setWordMotifs(
@@ -239,15 +239,15 @@ describe("setWordMotifs（改写词的候选母题）", () => {
       { primary: 20, alternatives: [10], parts: [] },
       "token",
     );
-    expect(remove.in).toHaveBeenCalledWith("category_id", [30]);
+    expect(remove.in).toHaveBeenCalledWith("motif_id", [30]);
     expect(demote.update).toHaveBeenCalledWith({ role: "alternative" });
-    expect(demote.eq).toHaveBeenCalledWith("category_id", 10);
+    expect(demote.eq).toHaveBeenCalledWith("motif_id", 10);
     expect(upsert.upsert).toHaveBeenCalledWith(
       [
-        { imagery_id: 7, category_id: 10, role: "alternative" },
-        { imagery_id: 7, category_id: 20, role: "primary" },
+        { imagery_id: 7, motif_id: 10, role: "alternative" },
+        { imagery_id: 7, motif_id: 20, role: "primary" },
       ],
-      { onConflict: "imagery_id,category_id" },
+      { onConflict: "imagery_id,motif_id" },
     );
   });
 
@@ -258,13 +258,13 @@ describe("setWordMotifs（改写词的候选母题）", () => {
         imagery_categories: motifRows([10]),
         imagery_motifs: [
           ok([
-            { category_id: 10, role: "primary" },
-            { category_id: 20, role: "alternative" },
+            { motif_id: 10, role: "primary" },
+            { motif_id: 20, role: "alternative" },
           ]),
           remove,
         ],
         working_song_imagery: ok([]),
-        published_song_imagery: ok([{ imagery_id: 7, category_id: 20 }]),
+        published_song_imagery: ok([{ imagery_id: 7, motif_id: 20 }]),
       }),
     );
     await expect(
@@ -296,8 +296,8 @@ const draftRpc = { rpc: { ensure_draft: { data: DRAFT, error: null } } };
 
 describe("createOccurrencesBatch", () => {
   const items = [
-    { imagery_id: 1, category_id: 10 },
-    { imagery_id: 2, category_id: 10 },
+    { imagery_id: 1, motif_id: 10 },
+    { imagery_id: 2, motif_id: 10 },
   ];
   // 校验母题：用到的都是第三级
   const motifOk = () => ok([10, 11, 12, 20].map((id) => ({ id, level: 3 })));
@@ -321,7 +321,7 @@ describe("createOccurrencesBatch", () => {
         song_versions: noTimeline(),
         song_imagery: songImagery([{ imagery_id: 1 }], insertBuilder),
         imagery_motifs: ok([
-          { imagery_id: 2, category_id: 10, role: "primary" },
+          { imagery_id: 2, motif_id: 10, role: "primary" },
         ]),
       },
       draftRpc,
@@ -331,7 +331,7 @@ describe("createOccurrencesBatch", () => {
     expect(result).toEqual({ created: 1, skipped: 1, newImagery: 0 });
     expect(client.rpc).toHaveBeenCalledWith("ensure_draft", { p_song_id: 5 });
     expect(insertBuilder.insert).toHaveBeenCalledWith([
-      { imagery_id: 2, category_id: 10, lyric_timetag: [], version_id: DRAFT },
+      { imagery_id: 2, motif_id: 10, lyric_timetag: [], version_id: DRAFT },
     ]);
   });
 
@@ -352,7 +352,7 @@ describe("createOccurrencesBatch", () => {
             createBuilder,
           ],
           imagery_motifs: [
-            ok([{ imagery_id: 3, category_id: 10, role: "primary" }]),
+            ok([{ imagery_id: 3, motif_id: 10, role: "primary" }]),
             registerBuilder,
           ],
         },
@@ -363,9 +363,9 @@ describe("createOccurrencesBatch", () => {
       5,
       [
         // 「明月」改成了已有的「月」，与另一条「月」合并
-        { imagery_name: "月", category_id: 10 },
-        { imagery_id: 3, category_id: 11 },
-        { imagery_name: "孤灯", category_id: 12 },
+        { imagery_name: "月", motif_id: 10 },
+        { imagery_id: 3, motif_id: 11 },
+        { imagery_name: "孤灯", motif_id: 12 },
       ],
       "token",
     );
@@ -373,12 +373,12 @@ describe("createOccurrencesBatch", () => {
     expect(createBuilder.insert).toHaveBeenCalledWith([{ name: "孤灯" }]);
     // 新词以这次选的母题为默认母题
     expect(registerBuilder.upsert).toHaveBeenCalledWith(
-      [{ imagery_id: 31, category_id: 12, role: "primary" }],
-      { onConflict: "imagery_id,category_id", ignoreDuplicates: true },
+      [{ imagery_id: 31, motif_id: 12, role: "primary" }],
+      { onConflict: "imagery_id,motif_id", ignoreDuplicates: true },
     );
     expect(insertBuilder.insert).toHaveBeenCalledWith([
-      { imagery_id: 3, category_id: 10, lyric_timetag: [], version_id: DRAFT },
-      { imagery_id: 31, category_id: 12, lyric_timetag: [], version_id: DRAFT },
+      { imagery_id: 3, motif_id: 10, lyric_timetag: [], version_id: DRAFT },
+      { imagery_id: 31, motif_id: 12, lyric_timetag: [], version_id: DRAFT },
     ]);
   });
 
@@ -401,7 +401,7 @@ describe("createOccurrencesBatch", () => {
     await expect(
       createOccurrencesBatch(
         5,
-        [{ imagery_name: "孤灯", category_id: 10 }],
+        [{ imagery_name: "孤灯", motif_id: 10 }],
         "token",
       ),
     ).rejects.toMatchObject({ code: "SONG_NOT_FOUND" });
@@ -425,8 +425,8 @@ describe("createOccurrencesBatch", () => {
       createOccurrencesBatch(
         5,
         [
-          { imagery_name: "明月", category_id: 10 },
-          { imagery_name: "孤灯", category_id: 10 },
+          { imagery_name: "明月", motif_id: 10 },
+          { imagery_name: "孤灯", motif_id: 10 },
         ],
         "token",
       ),
@@ -448,10 +448,10 @@ describe("createOccurrencesBatch", () => {
           imagery_motifs: [
             ok([
               // 1「风雨」：默认风（10），并列雨（11）
-              { imagery_id: 1, category_id: 10, role: "primary" },
-              { imagery_id: 1, category_id: 11, role: "part" },
+              { imagery_id: 1, motif_id: 10, role: "primary" },
+              { imagery_id: 1, motif_id: 11, role: "part" },
               // 2：默认母题是 20，这次选了 10
-              { imagery_id: 2, category_id: 20, role: "primary" },
+              { imagery_id: 2, motif_id: 20, role: "primary" },
             ]),
             registerBuilder,
           ],
@@ -462,13 +462,13 @@ describe("createOccurrencesBatch", () => {
     const result = await createOccurrencesBatch(5, items, "token");
     expect(result).toEqual({ created: 2, skipped: 0, newImagery: 0 });
     expect(registerBuilder.upsert).toHaveBeenCalledWith(
-      [{ imagery_id: 2, category_id: 10, role: "alternative" }],
-      { onConflict: "imagery_id,category_id", ignoreDuplicates: true },
+      [{ imagery_id: 2, motif_id: 10, role: "alternative" }],
+      { onConflict: "imagery_id,motif_id", ignoreDuplicates: true },
     );
     expect(insertBuilder.insert).toHaveBeenCalledWith([
-      expect.objectContaining({ imagery_id: 1, category_id: 10 }),
-      expect.objectContaining({ imagery_id: 1, category_id: 11 }),
-      expect.objectContaining({ imagery_id: 2, category_id: 10 }),
+      expect.objectContaining({ imagery_id: 1, motif_id: 10 }),
+      expect.objectContaining({ imagery_id: 1, motif_id: 11 }),
+      expect.objectContaining({ imagery_id: 2, motif_id: 10 }),
     ]);
   });
 
@@ -491,8 +491,8 @@ describe("createOccurrencesBatch", () => {
             }),
           ),
           imagery_motifs: ok([
-            { imagery_id: 1, category_id: 10, role: "primary" },
-            { imagery_id: 2, category_id: 10, role: "primary" },
+            { imagery_id: 1, motif_id: 10, role: "primary" },
+            { imagery_id: 2, motif_id: 10, role: "primary" },
           ]),
         },
         draftRpc,
@@ -519,16 +519,16 @@ describe("updateOccurrence / deleteOccurrence", () => {
       id: 1,
       song_id: 1,
       imagery_id: 2,
-      category_id: 20,
+      motif_id: 20,
       lyric_timetag: [],
       song_title: "歌",
       song_album: null,
       imagery_name: "汗",
-      category_name: "身躯",
+      motif_name: "身躯",
     });
   /** 工作版本里的这一行（开草稿前在版本 3 上） */
-  const current = (imagery_id: number, category_id: number) =>
-    ok({ song_id: 1, version_id: 3, imagery_id, category_id });
+  const current = (imagery_id: number, motif_id: number) =>
+    ok({ song_id: 1, version_id: 3, imagery_id, motif_id });
   const noTimeline = () => ok({ lyrics: null });
 
   it("改挂到非母题时拒绝", async () => {
@@ -536,7 +536,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
       createMockSupabaseClient([ok([{ id: 5, level: 2 }])]),
     );
     await expect(
-      updateOccurrence(1, { category_id: 5 }, "token"),
+      updateOccurrence(1, { motif_id: 5 }, "token"),
     ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 
@@ -552,12 +552,12 @@ describe("updateOccurrence / deleteOccurrence", () => {
         working_song_imagery: [current(2, 10), ok([]), relations()],
         published_song_imagery: ok([]),
         imagery_motifs: [
-          ok([{ imagery_id: 2, category_id: 10, role: "primary" }]), // 登记
+          ok([{ imagery_id: 2, motif_id: 10, role: "primary" }]), // 登记
           ok(null), // 登记身躯为「有时也指」
           ok({ role: "primary" }), // 原母题的登记
           unregister,
           promote,
-          ok([{ category_id: 20, role: "primary" }]), // 补写「同时算进」：这个词没有
+          ok([{ motif_id: 20, role: "primary" }]), // 补写「同时算进」：这个词没有
         ],
         song_imagery: [siblings, update, ok([])],
         song_versions: noTimeline(),
@@ -565,16 +565,16 @@ describe("updateOccurrence / deleteOccurrence", () => {
       draftRpc,
     );
     vi.mocked(getUserClient).mockReturnValue(client);
-    await updateOccurrence(1, { category_id: 20 }, "token");
+    await updateOccurrence(1, { motif_id: 20 }, "token");
     expect(client.rpc).toHaveBeenCalledWith("ensure_draft", { p_song_id: 1 });
     expect(siblings.eq).toHaveBeenCalledWith("version_id", DRAFT);
     expect(siblings.neq).toHaveBeenCalledWith("id", 1);
     expect(update.eq).toHaveBeenCalledWith("version_id", DRAFT);
     expect(update.eq).toHaveBeenCalledWith("id", 1);
-    expect(unregister.eq).toHaveBeenCalledWith("category_id", 10);
+    expect(unregister.eq).toHaveBeenCalledWith("motif_id", 10);
     expect(promote.upsert).toHaveBeenCalledWith(
-      { imagery_id: 2, category_id: 20, role: "primary" },
-      { onConflict: "imagery_id,category_id" },
+      { imagery_id: 2, motif_id: 20, role: "primary" },
+      { onConflict: "imagery_id,motif_id" },
     );
   });
 
@@ -585,9 +585,9 @@ describe("updateOccurrence / deleteOccurrence", () => {
         {
           imagery_categories: ok([{ id: 20, level: 3 }]),
           working_song_imagery: [current(2, 10), ok([]), relations()],
-          published_song_imagery: ok([{ imagery_id: 2, category_id: 10 }]),
+          published_song_imagery: ok([{ imagery_id: 2, motif_id: 10 }]),
           imagery_motifs: [
-            ok([{ imagery_id: 2, category_id: 10, role: "primary" }]),
+            ok([{ imagery_id: 2, motif_id: 10, role: "primary" }]),
             ok(null),
             ok({ role: "primary" }),
             unregister,
@@ -598,7 +598,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
         draftRpc,
       ),
     );
-    await updateOccurrence(1, { category_id: 20 }, "token");
+    await updateOccurrence(1, { motif_id: 20 }, "token");
     expect(unregister.delete).not.toHaveBeenCalled();
   });
 
@@ -611,7 +611,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
       draftRpc,
     );
     vi.mocked(getUserClient).mockReturnValue(client);
-    await updateOccurrence(1, { category_id: 10 }, "token");
+    await updateOccurrence(1, { motif_id: 10 }, "token");
     expect(client.rpc).not.toHaveBeenCalled();
   });
 
@@ -627,15 +627,15 @@ describe("updateOccurrence / deleteOccurrence", () => {
           published_song_imagery: ok([]),
           imagery_motifs: [
             ok([
-              { imagery_id: 1, category_id: 10, role: "primary" },
-              { imagery_id: 1, category_id: 11, role: "part" },
-              { imagery_id: 1, category_id: 30, role: "alternative" },
+              { imagery_id: 1, motif_id: 10, role: "primary" },
+              { imagery_id: 1, motif_id: 11, role: "part" },
+              { imagery_id: 1, motif_id: 30, role: "alternative" },
             ]), // 已登记，不用再登记
             ok({ role: "alternative" }),
             ok([
-              { category_id: 10, role: "primary" },
-              { category_id: 11, role: "part" },
-              { category_id: 30, role: "alternative" },
+              { motif_id: 10, role: "primary" },
+              { motif_id: 11, role: "part" },
+              { motif_id: 30, role: "alternative" },
             ]),
           ],
           song_imagery: [siblings, ok({ id: 1 }), parts, ok([])],
@@ -644,19 +644,19 @@ describe("updateOccurrence / deleteOccurrence", () => {
         draftRpc,
       ),
     );
-    await updateOccurrence(1, { category_id: 10 }, "token");
+    await updateOccurrence(1, { motif_id: 10 }, "token");
     expect(siblings.eq).toHaveBeenCalledWith("imagery_id", 1);
     expect(parts.upsert).toHaveBeenCalledWith(
       [
         {
           version_id: DRAFT,
           imagery_id: 1,
-          category_id: 11,
+          motif_id: 11,
           lyric_timetag: [],
         },
       ],
       {
-        onConflict: "version_id,imagery_id,category_id",
+        onConflict: "version_id,imagery_id,motif_id",
         ignoreDuplicates: true,
       },
     );
@@ -676,7 +676,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
           imagery_motifs: [
             ok([]), // 新词还没有登记
             ok(null), // 登记默认母题
-            ok([{ category_id: 10, role: "primary" }]),
+            ok([{ motif_id: 10, role: "primary" }]),
           ],
         },
         draftRpc,
@@ -687,12 +687,12 @@ describe("updateOccurrence / deleteOccurrence", () => {
     expect(siblings.eq).toHaveBeenCalledWith("imagery_id", 2);
     expect(update.update).toHaveBeenCalledWith({
       imagery_id: 31,
-      category_id: 10,
+      motif_id: 10,
     });
   });
 
   it("deleteOccurrence 在草稿里连同补写的「同时算进」一起删，再按草稿的歌词重算", async () => {
-    const remove = ok([{ category_id: 5 }, { category_id: 6 }]);
+    const remove = ok([{ motif_id: 5 }, { motif_id: 6 }]);
     const updateBuilder = ok(null);
     vi.mocked(getUserClient).mockReturnValue(
       createTableMockClient(
@@ -704,7 +704,7 @@ describe("updateOccurrence / deleteOccurrence", () => {
               {
                 id: 2,
                 imagery_id: 9,
-                category_id: 7,
+                motif_id: 7,
                 lyric_timetag: ["00:01.00"],
                 imagery: { name: "月" },
               },
@@ -796,7 +796,7 @@ describe("resyncDraftTimetags（发布前按草稿的歌词重算）", () => {
     {
       id: 1,
       imagery_id: 7,
-      category_id: 70,
+      motif_id: 70,
       lyric_timetag,
       imagery: { name: "明月" },
     },
@@ -816,14 +816,14 @@ describe("resyncDraftTimetags（发布前按草稿的歌词重算）", () => {
             {
               id: 2,
               imagery_id: 8,
-              category_id: 80,
+              motif_id: 80,
               lyric_timetag: ["00:05.00"],
               imagery: { name: "青天" },
             },
             {
               id: 3,
               imagery_id: 9,
-              category_id: 90,
+              motif_id: 90,
               lyric_timetag: ["00:02.00"],
               imagery: { name: "流水" },
             },
@@ -886,12 +886,12 @@ describe("整理空母题", () => {
     imagery_categories: [ok(categories), ...(extra.categories ?? [])],
     imagery_motifs: [
       ok([
-        { imagery_id: 1, category_id: 10, role: "primary" },
-        { imagery_id: 1, category_id: 11, role: "alternative" },
+        { imagery_id: 1, motif_id: 10, role: "primary" },
+        { imagery_id: 1, motif_id: 11, role: "alternative" },
       ]),
       ...(extra.motifs ?? []),
     ],
-    working_song_imagery: ok([{ imagery_id: 1, category_id: 11 }]),
+    working_song_imagery: ok([{ imagery_id: 1, motif_id: 11 }]),
     published_song_imagery: ok([]),
     imagery: ok([{ id: 1, name: "汗" }]),
   });
@@ -915,7 +915,7 @@ describe("整理空母题", () => {
     vi.mocked(getUserClient).mockReturnValue(
       createTableMockClient({
         ...routes(),
-        published_song_imagery: ok([{ imagery_id: 2, category_id: 12 }]),
+        published_song_imagery: ok([{ imagery_id: 2, motif_id: 12 }]),
       }),
     );
     const result = await getUnusedMotifs("token");
@@ -933,10 +933,10 @@ describe("整理空母题", () => {
     );
     const result = await deleteUnusedMotifs([10, 11, 12], "token");
     expect(unregister.delete).toHaveBeenCalled();
-    expect(unregister.in).toHaveBeenCalledWith("category_id", [10, 12]);
+    expect(unregister.in).toHaveBeenCalledWith("motif_id", [10, 12]);
     expect(promote.upsert).toHaveBeenCalledWith(
-      [{ imagery_id: 1, category_id: 11, role: "primary" }],
-      { onConflict: "imagery_id,category_id" },
+      [{ imagery_id: 1, motif_id: 11, role: "primary" }],
+      { onConflict: "imagery_id,motif_id" },
     );
     expect(remove.in).toHaveBeenCalledWith("id", [10, 12]);
     expect(result).toEqual({

@@ -102,7 +102,7 @@ function makeRows(): Rows {
         const tag = `0${k}:${String(10 + c).padStart(2, "0")}.00`;
         occurrences.push({
           song_id: songId,
-          category_id: leafOf[k],
+          motif_id: leafOf[k],
           imagery_id: dim.key === "tianxiang" && k === i ? 1 : 2,
           lyric_timetag: [tag],
         });

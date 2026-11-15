@@ -48,6 +48,11 @@ vi.mock("@/lib/db/supabase-server", async (importOriginal) => {
   };
 });
 
+let mockPublished = true;
+vi.mock("@/lib/server/service-songs", () => ({
+  isSongPublished: vi.fn(async () => mockPublished),
+}));
+
 import { GET } from "./route";
 
 function makeRequest(query = "?songId=42") {
@@ -64,6 +69,7 @@ async function getUrl(query?: string) {
 }
 
 beforeEach(() => {
+  mockPublished = true;
   mockUser = { id: "user-1" };
   mockUserRow = { can_stream: true };
   mockUserRowError = null;
@@ -119,6 +125,13 @@ describe("GET /api/navidrome/stream-url — 参数与数据", () => {
   it("songId 非数字返回 400", async () => {
     const res = await GET(makeRequest("?songId=abc"));
     expect(res.status).toBe(400);
+  });
+
+  it("歌不在线上时返回 404，不登记试听", async () => {
+    mockPublished = false;
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("该歌曲没有对应音频映射时返回 404", async () => {

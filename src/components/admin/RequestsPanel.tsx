@@ -93,11 +93,11 @@ export default function RequestsPanel({
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [replyStates, setReplyStates] = useState<Record<string, ReplyState>>(
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [replyStates, setReplyStates] = useState<Record<number, ReplyState>>(
     {},
   );
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
 
   const fetchPage = useCallback(
     async (p: number, type: string, status: string) => {
@@ -128,7 +128,7 @@ export default function RequestsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleReply = async (id: string, state: ReplyState) => {
+  const handleReply = async (id: number, state: ReplyState) => {
     if (!state.reply.trim()) return;
     setSavingId(id);
     try {

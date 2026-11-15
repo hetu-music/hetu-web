@@ -17,7 +17,7 @@ import { parseJsonBody } from "@/lib/server/parse-body";
 // ─── 回复 schema ──────────────────────────────────────────────────────────────
 
 const replySchema = z.object({
-  id: z.string().uuid("请求 ID 格式无效"),
+  id: z.number().int().positive("请求 ID 格式无效"),
   reply: z.string().min(1, "回复内容不能为空").max(2000),
   status: z.enum(["replied", "approved", "rejected"]),
 });
@@ -173,7 +173,6 @@ export const PUT = withAuth(
         status,
         replied_by: user.id,
         replied_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
       .eq("id", id);
 

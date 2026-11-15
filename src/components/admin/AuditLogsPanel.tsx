@@ -14,7 +14,7 @@ import {
 import { TEXT_BUTTON_CLASS } from "./kit/styles";
 
 interface AuditLog {
-  id: string;
+  id: number;
   table_name: string;
   action_type: string;
   user_id: string | null;
@@ -22,7 +22,7 @@ interface AuditLog {
   user_name: string | null;
   old_data: Record<string, unknown> | null;
   new_data: Record<string, unknown> | null;
-  changed_at: string | null;
+  created_at: string;
 }
 
 interface AuditLogsResponse {
@@ -264,7 +264,7 @@ function LogDetail({ log }: { log: AuditLog }) {
 
 export default function AuditLogsPanel() {
   const [page, setPage] = useState(1);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [tableFilter, setTableFilter] = useState<string>("all");
 
   const {
@@ -374,7 +374,7 @@ export default function AuditLogsPanel() {
                     {operatorLabel(log)}
                   </span>
                   <span className="shrink-0 tabular-nums text-slate-400">
-                    {formatDate(log.changed_at)}
+                    {formatDate(log.created_at)}
                   </span>
                 </button>
                 {isExpanded && hasData && <LogDetail log={log} />}

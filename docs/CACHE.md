@@ -49,8 +49,6 @@
 
 ## 三、Cloudflare 的规则
 
-### 现有
-
 1. **页面和公开接口按源站头进缓存**：
    ```
    (http.host eq "www.hetu-music.com"
@@ -59,47 +57,3 @@
    ```
    Eligible for cache，时长看源站的 `Cache-Control`。Cloudflare 默认不缓存 HTML 和 JSON，没有这条，页面和接口都不会进 CDN。
 2. **站内跳转请求绕过缓存**：带 `?_rsc=` 或请求头 `rsc: 1` 的请求不缓存。
-
-### 待加：缓存键忽略多余的参数
-
-**问题**：CDN 默认用完整地址（含查询串）当缓存键。`/api/imagery/motifs/9?locale=zh-TW&x=1` 和不带 `x=1` 的是两份缓存，前者从没被请求过，就会回源。在地址后面随便加个参数，就能让每个请求都绕过 CDN。
-
-源站现在扛得住（这几个接口的数据都在服务端缓存里，回源也只要几毫秒），加这两条是为了 CDN 命中率更高、访问更快。
-
-新建两条规则，放在上面那条「按源站头进缓存」之后（Cache Rules 按顺序生效，后面的只覆盖自己设的项）。Cache eligibility 和 Edge TTL 照抄现有那条，只多设缓存键：
-
-**规则一：按语言区分的接口，只认 `locale`**
-
-```
-(http.host eq "www.hetu-music.com"
- and (http.request.uri.path eq "/api/public/songs/lyrics-lines"
-      or starts_with(http.request.uri.path, "/api/imagery/motifs/")))
-```
-
-Cache key → Query string → Include specified query string parameters：`locale`
-
-**规则二：不需要参数的接口，查询串全部忽略**
-
-```
-(http.host eq "www.hetu-music.com"
- and (http.request.uri.path eq "/api/public/contributors"
-      or (starts_with(http.request.uri.path, "/api/public/songs/")
-          and ends_with(http.request.uri.path, "/lyrics"))))
-```
-
-Cache key → Query string → Exclude all query string parameters
-
-注意：
-
-- **不能直接改现有那条，给全站设「只认 `locale`」**。那条覆盖整个站点：封面走 Next 的图片优化（`/_next/image?url=…&w=…&q=…`），靠查询串区分是哪张图、什么尺寸。只认 `locale` 的话，所有图片都成了同一个缓存键，第一张被缓存的图会发给所有人。以后新加的、按查询参数返回不同内容的接口，也会被悄悄合并。
-- **清缓存照常有效**：代码里清的是标准写法的地址，Cloudflare 清的时候按同样的规则算缓存键，能对上。
-- **新增一个要缓存的接口时**，看它用不用查询参数，加进上面对应的那条规则。
-- 缓存键里查询串这一项，不确定免费套餐能不能用；界面上那一项是灰的就是当前套餐不支持。
-
-### 其他 CDN
-
-`server-revalidate.ts` 里还接了 EdgeOne 和 CloudFront。如果在用，缓存键要各设一遍：CloudFront 在缓存策略（Cache policy）的查询字符串里只放行 `locale`；EdgeOne 在节点缓存键的「查询字符串」规则里设。
-
-### 建议：限速
-
-不缓存、又不用登录就能调的接口，比如批注（`/api/public/songs/*/comments`）和 `/api/auth/*`，可以在 Cloudflare 上按 IP 限速。登录、注册、发验证码已有 Turnstile；校验验证码、重置密码是这些流程的第二步，第一步已经过了 Turnstile，这两步靠 Supabase 自带的频率限制。

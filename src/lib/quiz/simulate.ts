@@ -1,4 +1,5 @@
-import { rankSongs, scoreSongs, userVector, type QuizModel } from "./model";
+import { evaluate, TIE_EPSILON, type QuizModel } from "./model";
+import type { DimensionKey } from "./types";
 
 /** mulberry32：固定种子的伪随机数，只用于复现模拟样本 */
 export function createRng(seed: number): () => number {
@@ -20,6 +21,10 @@ export interface SimulationReport {
   firstCount: Map<number, number>;
   /** 每首歌进入前 topN 的次数 */
   topCount: Map<number, number>;
+  /** 每个人格（排第一的维度）出现的次数 */
+  personaCount: Map<DimensionKey, number>;
+  /** 第一、第二维度 z 分数并列的次数（人格靠打破并列的规则定） */
+  ties: number;
 }
 
 /**
@@ -35,6 +40,8 @@ export function simulate(
   const rng = createRng(seed);
   const firstCount = new Map<number, number>();
   const topCount = new Map<number, number>();
+  const personaCount = new Map<DimensionKey, number>();
+  let ties = 0;
   for (const song of model.songs) {
     firstCount.set(song.id, 0);
     topCount.set(song.id, 0);
@@ -44,16 +51,17 @@ export function simulate(
     const answers = model.questions.map((q) =>
       Math.floor(rng() * q.options.length),
     );
-    const { z } = userVector(model, answers);
-    const picked = rankSongs(model, scoreSongs(model, z), topN);
-    picked.forEach((j, rank) => {
-      const id = model.songs[j].id;
+    const { profile, matches } = evaluate(model, answers, topN);
+    matches.forEach(({ songId: id }, rank) => {
       if (rank === 0) firstCount.set(id, (firstCount.get(id) ?? 0) + 1);
       topCount.set(id, (topCount.get(id) ?? 0) + 1);
     });
+    const persona = profile[0].key;
+    personaCount.set(persona, (personaCount.get(persona) ?? 0) + 1);
+    if (Math.abs(profile[0].z - profile[1].z) <= TIE_EPSILON) ties += 1;
   }
 
-  return { samples, seed, topN, firstCount, topCount };
+  return { samples, seed, topN, firstCount, topCount, personaCount, ties };
 }
 
 /** 基尼系数：0 表示完全均匀，1 表示全部集中在一首歌 */

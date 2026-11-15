@@ -330,7 +330,7 @@ function explain(
 }
 
 /** z 分数相差小于此值视为并列（解析标准化的浮点误差远小于它） */
-const TIE_EPSILON = 1e-9;
+export const TIE_EPSILON = 1e-9;
 
 /** 每个维度在所选选项中作为主维度（该选项权重最高的维度）出现的次数 */
 function primaryPicks(

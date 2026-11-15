@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import { isSongPublished } from "@/lib/server/service-songs";
 import {
   fetchNavidromeSong,
   navidromeConfigFromEnv,
@@ -111,6 +112,11 @@ export const GET = withAuth(
         { error: "Service unavailable" },
         { status: 503 },
       );
+    }
+
+    // 没上线、已下架的歌不给音频：歌的 id 在，音频也可能在
+    if (!(await isSongPublished(songId))) {
+      return NextResponse.json({ error: "Song not found" }, { status: 404 });
     }
 
     const { data: navidRow, error: navidErr } = await serviceClient

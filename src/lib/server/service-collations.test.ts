@@ -168,9 +168,9 @@ describe("getSongCollations", () => {
               ...baseRow,
               id: 1,
               revisers: [
-                { first_at: "2026-11-03T00:00:00Z", user: { name: "丙" } },
-                { first_at: "2026-11-01T00:00:00Z", user: { name: "乙" } },
-                { first_at: "2026-11-02T00:00:00Z", user: null },
+                { created_at: "2026-11-03T00:00:00Z", user: { name: "丙" } },
+                { created_at: "2026-11-01T00:00:00Z", user: { name: "乙" } },
+                { created_at: "2026-11-02T00:00:00Z", user: null },
               ],
             },
             {

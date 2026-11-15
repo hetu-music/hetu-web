@@ -26,61 +26,68 @@ beforeEach(() => {
 });
 
 describe("getSongEmotions", () => {
-  it("按 rank 取出基调 id，主基调在前；有一行是 AI 预标就算未确认", async () => {
+  const working = () =>
+    makeQueryBuilder({ data: { version_id: 3 }, error: null });
+
+  it("读工作版本的基调，按 rank 排，主基调在前", async () => {
     const builder = makeQueryBuilder({
-      data: [
-        { emotion_id: 6, source: "ai" },
-        { emotion_id: 7, source: "ai" },
-      ],
+      data: [{ emotion_id: 6 }, { emotion_id: 7 }],
       error: null,
     });
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([builder]),
-    );
-    expect(await getSongEmotions(1)).toEqual({ ids: [6, 7], source: "ai" });
+    const client = createMockSupabaseClient([working(), builder]);
+    vi.mocked(getServiceClient).mockReturnValue(client);
+    expect(await getSongEmotions(1)).toEqual([6, 7]);
+    expect(client.from).toHaveBeenNthCalledWith(1, "working_songs");
+    expect(builder.eq).toHaveBeenCalledWith("version_id", 3);
     expect(builder.order).toHaveBeenCalledWith("rank");
   });
 
-  it("还没标时来源为 null", async () => {
+  it("歌不存在时返回空数组", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([makeQueryBuilder({ data: [], error: null })]),
+      createMockSupabaseClient([makeQueryBuilder({ data: null, error: null })]),
     );
-    expect(await getSongEmotions(1)).toEqual({ ids: [], source: null });
+    expect(await getSongEmotions(1)).toEqual([]);
   });
 
   it("查询出错时返回空数组", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
+        working(),
         makeQueryBuilder({ data: null, error: { message: "boom" } }),
       ]),
     );
-    expect(await getSongEmotions(1)).toEqual({ ids: [], source: null });
+    expect(await getSongEmotions(1)).toEqual([]);
   });
 });
 
 describe("setSongEmotions", () => {
-  const songExists = () => makeQueryBuilder({ data: { id: 1 }, error: null });
+  const songExists = () =>
+    makeQueryBuilder({ data: { version_id: 3 }, error: null });
+  const draft = { rpc: { ensure_draft: { data: 42, error: null } } };
 
-  it("整首替换：先删旧的，再按顺序写入 rank", async () => {
+  it("写在草稿上：开草稿，先删草稿里旧的，再按顺序写入 rank", async () => {
     const deleteBuilder = makeQueryBuilder({ data: null, error: null });
     const insertBuilder = makeQueryBuilder({ data: null, error: null });
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([songExists(), deleteBuilder, insertBuilder]),
+    const client = createMockSupabaseClient(
+      [songExists(), deleteBuilder, insertBuilder],
+      draft,
     );
+    vi.mocked(getUserClient).mockReturnValue(client);
     expect(await setSongEmotions(1, [6, 7], "token")).toEqual([6, 7]);
-    expect(deleteBuilder.eq).toHaveBeenCalledWith("song_id", 1);
+    expect(client.rpc).toHaveBeenCalledWith("ensure_draft", { p_song_id: 1 });
+    expect(deleteBuilder.eq).toHaveBeenCalledWith("version_id", 42);
     expect(insertBuilder.insert).toHaveBeenCalledWith([
-      { song_id: 1, emotion_id: 6, rank: 1, source: "human" },
-      { song_id: 1, emotion_id: 7, rank: 2, source: "human" },
+      { version_id: 42, emotion_id: 6, rank: 1 },
+      { version_id: 42, emotion_id: 7, rank: 2 },
     ]);
   });
 
   it("空数组只清空，不写入", async () => {
-    const client = createMockSupabaseClient([
-      songExists(),
-      makeQueryBuilder({ data: null, error: null }),
-    ]);
+    const client = createMockSupabaseClient(
+      [songExists(), makeQueryBuilder({ data: null, error: null })],
+      draft,
+    );
     vi.mocked(getUserClient).mockReturnValue(client);
     await setSongEmotions(1, [], "token");
     expect(client.from).toHaveBeenCalledTimes(2);
@@ -96,24 +103,29 @@ describe("setSongEmotions", () => {
     expect(getUserClient).not.toHaveBeenCalled();
   });
 
-  it("歌曲不存在时拒绝；查的是暂存表，未发布的歌也能标", async () => {
-    const client = createMockSupabaseClient([
-      makeQueryBuilder({ data: null, error: null }),
-    ]);
+  it("歌曲不存在时拒绝，不开草稿；未发布的歌也能标", async () => {
+    const client = createMockSupabaseClient(
+      [makeQueryBuilder({ data: null, error: null })],
+      draft,
+    );
     vi.mocked(getUserClient).mockReturnValue(client);
     await expect(setSongEmotions(1, [6], "token")).rejects.toMatchObject({
       code: "SONG_NOT_FOUND",
     });
-    expect(client.from).toHaveBeenCalledWith("temp");
+    expect(client.from).toHaveBeenCalledWith("working_songs");
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
   it("词表里没有的基调（外键失败）报可读的错误", async () => {
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        songExists(),
-        makeQueryBuilder({ data: null, error: null }),
-        makeQueryBuilder({ data: null, error: { code: "23503" } }),
-      ]),
+      createMockSupabaseClient(
+        [
+          songExists(),
+          makeQueryBuilder({ data: null, error: null }),
+          makeQueryBuilder({ data: null, error: { code: "23503" } }),
+        ],
+        draft,
+      ),
     );
     await expect(setSongEmotions(1, [99], "token")).rejects.toMatchObject({
       code: "INVALID_EMOTIONS",

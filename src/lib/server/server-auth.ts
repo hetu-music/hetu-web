@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { verifyCSRFToken } from "@/lib/server/server-utils";
+import {
+  isHumanAdmin,
+  isStaff,
+  isSuperRole,
+  roleOf,
+} from "@/lib/auth/roles";
 
 export interface AuthenticatedUser {
   id: string;
@@ -8,8 +14,8 @@ export interface AuthenticatedUser {
   /** 改邮箱验证到一半时的新邮箱 */
   new_email?: string;
   app_metadata?: {
-    is_admin?: boolean;
-    is_super?: boolean;
+    /** users.role，由数据库触发器同步（见 lib/auth/roles） */
+    role?: string;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -162,8 +168,9 @@ export async function authenticateUserWithCSRF(
  * 高阶函数：为 API 路由添加身份验证
  *
  * options.requireCSRF       — 同时验证 CSRF token（写操作必须开启；带 Authorization 头的请求免检）
- * options.requireAdmin      — 额外校验 JWT app_metadata.is_admin=true（管理后台操作必须开启）
- * options.requireSuperAdmin — 额外校验 JWT app_metadata.is_super=true（超级管理员操作）
+ * options.requireAdmin      — 角色为 bot、admin 或 super：能进后台读写（管理后台操作必须开启）
+ * options.requireHumanAdmin — 角色为 admin 或 super：发布、放弃草稿、处理歌曲反馈这类只有人能做的事
+ * options.requireSuperAdmin — 角色为 super（超级管理员操作）
  *
  * 鉴权方式两种：浏览器用 cookie 会话；脚本、agent 用 `Authorization: Bearer <JWT>`。
  * handler 的第三个参数带已验签的 accessToken，两种方式都有。
@@ -180,6 +187,7 @@ export function withAuth(
   options: {
     requireCSRF?: boolean;
     requireAdmin?: boolean;
+    requireHumanAdmin?: boolean;
     requireSuperAdmin?: boolean;
   } = {},
 ) {
@@ -200,17 +208,13 @@ export function withAuth(
     }
 
     // 从 JWT app_metadata 读取权限，由触发器 sync_user_claims_to_auth 保持同步
-    if (options.requireAdmin || options.requireSuperAdmin) {
-      const appMeta = authResult.user.app_metadata;
-      const isAdmin = appMeta?.is_admin === true;
-      const isSuper = appMeta?.is_super === true;
-
-      if (!isAdmin) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      if (options.requireSuperAdmin && !isSuper) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    const role = roleOf(authResult.user.app_metadata);
+    if (
+      (options.requireAdmin && !isStaff(role)) ||
+      (options.requireHumanAdmin && !isHumanAdmin(role)) ||
+      (options.requireSuperAdmin && !isSuperRole(role))
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     return handler(request, authResult.user, {
@@ -244,7 +248,7 @@ export async function getAdminPageSession(): Promise<AdminPageSession | null> {
   } = await supabase.auth.getUser();
 
   if (error || !user) return null;
-  if (user.app_metadata?.is_admin !== true) return null;
+  if (!isStaff(roleOf(user.app_metadata))) return null;
 
   // 身份已验签，这里只是取 token 交给 RLS 客户端使用
   const {
@@ -273,10 +277,12 @@ export async function getPageUser(): Promise<AuthenticatedUser | null> {
 }
 
 /**
- * 验证当前用户是否为管理员（适用于 Server Actions）
- * 如果验证失败则抛出错误，成功则返回当前登录的 AuthenticatedUser 对象。
+ * Server Action 用：校验登录与角色，返回当前用户与本次会话的 accessToken（交给 getUserClient 过 RLS）。
+ * 失败抛错。check 默认要求能进后台（bot、admin、super）。
  */
-export async function assertAdmin(): Promise<AuthenticatedUser> {
+export async function assertAdmin(
+  check: (role: ReturnType<typeof roleOf>) => boolean = isStaff,
+): Promise<{ user: AuthenticatedUser; accessToken: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -287,10 +293,18 @@ export async function assertAdmin(): Promise<AuthenticatedUser> {
     throw new Error("未登录或登录已过期");
   }
 
-  const isAdmin = user.app_metadata?.is_admin === true;
-  if (!isAdmin) {
+  if (!check(roleOf(user.app_metadata))) {
     throw new Error("无权进行此操作");
   }
 
-  return user as unknown as AuthenticatedUser;
+  // 身份已验签，这里只是取 token 交给 RLS 客户端
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("未登录或登录已过期");
+
+  return {
+    user: user as unknown as AuthenticatedUser,
+    accessToken: session.access_token,
+  };
 }

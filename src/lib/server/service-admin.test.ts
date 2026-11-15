@@ -31,13 +31,13 @@ function withServiceClient(builders: unknown[]) {
 }
 
 describe("getPublishedSongRaw", () => {
-  it("按 id 读正式表的原样行", async () => {
+  it("按 id 读线上版本的原样行", async () => {
     const row = { id: 7, title: "倾尽天下", lyricist: ["河图"] };
     const builder = makeQueryBuilder({ data: row, error: null });
     const client = withServiceClient([builder]);
 
     expect(await getPublishedSongRaw(7)).toEqual(row);
-    expect(client.from).toHaveBeenCalledWith(TABLES.MUSIC);
+    expect(client.from).toHaveBeenCalledWith(TABLES.PUBLISHED_SONGS);
     expect(builder.select).toHaveBeenCalledWith("*");
     expect(builder.eq).toHaveBeenCalledWith("id", 7);
     expect(builder.maybeSingle).toHaveBeenCalled();
@@ -63,43 +63,25 @@ describe("getPublishedSongRaw", () => {
 });
 
 describe("getPublishStatuses", () => {
-  it("逐首对比正式表：未发布 / 有改动 / 已发布", async () => {
-    const builder = makeQueryBuilder({
-      data: [
-        { id: 2, title: "旧标题" },
-        { id: 3, title: "同名", album: "" },
-      ],
-      error: null,
-    });
-    const client = withServiceClient([builder]);
-
-    const drafts = [
-      { id: 1, title: "新歌" },
-      { id: 2, title: "新标题" },
-      // 空串与 null 视为相同，不算改动
-      { id: 3, title: "同名", album: null },
+  it("由工作版本上的状态列得出，不再另读线上的表", async () => {
+    const client = withServiceClient([]);
+    const songs = [
+      { id: 1, is_live: false, has_draft: true, ever_published: false },
+      { id: 2, is_live: true, has_draft: true, ever_published: true },
+      { id: 3, is_live: true, has_draft: false, ever_published: true },
+      { id: 4, is_live: false, has_draft: false, ever_published: true },
     ] as unknown as Song[];
-
-    expect(await getPublishStatuses(drafts)).toEqual({
+    const expected = {
       1: "unpublished",
       2: "changed",
       3: "published",
-    });
-    // 也接受还没读完的暂存表
-    expect(await getPublishStatuses(Promise.resolve(drafts))).toEqual({
-      1: "unpublished",
-      2: "changed",
-      3: "published",
-    });
-    expect(client.from).toHaveBeenCalledWith(TABLES.MUSIC);
-    expect(builder.select).toHaveBeenCalledWith("*");
-  });
+      4: "withdrawn",
+    };
 
-  it("客户端不可用时返回空对象", async () => {
-    vi.mocked(getServiceClient).mockReturnValue(null as never);
-    expect(
-      await getPublishStatuses([{ id: 1, title: "x" }] as unknown as Song[]),
-    ).toEqual({});
+    expect(await getPublishStatuses(songs)).toEqual(expected);
+    // 也接受还没读完的列表
+    expect(await getPublishStatuses(Promise.resolve(songs))).toEqual(expected);
+    expect(client.from).not.toHaveBeenCalled();
   });
 });
 
@@ -132,7 +114,7 @@ describe("getOccurrenceCountsBySong", () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     expect(await getOccurrenceCountsBySong()).toEqual({ 1: 2, 2: 1 });
-    expect(client.from).toHaveBeenCalledWith(TABLES.IMAGERY_OCC);
+    expect(client.from).toHaveBeenCalledWith(TABLES.WORKING_SONG_IMAGERY);
     expect(builder.select).toHaveBeenCalledWith("song_id");
   });
 

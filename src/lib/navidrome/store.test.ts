@@ -37,15 +37,23 @@ function emptyPlan(over: Partial<SyncPlan> = {}): SyncPlan {
 }
 
 describe("loadSyncState", () => {
-  it("读取歌曲和映射", async () => {
-    const client = createMockSupabaseClient([
-      makeQueryBuilder({ data: [song(1)], error: null }),
-      makeQueryBuilder({ data: [{ id: 1, navid_id: "a" }], error: null }),
-    ]);
+  it("读取线上的歌和映射；映射的 song_id 读出来叫 id", async () => {
+    const songs = makeQueryBuilder({ data: [song(1)], error: null });
+    const mappings = makeQueryBuilder({
+      data: [{ id: 1, navid_id: "a" }],
+      error: null,
+    });
+    const client = createMockSupabaseClient([songs, mappings]);
     expect(await loadSyncState(client)).toEqual({
       songs: [song(1)],
       mappings: [{ id: 1, navid_id: "a" }],
     });
+    expect(client.from).toHaveBeenNthCalledWith(1, "published_songs");
+    expect(client.from).toHaveBeenNthCalledWith(2, "song_audio");
+    expect(mappings.select).toHaveBeenCalledWith(
+      "id:song_id,navid_id,suffix,duration",
+    );
+    expect(mappings.order).toHaveBeenCalledWith("song_id");
   });
 
   it("任何一页读取失败都直接抛错，不返回残缺数据", async () => {
@@ -58,12 +66,10 @@ describe("loadSyncState", () => {
 });
 
 describe("applySyncPlan", () => {
-  it("写入映射、删除失效映射并更新 has_audio", async () => {
+  it("写入映射、删除失效映射；has_audio 由视图算出，不另写", async () => {
     const upsert = makeQueryBuilder({ data: null, error: null });
     const del = makeQueryBuilder({ data: null, error: null });
-    const setTrue = makeQueryBuilder({ data: null, error: null });
-    const setFalse = makeQueryBuilder({ data: null, error: null });
-    const client = createMockSupabaseClient([upsert, del, setTrue, setFalse]);
+    const client = createMockSupabaseClient([upsert, del]);
 
     const result = await applySyncPlan(
       client,
@@ -85,13 +91,11 @@ describe("applySyncPlan", () => {
     );
 
     expect(upsert.upsert).toHaveBeenCalledWith(
-      [{ id: 1, navid_id: "a", suffix: "mp3", duration: 226 }],
-      { onConflict: "id" },
+      [{ song_id: 1, navid_id: "a", suffix: "mp3", duration: 226 }],
+      { onConflict: "song_id" },
     );
-    expect(del.in).toHaveBeenCalledWith("id", [2]);
-    expect(setTrue.update).toHaveBeenCalledWith({ has_audio: true });
-    expect(setTrue.in).toHaveBeenCalledWith("id", [1]);
-    expect(setFalse.update).toHaveBeenCalledWith({ has_audio: false });
+    expect(del.in).toHaveBeenCalledWith("song_id", [2]);
+    expect(client.from).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
       upserted: 1,
       deleted: 1,
@@ -110,7 +114,10 @@ describe("applySyncPlan", () => {
       emptyPlan({ mediaUpdates: rows }),
     );
 
-    expect(upsert.upsert).toHaveBeenCalledWith(rows, { onConflict: "id" });
+    expect(upsert.upsert).toHaveBeenCalledWith(
+      [{ song_id: 3, navid_id: "c", suffix: "flac", duration: 309 }],
+      { onConflict: "song_id" },
+    );
     expect(result.mediaUpdated).toBe(1);
   });
 
@@ -132,11 +139,10 @@ describe("applySyncPlan", () => {
 });
 
 describe("setSongMapping", () => {
-  it("关联曲目并置 has_audio 为 true", async () => {
+  it("关联曲目：写入映射与格式、时长", async () => {
     const owner = makeQueryBuilder({ data: null, error: null });
     const upsert = makeQueryBuilder({ data: null, error: null });
-    const update = makeQueryBuilder({ data: null, error: null });
-    const client = createMockSupabaseClient([owner, upsert, update]);
+    const client = createMockSupabaseClient([owner, upsert]);
 
     await setSongMapping(client, 1, {
       id: "a",
@@ -146,18 +152,18 @@ describe("setSongMapping", () => {
     });
 
     expect(owner.eq).toHaveBeenCalledWith("navid_id", "a");
-    expect(owner.neq).toHaveBeenCalledWith("id", 1);
+    expect(owner.neq).toHaveBeenCalledWith("song_id", 1);
     expect(upsert.upsert).toHaveBeenCalledWith(
-      { id: 1, navid_id: "a", suffix: "mp3", duration: 226 },
-      { onConflict: "id" },
+      { song_id: 1, navid_id: "a", suffix: "mp3", duration: 226 },
+      { onConflict: "song_id" },
     );
-    expect(update.update).toHaveBeenCalledWith({ has_audio: true });
+    expect(client.from).toHaveBeenCalledTimes(2);
   });
 
   it("曲目已被其他歌曲关联时抛 MappingConflictError，不写入", async () => {
     const upsert = makeQueryBuilder({ data: null, error: null });
     const client = createMockSupabaseClient([
-      makeQueryBuilder({ data: { id: 9 }, error: null }),
+      makeQueryBuilder({ data: { song_id: 9 }, error: null }),
       upsert,
     ]);
     await expect(
@@ -170,15 +176,14 @@ describe("setSongMapping", () => {
     expect(new MappingConflictError(9).message).toContain("#9");
   });
 
-  it("解除关联时删除映射并置 has_audio 为 false", async () => {
+  it("解除关联时删除映射", async () => {
     const del = makeQueryBuilder({ data: null, error: null });
-    const update = makeQueryBuilder({ data: null, error: null });
-    const client = createMockSupabaseClient([del, update]);
+    const client = createMockSupabaseClient([del]);
 
     await setSongMapping(client, 1, null);
 
     expect(del.delete).toHaveBeenCalled();
-    expect(del.eq).toHaveBeenCalledWith("id", 1);
-    expect(update.update).toHaveBeenCalledWith({ has_audio: false });
+    expect(del.eq).toHaveBeenCalledWith("song_id", 1);
+    expect(client.from).toHaveBeenCalledTimes(1);
   });
 });

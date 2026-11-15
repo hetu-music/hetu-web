@@ -120,9 +120,9 @@ function mockClient(overrides: Partial<Tables> = {}) {
   const byTable: Record<string, unknown[]> = {
     [TABLES.IMAGERY_CAT]: rows.categories,
     [TABLES.IMAGERY]: rows.imagery,
-    [TABLES.IMAGERY_OCC]: rows.occurrences,
-    [TABLES.MUSIC_CATALOG]: rows.songs,
-    [TABLES.SONG_EMOTIONS]: rows.songEmotions,
+    [TABLES.PUBLISHED_SONG_IMAGERY]: rows.occurrences,
+    [TABLES.CATALOG]: rows.songs,
+    [TABLES.PUBLISHED_SONG_EMOTIONS]: rows.songEmotions,
     [TABLES.EMOTIONS]: [],
   };
   const from = vi.fn((table: string) =>

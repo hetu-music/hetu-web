@@ -1,6 +1,7 @@
 import { routing } from "@/i18n/routing";
 import { createSupabaseMiddlewareClient } from "@/lib/db/supabase-auth";
 import { loginPathFor } from "@/lib/utils/safe-next";
+import { isStaff, roleOf } from "@/lib/auth/roles";
 import createIntlMiddleware from "next-intl/middleware";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -169,9 +170,7 @@ export async function proxy(request: NextRequest) {
         return redirectResponse;
       }
 
-      const isAdmin = user.app_metadata?.is_admin === true;
-
-      if (!isAdmin) {
+      if (!isStaff(roleOf(user.app_metadata))) {
         console.warn("Auth middleware: User is not admin", user.id);
         const homePath = pathname.startsWith("/zh-TW") ? "/zh-TW" : "/zh-CN";
         const redirectResponse = NextResponse.redirect(

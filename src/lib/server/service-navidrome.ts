@@ -118,7 +118,7 @@ export async function updateAudioMapping(
   const { supabase, config } = requireDeps();
 
   const { data: song, error } = await supabase
-    .from(TABLES.MUSIC)
+    .from(TABLES.WORKING_SONGS)
     .select("id,has_audio")
     .eq("id", songId)
     .maybeSingle();

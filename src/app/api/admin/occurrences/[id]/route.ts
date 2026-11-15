@@ -7,12 +7,7 @@ import {
 import {
   updateOccurrence,
   deleteOccurrence,
-  getOccurrenceRefs,
 } from "@/lib/server/service-imagery";
-import {
-  refreshImagery,
-  withPurgeStatus,
-} from "@/lib/server/server-revalidate";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -47,17 +42,9 @@ export const PUT = withAuth(
         UpdateOccurrenceSchema,
       );
       if (invalid) return invalid;
-      // 换了母题的话，原母题也要刷新
-      const before = await getOccurrenceRefs(id);
+      // 改在草稿上，线上不变；发布时再刷新
       const updated = await updateOccurrence(id, input, accessToken);
-      const purge = await refreshImagery({
-        songIds: [updated.song_id],
-        motifIds: [
-          updated.category_id,
-          ...(before ? [before.category_id] : []),
-        ],
-      });
-      return withPurgeStatus(NextResponse.json(updated), purge);
+      return NextResponse.json(updated);
     } catch (e) {
       if (
         e instanceof Error &&
@@ -86,15 +73,9 @@ export const DELETE = withAuth(
     const id = getIdFromUrl(request);
     if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     try {
-      // 连同补写的「同时算进」一起删，它们挂的母题都要刷新
-      const deleted = await deleteOccurrence(id, accessToken);
-      const purge = deleted
-        ? await refreshImagery({
-            songIds: [deleted.songId],
-            motifIds: deleted.motifIds,
-          })
-        : { failed: [] };
-      return withPurgeStatus(NextResponse.json({ success: true }), purge);
+      // 连同补写的「同时算进」一起删，删在草稿上；发布时再刷新
+      await deleteOccurrence(id, accessToken);
+      return NextResponse.json({ success: true });
     } catch (e) {
       console.error("[DELETE /api/admin/occurrences/[id]]", e);
       return NextResponse.json(

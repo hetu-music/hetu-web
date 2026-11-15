@@ -59,13 +59,13 @@ describe("getSongs", () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([makeQueryBuilder({ data: rows, error: null })]),
     );
-    const songs = await getSongs("music", undefined, false, "zh-TW");
+    const songs = await getSongs("published_songs", undefined, false, "zh-TW");
     expect(songs[0].title).toBe("中國話");
   });
 
   it("Admin 路径（带 accessToken）：user client 不可用返回空数组", async () => {
     vi.mocked(getUserClient).mockReturnValue(null);
-    const songs = await getSongs("temp", "token123");
+    const songs = await getSongs("working_songs", "token123");
     expect(songs).toEqual([]);
   });
 
@@ -75,7 +75,7 @@ describe("getSongs", () => {
         makeQueryBuilder({ data: null, error: { message: "db error" } }),
       ]),
     );
-    await expect(getSongs("temp", "token123")).rejects.toThrow(
+    await expect(getSongs("working_songs", "token123")).rejects.toThrow(
       "Failed to fetch songs",
     );
   });
@@ -135,7 +135,7 @@ describe("getSongById", () => {
         }),
       ]),
     );
-    const song = await getSongById(1, "music", undefined, "zh-TW");
+    const song = await getSongById(1, "published_songs", undefined, "zh-TW");
     expect(song?.title).toBe("中國話");
     expect(song?.album).toBe("簡體專輯");
     expect(song?.artist).toEqual(["中國歌手"]);
@@ -158,13 +158,13 @@ describe("getSongById", () => {
         }),
       ]),
     );
-    const song = await getSongById(1, "music", undefined, "zh-TW");
+    const song = await getSongById(1, "published_songs", undefined, "zh-TW");
     expect(song?.artist).toEqual(["蕭憶情"]);
     expect(song?.credited).toEqual({ artist: ["蕭憶情Alex"] });
     expect(song?.aliasOf).toEqual({ 蕭憶情Alex: "蕭憶情" });
   });
 
-  it("后台读 temp 表时署名保持原样", async () => {
+  it("后台读工作版本时署名保持原样", async () => {
     vi.mocked(getCreditAliases).mockResolvedValueOnce(
       new Map([["萧忆情Alex", "萧忆情"]]),
     );
@@ -176,7 +176,7 @@ describe("getSongById", () => {
         }),
       ]),
     );
-    const song = await getSongById(1, "temp", "token");
+    const song = await getSongById(1, "working_songs", "token");
     expect(song?.artist).toEqual(["萧忆情Alex"]);
     expect(song?.credited).toBeUndefined();
     // 后台路径不读别名表，排队的返回值要清掉，免得漏给后面的用例
@@ -191,76 +191,173 @@ describe("createSong", () => {
 
   it("user client 不可用时抛异常", async () => {
     vi.mocked(getUserClient).mockReturnValue(null);
-    await expect(createSong({ title: "新歌" })).rejects.toThrow(
-      "User client unavailable",
+    await expect(createSong({ title: "新歌" }, "token")).rejects.toThrow(
+      "Supabase client unavailable",
     );
   });
 
-  it("插入成功返回创建的歌曲", async () => {
-    const created = { id: 1, title: "新歌" };
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: created, error: null }),
-      ]),
+  it("资料交给 create_song 建歌与草稿，链接另存，返回工作版本", async () => {
+    const links = makeQueryBuilder({ data: null, error: null });
+    const created = { id: 9, title: "新歌", has_draft: true, is_live: false };
+    const client = createMockSupabaseClient(
+      [links, makeQueryBuilder({ data: created, error: null })],
+      { rpc: { create_song: { data: 9, error: null } } },
     );
-    const song = await createSong({ title: "新歌" });
+    vi.mocked(getUserClient).mockReturnValue(client);
+
+    const song = await createSong(
+      { title: "新歌", nelink: " https://music.163.com/song?id=1 " },
+      "token",
+    );
+
+    expect(client.rpc).toHaveBeenCalledWith("create_song", {
+      p_fields: { title: "新歌" },
+    });
+    expect(client.from).toHaveBeenNthCalledWith(1, "song_links");
+    expect(links.upsert).toHaveBeenCalledWith(
+      { song_id: 9, platform: "netease", url: "https://music.163.com/song?id=1" },
+      { onConflict: "song_id,platform" },
+    );
     expect(song).toEqual(created);
   });
 
-  it("插入出错时抛异常", async () => {
+  it("没有权限时抛 403", async () => {
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: null, error: { message: "insert failed" } }),
-      ]),
+      createMockSupabaseClient([], {
+        rpc: {
+          create_song: { data: null, error: { code: "42501", message: "没有权限" } },
+        },
+      }),
     );
-    await expect(createSong({ title: "新歌" })).rejects.toThrow(
-      "Failed to create song",
-    );
+    await expect(createSong({ title: "新歌" }, "token")).rejects.toMatchObject({
+      message: "没有权限",
+      status: 403,
+    });
   });
 });
 
-describe("updateSong（乐观锁）", () => {
+describe("updateSong（草稿与乐观锁）", () => {
   beforeEach(() => {
     vi.mocked(getUserClient).mockReset();
   });
 
-  it("PGRST116（0 行匹配）时判定为乐观锁冲突，抛 409", async () => {
+  const working = {
+    id: 1,
+    title: "旧名",
+    nelink: null,
+    updated_at: "2024-01-01T00:00:00Z",
+  };
+
+  it("歌不存在时抛 404", async () => {
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: null,
-          error: { code: "PGRST116", message: "Results contain 0 rows" },
-        }),
-      ]),
+      createMockSupabaseClient([makeQueryBuilder({ data: null, error: null })]),
     );
-    await expect(
-      updateSong(1, { title: "改名", updated_at: "2024-01-01T00:00:00Z" }),
-    ).rejects.toMatchObject({ message: "乐观锁冲突", status: 409 });
+    await expect(updateSong(1, { title: "改名" }, "token")).rejects.toMatchObject(
+      { status: 404 },
+    );
   });
 
-  it("其他数据库错误时抛通用错误，不误判为乐观锁冲突", async () => {
+  it("调用方读到的 updated_at 已过时：409，不开草稿", async () => {
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: working, error: null }),
+    ]);
+    vi.mocked(getUserClient).mockReturnValue(client);
+    await expect(
+      updateSong(1, { title: "改名", updated_at: "2023-12-31T00:00:00Z" }, "token"),
+    ).rejects.toMatchObject({ message: "乐观锁冲突", status: 409 });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("资料有改动：开草稿，按 updated_at 写进草稿，返回新的工作版本", async () => {
+    const update = makeQueryBuilder({ data: { id: 42 }, error: null });
+    const saved = { ...working, title: "改名", has_draft: true };
+    const client = createMockSupabaseClient(
+      [
+        makeQueryBuilder({ data: working, error: null }),
+        update,
+        makeQueryBuilder({ data: saved, error: null }),
+      ],
+      { rpc: { ensure_draft: { data: 42, error: null } } },
+    );
+    vi.mocked(getUserClient).mockReturnValue(client);
+
+    const song = await updateSong(
+      1,
+      { title: "改名", updated_at: working.updated_at },
+      "token",
+    );
+
+    expect(client.rpc).toHaveBeenCalledWith("ensure_draft", { p_song_id: 1 });
+    expect(client.from).toHaveBeenNthCalledWith(2, "song_versions");
+    expect(update.update).toHaveBeenCalledWith({ title: "改名" });
+    expect(update.eq).toHaveBeenCalledWith("id", 42);
+    expect(update.eq).toHaveBeenCalledWith("updated_at", working.updated_at);
+    expect(song).toEqual(saved);
+  });
+
+  it("草稿里那一行已被别人改过：409", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient(
+        [
+          makeQueryBuilder({ data: working, error: null }),
+          makeQueryBuilder({ data: null, error: null }),
+        ],
+        { rpc: { ensure_draft: { data: 42, error: null } } },
+      ),
+    );
+    await expect(updateSong(1, { title: "改名" }, "token")).rejects.toMatchObject(
+      { message: "乐观锁冲突", status: 409 },
+    );
+  });
+
+  it("只改了链接：直接改 song_links，不开草稿", async () => {
+    const links = makeQueryBuilder({ data: null, error: null });
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: working, error: null }),
+      links,
+      makeQueryBuilder({ data: working, error: null }),
+    ]);
+    vi.mocked(getUserClient).mockReturnValue(client);
+
+    await updateSong(1, { title: "旧名", nelink: "https://n/1" }, "token");
+
+    expect(client.rpc).not.toHaveBeenCalled();
+    expect(links.upsert).toHaveBeenCalledWith(
+      { song_id: 1, platform: "netease", url: "https://n/1" },
+      { onConflict: "song_id,platform" },
+    );
+  });
+
+  it("清空链接即删除那一行", async () => {
+    const links = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
+        makeQueryBuilder({ data: { ...working, qmlink: "https://y/1" }, error: null }),
+        links,
+        makeQueryBuilder({ data: working, error: null }),
+      ]),
+    );
+    await updateSong(1, { qmlink: "" }, "token");
+    expect(links.delete).toHaveBeenCalled();
+    expect(links.eq).toHaveBeenCalledWith("platform", "qq");
+  });
+
+  it("链接已挂在别的歌上：409，说明是哪个链接", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createMockSupabaseClient([
+        makeQueryBuilder({ data: working, error: null }),
         makeQueryBuilder({
           data: null,
           error: { code: "23505", message: "duplicate key" },
         }),
       ]),
     );
-    await expect(updateSong(1, { title: "改名" })).rejects.toThrow(
-      "Failed to update song",
-    );
-  });
-
-  it("更新成功返回最新数据", async () => {
-    const updated = { id: 1, title: "改名" };
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: updated, error: null }),
-      ]),
-    );
-    const song = await updateSong(1, { title: "改名" });
-    expect(song).toEqual(updated);
+    await expect(
+      updateSong(1, { nelink: "https://n/2" }, "token"),
+    ).rejects.toMatchObject({
+      message: "这个链接已挂在别的歌上：https://n/2",
+      status: 409,
+    });
   });
 });
 
@@ -363,7 +460,7 @@ describe("getSongLastModifiedMap", () => {
     expect((await getSongLastModifiedMap()).size).toBe(0);
   });
 
-  it("把 music 的 updated_at 映射为 id → Date", async () => {
+  it("把线上版本的 updated_at（发布时间）映射为 id → Date", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
         makeQueryBuilder({

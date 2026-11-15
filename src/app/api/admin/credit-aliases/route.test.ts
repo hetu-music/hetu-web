@@ -56,7 +56,7 @@ function request(method: string, body?: unknown, query = "") {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => undefined);
-  mockUser = { id: "a1", app_metadata: { is_admin: true, is_super: false } };
+  mockUser = { id: "a1", app_metadata: { role: "admin" } };
 });
 
 describe("GET /api/admin/credit-aliases", () => {

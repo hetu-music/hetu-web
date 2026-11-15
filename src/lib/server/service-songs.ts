@@ -10,6 +10,13 @@ import { mapAndSortSongs } from "@/lib/utils/utils-song";
 import { applyCreditAliases } from "@/lib/utils/utils-credits";
 import { getCreditAliases } from "@/lib/server/service-credit-aliases";
 import {
+  createSongRecord,
+  ensureDraft,
+  SongVersionError,
+  userDb,
+  type Db,
+} from "@/lib/server/service-versions";
+import {
   toTraditional,
   toTraditionalArray,
   toTraditionalLrc,
@@ -44,15 +51,15 @@ function toTraditionalSongList(songs: Song[]): Song[] {
 /**
  * 获取所有歌曲数据
  *
- * - 公共展示路径（不传 accessToken）：高权限客户端 + 全量分页，确保获取全部数据
- * - Admin 路径（传 accessToken）：用户权限客户端，操作 temp 表
+ * - 公共展示路径（不传 accessToken）：高权限客户端 + 全量分页，读线上的歌
+ * - 后台路径（传 accessToken）：用户权限客户端，读每首歌的工作版本
  *
- * @param table        - 表名，默认 TABLES.MUSIC；Admin 路径传 TABLES.ADMIN
+ * @param table        - 默认 TABLES.PUBLISHED_SONGS；后台传 TABLES.WORKING_SONGS
  * @param accessToken  - 登录用户的 accessToken（仅 Admin 路径需要）
  * @param forListView  - 为 true 时只获取列表字段，排除歌词等大字段
  */
 export const getSongs = cache(async function getSongs(
-  table: string = TABLES.MUSIC,
+  table: string = TABLES.PUBLISHED_SONGS,
   accessToken?: string,
   forListView: boolean = false,
   locale: string = "zh-CN",
@@ -61,7 +68,7 @@ export const getSongs = cache(async function getSongs(
   let songs: Song[];
 
   // 公共主表：高权限 + 分页全量获取
-  if (table === TABLES.MUSIC && !accessToken) {
+  if (table === TABLES.PUBLISHED_SONGS && !accessToken) {
     const supabase = getServiceClient();
     if (!supabase) {
       console.warn(
@@ -75,7 +82,7 @@ export const getSongs = cache(async function getSongs(
       ),
       getCreditAliases(),
     ]);
-    // 公开展示用主名；后台读 temp 表，署名保持原样
+    // 公开展示用主名；后台读工作版本，署名保持原样
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     songs = mapAndSortSongs(data as any).map((song) =>
       applyCreditAliases(song, aliases),
@@ -138,7 +145,7 @@ export async function getSongsByIds(
   for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
     const batch = uniqueIds.slice(i, i + BATCH_SIZE);
     const { data, error } = await supabase
-      .from(TABLES.MUSIC)
+      .from(TABLES.PUBLISHED_SONGS)
       .select(selectFields)
       .in("id", batch);
 
@@ -161,8 +168,7 @@ export async function getSongsByIds(
 /**
  * 获取每首歌的最后修改时间，供 sitemap 的 lastModified 使用。
  *
- * 数据来源是 music.updated_at，由 temp→music 的两条同步路径维护
- * （后台发布、每日定时同步）。
+ * 数据来源是 published_songs.updated_at，即线上版本的发布时间。
  *
  * 不要改用发行日期 date：那是发行时间不是修改时间，一首 2012 年的歌即使
  * 昨天刚勘误过歌词也会声称「2012 年后未变更」，反而抑制搜索引擎重新抓取，
@@ -180,7 +186,7 @@ export const getSongLastModifiedMap = cache(
 
     const rows = await fetchAll<{ id: number; updated_at: string | null }>(
       supabase,
-      TABLES.MUSIC,
+      TABLES.PUBLISHED_SONGS,
       "id,updated_at",
       (q) => q.order("id", { ascending: true }),
     );
@@ -196,17 +202,17 @@ export const getSongLastModifiedMap = cache(
 );
 
 /**
- * 根据 ID 获取歌曲详情（兼容 music 和 temp 表）
+ * 根据 ID 获取歌曲详情：公开端读线上版本，后台（传 accessToken 与 TABLES.WORKING_SONGS）读工作版本
  * @param locale - 当前语言，'zh-TW' 时自动转换繁体
  */
 export const getSongById = cache(async function getSongById(
   id: number,
-  table: string = TABLES.MUSIC,
+  table: string = TABLES.PUBLISHED_SONGS,
   accessToken?: string,
   locale: string = "zh-CN",
 ): Promise<SongDetail | null> {
   const supabase =
-    table === TABLES.MUSIC && !accessToken
+    table === TABLES.PUBLISHED_SONGS && !accessToken
       ? getServiceClient()
       : getUserClient(accessToken);
 
@@ -219,7 +225,7 @@ export const getSongById = cache(async function getSongById(
     .from(table)
     .select("*")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("[getSongById] query failed for id:", id, error);
@@ -235,7 +241,7 @@ export const getSongById = cache(async function getSongById(
     year: data.date ? new Date(data.date).getFullYear() : null,
   } as SongDetail;
   // 公开页卷首用主名，原署留在 credited 里给版记；后台编辑看到的仍是原样
-  const isPublic = table === TABLES.MUSIC && !accessToken;
+  const isPublic = table === TABLES.PUBLISHED_SONGS && !accessToken;
   const result = isPublic
     ? applyCreditAliases(detail, await getCreditAliases())
     : detail;
@@ -278,57 +284,156 @@ export const getSongById = cache(async function getSongById(
   return result;
 });
 
-/**
- * 新增歌曲（仅用于 Admin 路径，操作 temp 表）
- */
+// ─── 后台写入 ─────────────────────────────────────────────────────────────────
+
+/** 资料表单里的链接字段 → song_links 的平台。链接挂在歌上，保存即生效，不进版本 */
+const LINK_PLATFORMS = {
+  nelink: "netease",
+  qmlink: "qq",
+  kugolink: "kugou",
+} as const;
+type LinkField = keyof typeof LINK_PLATFORMS;
+const LINK_FIELDS = Object.keys(LINK_PLATFORMS) as LinkField[];
+
+/** 进版本的资料字段（song_versions 上 authenticated 能改的列） */
+const VERSION_FIELDS = [
+  "title",
+  "date",
+  "album",
+  "track",
+  "tracktotal",
+  "discnumber",
+  "disctotal",
+  "artist",
+  "lyricist",
+  "composer",
+  "arranger",
+  "albumartist",
+  "genre",
+  "type",
+  "length",
+  "lyrics",
+  "lyrics_start",
+  "comment",
+  "dispute_note",
+  "hascover",
+  "nmn_status",
+] as const;
+
+type SongInput = Partial<Record<(typeof VERSION_FIELDS)[number] | LinkField, unknown>>;
+
+function pickVersionFields(song: SongInput): Record<string, unknown> {
+  return Object.fromEntries(
+    VERSION_FIELDS.filter((k) => k in song).map((k) => [k, song[k]]),
+  );
+}
+
+/** 空串、空白算没填 */
+function normalizeLink(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+function conflict(message: string) {
+  return new SongVersionError(message, 409);
+}
+
+/** 写链接：给了哪个平台就改哪个，清空即删除 */
+async function saveLinks(
+  db: Db,
+  songId: number,
+  song: SongInput,
+  current: Partial<Record<LinkField, string | null>>,
+): Promise<void> {
+  for (const field of LINK_FIELDS) {
+    if (!(field in song)) continue;
+    const next = normalizeLink(song[field]);
+    if (next === (current[field] ?? null)) continue;
+    const platform = LINK_PLATFORMS[field];
+    const { error } =
+      next === null
+        ? await db
+            .from(TABLES.SONG_LINKS)
+            .delete()
+            .eq("song_id", songId)
+            .eq("platform", platform)
+        : await db
+            .from(TABLES.SONG_LINKS)
+            .upsert(
+              { song_id: songId, platform, url: next },
+              { onConflict: "song_id,platform" },
+            );
+    if (error?.code === "23505") {
+      throw conflict(`这个链接已挂在别的歌上：${next}`);
+    }
+    if (error) throw error;
+  }
+}
+
+async function readWorkingSong(
+  db: Db,
+  id: number,
+): Promise<SongDetail | null> {
+  const { data, error } = await db
+    .from(TABLES.WORKING_SONGS)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as SongDetail | null;
+}
+
+/** 新增歌曲：一首歌 + 它的草稿，链接另存。返回工作版本 */
 export async function createSong(
-  song: Partial<Song>,
-  table: string = TABLES.ADMIN,
-  accessToken?: string,
-): Promise<Song> {
-  const supabase = getUserClient(accessToken);
-  if (!supabase) throw new Error("[createSong] User client unavailable");
-
-  const { data, error } = await supabase
-    .from(table)
-    .insert([song])
-    .select()
-    .single();
-
-  if (error) throw new Error("Failed to create song");
-  return data as Song;
+  song: SongInput,
+  accessToken: string,
+): Promise<SongDetail> {
+  const db = userDb(accessToken);
+  const id = await createSongRecord(db, pickVersionFields(song));
+  await saveLinks(db, id, song, {});
+  const created = await readWorkingSong(db, id);
+  if (!created) throw new Error("Failed to create song");
+  return created;
 }
 
 /**
- * 更新歌曲（仅用于 Admin 路径，操作 temp 表，含乐观锁）
+ * 保存资料：资料字段写进草稿（有改动才开草稿），链接直接改。
+ * 乐观锁：updated_at 是调用方读到的工作版本的保存时间，与现在的对不上就 409。
+ * 开草稿时沿用源版本的 updated_at，所以打开着的表单在草稿刚开出来时不会误报冲突。
  */
 export async function updateSong(
   id: number,
-  song: Partial<Song>,
-  table: string = TABLES.ADMIN,
-  accessToken?: string,
-): Promise<Song> {
-  const supabase = getUserClient(accessToken);
-  if (!supabase) throw new Error("[updateSong] User client unavailable");
-
-  let query = supabase.from(table).update(song).eq("id", id);
-  if (song.updated_at) {
-    query = query.eq("updated_at", song.updated_at);
+  song: SongInput & { updated_at?: string },
+  accessToken: string,
+): Promise<SongDetail> {
+  const db = userDb(accessToken);
+  const current = await readWorkingSong(db, id);
+  if (!current) throw new SongVersionError("歌曲不存在", 404);
+  if (song.updated_at && song.updated_at !== current.updated_at) {
+    throw conflict("乐观锁冲突");
   }
-  const { data, error } = await query.select().single();
 
-  if (error) {
-    if (
-      error.code === "PGRST116" ||
-      error.message.includes("Results contain 0 rows")
-    ) {
-      const conflictError: Error & { status?: number } = new Error(
-        "乐观锁冲突",
-      );
-      conflictError.status = 409;
-      throw conflictError;
-    }
-    throw new Error("Failed to update song");
+  await saveLinks(db, id, song, current);
+
+  const before = current as unknown as Record<string, unknown>;
+  const changed = Object.fromEntries(
+    Object.entries(pickVersionFields(song)).filter(
+      ([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(before[k] ?? null),
+    ),
+  );
+  if (Object.keys(changed).length > 0) {
+    const draft = await ensureDraft(db, id);
+    const { data, error } = await db
+      .from(TABLES.SONG_VERSIONS)
+      .update(changed)
+      .eq("id", draft)
+      .eq("updated_at", current.updated_at)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw conflict("乐观锁冲突");
   }
-  return data as Song;
+
+  const saved = await readWorkingSong(db, id);
+  if (!saved) throw new SongVersionError("歌曲不存在", 404);
+  return saved;
 }

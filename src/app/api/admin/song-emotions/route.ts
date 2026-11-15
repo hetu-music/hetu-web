@@ -13,10 +13,6 @@ import {
   type SongEmotionErrorCode,
 } from "@/lib/server/service-emotions";
 import { isLlmConfigured } from "@/lib/server/llm";
-import {
-  refreshSongEmotions,
-  withPurgeStatus,
-} from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -34,7 +30,7 @@ const ERROR_STATUS: Record<SongEmotionErrorCode, number> = {
   SONG_NOT_FOUND: 404,
 };
 
-/** 词表、一首歌已标的基调及其来源：GET /api/admin/song-emotions?song_id= */
+/** 词表与一首歌（工作版本）已标的基调：GET /api/admin/song-emotions?song_id= */
 export const GET = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     const songId = Number(request.nextUrl.searchParams.get("song_id"));
@@ -48,8 +44,7 @@ export const GET = withAuth(
       ]);
       return NextResponse.json({
         emotions,
-        selected: current.ids,
-        source: current.source,
+        selected: current,
         llmEnabled: isLlmConfigured(),
       });
     } catch (e) {
@@ -77,8 +72,8 @@ export const PUT = withAuth(
         input.emotion_ids,
         accessToken,
       );
-      const purge = await refreshSongEmotions(input.song_id);
-      return withPurgeStatus(NextResponse.json({ selected }), purge);
+      // 写在草稿上，线上不变；发布时再刷新
+      return NextResponse.json({ selected });
     } catch (e) {
       const code = (e as { code?: string }).code as SongEmotionErrorCode;
       if (code in ERROR_STATUS) {

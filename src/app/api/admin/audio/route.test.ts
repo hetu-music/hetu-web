@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockUser = {
     id: "super-1",
-    app_metadata: { is_admin: true, is_super: true },
+    app_metadata: { role: "super" },
   };
   mockCsrfValid = true;
 });
@@ -62,7 +62,7 @@ beforeEach(() => {
 describe("超级管理员限定", () => {
   const plainAdmin = {
     id: "u1",
-    app_metadata: { is_admin: true, is_super: false },
+    app_metadata: { role: "admin" },
   };
 
   it.each([

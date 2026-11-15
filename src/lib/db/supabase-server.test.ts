@@ -56,7 +56,7 @@ afterEach(() => {
 describe("fetchAll — 分页", () => {
   it("单页取完（不足一页）时只请求一次", async () => {
     const { client, callCount } = makePagedClient([{ data: rows(42) }]);
-    const result = await fetchAll(client, TABLES.MUSIC, "id");
+    const result = await fetchAll(client, TABLES.PUBLISHED_SONGS, "id");
 
     expect(result).toHaveLength(42);
     expect(callCount()).toBe(1);
@@ -70,7 +70,7 @@ describe("fetchAll — 分页", () => {
       { data: rows(137) },
     ]);
 
-    const result = await fetchAll(client, TABLES.MUSIC, "id");
+    const result = await fetchAll(client, TABLES.PUBLISHED_SONGS, "id");
 
     expect(result).toHaveLength(PAGE_SIZE * 2 + 137);
     expect(callCount()).toBe(3);
@@ -87,7 +87,7 @@ describe("fetchAll — 分页", () => {
       { data: [] },
     ]);
 
-    const result = await fetchAll(client, TABLES.MUSIC, "id");
+    const result = await fetchAll(client, TABLES.PUBLISHED_SONGS, "id");
 
     expect(result).toHaveLength(PAGE_SIZE);
     expect(callCount()).toBe(2);
@@ -95,12 +95,12 @@ describe("fetchAll — 分页", () => {
 
   it("首页即为空时返回空数组", async () => {
     const { client } = makePagedClient([{ data: [] }]);
-    expect(await fetchAll(client, TABLES.MUSIC, "id")).toEqual([]);
+    expect(await fetchAll(client, TABLES.PUBLISHED_SONGS, "id")).toEqual([]);
   });
 
   it("data 为 null 时返回空数组而非抛异常", async () => {
     const { client } = makePagedClient([{ data: null }]);
-    expect(await fetchAll(client, TABLES.MUSIC, "id")).toEqual([]);
+    expect(await fetchAll(client, TABLES.PUBLISHED_SONGS, "id")).toEqual([]);
   });
 });
 
@@ -111,7 +111,7 @@ describe("fetchAll — 错误处理", () => {
       { data: null, error: { message: "boom" } },
     ]);
 
-    const result = await fetchAll(client, TABLES.MUSIC, "id");
+    const result = await fetchAll(client, TABLES.PUBLISHED_SONGS, "id");
 
     // 已知限制：出错时返回部分结果而非抛出，调用方无法区分「取完了」和「中断了」
     expect(result).toHaveLength(PAGE_SIZE);
@@ -122,7 +122,7 @@ describe("fetchAll — 错误处理", () => {
     const { client } = makePagedClient([
       { data: null, error: { message: "boom" } },
     ]);
-    expect(await fetchAll(client, TABLES.MUSIC, "id")).toEqual([]);
+    expect(await fetchAll(client, TABLES.PUBLISHED_SONGS, "id")).toEqual([]);
   });
 });
 
@@ -134,7 +134,7 @@ describe("fetchAll — 额外过滤条件", () => {
     ]);
     const extraFilter = vi.fn((q) => q.order("id", { ascending: true }));
 
-    await fetchAll(client, TABLES.MUSIC, "id", extraFilter);
+    await fetchAll(client, TABLES.PUBLISHED_SONGS, "id", extraFilter);
 
     expect(extraFilter).toHaveBeenCalledTimes(2);
   });
@@ -142,8 +142,8 @@ describe("fetchAll — 额外过滤条件", () => {
 
 describe("TABLES 常量", () => {
   it("表名集中定义，避免业务代码里散落字面量", () => {
-    expect(TABLES.MUSIC).toBe("music");
-    expect(TABLES.ADMIN).toBe("temp");
-    expect(TABLES.IMAGERY_OCC).toBe("imagery_occurrences");
+    expect(TABLES.PUBLISHED_SONGS).toBe("published_songs");
+    expect(TABLES.WORKING_SONGS).toBe("working_songs");
+    expect(TABLES.SONG_IMAGERY).toBe("song_imagery");
   });
 });

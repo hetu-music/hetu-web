@@ -4,7 +4,10 @@
  *
  * 用法：pnpm imagery:check [--fix] [--strict]
  *   --fix     修复时间标签：改成词在歌词里字面出现的行（补漏标的、去掉多出的）。
- *             歌词里找不到该词的标注只报告不改，要人决定删掉还是改标实际写的词
+ *             歌词里找不到该词的标注只报告不改，要人决定删掉还是改标实际写的词。
+ *             只能改草稿里的；已发布的版本冻结了，发布时会按歌词自动重算
+ *
+ * 查的是每首歌的工作版本（有草稿用草稿），与后台看到的一致。
  *   --strict  有需要处理的问题时以退出码 1 结束，供定时任务或 CI 使用
  *
  * 需要 .env.local 中的 SUPABASE_URL / SUPABASE_SECRET_API。
@@ -53,18 +56,22 @@ async function main() {
       "category_id",
     ]),
     fetchAll<CheckOccurrence>(
-      "imagery_occurrences",
+      "working_song_imagery",
       "id,song_id,imagery_id,category_id,lyric_timetag",
-      ["id"],
+      ["song_id", "id"],
     ),
-    fetchAll<{ id: number; title: string; lyrics: string | null }>(
-      // 标注按暂存表的歌词标（docs/SONGS.md），未发布的歌也有标注
-      "temp",
-      "id,title,lyrics",
-      ["id"],
-    ),
+    fetchAll<{
+      id: number;
+      title: string;
+      lyrics: string | null;
+      version_id: number;
+      has_draft: boolean;
+    }>("working_songs", "id,title,lyrics,version_id,has_draft", ["id"]),
   ]);
   const title = new Map(songs.map((s) => [s.id, s.title]));
+  const draftOf = new Map(
+    songs.filter((s) => s.has_draft).map((s) => [s.id, s.version_id]),
+  );
   const report = checkConsistency({ imagery, motifs, occurrences, songs });
   const where = (t: TimetagIssue) =>
     `#${t.occurrenceId}《${title.get(t.songId)}》${t.name}`;
@@ -90,7 +97,12 @@ async function main() {
       `《${title.get(p.songId)}》意象 #${p.imageryId} 缺母题 #${p.categoryId}`,
   );
 
-  const fixable = report.timetags.filter((t) => !t.notFound);
+  const fixable = report.timetags.filter(
+    (t) => !t.notFound && draftOf.has(t.songId),
+  );
+  const frozen = report.timetags.filter(
+    (t) => !t.notFound && !draftOf.has(t.songId),
+  );
   const notFound = report.timetags.filter((t) => t.notFound);
 
   console.log(
@@ -100,6 +112,10 @@ async function main() {
     fixable,
     (t) => `${where(t)}：[${t.current.join(" ")}] → [${t.fixed.join(" ")}]`,
   );
+  console.log(
+    `\n时间标签不对、但在已发布的版本里：${frozen.length} 条（冻结了改不了；开草稿后发布即自动重算）`,
+  );
+  list(frozen, where);
   console.log(
     `\n歌词里找不到该词：${notFound.length} 条（删掉，或改标歌词里实际写的词）`,
   );
@@ -111,8 +127,9 @@ async function main() {
       await Promise.all(
         fixable.slice(i, i + FIX_CONCURRENCY).map(async (t) => {
           const { error } = await supabase
-            .from("imagery_occurrences")
+            .from("song_imagery")
             .update({ lyric_timetag: t.fixed })
+            .eq("version_id", draftOf.get(t.songId) as number)
             .eq("id", t.occurrenceId);
           if (error) throw error;
         }),

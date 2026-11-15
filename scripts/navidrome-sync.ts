@@ -1,16 +1,16 @@
 /* eslint-disable no-console */
 /**
- * Navidrome 映射同步：拉取 Navidrome 全部曲目，按元数据与 music 表自动配对，
- * 重建 navid_song 映射并同步 music.has_audio。默认只预览，不写数据库。
+ * Navidrome 映射同步：拉取 Navidrome 全部曲目，按元数据与线上的歌自动配对，
+ * 重建 song_audio 映射（has_audio 由视图算出，不另存）。默认只预览，不写数据库。
  *
  * 用法：pnpm navidrome:sync [--apply]
- *   --apply  执行计划：写入新映射、删除失效映射、更新 has_audio，并刷新页面缓存
+ *   --apply  执行计划：写入新映射、删除失效映射，并刷新页面缓存
  *
  * 需要环境变量：SUPABASE_URL / SUPABASE_SECRET_API，
  *   NAVIDROME_URL / NAVIDROME_USER / NAVIDROME_PASSWORD（用于读取曲库的账号）
  * 可选：NEXT_PUBLIC_SITE_URL + REVALIDATE_SECRET（has_audio 变化后刷新页面缓存）
  *
- * 需要人工确认的歌曲：在 navid_song 里手工写入正确的 navid_id 即可，
+ * 需要人工确认的歌曲：在后台「音频」里手工关联，或在 song_audio 里写入正确的 navid_id，
  * 之后的同步会保留仍然有效的现有映射，不会覆盖。
  */
 import { createClient } from "@supabase/supabase-js";

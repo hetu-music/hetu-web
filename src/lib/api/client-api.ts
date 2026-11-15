@@ -1,5 +1,6 @@
 // Admin 管理页面 API 封装：一律走 lib/api/request 的 apiRequest，失败抛 ApiError
 import { apiRequest } from "@/lib/api/request";
+import { editorialWrite } from "@/lib/api/editorial-events";
 import type {
   CreateRequestPayload,
   Emotion,
@@ -43,6 +44,8 @@ export function apiCreateSong(song: Partial<Song>) {
     method: "POST",
     body: song,
     fallback: "新增失败",
+    // 链接已挂在别的歌上
+    serverMessage: [409],
   });
 }
 
@@ -188,20 +191,22 @@ export function apiReviewImagery(
 
 /**
  * 新增标注：手动添加一条或审核后多条，词典里没有的词随之创建。
- * 400 带着可读的原因（歌曲未发布、词不在歌词里等）
+ * 写在歌的草稿上；400 带着可读的原因（词不在歌词里等）
  */
 export function apiCreateOccurrencesBatch(
   songId: number,
   items: OccurrenceBatchItem[],
 ) {
-  return apiRequest<{ created: number; skipped: number; newImagery: number }>(
-    "/api/admin/occurrences/batch",
-    {
-      method: "POST",
-      body: { song_id: songId, items },
-      fallback: "保存意象标注失败",
-      serverMessage: [400],
-    },
+  return editorialWrite(
+    apiRequest<{ created: number; skipped: number; newImagery: number }>(
+      "/api/admin/occurrences/batch",
+      {
+        method: "POST",
+        body: { song_id: songId, items },
+        fallback: "保存意象标注失败",
+        serverMessage: [400],
+      },
+    ),
   );
 }
 
@@ -214,19 +219,23 @@ export function apiUpdateOccurrence(
     category_id?: number;
   },
 ) {
-  return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
-    method: "PUT",
-    body: data,
-    fallback: "更新标注失败",
-    serverMessage: [400],
-  });
+  return editorialWrite(
+    apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
+      method: "PUT",
+      body: data,
+      fallback: "更新标注失败",
+      serverMessage: [400],
+    }),
+  );
 }
 
 export function apiDeleteOccurrence(id: number) {
-  return apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
-    method: "DELETE",
-    fallback: "删除标注失败",
-  });
+  return editorialWrite(
+    apiRequest<Untyped>(`/api/admin/occurrences/${id}`, {
+      method: "DELETE",
+      fallback: "删除标注失败",
+    }),
+  );
 }
 
 // ─── Song Emotions API ─────────────────────────────────────────────────────────
@@ -235,8 +244,6 @@ export function apiGetSongEmotions(songId: number) {
   return apiRequest<{
     emotions: Emotion[];
     selected: number[];
-    /** ai：批量预标、尚未确认；human：人工标注或确认过；null：还没标 */
-    source: "human" | "ai" | null;
     llmEnabled: boolean;
   }>(`/api/admin/song-emotions?song_id=${songId}`, {
     fallback: "获取基调失败",
@@ -256,14 +263,16 @@ export function apiSuggestSongEmotions(songId: number) {
   );
 }
 
-/** emotionIds 按主、副顺序；400 带着可读的原因（歌曲未发布等） */
+/** emotionIds 按主、副顺序，写在歌的草稿上；400 带着可读的原因 */
 export function apiSetSongEmotions(songId: number, emotionIds: number[]) {
-  return apiRequest<{ selected: number[] }>("/api/admin/song-emotions", {
-    method: "PUT",
-    body: { song_id: songId, emotion_ids: emotionIds },
-    fallback: "保存基调失败",
-    serverMessage: [400],
-  });
+  return editorialWrite(
+    apiRequest<{ selected: number[] }>("/api/admin/song-emotions", {
+      method: "PUT",
+      body: { song_id: songId, emotion_ids: emotionIds },
+      fallback: "保存基调失败",
+      serverMessage: [400],
+    }),
+  );
 }
 
 // ─── Collations API ────────────────────────────────────────────────────────────
@@ -275,57 +284,67 @@ export function apiGetCollations(songId: number) {
   );
 }
 
-/** 400 带着可读的原因（歌曲未发布、字段校验），404 是校记已被别人删掉 */
+/** 写在歌的草稿上；400 带着可读的原因（字段校验），404 是校记已被别人删掉 */
 export function apiCreateCollation(
   songId: number,
   collation: CollationPayload,
 ) {
-  return apiRequest<{ id: number }>("/api/admin/collations", {
-    method: "POST",
-    body: { song_id: songId, entry: collation },
-    fallback: "保存校记失败",
-    serverMessage: [400],
-  });
+  return editorialWrite(
+    apiRequest<{ id: number }>("/api/admin/collations", {
+      method: "POST",
+      body: { song_id: songId, entry: collation },
+      fallback: "保存校记失败",
+      serverMessage: [400, 404],
+    }),
+  );
 }
 
 export function apiUpdateCollation(id: number, collation: CollationPayload) {
-  return apiRequest<{ success: true }>("/api/admin/collations", {
-    method: "PUT",
-    body: { id, entry: collation },
-    fallback: "保存校记失败",
-    serverMessage: [400, 404],
-  });
+  return editorialWrite(
+    apiRequest<{ success: true }>("/api/admin/collations", {
+      method: "PUT",
+      body: { id, entry: collation },
+      fallback: "保存校记失败",
+      serverMessage: [400, 404],
+    }),
+  );
 }
 
 export function apiCreateSupplement(
   songId: number,
   supplement: SupplementPayload,
 ) {
-  return apiRequest<{ id: number }>("/api/admin/supplements", {
-    method: "POST",
-    body: { song_id: songId, entry: supplement },
-    fallback: "保存补遗失败",
-    serverMessage: [400],
-  });
+  return editorialWrite(
+    apiRequest<{ id: number }>("/api/admin/supplements", {
+      method: "POST",
+      body: { song_id: songId, entry: supplement },
+      fallback: "保存补遗失败",
+      serverMessage: [400, 404],
+    }),
+  );
 }
 
 export function apiUpdateSupplement(id: number, supplement: SupplementPayload) {
-  return apiRequest<{ success: true }>("/api/admin/supplements", {
-    method: "PUT",
-    body: { id, entry: supplement },
-    fallback: "保存补遗失败",
-    serverMessage: [400, 404],
-  });
+  return editorialWrite(
+    apiRequest<{ success: true }>("/api/admin/supplements", {
+      method: "PUT",
+      body: { id, entry: supplement },
+      fallback: "保存补遗失败",
+      serverMessage: [400, 404],
+    }),
+  );
 }
 
 /** 校记与补遗同表，删除共用 */
 export function apiDeleteCollation(id: number) {
-  return apiRequest<{ success: true }>("/api/admin/collations", {
-    method: "DELETE",
-    body: { id },
-    fallback: "删除校记失败",
-    serverMessage: [404],
-  });
+  return editorialWrite(
+    apiRequest<{ success: true }>("/api/admin/collations", {
+      method: "DELETE",
+      body: { id },
+      fallback: "删除校记失败",
+      serverMessage: [404],
+    }),
+  );
 }
 
 // ─── Credit Aliases API ────────────────────────────────────────────────────────

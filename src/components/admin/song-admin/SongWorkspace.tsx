@@ -145,18 +145,7 @@ export default function SongWorkspace({
             ]
           : undefined
       }
-      actions={
-        song &&
-        ws.publishStatus !== "unpublished" && (
-          <Link
-            href={`/song/${song.id}`}
-            target="_blank"
-            className={TEXT_BUTTON_CLASS}
-          >
-            看公开页
-          </Link>
-        )
-      }
+      actions={song && <StateActions ws={ws} />}
       pinned={<UsageNotesButton />}
     >
       <FormProvider {...ws.form}>
@@ -229,11 +218,81 @@ export default function SongWorkspace({
   );
 }
 
+/**
+ * 页头右侧：看公开页，以及不常用、要两步确认的操作。
+ * 放弃草稿（admin、super，发布过的歌才有）；下架（super，在线的歌）；删歌（super，不在线的歌）。
+ */
+function StateActions({ ws }: { ws: SongWorkspaceState }) {
+  const { user } = useUserContext();
+  const discardConfirm = useTwoStepConfirm();
+  const unpublishConfirm = useTwoStepConfirm();
+  const deleteConfirm = useTwoStepConfirm();
+  const song = ws.song;
+  if (!song) return null;
+  const busy = ws.isSaving || ws.isPublishing || ws.isChangingState;
+
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      {song.is_live && (
+        <Link
+          href={`/song/${song.id}`}
+          target="_blank"
+          className={TEXT_BUTTON_CLASS}
+        >
+          看公开页
+        </Link>
+      )}
+      {user?.canPublish && song.has_draft && song.ever_published && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (discardConfirm.request()) void ws.discardDraft();
+          }}
+          className={TEXT_BUTTON_CLASS}
+          title="删掉草稿里的全部改动（资料、意象、基调、校勘），回到线上版本"
+        >
+          {discardConfirm.confirming ? "确认放弃草稿" : "放弃草稿"}
+        </button>
+      )}
+      {user?.isSuper && song.is_live && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (unpublishConfirm.request()) void ws.unpublish();
+          }}
+          className={cn(TEXT_BUTTON_CLASS, WARN_TEXT_CLASS)}
+          title="公开页不再显示这首歌；资料、草稿、评论、收藏都保留，可以重新上线"
+        >
+          {unpublishConfirm.confirming ? "确认下架" : "下架"}
+        </button>
+      )}
+      {user?.isSuper && !song.is_live && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (deleteConfirm.request()) void ws.deleteSong();
+          }}
+          className={cn(TEXT_BUTTON_CLASS, WARN_TEXT_CLASS)}
+          title="连同全部版本、意象、基调、校勘、评论、收藏一起删掉，不能恢复"
+        >
+          {deleteConfirm.confirming ? "确认删除，不能恢复" : "删除"}
+        </button>
+      )}
+    </span>
+  );
+}
+
 /** 吸顶栏右侧：状态、暂存、发布 */
 function SaveBar({ ws }: { ws: SongWorkspaceState }) {
+  const { user } = useUserContext();
   const publishConfirm = useTwoStepConfirm();
-  const busy = ws.isSaving || ws.isPublishing;
+  const busy = ws.isSaving || ws.isPublishing || ws.isChangingState;
   const nothingToPublish = !ws.isDirty && ws.publishStatus === "published";
+  // 已下架、没有新改动：发布即重新上线原来的版本
+  const republish = ws.publishStatus === "withdrawn" && !ws.song?.has_draft;
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:justify-end">
@@ -265,7 +324,8 @@ function SaveBar({ ws }: { ws: SongWorkspaceState }) {
         {ws.isSaving && <Loader2 size={14} className="animate-spin" />}
         {ws.song ? "暂存" : "创建"}
       </button>
-      {ws.song && (
+      {/* 机器人账号只写草稿，不能发布 */}
+      {ws.song && user?.canPublish && (
         <button
           type="button"
           onClick={() => {
@@ -273,14 +333,18 @@ function SaveBar({ ws }: { ws: SongWorkspaceState }) {
           }}
           disabled={busy || nothingToPublish}
           className={SOLID_BUTTON_CLASS}
-          title="发布后对所有人可见"
+          title="资料与意象、基调、校勘一起上线，对所有人可见"
         >
           {ws.isPublishing && <Loader2 size={14} className="animate-spin" />}
           {publishConfirm.confirming
             ? ws.isDirty
               ? "暂存并发布"
-              : "确认发布"
-            : "发布"}
+              : republish
+                ? "确认重新上线"
+                : "确认发布"
+            : republish && !ws.isDirty
+              ? "重新上线"
+              : "发布"}
         </button>
       )}
     </div>
@@ -321,14 +385,14 @@ function FieldGrid({
 const DISPUTE_EFFECTS = [
   "详情页顶部显示「资料存疑」提示块，内容就是这里写的说明",
   "曲库照常列出、能搜到，封面带「存疑」角标，但不计入首页和寻曲页的收录总数",
-  "不算进曲库口径（music_catalog）：意象词云、母题页的次数和寻曲测验的候选池都不含它，别的歌的「同有此意」也不会推荐它；它自己的详情页仍有意象标注和相关作品",
+  "不算进曲库口径（catalog）：意象词云、母题页的次数和寻曲测验的候选池都不含它，别的歌的「同有此意」也不会推荐它；它自己的详情页仍有意象标注和相关作品",
   "登录页的封面墙不用它",
 ];
 
 /**
  * 校勘：管理员对这首歌的考订，分校记、补遗、争议三块：
  * 校记写在歌词里，补遗在创作手记之后，争议在详情页页首。
- * 争议是资料表单的字段，随资料一起暂存、发布；补遗和校记保存即上线。
+ * 三者都写在草稿上，随整首歌发布上线。争议是资料表单的字段，随资料一起暂存。
  */
 function CollationsTab({
   ws,
@@ -430,7 +494,11 @@ function InfoTab({
               (key) => FIELD_BY_KEY.get(key)?.label ?? key,
             )}
             empty={
-              ws.publishStatus === "unpublished" ? "还没发布过" : "与线上一致"
+              ws.publishStatus === "unpublished"
+                ? "还没发布过"
+                : ws.publishStatus === "withdrawn"
+                  ? "已下架"
+                  : "与线上一致"
             }
           />
         </aside>

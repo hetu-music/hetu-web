@@ -94,7 +94,7 @@ describe("getImagerySuggestions", () => {
     const result = await getImagerySuggestions(5, "token");
     expect(result).toMatchObject({ hasLyrics: true, llmEnabled: true });
     // 先验的歌词与标注同源：取暂存表（标注挂在暂存表上，未发布的歌也有）
-    expect(service.from.mock.calls[2][0]).toBe("temp");
+    expect(service.from.mock.calls[2][0]).toBe("working_songs");
     // 词典与母题不随结果返回，审核时用后台共用的那一份
     expect(result).not.toHaveProperty("dictionary");
     expect(result).not.toHaveProperty("categories");

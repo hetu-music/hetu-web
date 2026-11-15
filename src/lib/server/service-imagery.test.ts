@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createMockSupabaseClient,
+  createTableMockClient,
   makeQueryBuilder,
 } from "@/test/mockSupabase";
 
@@ -26,7 +27,7 @@ import {
   updateMotif,
   updateOccurrence,
   getImageryLastModified,
-  resyncSongTimetags,
+  resyncDraftTimetags,
   getUnusedMotifs,
   deleteUnusedMotifs,
 } from "./service-imagery";
@@ -106,31 +107,29 @@ describe("getImageryWithCounts", () => {
   });
 });
 
+const ok = (data: unknown) => makeQueryBuilder({ data, error: null });
+
 describe("getOccurrencesForImagery（数据行映射）", () => {
-  it("嵌套的 temp/imagery/category 关联被拍平为 OccurrenceWithSong", async () => {
-    const builder = makeQueryBuilder({
-      data: [
-        {
-          id: 1,
-          song_id: 10,
-          imagery_id: 20,
-          category_id: 30,
-          lyric_timetag: ["01:00"],
-          temp: { title: "标题", album: "专辑" },
-          imagery: { name: "明月" },
-          imagery_categories: { name: "自然" },
-        },
-      ],
-      error: null,
-    });
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([builder]),
-    );
+  it("读工作版本的视图，歌名、词名、母题名直接是列", async () => {
+    const builder = ok([
+      {
+        id: 1,
+        song_id: 10,
+        imagery_id: 20,
+        category_id: 30,
+        lyric_timetag: ["01:00"],
+        song_title: "标题",
+        song_album: "专辑",
+        imagery_name: "明月",
+        category_name: "自然",
+      },
+    ]);
+    const client = createMockSupabaseClient([builder]);
+    vi.mocked(getServiceClient).mockReturnValue(client);
     const result = await getOccurrencesForImagery(20);
-    // 未发布的歌也有标注，歌名关联暂存表
-    expect(builder.select).toHaveBeenCalledWith(
-      expect.stringContaining("temp(title, album)"),
-    );
+    // 未发布的歌也有标注：读每首歌的工作版本
+    expect(client.from).toHaveBeenCalledWith("working_song_imagery");
+    expect(builder.eq).toHaveBeenCalledWith("imagery_id", 20);
     expect(result[0]).toMatchObject({
       id: 1,
       song_title: "标题",
@@ -212,34 +211,29 @@ describe("createMotif / updateMotif（只增改第三级）", () => {
 
 describe("setWordMotifs（改写词的候选母题）", () => {
   const motifRows = (ids: number[]) =>
-    makeQueryBuilder({
-      data: ids.map((id) => ({ id, level: 3 })),
-      error: null,
-    });
+    ok(ids.map((id) => ({ id, level: 3 })));
 
   it("换默认母题、去掉没标注的候选：先删、再把旧默认降为多义、最后写入", async () => {
-    const remove = makeQueryBuilder({ data: null, error: null });
-    const demote = makeQueryBuilder({ data: null, error: null });
-    const upsert = makeQueryBuilder({ data: null, error: null });
+    const remove = ok(null);
+    const demote = ok(null);
+    const upsert = ok(null);
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        motifRows([10, 20]),
-        makeQueryBuilder({
-          data: [
+      createTableMockClient({
+        imagery_categories: motifRows([10, 20]),
+        imagery_motifs: [
+          ok([
             { category_id: 10, role: "primary" },
             { category_id: 20, role: "alternative" },
             { category_id: 30, role: "alternative" },
-          ],
-          error: null,
-        }),
-        makeQueryBuilder({
-          data: [{ category_id: 10 }, { category_id: 20 }],
-          error: null,
-        }),
-        remove,
-        demote,
-        upsert,
-      ]),
+          ]),
+          remove,
+          demote,
+          upsert,
+        ],
+        // 在用的标注：工作版本挂 10，线上版本挂 20；30 哪儿都没用
+        working_song_imagery: ok([{ imagery_id: 7, category_id: 10 }]),
+        published_song_imagery: ok([{ imagery_id: 7, category_id: 20 }]),
+      }),
     );
     await setWordMotifs(
       7,
@@ -258,23 +252,26 @@ describe("setWordMotifs（改写词的候选母题）", () => {
     );
   });
 
-  it("要去掉的母题下还有这个词的标注时拒绝", async () => {
-    const client = createMockSupabaseClient([
-      motifRows([10]),
-      makeQueryBuilder({
-        data: [
-          { category_id: 10, role: "primary" },
-          { category_id: 20, role: "alternative" },
+  it("要去掉的母题下还有标注时拒绝：只有线上版本还在用也算", async () => {
+    const remove = ok(null);
+    vi.mocked(getUserClient).mockReturnValue(
+      createTableMockClient({
+        imagery_categories: motifRows([10]),
+        imagery_motifs: [
+          ok([
+            { category_id: 10, role: "primary" },
+            { category_id: 20, role: "alternative" },
+          ]),
+          remove,
         ],
-        error: null,
+        working_song_imagery: ok([]),
+        published_song_imagery: ok([{ imagery_id: 7, category_id: 20 }]),
       }),
-      makeQueryBuilder({ data: [{ category_id: 20 }], error: null }),
-    ]);
-    vi.mocked(getUserClient).mockReturnValue(client);
+    );
     await expect(
       setWordMotifs(7, { primary: 10, alternatives: [], parts: [] }, "token"),
     ).rejects.toMatchObject({ code: "MOTIF_IN_USE" });
-    expect(client.from).toHaveBeenCalledTimes(3);
+    expect(remove.delete).not.toHaveBeenCalled();
   });
 
   it("同一母题登记两次时拒绝，不访问数据库", async () => {
@@ -286,9 +283,7 @@ describe("setWordMotifs（改写词的候选母题）", () => {
 
   it("只能登记母题（第三级）", async () => {
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ id: 2, level: 2 }], error: null }),
-      ]),
+      createMockSupabaseClient([ok([{ id: 2, level: 2 }])]),
     );
     await expect(
       setWordMotifs(7, { primary: 2, alternatives: [], parts: [] }, "token"),
@@ -296,72 +291,74 @@ describe("setWordMotifs（改写词的候选母题）", () => {
   });
 });
 
+/** 草稿的 version id；工作版本（开草稿前）是 3 */
+const DRAFT = 42;
+const draftRpc = { rpc: { ensure_draft: { data: DRAFT, error: null } } };
+
 describe("createOccurrencesBatch", () => {
   const items = [
     { imagery_id: 1, category_id: 10 },
     { imagery_id: 2, category_id: 10 },
   ];
   // 校验母题：用到的都是第三级
-  const motifOk = () =>
-    makeQueryBuilder({
-      data: [10, 11, 12, 20].map((id) => ({ id, level: 3 })),
-      error: null,
-    });
-  const songExists = () => makeQueryBuilder({ data: { id: 5 }, error: null });
-  // 歌词没有时间轴：不拦、不重算，测的是其余逻辑。依次是歌词、已有标注、按 id 查的词名
-  const lyricsCheck = (byId = true) => [
-    makeQueryBuilder({ data: { lyrics: null }, error: null }),
-    makeQueryBuilder({ data: [], error: null }),
-    ...(byId ? [makeQueryBuilder({ data: [], error: null })] : []),
+  const motifOk = () => ok([10, 11, 12, 20].map((id) => ({ id, level: 3 })));
+  const working = () => ok({ version_id: 3 });
+  // 歌词没有时间轴：不拦、不重算，测的是其余逻辑
+  const noTimeline = () => ok({ lyrics: null });
+  /** song_imagery 上依次是：核对歌词时读工作版本的标注、草稿里已有的标注、插入、重算时读草稿 */
+  const songImagery = (existing: unknown[], insert: unknown) => [
+    ok([]),
+    ok(existing),
+    insert,
+    ok([]),
   ];
-  const noExisting = () => makeQueryBuilder({ data: [], error: null });
-  const motifs = (
-    rows: Array<{ imagery_id: number; category_id: number; role: string }>,
-  ) => makeQueryBuilder({ data: rows, error: null });
 
-  it("跳过该歌已标注的意象，只插入其余的", async () => {
-    const insertBuilder = makeQueryBuilder({ data: null, error: null });
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        motifOk(),
-        songExists(),
-        ...lyricsCheck(),
-        makeQueryBuilder({ data: [{ imagery_id: 1 }], error: null }), // 已有标注
-        motifs([{ imagery_id: 2, category_id: 10, role: "primary" }]),
-        insertBuilder,
-      ]),
+  it("先按工作版本校验，再开草稿；跳过草稿里已标注的意象，只插入其余的", async () => {
+    const insertBuilder = ok(null);
+    const client = createTableMockClient(
+      {
+        imagery_categories: motifOk(),
+        working_songs: working(),
+        song_versions: noTimeline(),
+        song_imagery: songImagery([{ imagery_id: 1 }], insertBuilder),
+        imagery_motifs: ok([
+          { imagery_id: 2, category_id: 10, role: "primary" },
+        ]),
+      },
+      draftRpc,
     );
+    vi.mocked(getUserClient).mockReturnValue(client);
     const result = await createOccurrencesBatch(5, items, "token");
     expect(result).toEqual({ created: 1, skipped: 1, newImagery: 0 });
+    expect(client.rpc).toHaveBeenCalledWith("ensure_draft", { p_song_id: 5 });
     expect(insertBuilder.insert).toHaveBeenCalledWith([
-      {
-        imagery_id: 2,
-        category_id: 10,
-        lyric_timetag: [],
-        song_id: 5,
-      },
+      { imagery_id: 2, category_id: 10, lyric_timetag: [], version_id: DRAFT },
     ]);
   });
 
   it("新意象名：复用同名意象、创建缺失的，并合并指向同一意象的项", async () => {
-    const createBuilder = makeQueryBuilder({
-      data: [{ id: 31, name: "孤灯" }],
-      error: null,
-    });
-    const registerBuilder = makeQueryBuilder({ data: null, error: null });
-    const insertBuilder = makeQueryBuilder({ data: null, error: null });
+    const createBuilder = ok([{ id: 31, name: "孤灯" }]);
+    const registerBuilder = ok(null);
+    const insertBuilder = ok(null);
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        motifOk(),
-        songExists(),
-        ...lyricsCheck(),
-        makeQueryBuilder({ data: [{ id: 3, name: "月" }], error: null }), // 按名查找
-        createBuilder,
-        noExisting(),
-        motifs([{ imagery_id: 3, category_id: 10, role: "primary" }]),
-        registerBuilder,
-        insertBuilder,
-      ]),
+      createTableMockClient(
+        {
+          imagery_categories: motifOk(),
+          working_songs: working(),
+          song_versions: noTimeline(),
+          song_imagery: songImagery([], insertBuilder),
+          imagery: [
+            ok([]), // 核对歌词时按 id 查词名
+            ok([{ id: 3, name: "月" }]), // 按名查找
+            createBuilder,
+          ],
+          imagery_motifs: [
+            ok([{ imagery_id: 3, category_id: 10, role: "primary" }]),
+            registerBuilder,
+          ],
+        },
+        draftRpc,
+      ),
     );
     const result = await createOccurrencesBatch(
       5,
@@ -381,38 +378,26 @@ describe("createOccurrencesBatch", () => {
       { onConflict: "imagery_id,category_id", ignoreDuplicates: true },
     );
     expect(insertBuilder.insert).toHaveBeenCalledWith([
-      {
-        imagery_id: 3,
-        category_id: 10,
-        lyric_timetag: [],
-        song_id: 5,
-      },
-      {
-        imagery_id: 31,
-        category_id: 12,
-        lyric_timetag: [],
-        song_id: 5,
-      },
+      { imagery_id: 3, category_id: 10, lyric_timetag: [], version_id: DRAFT },
+      { imagery_id: 31, category_id: 12, lyric_timetag: [], version_id: DRAFT },
     ]);
   });
 
   it("有一项不是母题（第三级）时拒绝整批", async () => {
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        // 空着的二级分类也没有子分类，原先按「叶子」判断会放过
-        makeQueryBuilder({ data: [{ id: 10, level: 2 }], error: null }),
-      ]),
+      // 空着的二级分类也没有子分类，原先按「叶子」判断会放过
+      createMockSupabaseClient([ok([{ id: 10, level: 2 }])]),
     );
     await expect(
       createOccurrencesBatch(5, items, "token"),
     ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 
-  it("歌曲不存在时在创建意象之前就拒绝；查的是暂存表，未发布的歌也能标", async () => {
-    const client = createMockSupabaseClient([
-      motifOk(),
-      makeQueryBuilder({ data: null, error: null }), // 暂存表中没有
-    ]);
+  it("歌曲不存在时在创建意象、开草稿之前就拒绝；未发布的歌也能标", async () => {
+    const client = createTableMockClient(
+      { imagery_categories: motifOk(), working_songs: ok(null) },
+      draftRpc,
+    );
     vi.mocked(getUserClient).mockReturnValue(client);
     await expect(
       createOccurrencesBatch(
@@ -421,17 +406,21 @@ describe("createOccurrencesBatch", () => {
         "token",
       ),
     ).rejects.toMatchObject({ code: "SONG_NOT_FOUND" });
-    expect(client.from).toHaveBeenCalledTimes(2);
-    expect(client.from.mock.calls[1][0]).toBe("temp");
+    expect(client.from).toHaveBeenCalledWith("working_songs");
+    expect(client.from).not.toHaveBeenCalledWith("imagery");
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
-  it("词不在歌词里时在创建意象之前就拒绝", async () => {
-    const client = createMockSupabaseClient([
-      motifOk(),
-      songExists(),
-      makeQueryBuilder({ data: { lyrics: "[00:01.00]明月" }, error: null }),
-      makeQueryBuilder({ data: [], error: null }),
-    ]);
+  it("词不在（工作版本的）歌词里时在创建意象、开草稿之前就拒绝", async () => {
+    const client = createTableMockClient(
+      {
+        imagery_categories: motifOk(),
+        working_songs: working(),
+        song_versions: ok({ lyrics: "[00:01.00]明月" }),
+        song_imagery: ok([]),
+      },
+      draftRpc,
+    );
     vi.mocked(getUserClient).mockReturnValue(client);
     await expect(
       createOccurrencesBatch(
@@ -443,28 +432,33 @@ describe("createOccurrencesBatch", () => {
         "token",
       ),
     ).rejects.toThrow("歌词里没有「孤灯」");
-    expect(client.from).toHaveBeenCalledTimes(4);
+    expect(client.from).not.toHaveBeenCalledWith("imagery");
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
   it("所选母题不在候选里时登记为多义候选；挂默认母题的并列词补写其余组成", async () => {
-    const registerBuilder = makeQueryBuilder({ data: null, error: null });
-    const insertBuilder = makeQueryBuilder({ data: null, error: null });
+    const registerBuilder = ok(null);
+    const insertBuilder = ok(null);
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        motifOk(),
-        songExists(),
-        ...lyricsCheck(),
-        noExisting(),
-        motifs([
-          // 1「风雨」：默认风（10），并列雨（11）
-          { imagery_id: 1, category_id: 10, role: "primary" },
-          { imagery_id: 1, category_id: 11, role: "part" },
-          // 2：默认母题是 20，这次选了 10
-          { imagery_id: 2, category_id: 20, role: "primary" },
-        ]),
-        registerBuilder,
-        insertBuilder,
-      ]),
+      createTableMockClient(
+        {
+          imagery_categories: motifOk(),
+          working_songs: working(),
+          song_versions: noTimeline(),
+          song_imagery: songImagery([], insertBuilder),
+          imagery_motifs: [
+            ok([
+              // 1「风雨」：默认风（10），并列雨（11）
+              { imagery_id: 1, category_id: 10, role: "primary" },
+              { imagery_id: 1, category_id: 11, role: "part" },
+              // 2：默认母题是 20，这次选了 10
+              { imagery_id: 2, category_id: 20, role: "primary" },
+            ]),
+            registerBuilder,
+          ],
+        },
+        draftRpc,
+      ),
     );
     const result = await createOccurrencesBatch(5, items, "token");
     expect(result).toEqual({ created: 2, skipped: 0, newImagery: 0 });
@@ -479,26 +473,31 @@ describe("createOccurrencesBatch", () => {
     ]);
   });
 
-  it("插入时 song_id 外键失败（歌在两次请求之间被删）提示歌曲不存在", async () => {
+  it("插入时 version_id 外键失败（草稿在两次请求之间没了）提示歌曲不存在", async () => {
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        motifOk(),
-        songExists(),
-        ...lyricsCheck(),
-        noExisting(),
-        motifs([
-          { imagery_id: 1, category_id: 10, role: "primary" },
-          { imagery_id: 2, category_id: 10, role: "primary" },
-        ]),
-        makeQueryBuilder({
-          data: null,
-          error: {
-            code: "23503",
-            message:
-              'insert or update on table "imagery_occurrences" violates foreign key constraint "imagery_occurrences_song_id_fkey"',
-          },
-        }),
-      ]),
+      createTableMockClient(
+        {
+          imagery_categories: motifOk(),
+          working_songs: working(),
+          song_versions: noTimeline(),
+          song_imagery: songImagery(
+            [],
+            makeQueryBuilder({
+              data: null,
+              error: {
+                code: "23503",
+                message:
+                  'insert or update on table "song_imagery" violates foreign key constraint "song_imagery_version_id_fkey"',
+              },
+            }),
+          ),
+          imagery_motifs: ok([
+            { imagery_id: 1, category_id: 10, role: "primary" },
+            { imagery_id: 2, category_id: 10, role: "primary" },
+          ]),
+        },
+        draftRpc,
+      ),
     );
     await expect(
       createOccurrencesBatch(5, items, "token"),
@@ -517,69 +516,62 @@ describe("createOccurrencesBatch", () => {
 
 describe("updateOccurrence / deleteOccurrence", () => {
   const relations = () =>
-    makeQueryBuilder({
-      data: {
-        id: 1,
-        song_id: 1,
-        imagery_id: 2,
-        category_id: 20,
-        lyric_timetag: [],
-        temp: null,
-        imagery: null,
-        imagery_categories: null,
-      },
-      error: null,
+    ok({
+      id: 1,
+      song_id: 1,
+      imagery_id: 2,
+      category_id: 20,
+      lyric_timetag: [],
+      song_title: "歌",
+      song_album: null,
+      imagery_name: "汗",
+      category_name: "身躯",
     });
+  /** 工作版本里的这一行（开草稿前在版本 3 上） */
+  const current = (imagery_id: number, category_id: number) =>
+    ok({ song_id: 1, version_id: 3, imagery_id, category_id });
+  const noTimeline = () => ok({ lyrics: null });
 
   it("改挂到非母题时拒绝", async () => {
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ id: 5, level: 2 }], error: null }),
-      ]),
+      createMockSupabaseClient([ok([{ id: 5, level: 2 }])]),
     );
     await expect(
       updateOccurrence(1, { category_id: 5 }, "token"),
     ).rejects.toMatchObject({ code: "NOT_MOTIF" });
   });
 
-  // 改完都按歌词重算整首：歌词没有时间轴时读两次就返回
-  const noTimeline = () => [
-    makeQueryBuilder({ data: { lyrics: null }, error: null }),
-    makeQueryBuilder({ data: [], error: null }),
-  ];
-
-  it("词在原母题下已没有标注、原母题是它的默认母题时，默认母题跟到新母题上", async () => {
-    const siblings = makeQueryBuilder({ data: null, error: null });
-    const unregister = makeQueryBuilder({ data: null, error: null });
-    const promote = makeQueryBuilder({ data: null, error: null });
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ id: 20, level: 3 }], error: null }),
-        makeQueryBuilder({
-          data: { song_id: 1, imagery_id: 2, category_id: 10 },
-          error: null,
-        }), // 当前：「汗」挂在母题汗（10）
-        makeQueryBuilder({
-          data: [{ imagery_id: 2, category_id: 10, role: "primary" }],
-          error: null,
-        }), // 登记
-        makeQueryBuilder({ data: null, error: null }), // 登记身躯为「有时也指」
-        siblings, // 删掉补写的「同时算进」
-        makeQueryBuilder({ data: { id: 1 }, error: null }), // 更新
-        makeQueryBuilder({ data: { role: "primary" }, error: null }), // 原母题的登记
-        makeQueryBuilder({ data: [], error: null }), // 原母题下已没有标注
-        unregister,
-        promote,
-        makeQueryBuilder({
-          data: [{ category_id: 20, role: "primary" }],
-          error: null,
-        }), // 补写「同时算进」：这个词没有
-        ...noTimeline(),
-        relations(),
-      ]),
+  it("改在草稿上；词在原母题下已没有标注、原母题是它的默认母题时，默认母题跟到新母题上", async () => {
+    const siblings = ok(null);
+    const update = ok({ id: 1 });
+    const unregister = ok(null);
+    const promote = ok(null);
+    const client = createTableMockClient(
+      {
+        imagery_categories: ok([{ id: 20, level: 3 }]),
+        // 当前：「汗」挂在母题汗（10）；中间一次是判断原母题还有没有人用；改完在工作版本里查出来返回
+        working_song_imagery: [current(2, 10), ok([]), relations()],
+        published_song_imagery: ok([]),
+        imagery_motifs: [
+          ok([{ imagery_id: 2, category_id: 10, role: "primary" }]), // 登记
+          ok(null), // 登记身躯为「有时也指」
+          ok({ role: "primary" }), // 原母题的登记
+          unregister,
+          promote,
+          ok([{ category_id: 20, role: "primary" }]), // 补写「同时算进」：这个词没有
+        ],
+        song_imagery: [siblings, update, ok([])],
+        song_versions: noTimeline(),
+      },
+      draftRpc,
     );
+    vi.mocked(getUserClient).mockReturnValue(client);
     await updateOccurrence(1, { category_id: 20 }, "token");
+    expect(client.rpc).toHaveBeenCalledWith("ensure_draft", { p_song_id: 1 });
+    expect(siblings.eq).toHaveBeenCalledWith("version_id", DRAFT);
     expect(siblings.neq).toHaveBeenCalledWith("id", 1);
+    expect(update.eq).toHaveBeenCalledWith("version_id", DRAFT);
+    expect(update.eq).toHaveBeenCalledWith("id", 1);
     expect(unregister.eq).toHaveBeenCalledWith("category_id", 10);
     expect(promote.upsert).toHaveBeenCalledWith(
       { imagery_id: 2, category_id: 20, role: "primary" },
@@ -587,107 +579,102 @@ describe("updateOccurrence / deleteOccurrence", () => {
     );
   });
 
-  it("原母题下还有这个词的标注时，默认母题不动", async () => {
-    const client = createMockSupabaseClient([
-      makeQueryBuilder({ data: [{ id: 20, level: 3 }], error: null }),
-      makeQueryBuilder({
-        data: { song_id: 1, imagery_id: 2, category_id: 10 },
-        error: null,
-      }),
-      makeQueryBuilder({
-        data: [{ imagery_id: 2, category_id: 10, role: "primary" }],
-        error: null,
-      }),
-      makeQueryBuilder({ data: null, error: null }),
-      makeQueryBuilder({ data: null, error: null }), // 删掉补写的
-      makeQueryBuilder({ data: { id: 1 }, error: null }),
-      makeQueryBuilder({ data: { role: "primary" }, error: null }),
-      makeQueryBuilder({ data: [{ id: 5 }], error: null }), // 别的歌还挂在原母题
-      makeQueryBuilder({
-        data: [
-          { category_id: 10, role: "primary" },
-          { category_id: 20, role: "alternative" },
-        ],
-        error: null,
-      }),
-      ...noTimeline(),
-      relations(),
-    ]);
-    vi.mocked(getUserClient).mockReturnValue(client);
+  it("原母题下还有这个词的标注时，默认母题不动：只有线上版本还在用也算", async () => {
+    const unregister = ok(null);
+    vi.mocked(getUserClient).mockReturnValue(
+      createTableMockClient(
+        {
+          imagery_categories: ok([{ id: 20, level: 3 }]),
+          working_song_imagery: [current(2, 10), ok([]), relations()],
+          published_song_imagery: ok([{ imagery_id: 2, category_id: 10 }]),
+          imagery_motifs: [
+            ok([{ imagery_id: 2, category_id: 10, role: "primary" }]),
+            ok(null),
+            ok({ role: "primary" }),
+            unregister,
+          ],
+          song_imagery: [ok(null), ok({ id: 1 }), ok([])],
+          song_versions: noTimeline(),
+        },
+        draftRpc,
+      ),
+    );
     await updateOccurrence(1, { category_id: 20 }, "token");
-    expect(client.from).toHaveBeenCalledTimes(12);
+    expect(unregister.delete).not.toHaveBeenCalled();
   });
 
-  it("改挂到词的「通常算作」上时，补写它「同时算进」的各条", async () => {
-    const siblings = makeQueryBuilder({ data: null, error: null });
-    const parts = makeQueryBuilder({ data: null, error: null });
+  it("没有改动时直接返回，不开草稿", async () => {
+    const client = createTableMockClient(
+      {
+        imagery_categories: ok([{ id: 10, level: 3 }]),
+        working_song_imagery: [current(2, 10), relations()],
+      },
+      draftRpc,
+    );
+    vi.mocked(getUserClient).mockReturnValue(client);
+    await updateOccurrence(1, { category_id: 10 }, "token");
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("改挂到词的「通常算作」上时，在草稿里补写它「同时算进」的各条", async () => {
+    const siblings = ok(null);
+    const parts = ok(null);
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: [{ id: 10, level: 3 }], error: null }),
-        makeQueryBuilder({
-          data: { song_id: 1, imagery_id: 1, category_id: 30 },
-          error: null,
-        }), // 「风雨」原来挂在「有时也指」30 上
-        makeQueryBuilder({
-          data: [
-            { imagery_id: 1, category_id: 10, role: "primary" },
-            { imagery_id: 1, category_id: 11, role: "part" },
-            { imagery_id: 1, category_id: 30, role: "alternative" },
+      createTableMockClient(
+        {
+          imagery_categories: ok([{ id: 10, level: 3 }]),
+          // 「风雨」原来挂在「有时也指」30 上
+          working_song_imagery: [current(1, 30), ok([]), relations()],
+          published_song_imagery: ok([]),
+          imagery_motifs: [
+            ok([
+              { imagery_id: 1, category_id: 10, role: "primary" },
+              { imagery_id: 1, category_id: 11, role: "part" },
+              { imagery_id: 1, category_id: 30, role: "alternative" },
+            ]), // 已登记，不用再登记
+            ok({ role: "alternative" }),
+            ok([
+              { category_id: 10, role: "primary" },
+              { category_id: 11, role: "part" },
+              { category_id: 30, role: "alternative" },
+            ]),
           ],
-          error: null,
-        }), // 已登记，不用再登记
-        siblings,
-        makeQueryBuilder({ data: { id: 1 }, error: null }),
-        makeQueryBuilder({ data: { role: "alternative" }, error: null }),
-        makeQueryBuilder({ data: [], error: null }),
-        makeQueryBuilder({
-          data: [
-            { category_id: 10, role: "primary" },
-            { category_id: 11, role: "part" },
-            { category_id: 30, role: "alternative" },
-          ],
-          error: null,
-        }),
-        parts,
-        ...noTimeline(),
-        relations(),
-      ]),
+          song_imagery: [siblings, ok({ id: 1 }), parts, ok([])],
+          song_versions: noTimeline(),
+        },
+        draftRpc,
+      ),
     );
     await updateOccurrence(1, { category_id: 10 }, "token");
     expect(siblings.eq).toHaveBeenCalledWith("imagery_id", 1);
     expect(parts.upsert).toHaveBeenCalledWith(
-      [{ song_id: 1, imagery_id: 1, category_id: 11, lyric_timetag: [] }],
-      { onConflict: "song_id,imagery_id,category_id", ignoreDuplicates: true },
+      [{ version_id: DRAFT, imagery_id: 1, category_id: 11, lyric_timetag: [] }],
+      {
+        onConflict: "version_id,imagery_id,category_id",
+        ignoreDuplicates: true,
+      },
     );
   });
 
-  it("换成词典里没有的词：核对歌词后创建，再改这条标注", async () => {
-    const createWord = makeQueryBuilder({
-      data: [{ id: 31, name: "孤灯" }],
-      error: null,
-    });
-    const siblings = makeQueryBuilder({ data: null, error: null });
-    const update = makeQueryBuilder({ data: { id: 1 }, error: null });
+  it("换成词典里没有的词：按工作版本核对歌词后创建，再改草稿里这条标注", async () => {
+    const createWord = ok([{ id: 31, name: "孤灯" }]);
+    const siblings = ok(null);
+    const update = ok({ id: 1 });
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: { song_id: 1, imagery_id: 2, category_id: 10 },
-          error: null,
-        }), // 当前
-        ...noTimeline(), // 核对歌词：没有时间轴
-        makeQueryBuilder({ data: [], error: null }), // 按名查找
-        createWord,
-        makeQueryBuilder({ data: [], error: null }), // 新词还没有登记
-        makeQueryBuilder({ data: null, error: null }), // 登记默认母题
-        siblings, // 旧词补写的「同时算进」
-        update,
-        makeQueryBuilder({
-          data: [{ category_id: 10, role: "primary" }],
-          error: null,
-        }),
-        ...noTimeline(),
-        relations(),
-      ]),
+      createTableMockClient(
+        {
+          working_song_imagery: [current(2, 10), relations()],
+          song_versions: noTimeline(),
+          song_imagery: [ok([]), siblings, update, ok([])],
+          imagery: [ok([]), createWord],
+          imagery_motifs: [
+            ok([]), // 新词还没有登记
+            ok(null), // 登记默认母题
+            ok([{ category_id: 10, role: "primary" }]),
+          ],
+        },
+        draftRpc,
+      ),
     );
     await updateOccurrence(1, { imagery_name: "孤灯" }, "token");
     expect(createWord.insert).toHaveBeenCalledWith([{ name: "孤灯" }]);
@@ -698,43 +685,50 @@ describe("updateOccurrence / deleteOccurrence", () => {
     });
   });
 
-  it("deleteOccurrence 连同补写的「同时算进」一起删，再重算整首", async () => {
-    const remove = makeQueryBuilder({
-      data: [{ category_id: 5 }, { category_id: 6 }],
-      error: null,
-    });
-    const updateBuilder = makeQueryBuilder({ data: null, error: null });
+  it("deleteOccurrence 在草稿里连同补写的「同时算进」一起删，再按草稿的歌词重算", async () => {
+    const remove = ok([{ category_id: 5 }, { category_id: 6 }]);
+    const updateBuilder = ok(null);
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { song_id: 1, imagery_id: 8 }, error: null }), // 「岁月」
-        remove,
-        makeQueryBuilder({
-          data: { lyrics: "[00:01.00]岁月如月\n[00:02.00]岁月" },
-          error: null,
-        }),
-        makeQueryBuilder({
-          data: [
-            {
-              id: 2,
-              imagery_id: 9,
-              category_id: 7,
-              lyric_timetag: ["00:01.00"],
-              imagery: { name: "月" },
-            },
+      createTableMockClient(
+        {
+          working_song_imagery: ok({ song_id: 1, imagery_id: 8 }), // 「岁月」
+          song_imagery: [
+            remove,
+            ok([
+              {
+                id: 2,
+                imagery_id: 9,
+                category_id: 7,
+                lyric_timetag: ["00:01.00"],
+                imagery: { name: "月" },
+              },
+            ]),
+            updateBuilder,
           ],
-          error: null,
-        }),
-        updateBuilder,
-      ]),
+          song_versions: ok({ lyrics: "[00:01.00]岁月如月\n[00:02.00]岁月" }),
+        },
+        draftRpc,
+      ),
     );
     const result = await deleteOccurrence(1, "token");
-    expect(remove.eq).toHaveBeenCalledWith("song_id", 1);
+    expect(remove.eq).toHaveBeenCalledWith("version_id", DRAFT);
     expect(remove.eq).toHaveBeenCalledWith("imagery_id", 8);
     // 删掉长词后，被它覆盖的短词拿回那几行
     expect(updateBuilder.update).toHaveBeenCalledWith({
       lyric_timetag: ["00:01.00", "00:02.00"],
     });
+    expect(updateBuilder.eq).toHaveBeenCalledWith("version_id", DRAFT);
     expect(result).toEqual({ songId: 1, motifIds: [5, 6] });
+  });
+
+  it("deleteOccurrence：工作版本里没有这条时返回 null，不开草稿", async () => {
+    const client = createTableMockClient(
+      { working_song_imagery: ok(null) },
+      draftRpc,
+    );
+    vi.mocked(getUserClient).mockReturnValue(client);
+    expect(await deleteOccurrence(1, "token")).toBeNull();
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
   it("deleteOccurrence 出错时抛异常", async () => {
@@ -791,24 +785,22 @@ describe("getImageryLastModified", () => {
   });
 });
 
-describe("resyncSongTimetags（发布新歌词后重算）", () => {
-  it("时间轴变了：改写标签，返回变动的母题；歌词里没有的词清空标签并报出", async () => {
-    const updateBuilder = makeQueryBuilder({ data: null, error: null });
+describe("resyncDraftTimetags（发布前按草稿的歌词重算）", () => {
+  const rows = (lyric_timetag: string[]) => [
+    { id: 1, imagery_id: 7, category_id: 70, lyric_timetag, imagery: { name: "明月" } },
+  ];
+
+  it("时间轴变了：改写草稿里的标签，返回变动的母题；歌词里没有的词清空标签并报出", async () => {
+    const updateBuilder = ok(null);
     vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({
-          data: { lyrics: "[00:03.00]明月几时有\n[00:05.00]把酒问青天" },
-          error: null,
+      createTableMockClient({
+        working_songs: ok({ version_id: DRAFT, has_draft: true }),
+        song_versions: ok({
+          lyrics: "[00:03.00]明月几时有\n[00:05.00]把酒问青天",
         }),
-        makeQueryBuilder({
-          data: [
-            {
-              id: 1,
-              imagery_id: 7,
-              category_id: 70,
-              lyric_timetag: ["00:01.00"],
-              imagery: { name: "明月" },
-            },
+        song_imagery: [
+          ok([
+            ...rows(["00:01.00"]),
             {
               id: 2,
               imagery_id: 8,
@@ -823,42 +815,46 @@ describe("resyncSongTimetags（发布新歌词后重算）", () => {
               lyric_timetag: ["00:02.00"],
               imagery: { name: "流水" },
             },
-          ],
-          error: null,
-        }),
-        updateBuilder,
-      ]),
+          ]),
+          updateBuilder,
+        ],
+      }),
     );
-    const result = await resyncSongTimetags(1, "token");
+    const result = await resyncDraftTimetags(1, "token");
     expect(updateBuilder.update.mock.calls).toEqual([
       [{ lyric_timetag: ["00:03.00"] }],
       [{ lyric_timetag: [] }],
     ]);
+    expect(updateBuilder.eq).toHaveBeenCalledWith("version_id", DRAFT);
     expect(result).toEqual({ motifIds: [70, 90], notFound: ["流水"] });
   });
 
-  it("歌词没有时间轴时不动", async () => {
-    const client = createMockSupabaseClient([
-      makeQueryBuilder({ data: { lyrics: "明月几时有" }, error: null }),
-      makeQueryBuilder({
-        data: [
-          {
-            id: 1,
-            imagery_id: 7,
-            category_id: 70,
-            lyric_timetag: ["00:01.00"],
-            imagery: { name: "明月" },
-          },
-        ],
-        error: null,
-      }),
-    ]);
+  it("没有草稿（下架后原样重新上线）时什么也不做", async () => {
+    const client = createTableMockClient({
+      working_songs: ok({ version_id: 3, has_draft: false }),
+    });
     vi.mocked(getUserClient).mockReturnValue(client);
-    expect(await resyncSongTimetags(1, "token")).toEqual({
+    expect(await resyncDraftTimetags(1, "token")).toEqual({
       motifIds: [],
       notFound: [],
     });
-    expect(client.from).toHaveBeenCalledTimes(2);
+    expect(client.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("歌词没有时间轴时不动", async () => {
+    const update = ok(null);
+    vi.mocked(getUserClient).mockReturnValue(
+      createTableMockClient({
+        working_songs: ok({ version_id: DRAFT, has_draft: true }),
+        song_versions: ok({ lyrics: "明月几时有" }),
+        song_imagery: [ok(rows(["00:01.00"])), update],
+      }),
+    );
+    expect(await resyncDraftTimetags(1, "token")).toEqual({
+      motifIds: [],
+      notFound: [],
+    });
+    expect(update.update).not.toHaveBeenCalled();
   });
 });
 
@@ -872,26 +868,24 @@ describe("整理空母题", () => {
     { id: 12, name: "虹", parent_id: 2, level: 3, description: null },
   ];
   // 「汗」先挂母题汗、后改成身躯：汗仍是它的默认母题，但已没有标注
-  const lookups = () => [
-    makeQueryBuilder({ data: categories, error: null }),
-    makeQueryBuilder({
-      data: [
+  const routes = (
+    extra: { motifs?: unknown[]; categories?: unknown[] } = {},
+  ) => ({
+    imagery_categories: [ok(categories), ...(extra.categories ?? [])],
+    imagery_motifs: [
+      ok([
         { imagery_id: 1, category_id: 10, role: "primary" },
         { imagery_id: 1, category_id: 11, role: "alternative" },
-      ],
-      error: null,
-    }),
-    makeQueryBuilder({
-      data: [{ imagery_id: 1, category_id: 11 }],
-      error: null,
-    }),
-    makeQueryBuilder({ data: [{ id: 1, name: "汗" }], error: null }),
-  ];
+      ]),
+      ...(extra.motifs ?? []),
+    ],
+    working_song_imagery: ok([{ imagery_id: 1, category_id: 11 }]),
+    published_song_imagery: ok([]),
+    imagery: ok([{ id: 1, name: "汗" }]),
+  });
 
   it("没有标注的第三级都列出，只剩词登记的也算；空着的二级分类不动", async () => {
-    vi.mocked(getUserClient).mockReturnValue(
-      createMockSupabaseClient(lookups()),
-    );
+    vi.mocked(getUserClient).mockReturnValue(createTableMockClient(routes()));
     const result = await getUnusedMotifs("token");
     expect(result.map((c) => c.id)).toEqual([10, 12]);
     expect(result[0].words).toEqual([
@@ -905,20 +899,26 @@ describe("整理空母题", () => {
     expect(result[1].words).toEqual([]);
   });
 
+  it("草稿里不用了、线上版本还在用的母题不算空", async () => {
+    vi.mocked(getUserClient).mockReturnValue(
+      createTableMockClient({
+        ...routes(),
+        published_song_imagery: ok([{ imagery_id: 2, category_id: 12 }]),
+      }),
+    );
+    const result = await getUnusedMotifs("token");
+    expect(result.map((c) => c.id)).toEqual([10]);
+  });
+
   it("删除：先删登记，再把多义候选提为默认母题，最后删母题", async () => {
-    const unregister = makeQueryBuilder({ data: null, error: null });
-    const promote = makeQueryBuilder({ data: null, error: null });
-    const remove = makeQueryBuilder({
-      data: [{ id: 10 }, { id: 12 }],
-      error: null,
-    });
-    const client = createMockSupabaseClient([
-      ...lookups(),
-      unregister,
-      promote,
-      remove,
-    ]);
-    vi.mocked(getUserClient).mockReturnValue(client);
+    const unregister = ok(null);
+    const promote = ok(null);
+    const remove = ok([{ id: 10 }, { id: 12 }]);
+    vi.mocked(getUserClient).mockReturnValue(
+      createTableMockClient(
+        routes({ motifs: [unregister, promote], categories: [remove] }),
+      ),
+    );
     const result = await deleteUnusedMotifs([10, 11, 12], "token");
     expect(unregister.delete).toHaveBeenCalled();
     expect(unregister.in).toHaveBeenCalledWith("category_id", [10, 12]);
@@ -934,12 +934,16 @@ describe("整理空母题", () => {
   });
 
   it("选中的都已有标注时不发删除", async () => {
-    const client = createMockSupabaseClient(lookups());
+    const client = createTableMockClient(routes());
     vi.mocked(getUserClient).mockReturnValue(client);
     expect(await deleteUnusedMotifs([11], "token")).toEqual({
       deleted: [],
       promoted: [],
     });
-    expect(client.from).toHaveBeenCalledTimes(4);
+    expect(
+      client.from.mock.calls.filter(
+        (c: unknown[]) => c[0] === "imagery_categories",
+      ),
+    ).toHaveLength(1);
   });
 });

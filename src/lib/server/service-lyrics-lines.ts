@@ -24,7 +24,7 @@ export async function getLyricsLines(
     title: string | null;
     lyrics: string | null;
     lyrics_start: string | null;
-  }>(supabase, TABLES.MUSIC, "id,title,lyrics,lyrics_start", (q) =>
+  }>(supabase, TABLES.PUBLISHED_SONGS, "id,title,lyrics,lyrics_start", (q) =>
     q.not("lyrics", "is", null).order("id", { ascending: true }),
   );
 

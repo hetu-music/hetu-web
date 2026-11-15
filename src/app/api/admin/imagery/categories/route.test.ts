@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 let mockUser: { id: string; app_metadata?: Record<string, unknown> } | null = {
   id: "admin-1",
-  app_metadata: { is_admin: true },
+  app_metadata: { role: "admin" },
 };
 let mockCsrfValid = true;
 /** withAuth 的登录态和路由自己再查一次的 session 理论上可能不一致（如 session cookie 缺失但 JWT 仍有效） */
@@ -53,7 +53,7 @@ function jsonRequest(method: string, body?: unknown) {
 }
 
 beforeEach(() => {
-  mockUser = { id: "admin-1", app_metadata: { is_admin: true } };
+  mockUser = { id: "admin-1", app_metadata: { role: "admin" } };
   mockCsrfValid = true;
   mockSessionAccessToken = "test-token";
   vi.mocked(getImageryCategories).mockReset();

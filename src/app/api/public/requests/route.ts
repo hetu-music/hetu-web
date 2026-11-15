@@ -36,7 +36,7 @@ export const GET = withAuth(
 
     const rows = data ?? [];
 
-    // 批量查 music 表获取歌曲标题
+    // 批量查线上的歌获取标题
     const songIds = [
       ...new Set(
         rows
@@ -49,7 +49,7 @@ export const GET = withAuth(
       const serviceClient = getServiceClient();
       if (serviceClient) {
         const { data: songsData } = await serviceClient
-          .from(TABLES.MUSIC)
+          .from(TABLES.PUBLISHED_SONGS)
           .select("id, title")
           .in("id", songIds);
         if (songsData) {

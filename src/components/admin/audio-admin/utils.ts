@@ -9,7 +9,7 @@ import {
 
 export type SongRow = {
   song: DbSong;
-  /** navid_song 中记录的 ID，可能指向已不存在的曲目 */
+  /** song_audio 中记录的 ID，可能指向已不存在的曲目 */
   navidId: string | null;
   /** 映射指向的曲目；映射失效或未关联时为 null */
   nav: NavSong | null;

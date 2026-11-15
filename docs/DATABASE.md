@@ -2,8 +2,8 @@
 
 本站数据库的目标结构、约定与迁移计划。新建表、改表结构、新增挂在别的数据上的表之前先读本文件。
 
-本文写的是**目标**，不是现状（2026-11-15 定稿，尚未开始迁移）。现状以 `supabase/schema.sql` 为准：
-歌曲仍在 `temp`（后台工作版本）与 `music`（线上快照）两张表里，各段迁移完成后在第九节打勾。
+本文写的是**目标**（2026-11-15 定稿）。现状以 `supabase/schema.sql` 为准。
+第一段的迁移与代码已写好、尚未上线（`20261115120000_songs_versions.sql`）；各段上线后在第九节打勾。
 讨论中定下来的事项记在第十节。
 
 ## 一、原则
@@ -22,7 +22,6 @@
           │   （资料）            ├─ song_emotions    基调
           │                      └─ song_collations  校记与补遗（+ 订者名单）
           ├─ song_links    各平台链接
-          ├─ song_assets   封面、简谱
           ├─ song_audio    音频（原 navid_song）
           └─ 读者数据       comments · collections · user_requests · stream_grants
 
@@ -37,8 +36,8 @@
 
 |                                    | 挂在哪               | 随发布吗                           |
 | ---------------------------------- | -------------------- | ---------------------------------- |
-| 资料、意象标注、基调、校记与补遗   | 版本 `song_versions` | 随：在草稿上改，发布时一起上线     |
-| 链接、封面与简谱、音频、读者数据   | 歌 `songs`           | 不随：属于这首歌本身，保存即生效   |
+| 资料（含封面、简谱的选项）、意象标注、基调、校记与补遗 | 版本 `song_versions` | 随：在草稿上改，发布时一起上线     |
+| 链接、音频、读者数据                                   | 歌 `songs`           | 不随：属于这首歌本身，保存即生效   |
 
 新增挂在歌上的表，先判断属于哪一类。随发布的要做三件事：外键指 `song_versions`、加进 `ensure_draft` 的复制、补 `published_` 视图。
 
@@ -58,7 +57,8 @@ song_versions
   song_id          bigint not null references songs on delete cascade
   title, date, album, track, tracktotal, discnumber, disctotal,
   artist[], lyricist[], composer[], arranger[], albumartist[],
-  genre[], type[], length, lyrics, lyrics_start, comment, dispute_note     -- 列名、类型不改
+  genre[], type[], length, lyrics, lyrics_start, comment, dispute_note,    -- 列名、类型不改
+  hascover, nmn_status                   -- 封面三选一（见下）、有无简谱
   published_at     timestamptz null     -- 空 = 草稿；非空 = 已冻结
   created_at, created_by, updated_at, updated_by
   unique (song_id, id)
@@ -106,22 +106,17 @@ song_links                                -- 原 kugolink / qmlink / nelink
   primary key (song_id, platform)
   unique (platform, url)                  -- 同一个链接不能挂在两首歌上
 
-song_assets                               -- 封面、简谱是否已上传（文件在 R2）
-  song_id   bigint references songs on delete cascade
-  kind      text check (kind in ('cover', 'score'))   -- cover/{id}.jpg、nmn/{id}.png
-  created_at, created_by
-  primary key (song_id, kind)
-
 song_audio                                -- 原 navid_song
   song_id   bigint primary key references songs on delete cascade
   navid_id  text unique not null
   suffix, duration, created_at
 ```
 
-- `hascover`、`nmn_status`、`has_audio` 三列都不再存，由视图按 `song_assets`、`song_audio` 有没有对应的行算出。
-  上传接口写 `song_assets`；触发器 `update_music_has_audio` 与音频同步里写 `has_audio` 的代码删掉。
-- 这三张表不随版本，保存即生效：R2 里的文件是覆盖写的，跟着版本走的标记反而对不上文件；链接是这首歌本身的事实。
-  agent 给已发布的歌补的链接因此不经审核就上线，这是接受的取舍。
+- `has_audio` 不再存，由视图按 `song_audio` 有没有这首歌算出；触发器 `update_music_has_audio` 与音频同步里写 `has_audio` 的代码删掉。
+- `hascover` 不是「有没有封面文件」，是**三选一的封面**：空 = 白底狐狸（默认图）、false = 初号机（黑底占位图）、true = 定制封面
+  （R2 上的 `cover/{id}.jpg`）。这是人的选择，算不出来，所以留在版本里随发布上线，与原来一样；`nmn_status` 同理。
+  原先设想的 `song_assets` 表（按文件在不在算）放不下这个三选一，不建。
+- 链接与音频不随版本，保存即生效：链接是这首歌本身的事实。agent 给已发布的歌补的链接因此不经审核就上线，这是接受的取舍。
 
 ### 视图
 
@@ -129,38 +124,46 @@ song_audio                                -- 原 navid_song
 
 | 视图                        | 内容                                                                              | 谁读                                 |
 | --------------------------- | --------------------------------------------------------------------------------- | ------------------------------------ |
-| `published_songs`           | 在线的歌 + 线上版本的资料 + `hascover` / `nmn_status` / `has_audio` + 三个链接列  | 公开端                               |
+| `published_songs`           | 在线的歌 + 线上版本的资料 + `has_audio` + 三个链接列 + `version_id`；`updated_at` 是发布时间 | 公开端                               |
 | `catalog`                   | `published_songs` 去掉 `dispute_note` 非空的（取代 `music_catalog`）              | 统计、推荐、寻曲、意象索引、登录画廊 |
 | `published_song_imagery`    | 线上版本的意象标注，带 `song_id`                                                  | 公开端                               |
-| `published_song_emotions`   | 线上版本的基调，带 `song_id`                                                      | 公开端                               |
-| `published_song_collations` | 线上版本的校记与补遗，带 `song_id`                                                | 公开端                               |
-| `working_songs`             | 每首歌的工作版本（有草稿用草稿，否则用最新冻结版本）+ 版本 id + 是否在线、有无草稿 | 后台、agent                          |
-| `working_song_imagery`      | 工作版本的意象标注，带 `song_id`                                                  | 后台意象库的跨歌查询                 |
+| `published_song_emotions`   | 线上版本的基调，带 `song_id`                                                      | 公开端（意象索引、寻曲）             |
+| `working_songs`             | 每首歌的工作版本（有草稿用草稿，否则用最新冻结版本）+ `version_id` + `is_live`、`has_draft`、`ever_published` | 后台、agent                          |
+| `working_song_imagery`      | 工作版本的意象标注，带 `song_id`、歌名、词名、母题名                              | 后台意象库的跨歌查询                 |
 | `imagery_summary_all`       | 全部词及次数，按工作版本统计（已有，改定义）                                      | 后台词典                             |
 
 - `published_songs` 的列名与现在的 `music` 一致，公开端代码基本只换表名。
-- 后台按单首歌读基调、校记时，从 `working_songs` 拿到版本 id 直接查表，不另设视图。
+- 按单首歌读基调、校记时（公开页与后台都是），先从 `published_songs` 或 `working_songs` 拿到版本 id，再按 `version_id` 直接查表，不另设视图。
+  所以一共七个视图，没有 `published_song_collations`。
 - 函数 `imagery_occurrence_counts` 同样改为按工作版本统计，否则草稿与线上版会重复计数。
 
 ## 四、编校数据
 
 三张表都挂在版本上，开草稿时整份复制，发布时一起上线。争议歌曲照常标注，汇总时由 `catalog` 排除。
 
+**行的 id 在各版本间不变。** 开草稿时连 id 一起复制，主键是 `(version_id, id)`。后台拿着的 id 在开草稿前后都有效：
+写的时候先开草稿，再按 `(草稿的 version_id, id)` 定位。校记、订者名单靠这个对上；也方便比对两个版本。
+
 ```sql
 song_imagery                              -- 原 imagery_occurrences
   version_id  bigint references song_versions on delete cascade
+  id          bigint identity             -- 各版本间不变
   imagery_id  bigint references imagery on delete cascade
-  motif_id    bigint references motifs
+  category_id bigint references imagery_categories   -- 第二段改为 motif_id → motifs
+  lyric_timetag jsonb[]                   -- 第二段去掉
   created_at, created_by
-  primary key (version_id, imagery_id, motif_id)
+  primary key (version_id, id);  unique (version_id, imagery_id, category_id)
 
 song_emotions
   version_id, emotion_id, rank, created_at, created_by       -- 去掉 source
   primary key (version_id, emotion_id);  unique (version_id, rank)
 
 song_collations                           -- song_id 改为 version_id，其余列不变
-song_collation_revisers                   -- 不变，跟着校记一起复制
+  primary key (version_id, id)            -- id 各版本间不变
+song_collation_revisers                   -- (version_id, collation_id, user_id)，跟着校记一起复制
 ```
+
+第一段原样搬过时间标签与「同时算进」补写的行，下面两条在第二段做：
 
 - **时间标签不存，读时在服务端算。** 标签就是「词在本曲字面出现的那几行」（`IMAGERY.md` 第三节），由 `songTimetags` 按同一版本的歌词算出，
   返回给前端的数据里仍叫 `lyric_timetag`。`syncSongTimetags`、`resyncSongTimetags`、发布后重算的那一步都删掉。
@@ -239,7 +242,9 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 - 普通用户的写入：经服务端接口，用 service role。
 
 **审计。** `record_audit_log` 触发器挂在：草稿的保存、三张编校表、意象体系四张表、`emotions`、`credit_aliases`。
-`ensure_draft` 的整份复制不记（函数里设会话标记，触发器跳过）。生命周期操作由函数各记一条。读者数据不审计。日志保留 90 天。
+`ensure_draft` 的整份复制不记（函数里设会话标记 `hetu.copying`，触发器跳过）；删歌、放弃草稿连带删掉的行也不记
+（级联删除的 AFTER 触发器要等整条语句结束才跑，按所属的版本、歌还在不在判断）。生命周期操作由函数各记一条（`table_name = songs`）。
+第一段挂了 `song_versions`（保存）、三张编校表、`song_links`；`imagery_motifs`、`emotions`、`credit_aliases` 在第三段补。读者数据不审计。日志保留 90 天。
 
 **缓存清单**（存了派生数据的地方）：
 
@@ -250,25 +255,30 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 
 ## 九、迁移计划
 
+**本地验证。** 没有 Docker，第一段的迁移在 PGlite（WebAssembly 版 Postgres 17）里重放过：桩出 Supabase 的 `auth`、`cron`、角色，
+跑 baseline 与全部迁移，塞样本数据后逐项核对回填、视图、各角色的权限、冻结、草稿复制、发布、下架、删歌与审计。
+PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
+
 允许整站中断，不做无缝迁移：每一段都是「批准 migration → 立即部署代码」，不写兼容旧结构的过渡代码，旧表在同一个 migration 里删掉。
 上线前备份数据库；回填的 migration 在末尾用断言核对行数，对不上就整体回滚。相邻两段可以合并成一次停机。
 
 ### 开始之前
 
-- [ ] 先单独上线 `20261113130000_revoke_definer_rpc.sql`（已确认生产还没执行）：`approve_music_sync`、`sync_music_from_temp`、`claim_stream_grant` 现在拿公开的 anon key 就能调，不等重构。
-- [ ] 删掉 `supabase/migrations/20261113140000_editorial_on_temp.sql`。它在 `fix` 分支上、不在 `main` 里，一旦合并就会被执行；本方案取代了它。
-- [ ] `fix` 分支上配套的代码（编校数据读 `temp`）在第一段里重写。
+- [ ] `20261113130000_revoke_definer_rpc.sql`（生产还没执行）与第一段一起上线（2026-11-15 定）。
+- [x] 删掉 `supabase/migrations/20261113140000_editorial_on_temp.sql`（本方案取代了它）。
+- [x] `fix` 分支上配套的代码（编校数据读 `temp`）在第一段里重写。
 
 ### 第一段：歌曲、版本、编校与角色
 
-- [ ] 建 `songs`、`song_versions`、`song_links`、`song_assets`、`song_audio`，三张编校表改挂版本，建视图、生命周期函数、冻结触发器。
+- [ ] 建 `songs`、`song_versions`、`song_links`、`song_audio`，三张编校表改挂版本，建视图、生命周期函数、冻结触发器。
 - [ ] 回填，id 沿用 `temp` 的：
   - `temp` 里每首歌建一行 `songs`。
   - `music` 里有的：建一个冻结版本并设为线上版本，现有编校数据挂到它上面。两张表的内容已确认一致，不另开草稿；
     migration 开头逐列比对资料字段（不含 `updated_at`、`has_audio`），发现不一致就停下，不猜该用哪一份。
   - `music` 里没有的（当天新建、还没被每日同步带过去的）：以 `temp` 的内容建草稿。
-  - 链接拆进 `song_links`；`hascover`、`nmn_status` 为真的各建一行 `song_assets`，照抄标记，不核对 R2；`navid_song` 搬进 `song_audio`。
-- [ ] `users.role` 取代 `is_admin` / `is_super`，RLS 策略与同步到 JWT 的触发器一并改；agent 的账号设为 `bot`。
+  - 链接拆进 `song_links`；`hascover`、`nmn_status` 原样进版本；`navid_song` 搬进 `song_audio`。
+- [ ] `users.role` 取代 `is_admin` / `is_super`，RLS 策略与同步到 JWT 的触发器一并改。
+- [ ] 上线后：在后台「用户」里把 agent 的账号设为「机器人」（迁移按原来的 `is_admin` 把它回填成了 admin）；管理员各重新登录一次。
 - [ ] 读者表的外键改指 `songs`。
 - [ ] 停掉每日同步（`cron.unschedule('Update music')`），删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
 - [ ] 断言：`songs` 行数 = 原 `temp` 行数；在线的歌数 = 原 `music` 行数；线上版本的标注、基调、校记行数与原表一致。
@@ -281,7 +291,7 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 
 - [ ] `motifs` 拆表，`imagery_categories` 改为类别 + `domain`，`imagery_motifs`、`song_imagery` 的外键改指 `motifs`。
 - [ ] 去掉 `lyric_timetag` 列，删掉 `part` 补写行（只留主条）。
-- [ ] 代码：读标注的地方改为读时算标签、展开「同时算进」；删 `syncSongTimetags`、`resyncSongTimetags`、`addParts`；`imagery:check` 去掉修标签的部分。
+- [ ] 代码：读标注的地方改为读时算标签、展开「同时算进」；删 `syncSongTimetags`、`resyncDraftTimetags`、`addParts`；`imagery:check` 去掉修标签的部分。
 
 ### 第三段：小项（各自独立）
 
@@ -303,7 +313,10 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 | 2026-11-15 | 链接、封面与简谱、音频挂在歌上，保存即生效，不随发布                                               |
 | 2026-11-15 | 下架与删除只有超管能做                                                                             |
 | 2026-11-15 | 门类改成 `imagery_categories.domain` 一列，不保留成表（已查过代码，只按名字用）                    |
-| 2026-11-15 | `song_assets` 的回填照抄 `hascover` / `nmn_status`，不核对 R2                                      |
+| 2026-11-15 | `revoke_definer_rpc` 与第一段一起上线                                                                |
 | 2026-11-15 | `temp` 与 `music` 的内容已确认一致，回填不开草稿                                                   |
 
-目前没有待定的事项。新出现的写在这里，定了再挪进上表。
+待定（新出现的写在这里，定了再挪进上表）：
+
+1. **封面与简谱留在版本里，不建 `song_assets`。** 写第一段时发现 `hascover` 是三选一的封面（见第三节「附属表」），
+   按文件在不在算不出来；已按「留在版本里」实现，与原来的行为一致。待确认。

@@ -1,62 +1,73 @@
 "use server";
 
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { getServiceClient } from "@/lib/db/supabase-server";
+import { isHumanAdmin, isSuperRole } from "@/lib/auth/roles";
 import { assertAdmin } from "@/lib/server/server-auth";
-import { resyncSongTimetags } from "@/lib/server/service-imagery";
+import { resyncDraftTimetags } from "@/lib/server/service-imagery";
+import {
+  deleteSong,
+  discardDraft,
+  liveVersionId,
+  motifIdsOfVersion,
+  publishSong,
+  unpublishSong,
+  userDb,
+} from "@/lib/server/service-versions";
 import { refreshImagery, refreshSongs } from "@/lib/server/server-revalidate";
 
 /**
- * 发布后按新歌词重算意象时间标签。发布已经成功，这里出错只提示、不回滚；
- * 返回 null 表示没同步成功，标签可能与歌词对不上
+ * 歌曲的生命周期操作（docs/DATABASE.md 第三节）。权限在数据库函数里再查一遍：
+ * 发布、放弃草稿要 admin 或 super，下架、删歌要 super，bot 都不能做。
  */
-async function resyncImagery(id: number) {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.access_token) return null;
-    return await resyncSongTimetags(id, session.access_token);
-  } catch (err) {
-    console.error("[handleApprove] 意象时间标签同步失败:", err);
-    return null;
-  }
+
+type ActionResult = { success: true } | { success: false; error: string };
+
+function failure(err: unknown): { success: false; error: string } {
+  console.error("[admin-actions]", err);
+  return {
+    success: false,
+    error: err instanceof Error ? err.message : "未知错误",
+  };
+}
+
+/** 刷新这首歌牵连的公开页面与缓存数据；线上版本变了，前后两版标注挂的母题页都要清 */
+async function refreshLive(songId: number, motifIds: number[]) {
+  const purges = await Promise.all([
+    refreshSongs([songId]),
+    ...(motifIds.length > 0 ? [refreshImagery({ motifIds })] : []),
+  ]);
+  return [...new Set(purges.flatMap((p) => p.failed))];
 }
 
 /**
- * 后台歌曲审批同步操作 (Server Action)
+ * 发布：草稿冻结并上线；没有草稿而已下架时，重新上线最新的冻结版本。
  *
- * @param id 暂存表 (temp) 中对应的歌曲 ID
+ * 冻结前先按草稿的歌词重算意象时间标签（冻结以后就改不了）。重算出错不拦发布，
+ * 只提示：标签可能与歌词对不上，要到意象页签改动任一标注、再发布一次。
  */
-export async function handleApprove(id: number) {
+export async function handleApprove(id: number): Promise<
+  | {
+      success: true;
+      cdnPurgeFailed: string[];
+      imagerySyncFailed: boolean;
+      imageryNotFound: string[];
+    }
+  | { success: false; error: string }
+> {
   try {
-    // 验证当前用户是否为管理员
-    await assertAdmin();
+    const { accessToken } = await assertAdmin(isHumanAdmin);
+    const db = userDb(accessToken);
 
-    const supabase = getServiceClient();
-    if (!supabase) {
-      throw new Error("数据库高权限客户端未初始化，请检查环境变量。");
-    }
+    const before = await motifIdsOfVersion(db, await liveVersionId(db, id));
+    const imagery = await resyncDraftTimetags(id, accessToken).catch((err) => {
+      console.error("[handleApprove] 意象时间标签同步失败:", err);
+      return null;
+    });
 
-    // 【第一步】以 Service Role 高权限通知数据库执行同步，避免普通用户权限不足报错
-    const { error } = await supabase.rpc("approve_music_sync", { temp_id: id });
-
-    if (error) {
-      console.error("同步失败:", error.message);
-      return { success: false, error: error.message };
-    }
-
-    // 【第二步】歌词可能改了：意象标注的时间标签按正式表的新歌词重算，要在刷缓存之前
-    const imagery = await resyncImagery(id);
-
-    // 【第三步】刷新这首歌牵连的页面、接口与缓存数据；标签有变的母题页也要清
-    const motifIds = imagery?.motifIds ?? [];
-    const purges = await Promise.all([
-      refreshSongs([id]),
-      ...(motifIds.length > 0 ? [refreshImagery({ motifIds })] : []),
+    const live = await publishSong(db, id);
+    const after = await motifIdsOfVersion(db, live);
+    const cdnPurgeFailed = await refreshLive(id, [
+      ...new Set([...before, ...after]),
     ]);
-    const cdnPurgeFailed = [...new Set(purges.flatMap((p) => p.failed))];
 
     // Server Action 拿不到响应头，没刷成功的 CDN 放进返回值，由调用方提示
     return {
@@ -65,11 +76,46 @@ export async function handleApprove(id: number) {
       imagerySyncFailed: imagery === null,
       imageryNotFound: imagery?.notFound ?? [],
     };
-  } catch (err: unknown) {
-    console.error("handleApprove unexpected error:", err);
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "未知错误",
-    };
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+/** 放弃草稿：删掉草稿及其编校数据，回到最新的冻结版本。线上不变，不用刷新 */
+export async function handleDiscardDraft(id: number): Promise<ActionResult> {
+  try {
+    const { accessToken } = await assertAdmin(isHumanAdmin);
+    await discardDraft(userDb(accessToken), id);
+    return { success: true };
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+/** 下架：不在线上，版本、草稿、读者数据都保留 */
+export async function handleUnpublish(
+  id: number,
+): Promise<
+  { success: true; cdnPurgeFailed: string[] } | { success: false; error: string }
+> {
+  try {
+    const { accessToken } = await assertAdmin(isSuperRole);
+    const db = userDb(accessToken);
+    const motifIds = await motifIdsOfVersion(db, await liveVersionId(db, id));
+    await unpublishSong(db, id);
+    return { success: true, cdnPurgeFailed: await refreshLive(id, motifIds) };
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+/** 删歌：歌及挂在上面的一切级联删除。在线的歌要先下架，所以不牵动公开页 */
+export async function handleDeleteSong(id: number): Promise<ActionResult> {
+  try {
+    const { accessToken } = await assertAdmin(isSuperRole);
+    await deleteSong(userDb(accessToken), id);
+    return { success: true };
+  } catch (err) {
+    return failure(err);
   }
 }

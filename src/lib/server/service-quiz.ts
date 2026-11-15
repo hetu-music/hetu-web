@@ -146,7 +146,7 @@ async function getLyricsByIds(ids: number[]): Promise<Map<number, string>> {
   const supabase = getServiceClient();
   if (!supabase || ids.length === 0) return new Map();
   const { data, error } = await supabase
-    .from(TABLES.MUSIC)
+    .from(TABLES.PUBLISHED_SONGS)
     .select("id,lyrics")
     .in("id", ids);
   if (error) {

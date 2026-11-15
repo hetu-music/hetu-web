@@ -417,7 +417,7 @@ describe("POST /api/auth/account", () => {
 
   it("管理员可以设 display，保存后清「关于」里的维护团队", async () => {
     refreshContributorsMock.mockClear();
-    mockUser = { ...BASE_USER, app_metadata: { is_admin: true } };
+    mockUser = { ...BASE_USER, app_metadata: { role: "admin" } };
     await updateAccount(makeRequest("account", { ...VALID, display: true }));
     expect(lastBuilder.update).toHaveBeenCalledWith({
       name: "荼靡",

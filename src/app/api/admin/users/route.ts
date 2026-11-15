@@ -22,7 +22,8 @@ const userUpdateSchema = z.object({
   name: displayNameField.optional(),
   display: z.boolean().optional(),
   intro: z.string().max(500, "简介不能超过500个字符").nullable().optional(),
-  is_admin: z.boolean().optional(),
+  // 超级管理员不在界面上指派（见 lib/auth/roles）
+  role: z.enum(["user", "bot", "admin"]).optional(),
   can_stream: z.boolean().optional(),
 });
 
@@ -38,7 +39,7 @@ export const GET = withAuth(
     const users = await fetchAll<UserRecord>(
       supabase,
       TABLES.USERS,
-      "id, name, display, intro, is_admin, is_super, can_stream",
+      "id, name, display, intro, role, can_stream",
       (q) => q.order("sort_order", { ascending: true, nullsFirst: false }),
     );
 
@@ -59,20 +60,20 @@ export const PUT = withAuth(
 
     const { id, ...fieldsToUpdate } = input;
 
-    // 防止超级管理员被取消 is_admin 权限
-    if (fieldsToUpdate.is_admin === false) {
+    // 超级管理员的角色不能在这里改
+    if (fieldsToUpdate.role !== undefined) {
       const supabase = getServiceClient();
       if (!supabase) {
         return NextResponse.json({ error: "服务暂不可用" }, { status: 503 });
       }
       const { data: targetUser } = await supabase
         .from(TABLES.USERS)
-        .select("is_super")
+        .select("role")
         .eq("id", id)
         .maybeSingle();
-      if (targetUser?.is_super === true) {
+      if (targetUser?.role === "super") {
         return NextResponse.json(
-          { error: "不能撤销超级管理员的管理权限" },
+          { error: "不能改超级管理员的角色" },
           { status: 403 },
         );
       }

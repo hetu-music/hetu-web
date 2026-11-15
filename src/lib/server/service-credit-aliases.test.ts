@@ -76,7 +76,7 @@ describe("listCreditNames", () => {
     const client = withUserClient([builder]);
 
     const names = await listCreditNames("token");
-    expect(client.from).toHaveBeenCalledWith(TABLES.ADMIN);
+    expect(client.from).toHaveBeenCalledWith(TABLES.WORKING_SONGS);
     expect(builder.order).toHaveBeenCalledWith("id", { ascending: true });
     expect(names).toEqual(
       expect.arrayContaining([
@@ -164,7 +164,7 @@ describe("getPublishedSongIdsCreditedAs", () => {
     vi.mocked(getServiceClient).mockReturnValue(client);
 
     expect(await getPublishedSongIdsCreditedAs("河图")).toEqual([1, 3]);
-    expect(client.from).toHaveBeenCalledWith(TABLES.MUSIC);
+    expect(client.from).toHaveBeenCalledWith(TABLES.PUBLISHED_SONGS);
   });
 
   it("客户端不可用时返回空", async () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import { isStaff, roleOf } from "@/lib/auth/roles";
 import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import {
   DISPLAY_NAME_TAKEN,
@@ -30,7 +31,7 @@ export const POST = withAuth(
     // 「公开展示」会把名字挂到关于页的维护团队里，只有管理员能给自己开。
     // 前端只对管理员显示这个开关，但接口不能只靠前端：普通用户直接调接口也得挡住。
     // 带了就忽略，不报错——普通用户的请求里本不该有它
-    if (data.display !== undefined && user.app_metadata?.is_admin === true) {
+    if (data.display !== undefined && isStaff(roleOf(user.app_metadata))) {
       update.display = data.display;
     }
 
@@ -64,7 +65,7 @@ export const POST = withAuth(
 
     // 维护团队名单里的人改了名字、简介，「关于」要跟着变。只有管理员会被列进去时才清：
     // 普通用户也能调这个接口，每次都清 CDN 会被拿来刷爆清缓存的配额（见 refreshContributors）
-    if (user.app_metadata?.is_admin === true) await refreshContributors();
+    if (isStaff(roleOf(user.app_metadata))) await refreshContributors();
 
     return NextResponse.json({ success: true });
   },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSongs, createSong, updateSong } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
+import { SongVersionError } from "@/lib/server/service-versions";
 import { z } from "zod";
 import {
   withAuth,
@@ -58,7 +59,7 @@ export const GET = withAuth(
     { accessToken }: AuthContext,
   ) => {
     try {
-      const songs = await getSongs(TABLES.ADMIN, accessToken);
+      const songs = await getSongs(TABLES.WORKING_SONGS, accessToken);
       return NextResponse.json(songs);
     } catch (e: unknown) {
       if (
@@ -93,9 +94,12 @@ export const POST = withAuth(
       );
       if (invalid) return invalid;
 
-      const song = await createSong(input, TABLES.ADMIN, accessToken);
+      const song = await createSong(input, accessToken);
       return NextResponse.json(song);
     } catch (e: unknown) {
+      if (e instanceof SongVersionError) {
+        return NextResponse.json({ error: e.message }, { status: e.status });
+      }
       if (
         e &&
         typeof e === "object" &&
@@ -128,25 +132,18 @@ export const PUT = withAuth(
       );
       if (invalid) return invalid;
       const { id, updated_at, ...data } = input;
-      // 传递 updated_at
-      const song = await updateSong(
-        id,
-        { ...data, updated_at },
-        TABLES.ADMIN,
-        accessToken,
-      );
+      const song = await updateSong(id, { ...data, updated_at }, accessToken);
       return NextResponse.json(song);
     } catch (e: unknown) {
-      if (
-        e &&
-        typeof e === "object" &&
-        ((e as { status?: number; message?: string }).status === 409 ||
-          ((e as { message?: string }).message &&
-            (e as { message: string }).message.includes("乐观锁冲突")))
-      ) {
+      if (e instanceof SongVersionError) {
         return NextResponse.json(
-          { error: "数据已被他人修改，请刷新页面后重试" },
-          { status: 409 },
+          {
+            error:
+              e.message === "乐观锁冲突"
+                ? "数据已被他人修改，请刷新页面后重试"
+                : e.message,
+          },
+          { status: e.status },
         );
       }
       if (

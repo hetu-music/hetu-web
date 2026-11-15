@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 let mockUser: { id: string; app_metadata?: Record<string, unknown> } | null = {
   id: "admin-1",
-  app_metadata: { is_admin: true },
+  app_metadata: { role: "admin" },
 };
 let mockCsrfValid = true;
 
@@ -24,7 +24,6 @@ vi.mock("@/lib/server/server-utils", () => ({
 
 vi.mock("@/lib/server/service-imagery", () => ({
   createOccurrencesBatch: vi.fn(),
-  getOccurrencesForSong: vi.fn(async () => []),
 }));
 
 vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
@@ -34,7 +33,6 @@ vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
 
 import {
   createOccurrencesBatch,
-  getOccurrencesForSong,
 } from "@/lib/server/service-imagery";
 import { refreshImagery } from "@/lib/server/server-revalidate";
 import { POST } from "./route";
@@ -53,7 +51,7 @@ const validItem = {
 };
 
 beforeEach(() => {
-  mockUser = { id: "admin-1", app_metadata: { is_admin: true } };
+  mockUser = { id: "admin-1", app_metadata: { role: "admin" } };
   mockCsrfValid = true;
   vi.mocked(createOccurrencesBatch).mockReset();
   vi.mocked(refreshImagery).mockClear();
@@ -73,21 +71,15 @@ describe("POST /api/admin/occurrences/batch", () => {
     );
   });
 
-  it("写入后按这首歌现有标注的母题刷新缓存", async () => {
+  it("写在草稿上，线上不变，不刷新公开页的缓存", async () => {
     vi.mocked(createOccurrencesBatch).mockResolvedValue({
       created: 1,
       skipped: 0,
       newImagery: 0,
     });
-    vi.mocked(getOccurrencesForSong).mockResolvedValue([
-      { imagery_id: 1, category_id: 30 },
-      { imagery_id: 7, category_id: 31 },
-    ] as Awaited<ReturnType<typeof getOccurrencesForSong>>);
-    await POST(post({ song_id: 5, items: [validItem] }));
-    expect(refreshImagery).toHaveBeenCalledWith({
-      songIds: [5],
-      motifIds: [30, 31],
-    });
+    const res = await POST(post({ song_id: 5, items: [validItem] }));
+    expect(res.status).toBe(200);
+    expect(refreshImagery).not.toHaveBeenCalled();
   });
 
   it("全部跳过时不刷新缓存", async () => {

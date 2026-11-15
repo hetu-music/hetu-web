@@ -1,9 +1,5 @@
 import { cache } from "react";
-import {
-  getServiceClient,
-  getUserClient,
-  TABLES,
-} from "@/lib/db/supabase-server";
+import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
 import {
   buildEmotionPrompt,
   buildEmotionSystemPrompt,
@@ -13,6 +9,11 @@ import {
 } from "@/lib/imagery/emotion-suggest";
 import { chatJson } from "@/lib/server/llm";
 import type { Emotion } from "@/lib/types";
+import {
+  ensureDraft,
+  userDb,
+  workingVersionId,
+} from "@/lib/server/service-versions";
 
 /** 每首歌最多 1 个主基调 + 2 个副基调 */
 export const MAX_SONG_EMOTIONS = 3;
@@ -34,41 +35,27 @@ export const getEmotions = cache(async function getEmotions(): Promise<
   return (data ?? []) as Emotion[];
 });
 
-export type SongEmotions = {
-  /** 主基调在前 */
-  ids: number[];
-  /** ai：批量预标、尚未经人确认；human：人工标注或确认过；null：还没标 */
-  source: "human" | "ai" | null;
-};
-
-/** 一首歌的基调 */
-export async function getSongEmotions(songId: number): Promise<SongEmotions> {
+/** 一首歌工作版本（有草稿用草稿）的基调，主基调在前。后台用 */
+export async function getSongEmotions(songId: number): Promise<number[]> {
   const supabase = getServiceClient();
-  if (!supabase) return { ids: [], source: null };
+  if (!supabase) return [];
+  const versionId = await workingVersionId(supabase, songId);
+  if (versionId === null) return [];
   const { data, error } = await supabase
     .from(TABLES.SONG_EMOTIONS)
-    .select("emotion_id,source")
-    .eq("song_id", songId)
+    .select("emotion_id")
+    .eq("version_id", versionId)
     .order("rank");
   if (error) {
     console.error("[getSongEmotions]", error);
-    return { ids: [], source: null };
+    return [];
   }
-  const rows = (data ?? []) as { emotion_id: number; source: string }[];
-  return {
-    ids: rows.map((r) => r.emotion_id),
-    source:
-      rows.length === 0
-        ? null
-        : rows.some((r) => r.source === "ai")
-          ? "ai"
-          : "human",
-  };
+  return ((data ?? []) as { emotion_id: number }[]).map((r) => r.emotion_id);
 }
 
 /**
  * 请模型为一首歌标基调，只返回建议、不写库。
- * 歌词取暂存表（基调挂在暂存表上，未发布的歌也能标，见 docs/SONGS.md）。
+ * 歌词取工作版本（基调写在草稿上，按草稿的歌词标）。
  * 歌不存在或没有歌词时返回 null。
  */
 export async function suggestSongEmotions(
@@ -77,7 +64,7 @@ export async function suggestSongEmotions(
   const supabase = getServiceClient();
   if (!supabase) throw new Error("Supabase client unavailable");
   const { data: song, error } = await supabase
-    .from(TABLES.ADMIN)
+    .from(TABLES.WORKING_SONGS)
     .select("title,lyrics")
     .eq("id", songId)
     .maybeSingle();
@@ -102,8 +89,7 @@ function emotionError(code: SongEmotionErrorCode, message: string) {
 
 /**
  * 整首替换一首歌的基调：emotionIds 按主、副顺序排列，空数组表示清空。
- * 后台保存即视为人已确认，来源记为 human（原样保存 AI 预标也是确认）。
- * 基调挂在暂存表的歌上，未发布的歌也能标。
+ * 写在歌的草稿上（没有就开一份），发布时随整首歌上线。
  */
 export async function setSongEmotions(
   songId: number,
@@ -119,29 +105,23 @@ export async function setSongEmotions(
       `基调最多 ${MAX_SONG_EMOTIONS} 个，且不能重复`,
     );
   }
-  const supabase = getUserClient(accessToken);
-  if (!supabase) throw new Error("Supabase client unavailable");
-
-  const { data: song, error: songError } = await supabase
-    .from(TABLES.ADMIN)
-    .select("id")
-    .eq("id", songId)
-    .maybeSingle();
-  if (songError) throw songError;
-  if (!song) throw emotionError("SONG_NOT_FOUND", "歌曲不存在");
+  const supabase = userDb(accessToken);
+  if ((await workingVersionId(supabase, songId)) === null) {
+    throw emotionError("SONG_NOT_FOUND", "歌曲不存在");
+  }
+  const draft = await ensureDraft(supabase, songId);
 
   const { error: deleteError } = await supabase
     .from(TABLES.SONG_EMOTIONS)
     .delete()
-    .eq("song_id", songId);
+    .eq("version_id", draft);
   if (deleteError) throw deleteError;
   if (emotionIds.length > 0) {
     const { error } = await supabase.from(TABLES.SONG_EMOTIONS).insert(
       emotionIds.map((emotion_id, i) => ({
-        song_id: songId,
+        version_id: draft,
         emotion_id,
         rank: i + 1,
-        source: "human",
       })),
     );
     // 外键失败：词表里没有这个基调

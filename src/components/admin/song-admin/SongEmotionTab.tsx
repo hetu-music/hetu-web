@@ -17,7 +17,6 @@ import {
   PANEL_CLASS,
   SOLID_BUTTON_CLASS,
   TEXT_BUTTON_CLASS,
-  WARN_TEXT_CLASS,
 } from "../kit/styles";
 import { notify, notifyError } from "../kit/toast";
 
@@ -37,7 +36,7 @@ const songEmotionsKey = (songId: number) =>
 /**
  * 一首歌的基调（见 IMAGERY.md）：左边整首歌词，右边词表。
  * 依次点选，第一个是主基调，其后最多两个副基调；再点一次取消。
- * 批量预标（来源 ai）的歌要人看过：改了就保存，没问题就点「确认」，两者都把来源记为 human。
+ * 保存写在歌的草稿上，随整首歌发布上线；不分人标的、AI 标的，审核以整首歌为单位。
  */
 export default function SongEmotionTab({
   song,
@@ -69,12 +68,10 @@ export default function SongEmotionTab({
   }
   if (query.isPending) return <LoadingState text="加载基调…" />;
 
-  const { emotions, selected: saved, source, llmEnabled } = query.data;
+  const { emotions, selected: saved, llmEnabled } = query.data;
   const selected = draft ?? saved;
   const dirty = selected.join() !== saved.join();
-  // AI 预标未确认时，原样保存也算确认
-  const pending = source === "ai";
-  const canSave = (dirty || pending) && !saving;
+  const canSave = dirty && !saving;
   const byId = new Map(emotions.map((e) => [e.id, e]));
 
   const toggle = (id: number) => {
@@ -106,7 +103,7 @@ export default function SongEmotionTab({
         queryKey: songEmotionsKey(song.id),
       });
       setDraft(null);
-      notify({ type: "success", text: dirty ? "基调已保存" : "基调已确认" });
+      notify({ type: "success", text: "基调已保存" });
     } catch (error) {
       notifyError(error, "保存基调失败");
     } finally {
@@ -144,11 +141,6 @@ export default function SongEmotionTab({
                   )
                   .join(" · ")}
           </p>
-          {pending && !dirty && (
-            <span className={`text-xs ${WARN_TEXT_CLASS}`}>
-              AI 预标，待确认
-            </span>
-          )}
         </div>
 
         {llmEnabled && (
@@ -251,7 +243,7 @@ export default function SongEmotionTab({
             disabled={!canSave}
             className={SOLID_BUTTON_CLASS}
           >
-            {saving ? "保存中…" : pending && !dirty ? "确认" : "保存"}
+            {saving ? "保存中…" : "保存"}
           </button>
         </div>
       </section>

@@ -40,12 +40,12 @@ async function main() {
     ),
     fetchAll<PoolRows["imagery"][number]>("imagery", "id,name"),
     fetchAll<PoolRows["occurrences"][number]>(
-      "imagery_occurrences",
+      "published_song_imagery",
       "song_id,category_id,imagery_id,lyric_timetag",
     ),
     fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
       // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池
-      "music_catalog",
+      "catalog",
       "id,title,artist,album,hascover,has_audio,type,date,lyrics",
     ),
   ]);

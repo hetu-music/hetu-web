@@ -21,7 +21,6 @@ import {
   refreshAudio,
   refreshCredits,
   refreshImagery,
-  refreshSongEmotions,
   refreshSongs,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
@@ -147,14 +146,3 @@ describe("refreshImagery", () => {
   });
 });
 
-describe("refreshSongEmotions", () => {
-  it("失效寻曲候选池与意象数据标签，只清这首歌的详情页", async () => {
-    const report = await refreshSongEmotions(3);
-    expect(revalidateTag).toHaveBeenCalledWith("imagery-index", { expire: 0 });
-    expect(purged()).toEqual(
-      expect.arrayContaining(["/zh-CN/song/3", "/zh-TW/song/3", "/song/3"]),
-    );
-    expect(purged()).not.toContain("/zh-CN/quiz");
-    expect(report).toEqual({ failed: [] });
-  });
-});

@@ -39,18 +39,33 @@ async function main() {
     categories: await fetchAll("imagery_categories", "id,name,parent_id,level"),
     imagery: await fetchAll("imagery", "id,name"),
     occurrences: await fetchAll(
-      "imagery_occurrences",
+      "published_song_imagery",
       "song_id,category_id,imagery_id,lyric_timetag",
     ),
     songs: await fetchAll(
       // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池
-      "music_catalog",
+      "catalog",
       "id,title,artist,album,hascover,has_audio,type,date",
     ),
-    songEmotions: await fetchAll(
-      "song_emotions",
-      "song_id,rank,emotions(tone,energy)",
-    ),
+    // 视图上不做关联查询，基调的明暗、扬抑按词表补上
+    songEmotions: await (async () => {
+      const [rows, emotions] = await Promise.all([
+        fetchAll<{ song_id: number; emotion_id: number; rank: number }>(
+          "published_song_emotions",
+          "song_id,emotion_id,rank",
+        ),
+        fetchAll<{ id: number; tone: string; energy: string }>(
+          "emotions",
+          "id,tone,energy",
+        ),
+      ]);
+      const byId = new Map(emotions.map((e) => [e.id, e]));
+      return rows.map((r) => ({
+        song_id: r.song_id,
+        rank: r.rank,
+        emotions: byId.get(r.emotion_id) ?? null,
+      }));
+    })(),
   };
 
   const pool = buildPool(rows);

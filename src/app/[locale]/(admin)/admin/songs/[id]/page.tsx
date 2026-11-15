@@ -28,7 +28,7 @@ export default async function SongWorkspacePage({
 
   const session = await requireAdminPage(locale, `/admin/songs/${id}`);
   const [song, published] = await Promise.all([
-    getSongById(id, TABLES.ADMIN, session.accessToken),
+    getSongById(id, TABLES.WORKING_SONGS, session.accessToken),
     getPublishedSongRaw(id),
   ]);
   if (!song) notFound();

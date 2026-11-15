@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSuperRole, roleOf } from "@/lib/auth/roles";
 import { z } from "zod";
 import {
   withAuth,
@@ -26,8 +27,7 @@ const replySchema = z.object({
 
 export const GET = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    const appMeta = user.app_metadata;
-    const isSuper = appMeta?.is_super === true;
+    const isSuper = isSuperRole(roleOf(user.app_metadata));
 
     const { searchParams } = new URL(request.url);
     const typeFilter = searchParams.get("type"); // 可选过滤
@@ -82,7 +82,7 @@ export const GET = withAuth(
       }
     }
 
-    // 批量查 music 表获取歌曲标题
+    // 批量查歌曲标题（工作版本：反馈的歌可能已下架）
     const songIds = [
       ...new Set(
         rows
@@ -93,7 +93,7 @@ export const GET = withAuth(
     let songTitleMap: Record<number, string> = {};
     if (songIds.length > 0) {
       const { data: songsData } = await supabase
-        .from(TABLES.MUSIC)
+        .from(TABLES.WORKING_SONGS)
         .select("id, title")
         .in("id", songIds);
       if (songsData) {
@@ -118,7 +118,7 @@ export const GET = withAuth(
       pageSize,
     });
   },
-  { requireAdmin: true },
+  { requireHumanAdmin: true },
 );
 
 // ─── PUT: 管理员回复/处理请求 ─────────────────────────────────────────────────
@@ -136,8 +136,7 @@ export const PUT = withAuth(
     if (invalid) return invalid;
 
     const { id, reply, status } = input;
-    const appMeta = user.app_metadata;
-    const isSuper = appMeta?.is_super === true;
+    const isSuper = isSuperRole(roleOf(user.app_metadata));
 
     // 先查出这条请求，校验权限
     const serviceClient = getServiceClient();
@@ -184,5 +183,5 @@ export const PUT = withAuth(
 
     return NextResponse.json({ success: true });
   },
-  { requireAdmin: true, requireCSRF: true },
+  { requireHumanAdmin: true, requireCSRF: true },
 );

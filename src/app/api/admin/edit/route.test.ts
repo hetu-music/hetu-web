@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 let mockUser: { id: string; app_metadata?: Record<string, unknown> } | null = {
   id: "admin-1",
-  app_metadata: { is_admin: true },
+  app_metadata: { role: "admin" },
 };
 let mockCsrfValid = true;
 
@@ -31,6 +31,7 @@ vi.mock("@/lib/server/service-songs", () => ({
 }));
 
 import { getSongs, createSong, updateSong } from "@/lib/server/service-songs";
+import { SongVersionError } from "@/lib/server/service-versions";
 import { GET, POST, PUT } from "./route";
 
 function jsonRequest(method: string, body?: unknown) {
@@ -42,7 +43,7 @@ function jsonRequest(method: string, body?: unknown) {
 }
 
 beforeEach(() => {
-  mockUser = { id: "admin-1", app_metadata: { is_admin: true } };
+  mockUser = { id: "admin-1", app_metadata: { role: "admin" } };
   mockCsrfValid = true;
   vi.mocked(getSongs).mockReset();
   vi.mocked(createSong).mockReset();
@@ -51,7 +52,7 @@ beforeEach(() => {
 
 describe("GET /api/admin/edit", () => {
   it("非 admin 用户被拒绝（withAuth 网关）", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: false } };
+    mockUser = { id: "u1", app_metadata: { role: "user" } };
     const res = await GET(jsonRequest("GET"));
     expect(res.status).toBe(403);
   });
@@ -127,16 +128,24 @@ describe("PUT /api/admin/edit", () => {
   });
 
   it("乐观锁冲突（updateSong 抛 409）时映射为友好提示", async () => {
-    const conflictError = Object.assign(new Error("乐观锁冲突"), {
-      status: 409,
-    });
-    vi.mocked(updateSong).mockRejectedValue(conflictError);
+    vi.mocked(updateSong).mockRejectedValue(
+      new SongVersionError("乐观锁冲突", 409),
+    );
     const res = await PUT(
       jsonRequest("PUT", { id: 1, title: "改名", updated_at: "2024-01-01" }),
     );
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toBe("数据已被他人修改，请刷新页面后重试");
+  });
+
+  it("链接重复等其他 4xx 原样带着说明返回", async () => {
+    vi.mocked(updateSong).mockRejectedValue(
+      new SongVersionError("这个链接已挂在别的歌上：https://n/1", 409),
+    );
+    const res = await PUT(jsonRequest("PUT", { id: 1, title: "改名" }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("这个链接已挂在别的歌上：https://n/1");
   });
 
   it("其他更新错误时返回 500", async () => {

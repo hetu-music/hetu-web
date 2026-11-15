@@ -8,16 +8,16 @@
  *
  * getServiceClient()
  *   使用 Service Role Key（SUPABASE_SECRET_API），绕过 RLS。
- *   适用于：公共展示数据的全量读取（music、imagery 相关表）。
+ *   适用于：公共展示数据的全量读取（published_songs、catalog、imagery 相关表）。
  *
  * getUserClient(accessToken?)
  *   使用 Anon Key（NEXT_PUBLIC_SUPABASE_ANON_KEY），受 RLS 约束。
- *   使用 accessToken 时以登录用户身份执行，适用于后台操作（temp 表、users 表）。
+ *   使用 accessToken 时以登录用户身份执行，适用于后台操作（working_songs、草稿、users 表）。
  *
  * === 表名常量 ===
  *
- * TABLES.MUSIC   — 公开歌曲表（只读，高权限访问）
- * TABLES.ADMIN   — 后台暂存表（增删改，用户权限访问）
+ * 歌曲的表与视图见 docs/DATABASE.md：公开端只读 PUBLISHED_* 与 CATALOG，后台读 WORKING_*，
+ * 写草稿与生命周期操作见 service-versions。
  */
 
 // 构建期护栏：任何客户端组件（含其依赖链）引用本模块都会直接构建失败。
@@ -33,22 +33,27 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   getUserClient()     — 用户权限 (受 RLS 约束)，所有写操作和用户关联读操作
 //
 // 各表对应的默认访问权限：
-//   MUSIC              → getServiceClient (公开只读)    ★ 写入时必须改用 getUserClient
-//   MUSIC_CATALOG      → getServiceClient (视图，只读)
-//   ADMIN              → getUserClient    (管理员读写)
+//   PUBLISHED_* / CATALOG → getServiceClient (视图，公开只读)
+//   WORKING_*          → getUserClient    (视图，后台读)
+//   SONG_VERSIONS 等    → getUserClient    (后台写草稿，RLS + 冻结触发器把关)
 //   CREDIT_ALIASES     → getServiceClient (公开只读)
-//   IMAGERY / _CAT / _OCC / _MOTIFS → getServiceClient (公开只读)
+//   IMAGERY / _CAT / _MOTIFS → getServiceClient (公开只读)
 //   USERS              → getUserClient    (用户本人读写，RLS 隔离)
 //   COLLECTIONS        → getUserClient    (用户本人读写，RLS 隔离)
 //   COMMENTS / _LIKES  → 读：getServiceClient（需连带作者名）；写：用户会话（RLS + RPC）
 //   QUIZ_RESULTS       → 按 id 公开读：getServiceClient；本人的列表与增删：用户会话（RLS 隔离）
 export const TABLES = {
-  // 核心业务表
-  MUSIC: "music", // 正式歌曲库（全部已发布的歌）
-  // 计入曲库的歌（视图，口径定义见 music_catalog migration）。
-  // 统计、推荐、寻曲等「以曲库为整体」的功能读它；单曲页、收藏等读 MUSIC。
-  MUSIC_CATALOG: "music_catalog",
-  ADMIN: "temp", // 管理员暂存/审核表
+  // 歌曲（docs/DATABASE.md 第三节）
+  SONGS: "songs", // 歌的身份；live_version_id 指向线上版本
+  SONG_VERSIONS: "song_versions", // 资料，一个版本一行；published_at 为空是草稿
+  SONG_LINKS: "song_links", // 各平台链接，挂在歌上，保存即生效
+  SONG_AUDIO: "song_audio", // Navidrome 音频（原 navid_song）
+  // 视图：线上的歌，列与原 music 一致。单曲页、收藏等「指名一首歌」的读它
+  PUBLISHED_SONGS: "published_songs",
+  // 视图：计入曲库的歌（published_songs 去掉有争议的）。统计、推荐、寻曲等「以曲库为整体」的读它
+  CATALOG: "catalog",
+  // 视图：每首歌的工作版本（有草稿用草稿），带 version_id、is_live、has_draft、ever_published。后台读它
+  WORKING_SONGS: "working_songs",
   CREDIT_ALIASES: "credit_aliases", // 署名别名 → 主名，公开读取时归并
 
   // 意象系统表
@@ -56,9 +61,13 @@ export const TABLES = {
   IMAGERY_SUMMARY_ALL: "imagery_summary_all", // 视图：全部词及次数，含争议歌曲（后台词典）
   IMAGERY_CAT: "imagery_categories",
   IMAGERY_MOTIFS: "imagery_motifs", // 词 → 可取的母题（见 IMAGERY.md）
-  IMAGERY_OCC: "imagery_occurrences",
   EMOTIONS: "emotions", // 基调词表（见 IMAGERY.md）
+  // 编校数据挂在版本上（version_id），行的 id 在各版本间不变；只能写在草稿上
+  SONG_IMAGERY: "song_imagery", // 意象标注（原 imagery_occurrences）
+  PUBLISHED_SONG_IMAGERY: "published_song_imagery", // 视图：线上版本的标注，带 song_id
+  WORKING_SONG_IMAGERY: "working_song_imagery", // 视图：工作版本的标注，带 song_id、歌名、词名、母题名
   SONG_EMOTIONS: "song_emotions", // 每首歌的主、副基调
+  PUBLISHED_SONG_EMOTIONS: "published_song_emotions", // 视图：线上版本的基调，带 song_id
   SONG_COLLATIONS: "song_collations", // 校记：管理员写在歌词上的勘误
   SONG_COLLATION_REVISERS: "song_collation_revisers", // 校记、补遗的订者名单
 
@@ -75,8 +84,6 @@ export const TABLES = {
   // 审计日志
   AUDIT_LOGS: "audit_logs",
 
-  // Navidrome 歌曲映射表
-  NAVID_SONG: "navid_song",
 
   // 用户请求/反馈表
   USER_REQUESTS: "user_requests",
@@ -157,7 +164,7 @@ export function getServiceClient(): SupabaseClient | null {
 /**
  * 用户权限客户端（Anon Key + 可选 accessToken）
  *
- * 受 RLS 约束，用于后台操作（temp 表）和用户相关查询（users 表）。
+ * 受 RLS 约束，用于后台操作（工作版本、草稿）和用户相关查询（users 表）。
  * 传入 accessToken 时以该登录用户身份执行请求。
  */
 export function getUserClient(accessToken?: string): SupabaseClient | null {

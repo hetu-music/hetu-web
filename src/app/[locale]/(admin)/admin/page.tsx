@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import AdminOverviewClient from "@/components/admin/AdminOverviewClient";
+import { isSuperRole, roleOf } from "@/lib/auth/roles";
 import { TABLES } from "@/lib/db/supabase-server";
+import { isPendingPublish } from "@/lib/utils/utils-song-diff";
 import { isPoolEligible, MIN_OCCURRENCES } from "@/lib/quiz/pool";
 import { requireAdminPage } from "@/lib/server/admin-page";
 import {
@@ -33,10 +35,10 @@ type Props = {
 export default async function AdminOverviewPage({ params }: Props) {
   const { locale } = await params;
   const session = await requireAdminPage(locale, "/admin");
-  const isSuper = session.user.app_metadata?.is_super === true;
+  const isSuper = isSuperRole(roleOf(session.user.app_metadata));
 
-  // 几路查询互不依赖，一起发出（发布状态要等暂存表，但它读正式表不用等）
-  const songsPromise = getSongs(TABLES.ADMIN, session.accessToken).catch(
+  // 几路查询互不依赖，一起发出
+  const songsPromise = getSongs(TABLES.WORKING_SONGS, session.accessToken).catch(
     (e) => {
       console.error("Fetch songs error:", e);
       return [];
@@ -58,8 +60,8 @@ export default async function AdminOverviewPage({ params }: Props) {
       counts={{
         songs: songs.length,
         pendingRequests,
-        unpublished: songs.filter(
-          (s) => (statuses[s.id] ?? "unpublished") !== "published",
+        unpublished: songs.filter((s) =>
+          isPendingPublish(statuses[s.id] ?? "unpublished"),
         ).length,
         incomplete: missingGroups.filter((g) => g.length > 0).length,
         missingByGroup: Object.fromEntries(

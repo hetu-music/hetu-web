@@ -5,14 +5,7 @@ import {
   type AuthenticatedUser,
   type AuthContext,
 } from "@/lib/server/server-auth";
-import {
-  createOccurrencesBatch,
-  getOccurrencesForSong,
-} from "@/lib/server/service-imagery";
-import {
-  refreshImagery,
-  withPurgeStatus,
-} from "@/lib/server/server-revalidate";
+import { createOccurrencesBatch } from "@/lib/server/service-imagery";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
 const BatchSchema = z.object({
@@ -53,14 +46,8 @@ export const POST = withAuth(
         input.items,
         accessToken,
       );
-      if (result.created === 0) return NextResponse.json(result);
-      // 新意象名可能落到已有意象上，按入库后的标注取母题
-      const occurrences = await getOccurrencesForSong(input.song_id);
-      const purge = await refreshImagery({
-        songIds: [input.song_id],
-        motifIds: occurrences.map((o) => o.category_id),
-      });
-      return withPurgeStatus(NextResponse.json(result), purge);
+      // 写在草稿上，线上不变；发布时再刷新
+      return NextResponse.json(result);
     } catch (e) {
       const code = (e as { code?: string }).code;
       if (e instanceof Error && code === "SONG_NOT_FOUND") {

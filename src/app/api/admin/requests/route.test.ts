@@ -5,7 +5,7 @@ import { makeQueryBuilder } from "@/test/mockSupabase";
 let mockUser: {
   id: string;
   app_metadata?: Record<string, unknown>;
-} | null = { id: "admin-1", app_metadata: { is_admin: true } };
+} | null = { id: "admin-1", app_metadata: { role: "admin" } };
 let mockCsrfValid = true;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mockExistingRequest: any = { type: "song_feedback" };
@@ -70,7 +70,7 @@ function validBody(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  mockUser = { id: "admin-1", app_metadata: { is_admin: true } };
+  mockUser = { id: "admin-1", app_metadata: { role: "admin" } };
   mockCsrfValid = true;
   mockExistingRequest = { type: "song_feedback" };
   mockExistingError = null;
@@ -79,7 +79,7 @@ beforeEach(() => {
 
 describe("PUT /api/admin/requests — 鉴权", () => {
   it("非管理员返回 403", async () => {
-    mockUser = { id: "u", app_metadata: { is_admin: false } };
+    mockUser = { id: "u", app_metadata: { role: "user" } };
     expect((await PUT(makeRequest(validBody()))).status).toBe(403);
   });
 
@@ -148,7 +148,7 @@ describe("PUT /api/admin/requests — 分级权限", () => {
   it("超级管理员可以处理权益申请", async () => {
     mockUser = {
       id: "super-1",
-      app_metadata: { is_admin: true, is_super: true },
+      app_metadata: { role: "super" },
     };
     mockExistingRequest = { type: "benefit_apply" };
     expect((await PUT(makeRequest(validBody()))).status).toBe(200);

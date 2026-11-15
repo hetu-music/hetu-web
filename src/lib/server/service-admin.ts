@@ -4,10 +4,11 @@ import type { Song } from "@/lib/types";
 import {
   type PublishStatus,
   publishStatusOf,
+  type VersionFlags,
 } from "@/lib/utils/utils-song-diff";
 
 /**
- * 后台读正式表：拿来和暂存表比对「发布了没有、改了什么」。
+ * 后台读线上版本：拿来和工作版本比对「改了什么」。
  * 读原样的行，不套署名主名（getSongById 的公开路径会套），否则署名字段永远对不上。
  */
 export async function getPublishedSongRaw(
@@ -16,7 +17,7 @@ export async function getPublishedSongRaw(
   const supabase = getServiceClient();
   if (!supabase) return null;
   const { data, error } = await supabase
-    .from(TABLES.MUSIC)
+    .from(TABLES.PUBLISHED_SONGS)
     .select("*")
     .eq("id", id)
     .maybeSingle();
@@ -27,29 +28,14 @@ export async function getPublishedSongRaw(
   return data;
 }
 
-/**
- * 暂存表里每首歌的发布状态。
- *
- * drafts 可以直接传读暂存表的 Promise：正式表不依赖它，两边同时读，
- * 不必等暂存表读完再开始读正式表（两张表都是全字段，各要一两秒）。
- */
+/** 每首歌的发布状态，由 working_songs 行上的 is_live、has_draft、ever_published 得出 */
 export async function getPublishStatuses(
-  drafts: Song[] | Promise<Song[]>,
+  songs: Song[] | Promise<Song[]>,
 ): Promise<Record<number, PublishStatus>> {
-  const supabase = getServiceClient();
-  if (!supabase) return {};
-  const [songs, published] = await Promise.all([
-    drafts,
-    fetchAll<Record<string, unknown>>(supabase, TABLES.MUSIC, "*"),
-  ]);
-  const byId = new Map(published.map((row) => [row.id as number, row]));
   return Object.fromEntries(
-    songs.map((song) => [
+    (await songs).map((song) => [
       song.id,
-      publishStatusOf(
-        song as unknown as Record<string, unknown>,
-        byId.get(song.id) ?? null,
-      ),
+      publishStatusOf(song as Song & VersionFlags),
     ]),
   );
 }
@@ -61,7 +47,7 @@ export async function getOccurrenceCountsBySong(): Promise<
   const supabase = getServiceClient();
   if (!supabase) return {};
 
-  // 库里 group by，一次往返（见 migrations/20261109000000_imagery_occurrence_counts.sql）
+  // 库里 group by，一次往返；按工作版本数（见 migrations/20261115120000_songs_versions.sql）
   const { data, error } = await supabase.rpc("imagery_occurrence_counts");
   if (!error && Array.isArray(data)) {
     return Object.fromEntries(
@@ -77,7 +63,7 @@ export async function getOccurrenceCountsBySong(): Promise<
   );
   const rows = await fetchAll<{ song_id: number }>(
     supabase,
-    TABLES.IMAGERY_OCC,
+    TABLES.WORKING_SONG_IMAGERY,
     "song_id",
   );
   const counts: Record<number, number> = {};

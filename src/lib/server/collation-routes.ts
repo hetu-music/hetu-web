@@ -12,16 +12,13 @@ import {
   type EntryRow,
   updateCollation,
 } from "@/lib/server/service-collations";
-import {
-  refreshCollations,
-  withPurgeStatus,
-} from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
 /**
  * 校记与补遗的写接口：两者同存一表，只是内容的校验和写库的位置不同，
  * 新增、修改、删除的流程一样，由这里统一生成，各自的路由只给 schema 与 toRow。
+ * 都写在歌的草稿上，线上不变，不用刷新公开页；发布时再刷新。
  */
 
 const id = z.number().int().positive();
@@ -58,8 +55,7 @@ export function entryWriteHandlers<T>(
           toRow(input.entry),
           token,
         );
-        const purge = await refreshCollations(input.song_id);
-        return withPurgeStatus(NextResponse.json({ id: newId }), purge);
+        return NextResponse.json({ id: newId });
       } catch (e) {
         return failed(`POST ${route}`, e);
       }
@@ -79,13 +75,8 @@ export function entryWriteHandlers<T>(
       );
       if (invalid) return invalid;
       try {
-        const songId = await updateCollation(
-          input.id,
-          toRow(input.entry),
-          token,
-        );
-        const purge = await refreshCollations(songId);
-        return withPurgeStatus(NextResponse.json({ success: true }), purge);
+        await updateCollation(input.id, toRow(input.entry), token);
+        return NextResponse.json({ success: true });
       } catch (e) {
         return failed(`PUT ${route}`, e);
       }
@@ -110,9 +101,8 @@ export const deleteEntryHandler = (route: string) =>
       );
       if (invalid) return invalid;
       try {
-        const songId = await deleteCollation(input.id, token);
-        const purge = await refreshCollations(songId);
-        return withPurgeStatus(NextResponse.json({ success: true }), purge);
+        await deleteCollation(input.id, token);
+        return NextResponse.json({ success: true });
       } catch (e) {
         return failed(`DELETE ${route}`, e);
       }

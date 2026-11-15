@@ -10,7 +10,7 @@ vi.mock("@/lib/db/supabase-auth", () => ({
         data: { session: { access_token: "test-token" } },
       })),
       getUser: vi.fn(async () => ({
-        data: { user: { id: "admin-1", app_metadata: { is_admin: true } } },
+        data: { user: { id: "admin-1", app_metadata: { role: "admin" } } },
       })),
     },
   })),

@@ -72,18 +72,18 @@ export const loadImageryIndex = unstable_cache(
         ),
         fetchAll<IndexOccurrence>(
           supabase,
-          TABLES.IMAGERY_OCC,
+          TABLES.PUBLISHED_SONG_IMAGERY,
           "song_id,imagery_id,category_id,lyric_timetag",
         ),
         fetchAll<IndexSong>(
           supabase,
-          TABLES.MUSIC_CATALOG,
+          TABLES.CATALOG,
           "id,title,artist,album,lyricist,hascover,has_audio,type,date",
         ),
         // 基调只参与排序与匹配；没标基调的歌当中性处理，这两张表允许为空
         fetchAll<ImageryIndex["songEmotions"][number]>(
           supabase,
-          TABLES.SONG_EMOTIONS,
+          TABLES.PUBLISHED_SONG_EMOTIONS,
           "song_id,emotion_id,rank",
         ),
         fetchAll<ImageryIndex["emotions"][number]>(

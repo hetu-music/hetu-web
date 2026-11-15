@@ -3,8 +3,7 @@
 本站数据库的目标结构、约定与迁移计划。新建表、改表结构、新增挂在别的数据上的表之前先读本文件。
 
 本文写的是**目标**（2026-11-15 定稿）。现状以 `supabase/schema.sql` 为准。
-第一、二段已上线（2026-11-15，`20261115120000_songs_versions.sql`、`20261116120000_motifs.sql`）；
-第三段的迁移与代码已写好、尚未上线（`20261117120000_reader_grants_audit.sql`）。
+三段都已上线（2026-11-15，`20261115120000_songs_versions.sql`、`20261116120000_motifs.sql`、`20261117120000_reader_grants_audit.sql`）。
 各段上线后在第九节打勾。
 讨论中定下来的事项记在第十节。
 
@@ -303,17 +302,17 @@ PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
   - 后台接口：`GET /api/admin/imagery/categories` 改为返回 `{ categories, motifs }`；新建、修改母题用 `category_id`（原 `parent_id`）；标注的写入用 `motif_id`（原 `category_id`）。
   - 改登记里的「同时算进」不再被已有标注拦住（它是读时展开的）；一首歌里重复标同一个词返回 400。
 
-### 第三段：小项（`20261117120000_reader_grants_audit.sql`，已写好、未上线）
+### 第三段：小项（`20261117120000_reader_grants_audit.sql`，2026-11-15 上线）
 
-- [ ] 用户外键统一、`collections` 主键、`comments` 文本枚举、`stream_grants.song_id`。
+- [x] 用户外键统一、`collections` 主键、`comments` 文本枚举、`stream_grants.song_id`。
   - 预检：读者表的 `user_id` 都在 `users` 里，`stream_grants` 的歌都在 `songs` 里，评论的状态值都认识。生产数据已只读核对过（2026-11-15），都满足。
   - `claim_stream_grant` 的 `p_song_id` 跟着改 `bigint`（删了重建）。`comments_select` 策略改为只对 `authenticated`。
   - `user_requests` 的两条检查约束改名为 `user_requests_type_check`、`user_requests_status_check`。
   - 断言：各表行数不变；评论里公开且正常的、已删的条数不变。
-- [ ] 收回表上的默认权限，逐表显式授权：`anon`、`authenticated` 的表权限全部收回后重写一遍（第一、二段写过的也在内），
+- [x] 收回表上的默认权限，逐表显式授权：`anon`、`authenticated` 的表权限全部收回后重写一遍（第一、二段写过的也在内），
   `service_role` 拿到全部表。没有授权的策略删掉：`comment_likes_select`、`emotions_admin`。断言 `anon` 在任何表、列上都没有权限。
-- [ ] 补审计触发器：`imagery_motifs`、`emotions`、`credit_aliases`。
-- [ ] 代码：评论的状态值改用文本；几处说明「谁用哪个客户端」的注释改成与实际一致。接口不变。
+- [x] 补审计触发器：`imagery_motifs`、`emotions`、`credit_aliases`。
+- [x] 代码：评论的状态值改用文本；几处说明「谁用哪个客户端」的注释改成与实际一致。接口不变。
 
 ## 十、已定事项
 

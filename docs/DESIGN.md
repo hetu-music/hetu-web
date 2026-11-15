@@ -1,6 +1,6 @@
 # 河图站点设计语言
 
-改动公开页面（`src/app/[locale]/(public)/**` 及其组件）的界面前先读本文件。歌曲详情页（`src/components/detail/**`）是这套风格的样板：拿不准时，照它的写法做，不要另起一套。后台（`/admin`）不在此列，除非明确要求。主页的结构与例外另见 `DESIGN-HOME.md`。
+改动公开页面（`src/app/[locale]/(public)/**` 及其组件）的界面前先读本文件。歌曲详情页（`src/components/detail/**`）是这套风格的样板：拿不准时，照它的写法做，不要另起一套。后台（`/admin`）不在此列，除非明确要求。
 
 ## 一、总体气质：一本书，而不是一个应用
 
@@ -42,7 +42,6 @@
 - 警示、争议资料：amber（参考 `DisputeNotice`），这是全页唯一允许的带底色提示块。
 - 删除确认、已收藏：rose。
 - 站标：顶栏站名「河图 | 作品勘鉴」中间的竖线固定用 `bg-blue-600`。它是站标的一部分，不是强调色，不随 `--tone` 变。顶栏的用户图标在已登录时也用这个颜色（`text-blue-600`），与竖线呼应。
-- 迁移旧页面时，把 `blue-*` 系列强调色一律改成 `--tone`（站标竖线和已登录的用户图标除外）。
 
 ## 三、字体
 
@@ -172,12 +171,12 @@
 - 重复出现的样式抽成常量或组件（`NAV_BUTTON_CLASS`、`SectionHeading`），不要复制粘贴长 className。
 - 新的共享样式先找 `src/components/shared` 与 `src/components/detail` 里有没有现成的。
 
-## 十一、迁移一个页面时的检查清单
+## 十一、新页面的检查清单
 
 1. 根容器用页面底色，并设好 `--tone`。
 2. 顶栏用 `TopBar`，选对出口，常驻按钮按第四节的标准。
 3. 每一节都是 `section` 加 `SectionHeading`，节距 `py-16 md:py-20`。
-4. 去掉卡片、渐变、图标标题、彩色徽章；`blue-*` 换成 `--tone`。
+4. 没有卡片、渐变、图标标题、彩色徽章，强调色不写 `blue-*`。
 5. 字体按第三节归位：人写的话用楷体，标题与作品名用衬线体。
 6. 选中状态只改颜色；危险操作改成两步确认。
 7. 窄屏检查：没有横向滚动，悬停操作有点按的替代方式，浮层是底部面板。
@@ -191,9 +190,6 @@
 - 章节题头：`SectionHeading.tsx`
 - 正文与旁注：`LyricsFolio.tsx`、`comments/CommentGutter.tsx`
 - 文字列表：`SongColophon.tsx`
-- 作品卡：`src/components/shared/WorkCard.tsx`（主页图录与「同有此意」共用，不另写）
-- 竖排摘句：`src/components/shared/VerticalExcerpt.tsx`
-- 主页：结构、灯与展室见 `DESIGN-HOME.md`，原型在 `src/components/lab/HomeProto.tsx`
 - 顶栏：`src/components/shared/topbar/TopBar.tsx`；目录跳转与阅读进度：`SectionNav.tsx`
 - 浮动按钮：`src/components/shared/FloatingActionButtons.tsx`
 - 取色：`src/lib/utils/utils-tone.ts`

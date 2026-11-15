@@ -4,21 +4,30 @@
  *
  * 用法：pnpm quiz:diagnose [样本数]
  *
- * 关注指标：
+ * 先按 docs/QUIZ.md 的合格线逐项检查，有一项不过就以非零状态退出：
  * - 第一契合的基尼系数与最大占比：过高说明存在「枢纽歌曲」
- * - 从未进入前五的歌曲数：过多说明部分歌曲在测验中永远不可见
+ * - 曾获第一的歌曲：过少说明部分歌曲在测验中永远不可见
+ * - 人格分布：某个人格过多或过少，说明题目在维度上失衡
  */
 import { createClient } from "@supabase/supabase-js";
 import {
   expandAnnotations,
   type PublishedAnnotation,
 } from "../src/lib/imagery/consistency";
+import { DIMENSIONS } from "../src/lib/quiz/dimensions";
 import { buildPool, type PoolRows } from "../src/lib/quiz/pool";
 import { buildModel, evaluate } from "../src/lib/quiz/model";
 import { QUESTIONS } from "../src/lib/quiz/questions";
 import { gini, simulate } from "../src/lib/quiz/simulate";
 
 const PAGE_SIZE = 1000;
+
+/** 合格线（docs/QUIZ.md「改完之后」） */
+const MAX_FIRST_GINI = 0.5;
+const MIN_FIRST_COVERAGE = 0.95;
+/** 第一契合率最高的单曲，不超过平均值的这么多倍 */
+const MAX_FIRST_RATIO = 6;
+const PERSONA_RANGE = [0.09, 0.14] as const;
 
 async function main() {
   const url = process.env.SUPABASE_URL;
@@ -109,19 +118,55 @@ async function main() {
   const top = [...report.topCount.entries()].sort((a, b) => b[1] - a[1]);
   const pct = (n: number) => ((n / samples) * 100).toFixed(2) + "%";
 
+  const firstGini = gini(report.firstCount.values());
+  const everFirst = first.filter(([, c]) => c > 0).length;
+  const maxFirst = first[0]?.[1] ?? 0;
+  const meanFirst = samples / pool.length;
+  const personas = DIMENSIONS.map((d) => ({
+    label: d.label,
+    share: (report.personaCount.get(d.key) ?? 0) / samples,
+  }));
+  const [minShare, maxShare] = PERSONA_RANGE;
+  const percent = (x: number) => `${Math.round(x * 100)}%`;
+
+  const checks: Array<[name: string, value: string, ok: boolean]> = [
+    [
+      "第一契合的基尼系数",
+      `${firstGini.toFixed(3)}（不高于 ${MAX_FIRST_GINI}）`,
+      firstGini <= MAX_FIRST_GINI,
+    ],
+    [
+      "曾获第一的歌曲",
+      `${everFirst} / ${pool.length}（不少于 ${percent(MIN_FIRST_COVERAGE)}）`,
+      everFirst >= pool.length * MIN_FIRST_COVERAGE,
+    ],
+    [
+      "第一契合率最高的单曲",
+      `${pct(maxFirst)}（不高于平均值 ${pct(meanFirst)} 的 ${MAX_FIRST_RATIO} 倍）`,
+      maxFirst <= meanFirst * MAX_FIRST_RATIO,
+    ],
+    [
+      "人格分布",
+      `每个在 ${percent(minShare)}–${percent(maxShare)} 之间\n      ` +
+        personas
+          .map((p) => `${p.label} ${(p.share * 100).toFixed(1)}%`)
+          .join("  "),
+      personas.every((p) => p.share >= minShare && p.share <= maxShare),
+    ],
+  ];
+  console.log("\n合格线：");
+  for (const [name, value, ok] of checks) {
+    console.log(`  ${ok ? "✓" : "✗"} ${name}：${value}`);
+  }
+  const failed = checks.some(([, , ok]) => !ok);
+
   console.log(
-    `第一契合 基尼系数：${gini(report.firstCount.values()).toFixed(3)}`,
-  );
-  console.log(
-    `前五入选 基尼系数：${gini(report.topCount.values()).toFixed(3)}`,
-  );
-  console.log(
-    `曾获第一的歌曲：${first.filter(([, c]) => c > 0).length} / ${pool.length}`,
+    `\n前五入选 基尼系数：${gini(report.topCount.values()).toFixed(3)}`,
   );
   console.log(
     `曾入前五的歌曲：${top.filter(([, c]) => c > 0).length} / ${pool.length}`,
   );
-  console.log(`均匀分布下每首歌的期望第一率：${pct(samples / pool.length)}`);
+  console.log(`第一、第二维度并列：${pct(report.ties)}`);
 
   console.log("\n第一契合率最高的 10 首：");
   for (const [id, c] of first.slice(0, 10)) {
@@ -146,6 +191,8 @@ async function main() {
       .join("、");
     console.log(`  全选 ${"ABCD"[choice]}：${persona}\n    → ${songs}`);
   }
+
+  if (failed) process.exit(1);
 }
 
 main().catch((err) => {

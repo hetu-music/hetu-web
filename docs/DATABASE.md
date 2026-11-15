@@ -4,7 +4,7 @@
 
 本文写的是**目标**，不是现状（2026-11-15 定稿，尚未开始迁移）。现状以 `supabase/schema.sql` 为准：
 歌曲仍在 `temp`（后台工作版本）与 `music`（线上快照）两张表里，各段迁移完成后在第九节打勾。
-还没定的事项集中在第十节，正文里用「**待定 n**」指过去。
+讨论中定下来的事项记在第十节。
 
 ## 一、原则
 
@@ -90,11 +90,11 @@ song_versions
 | 放弃草稿 | `discard_draft(song_id)`   | 有冻结版本                 | 删掉草稿及其编校数据                                         | 管理员         |
 | 发布     | `publish_song(song_id)`    | 有草稿                     | 草稿冻结，`live_version_id` 指向它                           | 管理员（人）   |
 | 重新上线 | `publish_song(song_id)`    | 已下架且没有草稿           | `live_version_id` 指回最新的冻结版本                         | 管理员（人）   |
-| 下架     | `unpublish_song(song_id)`  | 在线                       | `live_version_id` 置空；版本、草稿、读者数据都保留           | 超管（待定 3） |
-| 删除     | `delete_song(song_id)`     | 不在线                     | 歌及挂在上面的一切级联删除                                   | 超管（待定 3） |
+| 下架     | `unpublish_song(song_id)`  | 在线                       | `live_version_id` 置空；版本、草稿、读者数据都保留           | 超管           |
+| 删除     | `delete_song(song_id)`     | 不在线                     | 歌及挂在上面的一切级联删除                                   | 超管           |
 
 - 写编校数据的接口先调 `ensure_draft`，写在草稿上。只是打开看看不会开出草稿。
-- agent 不能发布，怎么在库里认出 agent 见**待定 1**。
+- agent 的账号角色是 `bot`（第六节）：能新建、开草稿、写草稿，不能发布。`publish_song` 等函数按 JWT 里的角色检查，不只靠接口层拦。
 
 ### 附属表
 
@@ -120,7 +120,8 @@ song_audio                                -- 原 navid_song
 
 - `hascover`、`nmn_status`、`has_audio` 三列都不再存，由视图按 `song_assets`、`song_audio` 有没有对应的行算出。
   上传接口写 `song_assets`；触发器 `update_music_has_audio` 与音频同步里写 `has_audio` 的代码删掉。
-- 这三张表不随版本：R2 里的文件是覆盖写的，跟着版本走的标记反而对不上文件。链接是否也这样，见**待定 2**。
+- 这三张表不随版本，保存即生效：R2 里的文件是覆盖写的，跟着版本走的标记反而对不上文件；链接是这首歌本身的事实。
+  agent 给已发布的歌补的链接因此不经审核就上线，这是接受的取舍。
 
 ### 视图
 
@@ -186,13 +187,16 @@ imagery                                   -- 词，不变
 imagery_motifs                            -- category_id 改名 motif_id，指向 motifs；其余不变
 ```
 
-门类改成一列后，原来的三行门类不再存在，见**待定 4**。
+门类改成一列后，原来的三行门类不再存在。代码里门类只按名字用（配色顺序、后台类别栏的行首、分类路径），
+id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也没有地方显示，所以不需要保留成表。
+涉及的代码：`palette.ts` 的 `sortLevel1Categories`、`service-imagery-cloud.ts` 与 `service-song-imagery.ts` 的 `pathOf`、
+`MotifsClient.tsx` 的类别栏、`word-motifs.ts` 的 `categoryPath`、`quiz/pool.ts` 与 `quiz/coverage.ts`。
 
 ## 六、用户与互动
 
 | 表              | 改动                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------ |
-| `users`         | `is_admin`、`is_super` 合成 `role`（见待定 1）；同步到 JWT 的 `app_metadata.role`，RLS 与 `withAuth` 改读它 |
+| `users`         | `is_admin`、`is_super` 合成 `role`：`user / bot / admin / super`；同步到 JWT 的 `app_metadata.role`，RLS 与 `withAuth` 改读它 |
 | `comments`      | `status`、`visibility` 由数字改为文本：`normal / pending / hidden / deleted`、`public / private`       |
 | `collections`   | 去掉 uuid 主键，主键改为 `(user_id, song_id)`                                                          |
 | `stream_grants` | `song_id` 改 `bigint`，加外键指 `songs`                                                                |
@@ -201,6 +205,9 @@ imagery_motifs                            -- category_id 改名 motif_id，指�
 | `quiz_results`  | 不变；`song_ids` 是测试结果的快照，不加外键，表注释里写明                                              |
 
 读者数据挂在 `songs` 上，歌没上线或下架后数据仍在。公开端读写它们时经 `published_songs` 确认歌在线。
+
+`role` 的四个值逐级包含：`bot` 能做后台的读写但不能发布、下架、删除，也不处理用户请求；`admin` 再加发布与放弃草稿；`super` 再加下架、删除与用户管理。
+改 `role` 后旧的登录令牌里没有新字段，上线后管理员需要重新登录一次。
 
 `story_qjtx`、`emotions`、`credit_aliases`、`comment_likes` 不变。
 
@@ -248,21 +255,25 @@ imagery_motifs                            -- category_id 改名 motif_id，指�
 
 ### 开始之前
 
-- 删掉 `supabase/migrations/20261113140000_editorial_on_temp.sql`。它在 `fix` 分支上、不在 `main` 里，一旦合并就会被执行；本方案取代了它。
-- `fix` 分支上配套的代码（编校数据读 `temp`）在第一段里重写。
+- [ ] 先单独上线 `20261113130000_revoke_definer_rpc.sql`（已确认生产还没执行）：`approve_music_sync`、`sync_music_from_temp`、`claim_stream_grant` 现在拿公开的 anon key 就能调，不等重构。
+- [ ] 删掉 `supabase/migrations/20261113140000_editorial_on_temp.sql`。它在 `fix` 分支上、不在 `main` 里，一旦合并就会被执行；本方案取代了它。
+- [ ] `fix` 分支上配套的代码（编校数据读 `temp`）在第一段里重写。
 
-### 第一段：歌曲、版本与编校
+### 第一段：歌曲、版本、编校与角色
 
 - [ ] 建 `songs`、`song_versions`、`song_links`、`song_assets`、`song_audio`，三张编校表改挂版本，建视图、生命周期函数、冻结触发器。
 - [ ] 回填，id 沿用 `temp` 的：
   - `temp` 里每首歌建一行 `songs`。
-  - `music` 里有的：以 `music` 的内容建一个冻结版本并设为线上版本，现有编校数据挂到它上面；`temp` 与 `music` 内容不同的，再以 `temp` 的内容开草稿，编校数据复制一份。
-  - `music` 里没有的：以 `temp` 的内容建草稿。
-  - 链接拆进 `song_links`；`hascover`、`nmn_status` 为真的各建一行 `song_assets`（见待定 5）；`navid_song` 搬进 `song_audio`。
+  - `music` 里有的：建一个冻结版本并设为线上版本，现有编校数据挂到它上面。两张表的内容已确认一致，不另开草稿；
+    migration 开头逐列比对资料字段（不含 `updated_at`、`has_audio`），发现不一致就停下，不猜该用哪一份。
+  - `music` 里没有的（当天新建、还没被每日同步带过去的）：以 `temp` 的内容建草稿。
+  - 链接拆进 `song_links`；`hascover`、`nmn_status` 为真的各建一行 `song_assets`，照抄标记，不核对 R2；`navid_song` 搬进 `song_audio`。
+- [ ] `users.role` 取代 `is_admin` / `is_super`，RLS 策略与同步到 JWT 的触发器一并改；agent 的账号设为 `bot`。
 - [ ] 读者表的外键改指 `songs`。
 - [ ] 停掉每日同步（`cron.unschedule('Update music')`），删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
 - [ ] 断言：`songs` 行数 = 原 `temp` 行数；在线的歌数 = 原 `music` 行数；线上版本的标注、基调、校记行数与原表一致。
-- [ ] 代码：公开端改读 `published_*` 与 `catalog`；后台改读 `working_*`、写走函数；发布、下架、放弃草稿、删除的界面；去掉基调的「待确认」；agent 用的接口。
+- [ ] 代码：公开端改读 `published_*` 与 `catalog`；后台改读 `working_*`、写走函数；发布、下架、放弃草稿、删除的界面；去掉基调的「待确认」；
+      `withAuth` 改读 `role`；agent 用的接口。
 
 这一段里 `song_imagery` 暂时保留 `lyric_timetag` 列与补写的 `part` 行，原样搬过去，沿用现有的重算；重算要挪到冻结之前（冻结后改不了）。
 
@@ -274,23 +285,25 @@ imagery_motifs                            -- category_id 改名 motif_id，指�
 
 ### 第三段：小项（各自独立）
 
-- [ ] `users.role`（若待定 1 定为提前，则并入第一段）。
 - [ ] 用户外键统一、`collections` 主键、`comments` 文本枚举、`stream_grants.song_id`。
 - [ ] 收回表上的默认权限，逐表显式授权。
 - [ ] 补审计触发器。
 
-## 十、待定
+## 十、已定事项
 
-1. **库里怎么认出 agent。** agent 现在是普通管理员账号，数据库分不出它和人，「agent 不能发布」只能靠接口层拦。
-   建议 `users.role` 取 `user / bot / admin / super` 四个值，`bot` 能写草稿、不能发布，`publish_song` 里检查。
-   这要求把 `role` 从第三段提前到第一段，第一段会因此多改一遍 RLS 策略与 `withAuth`。
-   另一种做法是第一段先加一列 `is_bot`，第三段再并进 `role`。
-2. **链接是否随发布。** 现在设计为挂在歌上，保存即生效。agent 给已发布的歌补链接时不经人审核就上线；要过审就得挂到版本上。
-3. **下架与删除的权限。** 暂写超管才能做，普通管理员只能发布。没有和你确认过。
-4. **三行门类去掉后有没有影响。** 门类改成 `imagery_categories.domain` 一列后，门类不再有自己的 id 与说明。
-   我没有逐处确认界面上是否用到门类的 id 或 `description`；用到的话，门类保留成一张三行的小表。
-5. **`song_assets` 的回填以什么为准。** 手勾的 `hascover` / `nmn_status` 可能与 R2 里实际有没有文件对不上。
-   回填时照抄标记，还是写个脚本按 R2 里的文件核对一遍。
-6. **`20261113130000_revoke_definer_rpc.sql` 是否已在生产执行。** 它也只在 `fix` 分支上，`schema.sql` 里那三个函数对 `anon` 仍有执行权限。
-   如果还没执行，在第一段之前先单独上线：`approve_music_sync` 现在拿公开的 anon key 就能调。
-7. **第一段的回填里，`temp` 与 `music`「内容不同」怎么比。** 打算逐列比对资料字段（不含 `updated_at`、`has_audio`）。每日同步一直在跑，预计有差异的歌很少，上线前会先查出具体是哪几首给你看。
+| 日期       | 定了什么                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| 2026-11-13 | 编校数据不分人写、agent 写，不逐条确认；审核以整首歌为单位，发布就是一起发布                       |
+| 2026-11-13 | 草稿的保存是覆盖，不留历史；发布即冻结                                                             |
+| 2026-11-13 | 这次重构允许整站中断，不做无缝迁移                                                                 |
+| 2026-11-15 | agent 不能发布，只写草稿；库里用 `role = 'bot'` 认它，`role` 提前到第一段                          |
+| 2026-11-15 | 时间标签与「同时算进」改为读时在服务端计算，不存（第二段）                                         |
+| 2026-11-15 | 争议歌曲保留意象标注，汇总时由 `catalog` 排除                                                      |
+| 2026-11-15 | 历史版本全部保留                                                                                   |
+| 2026-11-15 | 链接、封面与简谱、音频挂在歌上，保存即生效，不随发布                                               |
+| 2026-11-15 | 下架与删除只有超管能做                                                                             |
+| 2026-11-15 | 门类改成 `imagery_categories.domain` 一列，不保留成表（已查过代码，只按名字用）                    |
+| 2026-11-15 | `song_assets` 的回填照抄 `hascover` / `nmn_status`，不核对 R2                                      |
+| 2026-11-15 | `temp` 与 `music` 的内容已确认一致，回填不开草稿                                                   |
+
+目前没有待定的事项。新出现的写在这里，定了再挪进上表。

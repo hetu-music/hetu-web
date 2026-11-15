@@ -122,7 +122,8 @@ async function draftOf(db: Db, songId: number): Promise<number> {
   try {
     return await ensureDraft(db, songId);
   } catch (e) {
-    if (e instanceof SongVersionError) throw new CollationError(e.message, e.status);
+    if (e instanceof SongVersionError)
+      throw new CollationError(e.message, e.status);
     throw e;
   }
 }

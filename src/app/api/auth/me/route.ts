@@ -3,12 +3,7 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { TABLES } from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
-import {
-  isHumanAdmin,
-  isStaff,
-  isSuperRole,
-  roleOf,
-} from "@/lib/auth/roles";
+import { isHumanAdmin, isStaff, isSuperRole, roleOf } from "@/lib/auth/roles";
 
 export const GET = withAuth(
   async (_request: NextRequest, user: AuthenticatedUser) => {

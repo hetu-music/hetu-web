@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { verifyCSRFToken } from "@/lib/server/server-utils";
-import {
-  isHumanAdmin,
-  isStaff,
-  isSuperRole,
-  roleOf,
-} from "@/lib/auth/roles";
+import { isHumanAdmin, isStaff, isSuperRole, roleOf } from "@/lib/auth/roles";
 
 export interface AuthenticatedUser {
   id: string;

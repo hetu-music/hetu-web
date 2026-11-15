@@ -96,7 +96,8 @@ export async function handleDiscardDraft(id: number): Promise<ActionResult> {
 export async function handleUnpublish(
   id: number,
 ): Promise<
-  { success: true; cdnPurgeFailed: string[] } | { success: false; error: string }
+  | { success: true; cdnPurgeFailed: string[] }
+  | { success: false; error: string }
 > {
   try {
     const { accessToken } = await assertAdmin(isSuperRole);

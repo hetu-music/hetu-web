@@ -31,9 +31,7 @@ vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
   refreshImagery: vi.fn(async () => ({ failed: [] })),
 }));
 
-import {
-  createOccurrencesBatch,
-} from "@/lib/server/service-imagery";
+import { createOccurrencesBatch } from "@/lib/server/service-imagery";
 import { refreshImagery } from "@/lib/server/server-revalidate";
 import { POST } from "./route";
 

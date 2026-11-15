@@ -38,12 +38,13 @@ export default async function AdminOverviewPage({ params }: Props) {
   const isSuper = isSuperRole(roleOf(session.user.app_metadata));
 
   // 几路查询互不依赖，一起发出
-  const songsPromise = getSongs(TABLES.WORKING_SONGS, session.accessToken).catch(
-    (e) => {
-      console.error("Fetch songs error:", e);
-      return [];
-    },
-  ) as Promise<SongDetail[]>;
+  const songsPromise = getSongs(
+    TABLES.WORKING_SONGS,
+    session.accessToken,
+  ).catch((e) => {
+    console.error("Fetch songs error:", e);
+    return [];
+  }) as Promise<SongDetail[]>;
   const [songs, statuses, occurrenceCounts, pendingRequests] =
     await Promise.all([
       songsPromise,

@@ -1031,15 +1031,20 @@ async function addParts(
   }
   const parts = rows.filter((r) => r.role === "part");
   if (parts.length === 0) return;
-  const { error: insertError } = await supabase.from(TABLES.SONG_IMAGERY).upsert(
-    parts.map((p) => ({
-      version_id: versionId,
-      imagery_id: imageryId,
-      category_id: p.category_id,
-      lyric_timetag: [] as string[],
-    })),
-    { onConflict: "version_id,imagery_id,category_id", ignoreDuplicates: true },
-  );
+  const { error: insertError } = await supabase
+    .from(TABLES.SONG_IMAGERY)
+    .upsert(
+      parts.map((p) => ({
+        version_id: versionId,
+        imagery_id: imageryId,
+        category_id: p.category_id,
+        lyric_timetag: [] as string[],
+      })),
+      {
+        onConflict: "version_id,imagery_id,category_id",
+        ignoreDuplicates: true,
+      },
+    );
   if (insertError) throw insertError;
 }
 

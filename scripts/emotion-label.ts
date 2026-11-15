@@ -39,7 +39,9 @@ async function main() {
   const siteUrl = process.env.SITE_URL;
   const token = process.env.ADMIN_ACCESS_TOKEN;
   if (!dryRun && (!siteUrl || !token)) {
-    throw new Error("写库需要 SITE_URL 与 ADMIN_ACCESS_TOKEN；只看结果加 --dry-run");
+    throw new Error(
+      "写库需要 SITE_URL 与 ADMIN_ACCESS_TOKEN；只看结果加 --dry-run",
+    );
   }
 
   async function fetchAll<T>(table: string, select: string): Promise<T[]> {

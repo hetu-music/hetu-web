@@ -320,7 +320,9 @@ const VERSION_FIELDS = [
   "nmn_status",
 ] as const;
 
-type SongInput = Partial<Record<(typeof VERSION_FIELDS)[number] | LinkField, unknown>>;
+type SongInput = Partial<
+  Record<(typeof VERSION_FIELDS)[number] | LinkField, unknown>
+>;
 
 function pickVersionFields(song: SongInput): Record<string, unknown> {
   return Object.fromEntries(
@@ -369,10 +371,7 @@ async function saveLinks(
   }
 }
 
-async function readWorkingSong(
-  db: Db,
-  id: number,
-): Promise<SongDetail | null> {
+async function readWorkingSong(db: Db, id: number): Promise<SongDetail | null> {
   const { data, error } = await db
     .from(TABLES.WORKING_SONGS)
     .select("*")
@@ -417,7 +416,8 @@ export async function updateSong(
   const before = current as unknown as Record<string, unknown>;
   const changed = Object.fromEntries(
     Object.entries(pickVersionFields(song)).filter(
-      ([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(before[k] ?? null),
+      ([k, v]) =>
+        JSON.stringify(v ?? null) !== JSON.stringify(before[k] ?? null),
     ),
   );
   if (Object.keys(changed).length > 0) {

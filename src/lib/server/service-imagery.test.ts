@@ -210,8 +210,7 @@ describe("createMotif / updateMotif（只增改第三级）", () => {
 });
 
 describe("setWordMotifs（改写词的候选母题）", () => {
-  const motifRows = (ids: number[]) =>
-    ok(ids.map((id) => ({ id, level: 3 })));
+  const motifRows = (ids: number[]) => ok(ids.map((id) => ({ id, level: 3 })));
 
   it("换默认母题、去掉没标注的候选：先删、再把旧默认降为多义、最后写入", async () => {
     const remove = ok(null);
@@ -648,7 +647,14 @@ describe("updateOccurrence / deleteOccurrence", () => {
     await updateOccurrence(1, { category_id: 10 }, "token");
     expect(siblings.eq).toHaveBeenCalledWith("imagery_id", 1);
     expect(parts.upsert).toHaveBeenCalledWith(
-      [{ version_id: DRAFT, imagery_id: 1, category_id: 11, lyric_timetag: [] }],
+      [
+        {
+          version_id: DRAFT,
+          imagery_id: 1,
+          category_id: 11,
+          lyric_timetag: [],
+        },
+      ],
       {
         onConflict: "version_id,imagery_id,category_id",
         ignoreDuplicates: true,
@@ -787,7 +793,13 @@ describe("getImageryLastModified", () => {
 
 describe("resyncDraftTimetags（发布前按草稿的歌词重算）", () => {
   const rows = (lyric_timetag: string[]) => [
-    { id: 1, imagery_id: 7, category_id: 70, lyric_timetag, imagery: { name: "明月" } },
+    {
+      id: 1,
+      imagery_id: 7,
+      category_id: 70,
+      lyric_timetag,
+      imagery: { name: "明月" },
+    },
   ];
 
   it("时间轴变了：改写草稿里的标签，返回变动的母题；歌词里没有的词清空标签并报出", async () => {

@@ -24,7 +24,12 @@ export async function generateMetadata({
   if (songId === null) return {};
 
   const t = await getTranslations({ locale, namespace: "song" });
-  const song = await getSongById(songId, TABLES.PUBLISHED_SONGS, undefined, locale);
+  const song = await getSongById(
+    songId,
+    TABLES.PUBLISHED_SONGS,
+    undefined,
+    locale,
+  );
   if (!song) return {};
 
   // 构建描述信息 — 使用｜分隔的紧凑格式

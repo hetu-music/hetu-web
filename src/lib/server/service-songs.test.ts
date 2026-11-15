@@ -215,7 +215,11 @@ describe("createSong", () => {
     });
     expect(client.from).toHaveBeenNthCalledWith(1, "song_links");
     expect(links.upsert).toHaveBeenCalledWith(
-      { song_id: 9, platform: "netease", url: "https://music.163.com/song?id=1" },
+      {
+        song_id: 9,
+        platform: "netease",
+        url: "https://music.163.com/song?id=1",
+      },
       { onConflict: "song_id,platform" },
     );
     expect(song).toEqual(created);
@@ -225,7 +229,10 @@ describe("createSong", () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([], {
         rpc: {
-          create_song: { data: null, error: { code: "42501", message: "没有权限" } },
+          create_song: {
+            data: null,
+            error: { code: "42501", message: "没有权限" },
+          },
         },
       }),
     );
@@ -252,9 +259,9 @@ describe("updateSong（草稿与乐观锁）", () => {
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([makeQueryBuilder({ data: null, error: null })]),
     );
-    await expect(updateSong(1, { title: "改名" }, "token")).rejects.toMatchObject(
-      { status: 404 },
-    );
+    await expect(
+      updateSong(1, { title: "改名" }, "token"),
+    ).rejects.toMatchObject({ status: 404 });
   });
 
   it("调用方读到的 updated_at 已过时：409，不开草稿", async () => {
@@ -263,7 +270,11 @@ describe("updateSong（草稿与乐观锁）", () => {
     ]);
     vi.mocked(getUserClient).mockReturnValue(client);
     await expect(
-      updateSong(1, { title: "改名", updated_at: "2023-12-31T00:00:00Z" }, "token"),
+      updateSong(
+        1,
+        { title: "改名", updated_at: "2023-12-31T00:00:00Z" },
+        "token",
+      ),
     ).rejects.toMatchObject({ message: "乐观锁冲突", status: 409 });
     expect(client.rpc).not.toHaveBeenCalled();
   });
@@ -305,9 +316,9 @@ describe("updateSong（草稿与乐观锁）", () => {
         { rpc: { ensure_draft: { data: 42, error: null } } },
       ),
     );
-    await expect(updateSong(1, { title: "改名" }, "token")).rejects.toMatchObject(
-      { message: "乐观锁冲突", status: 409 },
-    );
+    await expect(
+      updateSong(1, { title: "改名" }, "token"),
+    ).rejects.toMatchObject({ message: "乐观锁冲突", status: 409 });
   });
 
   it("只改了链接：直接改 song_links，不开草稿", async () => {
@@ -332,7 +343,10 @@ describe("updateSong（草稿与乐观锁）", () => {
     const links = makeQueryBuilder({ data: null, error: null });
     vi.mocked(getUserClient).mockReturnValue(
       createMockSupabaseClient([
-        makeQueryBuilder({ data: { ...working, qmlink: "https://y/1" }, error: null }),
+        makeQueryBuilder({
+          data: { ...working, qmlink: "https://y/1" },
+          error: null,
+        }),
         links,
         makeQueryBuilder({ data: working, error: null }),
       ]),

@@ -19,7 +19,9 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 export function isRole(value: unknown): value is Role {
-  return typeof value === "string" && (ROLES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" && (ROLES as readonly string[]).includes(value)
+  );
 }
 
 /** 从 JWT 的 app_metadata 读角色；没有或不认识的一律当普通用户 */

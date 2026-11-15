@@ -33,7 +33,8 @@ export function diffSongFields(
  * unpublished 从没发布过；published 在线、没有草稿；changed 在线、有草稿；withdrawn 下架了。
  * 「有草稿」包括只改了意象、基调、校勘的：资料字段一样也算有未发布的改动。
  */
-export type PublishStatus = "unpublished" | "changed" | "published" | "withdrawn";
+export type PublishStatus =
+  "unpublished" | "changed" | "published" | "withdrawn";
 
 /** working_songs 上的三个状态列 */
 export type VersionFlags = {

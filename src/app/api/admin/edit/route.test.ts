@@ -145,7 +145,9 @@ describe("PUT /api/admin/edit", () => {
     );
     const res = await PUT(jsonRequest("PUT", { id: 1, title: "改名" }));
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe("这个链接已挂在别的歌上：https://n/1");
+    expect((await res.json()).error).toBe(
+      "这个链接已挂在别的歌上：https://n/1",
+    );
   });
 
   it("其他更新错误时返回 500", async () => {

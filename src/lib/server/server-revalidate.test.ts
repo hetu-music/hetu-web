@@ -145,4 +145,3 @@ describe("refreshImagery", () => {
     expect(purged().filter((p) => p === "/zh-CN/song/3")).toHaveLength(1);
   });
 });
-

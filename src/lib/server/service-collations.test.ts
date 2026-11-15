@@ -95,7 +95,10 @@ describe("getSongCollations", () => {
 
   it("data 为 null 时返回空数组", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([version(), makeQueryBuilder({ data: null, error: null })]),
+      createMockSupabaseClient([
+        version(),
+        makeQueryBuilder({ data: null, error: null }),
+      ]),
     );
     expect(await getSongCollations(7, "zh-CN")).toEqual([]);
   });

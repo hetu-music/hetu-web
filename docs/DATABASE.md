@@ -3,7 +3,8 @@
 本站数据库的目标结构、约定与迁移计划。新建表、改表结构、新增挂在别的数据上的表之前先读本文件。
 
 本文写的是**目标**（2026-11-15 定稿）。现状以 `supabase/schema.sql` 为准。
-第一段已上线（2026-11-15，`20261115120000_songs_versions.sql`）；第二段的迁移与代码已写好、尚未上线（`20261116120000_motifs.sql`）。
+第一、二段已上线（2026-11-15，`20261115120000_songs_versions.sql`、`20261116120000_motifs.sql`）；
+第三段的迁移与代码已写好、尚未上线（`20261117120000_reader_grants_audit.sql`）。
 各段上线后在第九节打勾。
 讨论中定下来的事项记在第十节。
 
@@ -236,15 +237,17 @@ id 只在一次请求内当作 Map 的键，不进地址、不落库，说明也
 
 **权限。**
 
-- 新表、新函数在 migration 里显式授权。`anon`、`authenticated` 在表上的默认权限收回（函数的已在 `20261113130000` 收回）。
+- 新表、新函数在 migration 里显式授权。`anon`、`authenticated` 在表上、函数上的默认权限都已收回（`20261117120000`、`20261113130000`），
+  新建的表不授权就谁都用不了（`service_role` 也要写明）。现行的授权清单在 `20261117120000` 里，改了要同步。
+- `anon` 在任何表、视图上都没有权限。`authenticated` 只有代码里用本人 JWT 做的那些事；有 RLS 策略却没有授权的，策略删掉，不留看似生效的规则。
 - 公开端：服务端用 service role 读视图。
 - 后台与 agent：用本人的 JWT，经 RLS；生命周期函数是 `SECURITY DEFINER`，函数里按 JWT 的角色检查。
-- 普通用户的写入：经服务端接口，用 service role。
+- 普通用户的写入：经服务端接口，用 service role（限流、校验都在接口里，直连 PostgREST 写不进去）。本人的读用自己的会话，经 RLS。
 
-**审计。** `record_audit_log` 触发器挂在：草稿的保存、三张编校表、意象体系四张表、`emotions`、`credit_aliases`。
+**审计。** `record_audit_log` 触发器挂在：草稿的保存、三张编校表、`song_links`、意象体系四张表、`emotions`、`credit_aliases`。
 `ensure_draft` 的整份复制不记（函数里设会话标记 `hetu.copying`，触发器跳过）；删歌、放弃草稿连带删掉的行也不记
 （级联删除的 AFTER 触发器要等整条语句结束才跑，按所属的版本、歌还在不在判断）。生命周期操作由函数各记一条（`table_name = songs`）。
-第一段挂了 `song_versions`（保存）、三张编校表、`song_links`；`imagery_motifs`、`emotions`、`credit_aliases` 在第三段补。读者数据不审计。日志保留 90 天。
+读者数据不审计。日志保留 90 天。
 
 **缓存清单**（存了派生数据的地方）：
 
@@ -278,7 +281,7 @@ PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
   - `music` 里没有的（当天新建、还没被每日同步带过去的）：以 `temp` 的内容建草稿。
   - 链接拆进 `song_links`；`hascover`、`nmn_status` 原样进版本；`navid_song` 搬进 `song_audio`。
 - [x] `users.role` 取代 `is_admin` / `is_super`，RLS 策略与同步到 JWT 的触发器一并改。
-- [ ] 上线后：在后台「用户」里把 agent 的账号设为「机器人」（迁移按原来的 `is_admin` 把它回填成了 admin）；管理员各重新登录一次。
+- [x] 上线后：管理员各重新登录一次。agent 的账号当时还没建，建好后在后台「用户」里设为「机器人」（新账号默认是普通用户）。
 - [x] 读者表的外键改指 `songs`。
 - [x] 停掉每日同步（`cron.unschedule('Update music')`），删 `temp`、`music`、`navid_song`、`music_catalog`、`approve_music_sync`、`sync_music_from_temp`、`update_music_has_audio`。
 - [x] 断言：`songs` 行数 = 原 `temp` 行数；在线的歌数 = 原 `music` 行数；线上版本的标注、基调、校记行数与原表一致。
@@ -288,23 +291,29 @@ PR 的 CI 仍会在真正的 Supabase 空库上重放一遍。
 这一段里 `song_imagery` 暂时保留了 `lyric_timetag` 列与补写的 `part` 行，第二段去掉。
 上线时预检拦下了一处数据：353、355 两首歌挂着同一条 QQ、酷狗链接（355 的是从 353 复制来的），清掉 355 的两条后重跑通过。
 
-### 第二段：意象（`20261116120000_motifs.sql`，已写好、未上线）
+### 第二段：意象（`20261116120000_motifs.sql`，2026-11-15 上线）
 
-- [ ] `motifs` 拆表，`imagery_categories` 改为类别 + `domain`，`imagery_motifs`、`song_imagery` 的外键改指 `motifs`（列名 `category_id` 改 `motif_id`）。
-- [ ] 去掉 `lyric_timetag` 列，删掉 `part` 补写行（只留主条）；`song_imagery` 加 `unique (version_id, imagery_id)`。
+- [x] `motifs` 拆表，`imagery_categories` 改为类别 + `domain`，`imagery_motifs`、`song_imagery` 的外键改指 `motifs`（列名 `category_id` 改 `motif_id`）。
+- [x] 去掉 `lyric_timetag` 列，删掉 `part` 补写行（只留主条）；`song_imagery` 加 `unique (version_id, imagery_id)`。
   - 预检：分类树恰好三层、门类只有三个、标注与登记只挂在第三级上。生产数据已只读核对过（2026-11-15）：391 条补写行都有主条，删后每个版本一个词一条。
   - 删补写行会改到冻结的版本：补写行与标签都是派生数据，删掉不改变任何版本的内容；迁移里临时关掉守卫与审计触发器。
   - 断言：类别、母题、登记行数不变；标注数 = 原数 − 补写行数；每条删掉的补写行都能由视图展开回来。
-- [ ] 代码：读标注的地方改为读时算标签、展开「同时算进」；删 `syncSongTimetags`、`resyncDraftTimetags`、`addParts`；`imagery:check` 去掉修标签的部分（`--fix` 没有了）。
+- [x] 代码：读标注的地方改为读时算标签、展开「同时算进」；删 `syncSongTimetags`、`resyncDraftTimetags`、`addParts`；`imagery:check` 去掉修标签的部分（`--fix` 没有了）。
   - 发布时只核对歌词里找不到的标注词并提示，不再重算。
   - 后台接口：`GET /api/admin/imagery/categories` 改为返回 `{ categories, motifs }`；新建、修改母题用 `category_id`（原 `parent_id`）；标注的写入用 `motif_id`（原 `category_id`）。
   - 改登记里的「同时算进」不再被已有标注拦住（它是读时展开的）；一首歌里重复标同一个词返回 400。
 
-### 第三段：小项（各自独立）
+### 第三段：小项（`20261117120000_reader_grants_audit.sql`，已写好、未上线）
 
 - [ ] 用户外键统一、`collections` 主键、`comments` 文本枚举、`stream_grants.song_id`。
-- [ ] 收回表上的默认权限，逐表显式授权。
-- [ ] 补审计触发器。
+  - 预检：读者表的 `user_id` 都在 `users` 里，`stream_grants` 的歌都在 `songs` 里，评论的状态值都认识。生产数据已只读核对过（2026-11-15），都满足。
+  - `claim_stream_grant` 的 `p_song_id` 跟着改 `bigint`（删了重建）。`comments_select` 策略改为只对 `authenticated`。
+  - `user_requests` 的两条检查约束改名为 `user_requests_type_check`、`user_requests_status_check`。
+  - 断言：各表行数不变；评论里公开且正常的、已删的条数不变。
+- [ ] 收回表上的默认权限，逐表显式授权：`anon`、`authenticated` 的表权限全部收回后重写一遍（第一、二段写过的也在内），
+  `service_role` 拿到全部表。没有授权的策略删掉：`comment_likes_select`、`emotions_admin`。断言 `anon` 在任何表、列上都没有权限。
+- [ ] 补审计触发器：`imagery_motifs`、`emotions`、`credit_aliases`。
+- [ ] 代码：评论的状态值改用文本；几处说明「谁用哪个客户端」的注释改成与实际一致。接口不变。
 
 ## 十、已定事项
 

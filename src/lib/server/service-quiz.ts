@@ -362,7 +362,8 @@ export const getQuizResult = cache(
 
 // ─── 保存的记录 ───────────────────────────────────────────────────────────────
 //
-// 以下都用用户会话的客户端，RLS 保证只碰得到自己的记录
+// 读用用户会话的客户端，RLS 保证只碰得到自己的记录；
+// 存、删由接口用 service 连接调用（库里不给 authenticated 写），按 userId 限定
 
 /** 自己保存的记录，新的在前；主气韵认不出的旧记录略去 */
 export async function listQuizRecords(

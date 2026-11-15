@@ -36,12 +36,15 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   PUBLISHED_* / CATALOG → getServiceClient (视图，公开只读)
 //   WORKING_*          → getUserClient    (视图，后台读)
 //   SONG_VERSIONS 等    → getUserClient    (后台写草稿，RLS + 冻结触发器把关)
-//   CREDIT_ALIASES     → getServiceClient (公开只读)
-//   IMAGERY / _CAT / _MOTIFS → getServiceClient (公开只读)
-//   USERS              → getUserClient    (用户本人读写，RLS 隔离)
-//   COLLECTIONS        → getUserClient    (用户本人读写，RLS 隔离)
-//   COMMENTS / _LIKES  → 读：getServiceClient（需连带作者名）；写：用户会话（RLS + RPC）
-//   QUIZ_RESULTS       → 按 id 公开读：getServiceClient；本人的列表与增删：用户会话（RLS 隔离）
+//   CREDIT_ALIASES     → 公开读 getServiceClient；后台增删 getUserClient
+//   IMAGERY / _CAT / _MOTIFS → 公开读 getServiceClient；后台读写 getUserClient
+//
+// 读者数据：本人的读用用户会话（RLS 隔离）；写一律经服务端接口用 getServiceClient，
+// 库里不给 authenticated 写这些表（授权清单见 migration 20261117120000）
+//   USERS / COLLECTIONS / QUIZ_RESULTS → 本人读：用户会话；写：getServiceClient
+//   COMMENTS / _LIKES  → 读：getServiceClient（需连带作者名），本人的列表用用户会话；
+//                        写：getServiceClient，改、删自己的经 RPC（edit_comment、delete_comment）
+//   USER_REQUESTS      → 本人读：用户会话；管理员回复：getUserClient（RLS 按角色放行）
 export const TABLES = {
   // 歌曲（docs/DATABASE.md 第三节）
   SONGS: "songs", // 歌的身份；live_version_id 指向线上版本

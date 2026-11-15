@@ -127,11 +127,13 @@ function mockClient(
   const byTable: Record<string, () => unknown> = {
     [TABLES.IMAGERY_CAT]: () => makeQueryBuilder(ok(rows.categories)),
     [TABLES.IMAGERY]: () => makeQueryBuilder(ok(rows.imagery)),
-    [TABLES.IMAGERY_OCC]: () => makeQueryBuilder(ok(rows.occurrences)),
-    [TABLES.MUSIC_CATALOG]: () => makeQueryBuilder(ok(rows.songs)),
-    [TABLES.SONG_EMOTIONS]: () => makeQueryBuilder(ok([])),
+    [TABLES.PUBLISHED_SONG_IMAGERY]: () =>
+      makeQueryBuilder(ok(rows.occurrences)),
+    [TABLES.CATALOG]: () => makeQueryBuilder(ok(rows.songs)),
+    [TABLES.PUBLISHED_SONG_EMOTIONS]: () => makeQueryBuilder(ok([])),
     [TABLES.EMOTIONS]: () => makeQueryBuilder(ok([])),
-    [TABLES.MUSIC]: () => makeQueryBuilder(lyricsResult ?? ok(rows.lyrics)),
+    [TABLES.PUBLISHED_SONGS]: () =>
+      makeQueryBuilder(lyricsResult ?? ok(rows.lyrics)),
     ...extra,
   };
   const from = vi.fn((table: string) => byTable[table]());

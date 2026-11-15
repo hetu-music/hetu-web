@@ -51,11 +51,12 @@ async function main() {
   const [dictionary, occurrences, songs, categoryRows] = await Promise.all([
     fetchAll<{ id: number; name: string }>("imagery", "id,name"),
     fetchAll<{ song_id: number; imagery_id: number; category_id: number }>(
-      "imagery_occurrences",
+      "working_song_imagery",
       "song_id,imagery_id,category_id",
     ),
     fetchAll<{ id: number; title: string; lyrics: string | null }>(
-      "music",
+      // 标注按同一版本的歌词标：都取工作版本（有草稿用草稿）
+      "working_songs",
       "id,title,lyrics",
     ),
     fetchAll<{ id: number; name: string; parent_id: number | null }>(

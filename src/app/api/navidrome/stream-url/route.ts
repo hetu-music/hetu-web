@@ -24,7 +24,7 @@ const DAILY_SONG_LIMIT = 400;
 const DURATION_TIMEOUT_MS = 3000;
 
 /**
- * navid_song 里还没有格式、时长时（尚未跑过同步回填），现场问 Navidrome。
+ * song_audio 里还没有格式、时长时（尚未跑过同步回填），现场问 Navidrome。
  * 取不到就不带时长、按转码处理，不影响播放
  */
 async function fetchMediaLive(
@@ -114,14 +114,14 @@ export const GET = withAuth(
     }
 
     const { data: navidRow, error: navidErr } = await serviceClient
-      .from(TABLES.NAVID_SONG)
+      .from(TABLES.SONG_AUDIO)
       .select("navid_id, suffix, duration")
-      .eq("id", songId)
+      .eq("song_id", songId)
       .maybeSingle();
 
     if (navidErr) {
       return NextResponse.json(
-        { error: "Failed to query navid_song" },
+        { error: "Failed to query song_audio" },
         { status: 500 },
       );
     }
@@ -146,7 +146,7 @@ export const GET = withAuth(
 
     // 格式决定发原文件还是转码；时长给进度条用（opus 流没有 Content-Length，
     // 浏览器读不出 audio.duration），也用来算链接的过期时间。
-    // 两项都由同步写进 navid_song，缺了才现场取
+    // 两项都由同步写进 song_audio，缺了才现场取
     const { suffix, duration } =
       row.suffix != null && row.duration != null
         ? row

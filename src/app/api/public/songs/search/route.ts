@@ -35,7 +35,7 @@ export const GET = withAuth(async (request: NextRequest) => {
   }
 
   const { data, error } = await supabase
-    .from(TABLES.MUSIC)
+    .from(TABLES.PUBLISHED_SONGS)
     .select("id, title")
     .ilike("title", `%${q}%`)
     .order("title", { ascending: true })

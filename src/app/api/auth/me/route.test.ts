@@ -35,8 +35,7 @@ beforeEach(() => {
     name: "荼靡",
     display: true,
     intro: "简介",
-    is_admin: false,
-    is_super: false,
+    role: "user",
     can_stream: false,
   };
   mockRowError = null;
@@ -58,6 +57,17 @@ describe("GET /api/auth/me", () => {
     expect(body.name).toBe("荼靡");
     expect(body.hasBenefits).toBe(true);
     expect(body).not.toHaveProperty("can_stream");
+  });
+
+  it("按库里的角色给出能否进后台、能否发布", async () => {
+    mockRow = { ...mockRow, role: "bot" };
+    const body = await (await GET(request())).json();
+    expect(body).toMatchObject({
+      role: "bot",
+      isAdmin: true,
+      canPublish: false,
+      isSuper: false,
+    });
   });
 
   it("没有试听权益时 hasBenefits 为 false", async () => {

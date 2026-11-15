@@ -176,33 +176,12 @@ export async function refreshImagery({
 }
 
 /**
- * 歌曲基调变了：基调参与寻曲测验的匹配和详情页相关作品的排序，页面上都不显示。
- *
- * 寻曲结果页按作答动态渲染，读的是候选池缓存；入口页只用到候选池的歌曲数，
- * 与基调无关。相关作品会牵动别的歌，标签让 Next 上的全部详情页失效；
- * CDN 上只清这首歌的详情页。
- */
-export async function refreshSongEmotions(
-  songId: number,
-): Promise<PurgeReport> {
-  return invalidate({
-    pages: [songPage(songId)],
-    tags: [IMAGERY_INDEX_TAG],
-  });
-}
-
-/**
  * 「关于」里的维护团队变了：后台改了用户的展示、排序、简介，或者管理员改了自己的名字、简介。
  * 普通用户改自己的资料不调这里：任何登录用户都能反复保存，每次都清 CDN 会被拿来刷爆清缓存的配额；
  * 被展示的普通成员改名，最多 6 小时后更新。
  */
 export async function refreshContributors(): Promise<PurgeReport> {
   return invalidate({ paths: ["/api/public/contributors"] });
-}
-
-/** 校记变了：只显示在这首歌的详情页，不进意象索引 */
-export async function refreshCollations(songId: number): Promise<PurgeReport> {
-  return invalidate({ pages: [songPage(songId)] });
 }
 
 /** 部署后预热与外部同步脚本用：列表类页面和各项聚合数据 */

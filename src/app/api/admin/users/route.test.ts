@@ -7,7 +7,7 @@ import {
 
 let mockUser: { id: string; app_metadata?: Record<string, unknown> } | null = {
   id: "super-1",
-  app_metadata: { is_admin: true, is_super: true },
+  app_metadata: { role: "super" },
 };
 let mockCsrfValid = true;
 
@@ -57,7 +57,7 @@ const VALID_UUID = "123e4567-e89b-12d3-a456-426614174000";
 beforeEach(() => {
   mockUser = {
     id: "super-1",
-    app_metadata: { is_admin: true, is_super: true },
+    app_metadata: { role: "super" },
   };
   mockCsrfValid = true;
   vi.mocked(getServiceClient).mockReset();
@@ -65,7 +65,7 @@ beforeEach(() => {
 
 describe("GET /api/admin/users", () => {
   it("普通 admin（非 super）被拒绝", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: true, is_super: false } };
+    mockUser = { id: "u1", app_metadata: { role: "admin" } };
     const res = await GET(jsonRequest("GET"));
     expect(res.status).toBe(403);
   });
@@ -100,32 +100,34 @@ describe("PUT /api/admin/users（防止超管权限被误撤销）", () => {
     expect(res.status).toBe(400);
   });
 
-  it("试图撤销超级管理员的 is_admin 时拒绝", async () => {
+  it("试图改超级管理员的角色时拒绝", async () => {
     vi.mocked(getServiceClient).mockReturnValue(
       createMockSupabaseClient([
-        // 第一次查询：目标用户 is_super
-        makeQueryBuilder({ data: { is_super: true }, error: null }),
+        // 第一次查询：目标用户的角色
+        makeQueryBuilder({ data: { role: "super" }, error: null }),
       ]),
     );
-    const res = await PUT(
-      jsonRequest("PUT", { id: VALID_UUID, is_admin: false }),
-    );
+    const res = await PUT(jsonRequest("PUT", { id: VALID_UUID, role: "user" }));
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error).toBe("不能撤销超级管理员的管理权限");
+    expect(body.error).toBe("不能改超级管理员的角色");
   });
 
-  it("撤销普通管理员的 is_admin 时允许，改完清「关于」里的维护团队", async () => {
-    refreshContributorsMock.mockClear();
-    vi.mocked(getServiceClient).mockReturnValue(
-      createMockSupabaseClient([
-        makeQueryBuilder({ data: { is_super: false }, error: null }), // 目标用户不是超管
-        makeQueryBuilder({ data: null, error: null }), // 更新
-      ]),
-    );
+  it("不能在界面上把人设成超级管理员", async () => {
     const res = await PUT(
-      jsonRequest("PUT", { id: VALID_UUID, is_admin: false }),
+      jsonRequest("PUT", { id: VALID_UUID, role: "super" }),
     );
+    expect(res.status).toBe(400);
+  });
+
+  it("把管理员改成机器人时允许，改完清「关于」里的维护团队", async () => {
+    refreshContributorsMock.mockClear();
+    const client = createMockSupabaseClient([
+      makeQueryBuilder({ data: { role: "admin" }, error: null }), // 目标用户不是超管
+      makeQueryBuilder({ data: null, error: null }), // 更新
+    ]);
+    vi.mocked(getServiceClient).mockReturnValue(client);
+    const res = await PUT(jsonRequest("PUT", { id: VALID_UUID, role: "bot" }));
     expect(res.status).toBe(200);
     expect(refreshContributorsMock).toHaveBeenCalledTimes(1);
   });

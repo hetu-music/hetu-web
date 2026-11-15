@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSongs, createSong, updateSong } from "@/lib/server/service-songs";
 import { TABLES } from "@/lib/db/supabase-server";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import { SongVersionError } from "@/lib/server/service-versions";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
 //类型校验
@@ -49,13 +53,13 @@ const SongUpdateSchema = SongSchema.extend({
 });
 
 export const GET = withAuth(
-  async (_request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    _request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     try {
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const songs = await getSongs(TABLES.ADMIN, session?.access_token);
+      const songs = await getSongs(TABLES.WORKING_SONGS, accessToken);
       return NextResponse.json(songs);
     } catch (e: unknown) {
       if (
@@ -78,7 +82,11 @@ export const GET = withAuth(
 );
 
 export const POST = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     try {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
@@ -86,13 +94,12 @@ export const POST = withAuth(
       );
       if (invalid) return invalid;
 
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const song = await createSong(input, TABLES.ADMIN, session?.access_token);
+      const song = await createSong(input, accessToken);
       return NextResponse.json(song);
     } catch (e: unknown) {
+      if (e instanceof SongVersionError) {
+        return NextResponse.json({ error: e.message }, { status: e.status });
+      }
       if (
         e &&
         typeof e === "object" &&
@@ -113,7 +120,11 @@ export const POST = withAuth(
 );
 
 export const PUT = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     try {
       const { data: input, response: invalid } = await parseJsonBody(
         request,
@@ -121,29 +132,18 @@ export const PUT = withAuth(
       );
       if (invalid) return invalid;
       const { id, updated_at, ...data } = input;
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      // 传递 updated_at
-      const song = await updateSong(
-        id,
-        { ...data, updated_at },
-        TABLES.ADMIN,
-        session?.access_token,
-      );
+      const song = await updateSong(id, { ...data, updated_at }, accessToken);
       return NextResponse.json(song);
     } catch (e: unknown) {
-      if (
-        e &&
-        typeof e === "object" &&
-        ((e as { status?: number; message?: string }).status === 409 ||
-          ((e as { message?: string }).message &&
-            (e as { message: string }).message.includes("乐观锁冲突")))
-      ) {
+      if (e instanceof SongVersionError) {
         return NextResponse.json(
-          { error: "数据已被他人修改，请刷新页面后重试" },
-          { status: 409 },
+          {
+            error:
+              e.message === "乐观锁冲突"
+                ? "数据已被他人修改，请刷新页面后重试"
+                : e.message,
+          },
+          { status: e.status },
         );
       }
       if (

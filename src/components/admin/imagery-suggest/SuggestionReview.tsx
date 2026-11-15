@@ -249,7 +249,7 @@ export default function SuggestionReview({
   const suggestions = result?.suggestions ?? [];
   const recommended = suggestions.filter((s) => s.recommended);
   const others = suggestions.filter((s) => !s.recommended);
-  const canSave = Boolean(result?.published) && imagery.selectedCount > 0;
+  const canSave = Boolean(result) && imagery.selectedCount > 0;
 
   const dictionaryListId = `imagery-dictionary-${songId}`;
 
@@ -338,11 +338,6 @@ export default function SuggestionReview({
               <option key={d.id} value={d.name} />
             ))}
           </datalist>
-          {!result.published && (
-            <p className="text-sm text-amber-700 dark:text-amber-400">
-              歌曲尚未发布，可以先预览候选；发布后才能保存标注。
-            </p>
-          )}
           {!result.hasLyrics ? (
             <p className="font-kaiti text-base text-slate-400">
               这首歌还没有歌词，无法生成候选。

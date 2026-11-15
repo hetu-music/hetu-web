@@ -301,7 +301,6 @@ describe("SongAnnotationWorkbench", () => {
 
   it("候选审核：生成候选后在歌词中标出，批量保存后刷新标注", async () => {
     vi.mocked(apiGetImagerySuggestions).mockResolvedValue({
-      published: true,
       hasLyrics: true,
       llmEnabled: false,
       suggestions: [

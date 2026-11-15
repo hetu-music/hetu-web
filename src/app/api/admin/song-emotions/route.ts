@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
 import {
   getEmotions,
   getSongEmotions,
@@ -10,10 +13,6 @@ import {
   type SongEmotionErrorCode,
 } from "@/lib/server/service-emotions";
 import { isLlmConfigured } from "@/lib/server/llm";
-import {
-  refreshSongEmotions,
-  withPurgeStatus,
-} from "@/lib/server/server-revalidate";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -28,10 +27,10 @@ const SetSongEmotionsSchema = z.object({
 
 const ERROR_STATUS: Record<SongEmotionErrorCode, number> = {
   INVALID_EMOTIONS: 400,
-  SONG_NOT_PUBLISHED: 400,
+  SONG_NOT_FOUND: 404,
 };
 
-/** 词表、一首歌已标的基调及其来源：GET /api/admin/song-emotions?song_id= */
+/** 词表与一首歌（工作版本）已标的基调：GET /api/admin/song-emotions?song_id= */
 export const GET = withAuth(
   async (request: NextRequest, _user: AuthenticatedUser) => {
     const songId = Number(request.nextUrl.searchParams.get("song_id"));
@@ -45,8 +44,7 @@ export const GET = withAuth(
       ]);
       return NextResponse.json({
         emotions,
-        selected: current.ids,
-        source: current.source,
+        selected: current,
         llmEnabled: isLlmConfigured(),
       });
     } catch (e) {
@@ -58,27 +56,24 @@ export const GET = withAuth(
 
 /** 整首替换一首歌的基调：PUT /api/admin/song-emotions */
 export const PUT = withAuth(
-  async (request: NextRequest, _user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    _user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const { data: input, response: invalid } = await parseJsonBody(
       request,
       SetSongEmotionsSchema,
     );
     if (invalid) return invalid;
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     try {
       const selected = await setSongEmotions(
         input.song_id,
         input.emotion_ids,
-        session.access_token,
+        accessToken,
       );
-      const purge = await refreshSongEmotions(input.song_id);
-      return withPurgeStatus(NextResponse.json({ selected }), purge);
+      // 写在草稿上，线上不变；发布时再刷新
+      return NextResponse.json({ selected });
     } catch (e) {
       const code = (e as { code?: string }).code as SongEmotionErrorCode;
       if (code in ERROR_STATUS) {

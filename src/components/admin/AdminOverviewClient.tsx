@@ -64,7 +64,7 @@ export default function AdminOverviewClient({
           href="/admin/songs?f=unpublished"
           count={counts.unpublished}
           label="待发布的歌曲"
-          hint="暂存表里有改动，或者还没发布过"
+          hint="有未发布的草稿，或者还没发布过"
         />
         <TodoItem
           href="/admin/songs?f=incomplete"

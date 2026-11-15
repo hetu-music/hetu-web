@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { diffSongFields, publishStatusOf } from "./utils-song-diff";
+import {
+  diffSongFields,
+  isPendingPublish,
+  publishStatusOf,
+} from "./utils-song-diff";
 
 describe("diffSongFields", () => {
   it("没发布过时不列字段", () => {
@@ -32,9 +36,24 @@ describe("diffSongFields", () => {
 });
 
 describe("publishStatusOf", () => {
-  it("区分未发布、有改动与已发布", () => {
-    expect(publishStatusOf({ title: "a" }, null)).toBe("unpublished");
-    expect(publishStatusOf({ title: "a" }, { title: "b" })).toBe("changed");
-    expect(publishStatusOf({ title: "a" }, { title: "a" })).toBe("published");
+  it("按工作版本上的三个状态列区分四种状态", () => {
+    const flags = (is_live: boolean, has_draft: boolean, ever: boolean) => ({
+      is_live,
+      has_draft,
+      ever_published: ever,
+    });
+    expect(publishStatusOf(flags(false, true, false))).toBe("unpublished");
+    expect(publishStatusOf(flags(true, true, true))).toBe("changed");
+    expect(publishStatusOf(flags(true, false, true))).toBe("published");
+    expect(publishStatusOf(flags(false, false, true))).toBe("withdrawn");
+    // 下架后又开了草稿：仍是下架，发布即带着新改动重新上线
+    expect(publishStatusOf(flags(false, true, true))).toBe("withdrawn");
+  });
+
+  it("等着发布的只有从没发布过的和线上有草稿的", () => {
+    expect(isPendingPublish("unpublished")).toBe(true);
+    expect(isPendingPublish("changed")).toBe(true);
+    expect(isPendingPublish("published")).toBe(false);
+    expect(isPendingPublish("withdrawn")).toBe(false);
   });
 });

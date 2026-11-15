@@ -68,9 +68,9 @@ function mockClient() {
   const byTable: Record<string, unknown[]> = {
     [TABLES.IMAGERY_CAT]: categories,
     [TABLES.IMAGERY]: imagery,
-    [TABLES.IMAGERY_OCC]: occurrences,
-    [TABLES.MUSIC_CATALOG]: songs,
-    [TABLES.SONG_EMOTIONS]: [],
+    [TABLES.PUBLISHED_SONG_IMAGERY]: occurrences,
+    [TABLES.CATALOG]: songs,
+    [TABLES.PUBLISHED_SONG_EMOTIONS]: [],
     [TABLES.EMOTIONS]: [],
   };
   const from = vi.fn((table: string) =>

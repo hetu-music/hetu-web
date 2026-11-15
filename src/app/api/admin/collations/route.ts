@@ -16,7 +16,7 @@ export const GET = withAuth(
     if (!Number.isInteger(songId) || songId < 1) {
       return NextResponse.json({ error: "Invalid song_id" }, { status: 400 });
     }
-    const collations = await getSongCollations(songId, "zh-CN");
+    const collations = await getSongCollations(songId, "zh-CN", "working");
     return NextResponse.json({ collations });
   },
   { requireAdmin: true },

@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSuperRole, roleOf } from "@/lib/auth/roles";
 import { z } from "zod";
-import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
-import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
-import { getServiceClient, TABLES } from "@/lib/db/supabase-server";
+import {
+  withAuth,
+  type AuthenticatedUser,
+  type AuthContext,
+} from "@/lib/server/server-auth";
+import {
+  getServiceClient,
+  getUserClient,
+  TABLES,
+} from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
@@ -19,8 +27,7 @@ const replySchema = z.object({
 
 export const GET = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
-    const appMeta = user.app_metadata;
-    const isSuper = appMeta?.is_super === true;
+    const isSuper = isSuperRole(roleOf(user.app_metadata));
 
     const { searchParams } = new URL(request.url);
     const typeFilter = searchParams.get("type"); // 可选过滤
@@ -75,7 +82,7 @@ export const GET = withAuth(
       }
     }
 
-    // 批量查 music 表获取歌曲标题
+    // 批量查歌曲标题（工作版本：反馈的歌可能已下架）
     const songIds = [
       ...new Set(
         rows
@@ -86,7 +93,7 @@ export const GET = withAuth(
     let songTitleMap: Record<number, string> = {};
     if (songIds.length > 0) {
       const { data: songsData } = await supabase
-        .from(TABLES.MUSIC)
+        .from(TABLES.WORKING_SONGS)
         .select("id, title")
         .in("id", songIds);
       if (songsData) {
@@ -111,13 +118,17 @@ export const GET = withAuth(
       pageSize,
     });
   },
-  { requireAdmin: true },
+  { requireHumanAdmin: true },
 );
 
 // ─── PUT: 管理员回复/处理请求 ─────────────────────────────────────────────────
 
 export const PUT = withAuth(
-  async (request: NextRequest, user: AuthenticatedUser) => {
+  async (
+    request: NextRequest,
+    user: AuthenticatedUser,
+    { accessToken }: AuthContext,
+  ) => {
     const { data: input, response: invalid } = await parseJsonBody(
       request,
       replySchema,
@@ -125,8 +136,7 @@ export const PUT = withAuth(
     if (invalid) return invalid;
 
     const { id, reply, status } = input;
-    const appMeta = user.app_metadata;
-    const isSuper = appMeta?.is_super === true;
+    const isSuper = isSuperRole(roleOf(user.app_metadata));
 
     // 先查出这条请求，校验权限
     const serviceClient = getServiceClient();
@@ -149,8 +159,12 @@ export const PUT = withAuth(
       return NextResponse.json({ error: "权限不足" }, { status: 403 });
     }
 
-    // 使用用户权限客户端（受 RLS 约束，确保安全）
-    const supabase = await createSupabaseServerClient();
+    // 使用用户权限客户端（受 RLS 约束，确保安全）。token 取 withAuth 验过的那个，
+    // 不读 cookie：只带 Authorization 头的请求没有 cookie 会话
+    const supabase = getUserClient(accessToken);
+    if (!supabase) {
+      return NextResponse.json({ error: "服务暂不可用" }, { status: 503 });
+    }
 
     const { error } = await supabase
       .from(TABLES.USER_REQUESTS)
@@ -169,5 +183,5 @@ export const PUT = withAuth(
 
     return NextResponse.json({ success: true });
   },
-  { requireAdmin: true, requireCSRF: true },
+  { requireHumanAdmin: true, requireCSRF: true },
 );

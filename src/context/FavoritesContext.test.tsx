@@ -38,7 +38,9 @@ function makeUser(id: string): UserInfo {
     name: `用户${id}`,
     display: true,
     intro: null,
+    role: "user",
     isAdmin: false,
+    canPublish: false,
     isSuper: false,
     hasBenefits: false,
   };

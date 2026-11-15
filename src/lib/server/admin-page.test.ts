@@ -22,7 +22,7 @@ function session(isSuper: boolean): AdminPageSession {
   return {
     user: {
       id: "u1",
-      app_metadata: { is_admin: true, is_super: isSuper },
+      app_metadata: { role: isSuper ? "super" : "admin" },
     },
     accessToken: "token",
   } as unknown as AdminPageSession;

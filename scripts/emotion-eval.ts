@@ -30,7 +30,7 @@ async function main() {
   const [emotionsRes, labelsRes] = await Promise.all([
     supabase.from("emotions").select("*").order("sort"),
     supabase
-      .from("song_emotions")
+      .from("published_song_emotions")
       .select("song_id,emotion_id,rank")
       .order("rank"),
   ]);
@@ -44,7 +44,7 @@ async function main() {
   }
   const songIds = [...human.keys()].slice(0, limit);
   const songsRes = await supabase
-    .from("music")
+    .from("published_songs")
     .select("id,title,lyrics")
     .in("id", songIds);
   if (songsRes.error) throw songsRes.error;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { verifyCSRFToken } from "@/lib/server/server-utils";
+import { isHumanAdmin, isStaff, isSuperRole, roleOf } from "@/lib/auth/roles";
 
 export interface AuthenticatedUser {
   id: string;
@@ -8,8 +9,8 @@ export interface AuthenticatedUser {
   /** 改邮箱验证到一半时的新邮箱 */
   new_email?: string;
   app_metadata?: {
-    is_admin?: boolean;
-    is_super?: boolean;
+    /** users.role，由数据库触发器同步（见 lib/auth/roles） */
+    role?: string;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -18,30 +19,47 @@ export interface AuthenticatedUser {
 export interface AuthResult {
   success: boolean;
   user?: AuthenticatedUser;
+  /** 已验签的 JWT，交给 getUserClient 以该用户身份过 RLS */
+  accessToken?: string;
   error?: string;
   response?: NextResponse;
 }
 
+/** withAuth 交给 handler 的第三个参数 */
+export interface AuthContext {
+  /**
+   * 本次请求已验签的 JWT：来自 Authorization 头，或 cookie 里的会话。
+   * 路由不要再自己 getSession() 取 token——只带 Authorization 头的请求
+   * （脚本、agent）没有 cookie 会话，那样取到的是空的。
+   */
+  accessToken: string;
+}
+
+const BEARER_PATTERN = /^Bearer ([A-Za-z0-9-._~+/]+=*)$/;
+
 /**
- * 从请求中获取用户信息
+ * 请求是否自带 Authorization 头。带了就只认这个头（格式不对直接判未登录），
+ * 不再看 cookie——所以这类请求不受 CSRF 影响：浏览器不会替跨站页面
+ * 自动附上 Authorization 头，跨站带它还得先过 CORS 预检。
  */
-export async function getUserFromRequest(
+function hasAuthorizationHeader(request: NextRequest): boolean {
+  return request.headers.has("authorization");
+}
+
+/** 取出本次请求的 token 并向 Supabase 验签，返回用户与这个 token */
+async function resolveRequestAuth(
   request: NextRequest,
-): Promise<AuthenticatedUser | null> {
+): Promise<{ user: AuthenticatedUser; accessToken: string } | null> {
   const supabase = await createSupabaseServerClient();
 
-  // 优先使用 Authorization header
-  const authHeader = request.headers.get("authorization");
   let token: string | undefined;
+  const authHeader = request.headers.get("authorization");
 
-  if (authHeader) {
+  if (authHeader !== null) {
     // 严格校验 Bearer token 格式
-    const match = authHeader.match(/^Bearer ([A-Za-z0-9\-._~+/]+=*)$/);
-    if (match) {
-      token = match[1];
-    } else {
-      return null;
-    }
+    const match = authHeader.match(BEARER_PATTERN);
+    if (!match) return null;
+    token = match[1];
   } else {
     // 没有 header 时，取 session 里的 access_token
     const {
@@ -56,7 +74,17 @@ export async function getUserFromRequest(
     data: { user },
   } = await supabase.auth.getUser(token);
 
-  return user as AuthenticatedUser | null;
+  if (!user) return null;
+  return { user: user as unknown as AuthenticatedUser, accessToken: token };
+}
+
+/**
+ * 从请求中获取用户信息
+ */
+export async function getUserFromRequest(
+  request: NextRequest,
+): Promise<AuthenticatedUser | null> {
+  return (await resolveRequestAuth(request))?.user ?? null;
 }
 
 /**
@@ -66,9 +94,9 @@ export async function authenticateUser(
   request: NextRequest,
 ): Promise<AuthResult> {
   try {
-    const user = await getUserFromRequest(request);
+    const auth = await resolveRequestAuth(request);
 
-    if (!user) {
+    if (!auth) {
       return {
         success: false,
         error: "Unauthorized",
@@ -78,7 +106,8 @@ export async function authenticateUser(
 
     return {
       success: true,
-      user,
+      user: auth.user,
+      accessToken: auth.accessToken,
     };
   } catch (error) {
     console.error("Authentication error:", error);
@@ -95,13 +124,16 @@ export async function authenticateUser(
 
 /**
  * 验证用户身份和 CSRF token（用于需要 CSRF 保护的请求）
+ *
+ * 带 Authorization 头的请求跳过 CSRF：凭据不是浏览器自动附带的 cookie，
+ * 没有跨站伪造的问题（见 hasAuthorizationHeader）。
  */
 export async function authenticateUserWithCSRF(
   request: NextRequest,
 ): Promise<AuthResult> {
   try {
     // 先验证 CSRF token
-    if (!(await verifyCSRFToken(request))) {
+    if (!hasAuthorizationHeader(request) && !(await verifyCSRFToken(request))) {
       return {
         success: false,
         error: "Invalid CSRF token",
@@ -130,9 +162,13 @@ export async function authenticateUserWithCSRF(
 /**
  * 高阶函数：为 API 路由添加身份验证
  *
- * options.requireCSRF       — 同时验证 CSRF token（写操作必须开启）
- * options.requireAdmin      — 额外校验 JWT app_metadata.is_admin=true（管理后台操作必须开启）
- * options.requireSuperAdmin — 额外校验 JWT app_metadata.is_super=true（超级管理员操作）
+ * options.requireCSRF       — 同时验证 CSRF token（写操作必须开启；带 Authorization 头的请求免检）
+ * options.requireAdmin      — 角色为 bot、admin 或 super：能进后台读写（管理后台操作必须开启）
+ * options.requireHumanAdmin — 角色为 admin 或 super：发布、放弃草稿、处理歌曲反馈这类只有人能做的事
+ * options.requireSuperAdmin — 角色为 super（超级管理员操作）
+ *
+ * 鉴权方式两种：浏览器用 cookie 会话；脚本、agent 用 `Authorization: Bearer <JWT>`。
+ * handler 的第三个参数带已验签的 accessToken，两种方式都有。
  *
  * 权限来源：Supabase JWT 的 app_metadata，由数据库触发器 sync_user_claims_to_auth 同步写入，
  * 无需额外查询 users 表，性能更好且不受 RLS 影响。
@@ -141,10 +177,12 @@ export function withAuth(
   handler: (
     request: NextRequest,
     user: AuthenticatedUser,
+    auth: AuthContext,
   ) => Promise<NextResponse>,
   options: {
     requireCSRF?: boolean;
     requireAdmin?: boolean;
+    requireHumanAdmin?: boolean;
     requireSuperAdmin?: boolean;
   } = {},
 ) {
@@ -160,25 +198,23 @@ export function withAuth(
       );
     }
 
-    if (!authResult.user) {
+    if (!authResult.user || !authResult.accessToken) {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
     // 从 JWT app_metadata 读取权限，由触发器 sync_user_claims_to_auth 保持同步
-    if (options.requireAdmin || options.requireSuperAdmin) {
-      const appMeta = authResult.user.app_metadata;
-      const isAdmin = appMeta?.is_admin === true;
-      const isSuper = appMeta?.is_super === true;
-
-      if (!isAdmin) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      if (options.requireSuperAdmin && !isSuper) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    const role = roleOf(authResult.user.app_metadata);
+    if (
+      (options.requireAdmin && !isStaff(role)) ||
+      (options.requireHumanAdmin && !isHumanAdmin(role)) ||
+      (options.requireSuperAdmin && !isSuperRole(role))
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return handler(request, authResult.user);
+    return handler(request, authResult.user, {
+      accessToken: authResult.accessToken,
+    });
   };
 }
 
@@ -207,7 +243,7 @@ export async function getAdminPageSession(): Promise<AdminPageSession | null> {
   } = await supabase.auth.getUser();
 
   if (error || !user) return null;
-  if (user.app_metadata?.is_admin !== true) return null;
+  if (!isStaff(roleOf(user.app_metadata))) return null;
 
   // 身份已验签，这里只是取 token 交给 RLS 客户端使用
   const {
@@ -236,10 +272,12 @@ export async function getPageUser(): Promise<AuthenticatedUser | null> {
 }
 
 /**
- * 验证当前用户是否为管理员（适用于 Server Actions）
- * 如果验证失败则抛出错误，成功则返回当前登录的 AuthenticatedUser 对象。
+ * Server Action 用：校验登录与角色，返回当前用户与本次会话的 accessToken（交给 getUserClient 过 RLS）。
+ * 失败抛错。check 默认要求能进后台（bot、admin、super）。
  */
-export async function assertAdmin(): Promise<AuthenticatedUser> {
+export async function assertAdmin(
+  check: (role: ReturnType<typeof roleOf>) => boolean = isStaff,
+): Promise<{ user: AuthenticatedUser; accessToken: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -250,10 +288,18 @@ export async function assertAdmin(): Promise<AuthenticatedUser> {
     throw new Error("未登录或登录已过期");
   }
 
-  const isAdmin = user.app_metadata?.is_admin === true;
-  if (!isAdmin) {
+  if (!check(roleOf(user.app_metadata))) {
     throw new Error("无权进行此操作");
   }
 
-  return user as unknown as AuthenticatedUser;
+  // 身份已验签，这里只是取 token 交给 RLS 客户端
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("未登录或登录已过期");
+
+  return {
+    user: user as unknown as AuthenticatedUser,
+    accessToken: session.access_token,
+  };
 }

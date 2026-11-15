@@ -36,12 +36,23 @@ const ACTION_LABELS: Record<string, string> = {
   INSERT: "新增",
   UPDATE: "修改",
   DELETE: "删除",
+  // 歌曲的生命周期操作（songs，见 docs/DATABASE.md）
+  CREATE: "新建歌曲",
+  PUBLISH: "发布",
+  REPUBLISH: "重新上线",
+  UNPUBLISH: "下架",
+  DISCARD_DRAFT: "放弃草稿",
 };
 
 const ACTION_TEXT: Record<string, string> = {
   INSERT: "text-(--tone)",
   UPDATE: "text-slate-500 dark:text-slate-400",
   DELETE: "text-rose-600 dark:text-rose-400",
+  CREATE: "text-(--tone)",
+  PUBLISH: "text-(--tone)",
+  REPUBLISH: "text-(--tone)",
+  UNPUBLISH: "text-rose-600 dark:text-rose-400",
+  DISCARD_DRAFT: "text-slate-500 dark:text-slate-400",
 };
 
 function isEmpty(val: unknown): boolean {
@@ -115,18 +126,26 @@ function getEntityIdentity(
   if (!data) return null;
 
   switch (tableName) {
-    case "temp":
+    case "songs":
+      return data.song_id ? `歌曲 ID：${data.song_id}` : null;
+    case "song_versions":
       return data.title
-        ? `曲目：${data.title}`
-        : data.id
-          ? `曲目 ID：${data.id}`
+        ? `曲目：${data.title}（草稿 #${data.id}）`
+        : data.song_id
+          ? `曲目 ID：${data.song_id}`
           : null;
+    case "song_links":
+      return `链接 (曲目 ID: ${data.song_id}, ${data.platform})`;
+    case "song_emotions":
+      return `基调 (版本 #${data.version_id}, 基调 ID: ${data.emotion_id})`;
+    case "song_collations":
+      return `校勘 (版本 #${data.version_id}, #${data.id})`;
     case "imagery":
       return data.name ? `意象：${data.name}` : null;
     case "imagery_categories":
       return data.name ? `分类：${data.name}` : null;
-    case "imagery_occurrences":
-      return `标注 (曲目 ID: ${data.song_id}, 意象 ID: ${data.imagery_id})`;
+    case "song_imagery":
+      return `标注 (版本 #${data.version_id}, 意象 ID: ${data.imagery_id})`;
     default:
       return null;
   }
@@ -146,10 +165,14 @@ async function fetchAuditLogs(
 
 const TABLE_FILTERS = [
   { id: "all", label: "全部" },
-  { id: "temp", label: "曲目" },
+  { id: "songs", label: "发布" },
+  { id: "song_versions", label: "资料" },
+  { id: "song_imagery", label: "意象标注" },
+  { id: "song_emotions", label: "基调" },
+  { id: "song_collations", label: "校勘" },
+  { id: "song_links", label: "链接" },
   { id: "imagery", label: "意象" },
   { id: "imagery_categories", label: "意象分类" },
-  { id: "imagery_occurrences", label: "意象标注" },
 ];
 
 function DataBlock({

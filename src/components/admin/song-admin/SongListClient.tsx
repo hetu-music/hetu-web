@@ -15,7 +15,10 @@ import {
   writeInt,
   writeString,
 } from "@/lib/utils/url-params";
-import type { PublishStatus } from "@/lib/utils/utils-song-diff";
+import {
+  isPendingPublish,
+  type PublishStatus,
+} from "@/lib/utils/utils-song-diff";
 import AdminShell from "../kit/AdminShell";
 import {
   AdminOptions,
@@ -42,6 +45,14 @@ const ITEMS_PER_PAGE = 30;
 
 /** 搜索框停下多久才写进地址栏（同曲库页） */
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** 列表里一行的状态字样；已发布的不标 */
+const STATUS_TAG: Record<PublishStatus, string> = {
+  unpublished: "未发布",
+  changed: "待发布",
+  published: "",
+  withdrawn: "已下架",
+};
 
 type Filter =
   "all" | "incomplete" | "unpublished" | "imagery" | "score" | "links";
@@ -109,7 +120,7 @@ export default function SongListClient({
       all: () => true,
       incomplete: (s) => getMissingFields(s).length > 0,
       unpublished: (s) =>
-        (publishStatuses[s.id] ?? "unpublished") !== "published",
+        isPendingPublish(publishStatuses[s.id] ?? "unpublished"),
       imagery: (s) => lacksImagery(s, occurrenceCounts[s.id] ?? 0),
       score: lacksScore,
       links: (s) => getMissingLinks(s).length > 0,
@@ -354,10 +365,10 @@ function SongRow({
           {status !== "published" && (
             <span
               className={
-                status === "unpublished" ? WARN_TEXT_CLASS : "text-(--tone)"
+                status === "changed" ? "text-(--tone)" : WARN_TEXT_CLASS
               }
             >
-              {status === "unpublished" ? "未发布" : "待发布"}
+              {STATUS_TAG[status]}
             </span>
           )}
           {missing.length > 0 && (

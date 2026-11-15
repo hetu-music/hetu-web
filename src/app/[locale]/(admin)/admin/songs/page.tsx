@@ -28,7 +28,7 @@ export default async function SongsAdminPage({ params, searchParams }: Props) {
   const session = await requireAdminPage(locale, "/admin/songs");
 
   const loaded = (
-    getSongs(TABLES.ADMIN, session.accessToken) as Promise<SongDetail[]>
+    getSongs(TABLES.WORKING_SONGS, session.accessToken) as Promise<SongDetail[]>
   ).then(
     (songs) => ({ songs, error: null }),
     (e: unknown) => {
@@ -40,7 +40,7 @@ export default async function SongsAdminPage({ params, searchParams }: Props) {
     },
   );
 
-  // 几路查询一起发出（发布状态要等暂存表，但它读正式表不用等）
+  // 几路查询一起发出；发布状态由工作版本上的状态列得出
   const [{ songs, error }, publishStatuses, occurrenceCounts] =
     await Promise.all([
       loaded,

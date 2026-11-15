@@ -24,7 +24,12 @@ export async function generateMetadata({
   if (songId === null) return {};
 
   const t = await getTranslations({ locale, namespace: "song" });
-  const song = await getSongById(songId, TABLES.MUSIC, undefined, locale);
+  const song = await getSongById(
+    songId,
+    TABLES.PUBLISHED_SONGS,
+    undefined,
+    locale,
+  );
   if (!song) return {};
 
   // 构建描述信息 — 使用｜分隔的紧凑格式
@@ -81,7 +86,7 @@ export default async function SongDetailPage({
   let collations;
   try {
     [song, imagery, collations] = await Promise.all([
-      getSongById(songId, TABLES.MUSIC, undefined, locale),
+      getSongById(songId, TABLES.PUBLISHED_SONGS, undefined, locale),
       getSongImagery(songId, locale),
       getSongCollations(songId, locale),
     ]);

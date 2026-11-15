@@ -20,12 +20,11 @@ const loadGalleryPool = unstable_cache(
     // 否则一次查询失败会让空池被缓存 6 小时
     const supabase = getServiceClient();
     if (!supabase) throw new Error("Supabase 未配置");
-    // 只取资料无争议的歌（同 music_catalog 的规则）；视图是 select * 建的，
-    // 未必带 lyrics_start 这类后加的列，所以直接查主表
+    // 只取线上、资料无争议的歌（同 catalog 的规则）；要 lyrics_start，直接按条件查 published_songs
     const [rows, index] = await Promise.all([
       fetchAll<GalleryRow>(
         supabase,
-        TABLES.MUSIC,
+        TABLES.PUBLISHED_SONGS,
         "id,title,lyrics,lyrics_start",
         (q) =>
           q

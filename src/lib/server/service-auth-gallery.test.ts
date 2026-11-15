@@ -63,7 +63,7 @@ describe("getAuthGallery", () => {
   it("只取资料无争议、有封面、有歌词的歌，按 id 升序", async () => {
     await getAuthGallery("zh-CN");
     const [, table, fields, modify] = vi.mocked(fetchAll).mock.calls[0];
-    expect(table).toBe("music");
+    expect(table).toBe("published_songs");
     expect(fields).toBe("id,title,lyrics,lyrics_start");
     const q = makeQueryBuilder({ data: [], error: null });
     q.is = vi.fn(() => q);

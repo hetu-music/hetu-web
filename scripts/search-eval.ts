@@ -77,7 +77,7 @@ async function loadData(): Promise<EvalData> {
   const rows: (SongDetail & { lyrics_start: string | null })[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
-      .from("music")
+      .from("published_songs")
       .select(`${SONG_LIST_VIEW_FIELDS.join(",")},lyrics,lyrics_start`)
       .order("id", { ascending: true })
       .range(from, from + 999);

@@ -4,7 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Resolver, useForm } from "react-hook-form";
-import { handleApprove } from "@/app/actions/admin-actions";
+import {
+  handleApprove,
+  handleDeleteSong,
+  handleDiscardDraft,
+  handleUnpublish,
+} from "@/app/actions/admin-actions";
+import { onEditorialWrite } from "@/lib/api/editorial-events";
 import {
   mergeAutoCompleteData,
   useAutoComplete,
@@ -32,10 +38,11 @@ import { songOccurrencesKey } from "./SongImageryTab";
 type Published = Record<string, unknown> | null;
 
 /**
- * 歌曲工作台的表单、暂存与发布。
+ * 歌曲工作台的表单、暂存、发布与下架。
  *
+ * song 是这首歌的工作版本（有草稿用草稿），带 is_live、has_draft、ever_published。
  * song 为 null 是新增：保存后换到这首歌自己的地址，其余板块（封面、意象、音频）
- * 都要先有 id 才能用。发布前先把未暂存的改动存进暂存表，再同步到正式表。
+ * 都要先有 id 才能用。资料与意象、基调、校勘都写在草稿上，发布时一起上线；发布前先把未暂存的表单存掉。
  */
 export function useSongWorkspace(
   initialSong: SongDetail | null,
@@ -46,6 +53,16 @@ export function useSongWorkspace(
   const [song, setSong] = useState(initialSong);
   const [published, setPublished] = useState(initialPublished);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isChangingState, setIsChangingState] = useState(false);
+
+  // 意象、基调、校勘写进了草稿：线上的歌变成「有未发布的改动」
+  useEffect(
+    () =>
+      onEditorialWrite(() =>
+        setSong((s) => (s && !s.has_draft ? { ...s, has_draft: true } : s)),
+      ),
+    [],
+  );
 
   const form = useForm<SongFormStateValues>({
     resolver: zodResolver(songFormStateSchema) as Resolver<SongFormStateValues>,
@@ -74,9 +91,7 @@ export function useSongWorkspace(
       ),
     [published, song],
   );
-  const publishStatus = song
-    ? publishStatusOf(song as unknown as Record<string, unknown>, published)
-    : "unpublished";
+  const publishStatus = song ? publishStatusOf(song) : "unpublished";
 
   // 有没暂存的改动时，关页面或刷新先问一句
   useEffect(() => {
@@ -86,7 +101,7 @@ export function useSongWorkspace(
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty]);
 
-  /** 把表单写进暂存表，返回存好的那一行；失败返回 null */
+  /** 把表单写进草稿（链接直接改），返回存好的工作版本；失败返回 null */
   const persist = useCallback(
     async (data: SongFormStateValues): Promise<SongDetail | null> => {
       const payload = convertEmptyStringToNull(toSongFormPayload(data));
@@ -120,7 +135,7 @@ export function useSongWorkspace(
     }
   });
 
-  /** 发布：先跑校验、把没暂存的改动存掉，再同步到正式表 */
+  /** 发布：先跑校验、把没暂存的改动存掉，再让草稿冻结上线（已下架而没有草稿时是重新上线） */
   const publish = useCallback(async () => {
     if (!song) return;
     if (!(await form.trigger())) {
@@ -136,10 +151,16 @@ export function useSongWorkspace(
       if (!saved) return;
 
       const res = await handleApprove(saved.id);
-      if (!res.success) throw new Error(res.error || "同步失败");
+      if (!res.success) throw new Error(res.error || "发布失败");
 
-      // 正式表现在与暂存表一致
+      // 工作版本现在就是线上版本
       setPublished({ ...saved });
+      setSong({
+        ...saved,
+        is_live: true,
+        has_draft: false,
+        ever_published: true,
+      });
       if (res.cdnPurgeFailed?.length) {
         notify({ type: "error", text: cdnPurgeWarning(res.cdnPurgeFailed) });
       } else {
@@ -172,6 +193,62 @@ export function useSongWorkspace(
     form.reset(song ? toSongFormState(song) : createEmptySongFormState());
   }, [form, song]);
 
+  /** 下架、放弃草稿、删歌：都是两步确认后才调；成功后按各自的结果更新页面 */
+  const changeState = useCallback(
+    async (
+      run: () => Promise<{ success: boolean; error?: string }>,
+      done: () => void,
+      failText: string,
+    ) => {
+      setIsChangingState(true);
+      try {
+        const res = await run();
+        if (!res.success) throw new Error(res.error || failText);
+        done();
+      } catch (err) {
+        notifyError(err, failText);
+      } finally {
+        setIsChangingState(false);
+      }
+    },
+    [],
+  );
+
+  /** 放弃草稿：回到线上版本。各页签的数据都变了，整页重新加载最省事 */
+  const discardDraft = useCallback(async () => {
+    if (!song) return;
+    await changeState(
+      () => handleDiscardDraft(song.id),
+      () => window.location.reload(),
+      "放弃草稿失败",
+    );
+  }, [changeState, song]);
+
+  const unpublish = useCallback(async () => {
+    if (!song) return;
+    await changeState(
+      () => handleUnpublish(song.id),
+      () => {
+        setSong({ ...song, is_live: false });
+        setPublished(null);
+        notify({ type: "success", text: "已下架" });
+      },
+      "下架失败",
+    );
+  }, [changeState, song]);
+
+  const deleteSong = useCallback(async () => {
+    if (!song) return;
+    await changeState(
+      () => handleDeleteSong(song.id),
+      () => {
+        notify({ type: "success", text: "已删除" });
+        router.replace("/admin/songs");
+      },
+      "删除失败",
+    );
+  }, [changeState, router, song]);
+
   const runAutoComplete = useCallback(
     async (provider: MusicProviderType) => {
       const values = toSongFormPayload(form.getValues());
@@ -202,12 +279,16 @@ export function useSongWorkspace(
     isDirty,
     isSaving: form.formState.isSubmitting,
     isPublishing,
+    isChangingState,
     publishStatus,
     changedFields,
     autoComplete,
     save,
     publish,
     discard,
+    discardDraft,
+    unpublish,
+    deleteSong,
     runAutoComplete,
     selectSearchResult,
   };

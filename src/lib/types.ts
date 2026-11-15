@@ -60,6 +60,12 @@ export type SongDetail = Song & {
   credited?: Partial<Record<CreditField, string[] | null>>;
   /** 本曲用到的别名 → 主名，版记给原署加注 */
   aliasOf?: Record<string, string>;
+  /** 这一行资料所在的版本（published_songs、working_songs 都有） */
+  version_id?: number;
+  /** 以下三项只在后台读的 working_songs 上有，见 utils-song-diff 的 publishStatusOf */
+  is_live?: boolean;
+  has_draft?: boolean;
+  ever_published?: boolean;
 };
 
 // 音乐库客户端组件属性
@@ -362,8 +368,7 @@ export type UserRecord = {
   name: string;
   display: boolean;
   intro: string | null;
-  is_admin: boolean;
-  is_super: boolean;
+  role: import("@/lib/auth/roles").Role;
   /** 试听权益：能否在站内播放 */
   can_stream: boolean;
 };
@@ -410,7 +415,7 @@ export type UserUpdatePayload = {
   name?: string;
   display?: boolean;
   intro?: string | null;
-  is_admin?: boolean;
-  is_super?: boolean;
+  /** 不能设为 super，也不能改超管的角色 */
+  role?: "user" | "bot" | "admin";
   can_stream?: boolean;
 };

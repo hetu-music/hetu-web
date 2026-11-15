@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 let mockUser: { id: string; app_metadata?: Record<string, unknown> } | null = {
   id: "admin-1",
-  app_metadata: { is_admin: true },
+  app_metadata: { role: "admin" },
 };
 let mockCsrfValid = true;
 /** withAuth 的登录态和路由自己再查一次的 session 理论上可能不一致（如 session cookie 缺失但 JWT 仍有效） */
@@ -53,7 +53,7 @@ function jsonRequest(method: string, body?: unknown) {
 }
 
 beforeEach(() => {
-  mockUser = { id: "admin-1", app_metadata: { is_admin: true } };
+  mockUser = { id: "admin-1", app_metadata: { role: "admin" } };
   mockCsrfValid = true;
   mockSessionAccessToken = "test-token";
   vi.mocked(getImageryCategories).mockReset();
@@ -115,11 +115,17 @@ describe("POST /api/admin/imagery/categories", () => {
     expect(res.status).toBe(500);
   });
 
-  it("经 Authorization header 鉴权通过、但 cookie session 缺失时返回 401（不会带着空 token 调用 service 层）", async () => {
-    // withAuth 支持用 Authorization header 鉴权（不依赖 cookie session）。
-    // 这条路径下，路由自己再查一次 supabase.auth.getSession() 时可能拿不到
-    // cookie session —— 这里验证这种不一致场景会被安全地拦截。
+  it("只带 Authorization header、没有 cookie session 时，以 header 里的 token 写库", async () => {
+    // 脚本、agent 只带 Bearer 头：token 由 withAuth 交给路由，不再从 cookie 取，
+    // 也不要求 CSRF（mockCsrfValid 置 false 验证这一点）
     mockSessionAccessToken = null;
+    mockCsrfValid = false;
+    vi.mocked(createMotif).mockResolvedValue({
+      id: 9,
+      name: "新母题",
+      parent_id: 2,
+      level: 3,
+    } as never);
     const request = new NextRequest(
       "http://localhost/api/admin/imagery/categories",
       {
@@ -132,8 +138,8 @@ describe("POST /api/admin/imagery/categories", () => {
       },
     );
     const res = await POST(request);
-    expect(res.status).toBe(401);
-    expect(createMotif).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(createMotif).toHaveBeenCalledWith(valid, "valid.header.token");
   });
 
   it("创建成功返回新母题", async () => {

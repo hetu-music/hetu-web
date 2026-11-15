@@ -70,13 +70,13 @@ export async function listCreditAliases(
   return data as CreditAliasRow[];
 }
 
-/** 全部署名及其用法；读暂存表，还没发布的歌里的名字也能登记 */
+/** 全部署名及其用法；读工作版本，还没发布的歌里的名字也能登记 */
 export async function listCreditNames(
   accessToken: string,
 ): Promise<CreditNameUsage[]> {
   const rows = await fetchAll<Record<string, string[] | null>>(
     userClient(accessToken),
-    TABLES.ADMIN,
+    TABLES.WORKING_SONGS,
     ["id", ...CREDIT_FIELDS].join(","),
     (q) => q.order("id", { ascending: true }),
   );
@@ -131,7 +131,7 @@ export async function getPublishedSongIdsCreditedAs(
   if (!supabase) return [];
   const rows = await fetchAll<Record<string, unknown> & { id: number }>(
     supabase,
-    TABLES.MUSIC,
+    TABLES.PUBLISHED_SONGS,
     ["id", ...CREDIT_FIELDS].join(","),
   );
   return rows

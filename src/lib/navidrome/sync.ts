@@ -1,6 +1,6 @@
 /**
- * Navidrome 映射同步：把 music 表里的歌曲与 Navidrome 曲库按元数据自动配对，
- * 生成 navid_song / has_audio 的变更计划。纯函数，不做任何 I/O，
+ * Navidrome 映射同步：把线上的歌（published_songs）与 Navidrome 曲库按元数据自动配对，
+ * 生成 song_audio 的变更计划（has_audio 由视图按映射算出）。纯函数，不做任何 I/O，
  * 由 scripts/navidrome-sync.ts 负责拉取数据和落库。
  *
  * Navidrome 的曲目 ID 会随版本升级（ID 算法变化）或文件改名而整体改变，
@@ -30,7 +30,7 @@ export type NavSong = {
 };
 
 /**
- * navid_song 的一行。suffix 与 duration 是同步时从曲库抄来的，
+ * song_audio 的一行（song_id 读出来叫 id）。suffix 与 duration 是同步时从曲库抄来的，
  * 播放时直接读，不用每次再问 Navidrome；尚未回填时为 null
  */
 export type MappingRow = {
@@ -40,7 +40,7 @@ export type MappingRow = {
   duration?: number | null;
 };
 
-/** 写入 navid_song 的曲目信息 */
+/** 写入 song_audio 的曲目信息 */
 export function mediaOf(nav: NavSong): {
   suffix: string | null;
   duration: number | null;

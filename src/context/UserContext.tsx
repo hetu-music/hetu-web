@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import React, { createContext, useCallback, useContext } from "react";
 import { postAuth } from "@/lib/api/auth-api";
+import type { Role } from "@/lib/auth/roles";
 
 export interface UserInfo {
   id: string;
@@ -13,7 +14,11 @@ export interface UserInfo {
   name: string;
   display: boolean;
   intro: string | null;
+  role: Role;
+  /** 能进后台：bot、admin、super */
   isAdmin: boolean;
+  /** 能发布、放弃草稿、处理歌曲反馈：admin、super */
+  canPublish: boolean;
   isSuper: boolean;
   hasBenefits: boolean;
 }

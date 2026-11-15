@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiGetUsers, apiUpdateUser } from "@/lib/api/client-api";
+import { isStaff, ROLE_LABEL, type Role } from "@/lib/auth/roles";
 import type { UserRecord, UserUpdatePayload } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import {
@@ -30,7 +31,7 @@ interface EditState {
   name: string;
   display: boolean;
   intro: string;
-  is_admin: boolean;
+  role: Role;
   can_stream: boolean;
 }
 
@@ -39,7 +40,7 @@ function buildEditState(user: UserRecord): EditState {
     name: user.name,
     display: user.display,
     intro: user.intro ?? "",
-    is_admin: user.is_admin,
+    role: user.role,
     can_stream: user.can_stream,
   };
 }
@@ -50,6 +51,12 @@ const YES_NO = [
   { id: "yes", label: "是" },
   { id: "no", label: "否" },
 ];
+
+/** 后台能指派的角色；超级管理员不在界面上指派 */
+const ASSIGNABLE_ROLES = (["user", "bot", "admin"] as Role[]).map((id) => ({
+  id,
+  label: ROLE_LABEL[id],
+}));
 
 /** 布尔字段：标签加「是 · 否」两个文字选项 */
 function BoolField({
@@ -127,8 +134,8 @@ export default function UserManagePanel() {
     { key: "all", label: "全部", count: users.length },
     {
       key: "admin",
-      label: "管理员",
-      count: users.filter((u) => u.is_admin).length,
+      label: "后台账号",
+      count: users.filter((u) => isStaff(u.role)).length,
     },
     {
       key: "stream",
@@ -142,7 +149,7 @@ export default function UserManagePanel() {
     return users.filter(
       (u) =>
         (filter === "all" ||
-          (filter === "admin" && u.is_admin) ||
+          (filter === "admin" && isStaff(u.role)) ||
           (filter === "stream" && u.can_stream)) &&
         (!q || `${u.name} ${u.id}`.toLowerCase().includes(q)),
     );
@@ -189,7 +196,8 @@ export default function UserManagePanel() {
         name: editState.name,
         display: editState.display,
         intro: editState.intro || null,
-        is_admin: editState.is_admin,
+        // 超管的角色不改，也不发
+        ...(editState.role !== "super" ? { role: editState.role } : {}),
         can_stream: editState.can_stream,
       };
       await apiUpdateUser(payload);
@@ -257,10 +265,8 @@ export default function UserManagePanel() {
                     <span className="truncate text-slate-900 dark:text-slate-100">
                       {user.name}
                     </span>
-                    {user.is_super ? (
-                      <span className={TAG_CLASS}>超管</span>
-                    ) : (
-                      user.is_admin && <span className={TAG_CLASS}>管理员</span>
+                    {user.role !== "user" && (
+                      <span className={TAG_CLASS}>{ROLE_LABEL[user.role]}</span>
                     )}
                     {user.can_stream && <span className={TAG_CLASS}>试听</span>}
                     <span className="hidden min-w-0 truncate font-mono text-[11px] text-slate-400 md:block">
@@ -313,12 +319,22 @@ export default function UserManagePanel() {
                             value={editState.can_stream}
                             onChange={(can_stream) => patch({ can_stream })}
                           />
-                          <BoolField
-                            label="管理员"
-                            value={editState.is_admin}
-                            onChange={(is_admin) => patch({ is_admin })}
-                            locked={user.is_super ? "超管锁定" : undefined}
-                          />
+                          <div>
+                            <span className={LABEL_CLASS}>
+                              角色
+                              {user.role === "super" && (
+                                <span className="ml-2 tracking-normal">
+                                  （超管锁定）
+                                </span>
+                              )}
+                            </span>
+                            <AdminOptions
+                              items={ASSIGNABLE_ROLES}
+                              active={editState.role}
+                              disabled={user.role === "super"}
+                              onSelect={(role) => patch({ role })}
+                            />
+                          </div>
                         </div>
                         <div className="flex items-center gap-4">
                           <button
@@ -348,14 +364,7 @@ export default function UserManagePanel() {
                           label="公开展示"
                           value={user.display ? "是" : "否"}
                         />
-                        <ReadField
-                          label="管理员"
-                          value={user.is_admin ? "是" : "否"}
-                        />
-                        <ReadField
-                          label="超管"
-                          value={user.is_super ? "是" : "否"}
-                        />
+                        <ReadField label="角色" value={ROLE_LABEL[user.role]} />
                         <ReadField
                           label="试听权益"
                           value={user.can_stream ? "有" : "无"}

@@ -10,7 +10,7 @@
  */
 
 export interface LrcLine {
-  /** 原始时间标签，如 "01:26.04"，与 imagery_occurrences.lyric_timetag 格式一致 */
+  /** 原始时间标签，如 "01:26.04"，与 song_imagery.lyric_timetag 格式一致 */
   tag: string;
   text: string;
 }

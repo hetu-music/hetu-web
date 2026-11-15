@@ -3,13 +3,14 @@ import { withAuth, type AuthenticatedUser } from "@/lib/server/server-auth";
 import { createSupabaseServerClient } from "@/lib/db/supabase-auth";
 import { TABLES } from "@/lib/db/supabase-server";
 import { serverErrorResponse } from "@/lib/server/server-utils";
+import { isHumanAdmin, isStaff, isSuperRole, roleOf } from "@/lib/auth/roles";
 
 export const GET = withAuth(
   async (_request: NextRequest, user: AuthenticatedUser) => {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from(TABLES.USERS)
-      .select("name, display, intro, is_admin, is_super, can_stream")
+      .select("name, display, intro, role, can_stream")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -25,8 +26,11 @@ export const GET = withAuth(
       name: data?.name ?? "未设置用户名",
       display: data?.display ?? false,
       intro: data?.intro ?? null,
-      isAdmin: data?.is_admin ?? false,
-      isSuper: data?.is_super ?? false,
+      // 角色以库里为准：刚改了角色、令牌还没刷新时，界面先跟上
+      role: roleOf(data),
+      isAdmin: isStaff(roleOf(data)),
+      canPublish: isHumanAdmin(roleOf(data)),
+      isSuper: isSuperRole(roleOf(data)),
       hasBenefits: data?.can_stream === true,
     });
   },

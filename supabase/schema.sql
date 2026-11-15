@@ -52,51 +52,19 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
 
 
-CREATE OR REPLACE FUNCTION "public"."approve_music_sync"("temp_id" bigint) RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$BEGIN
-  INSERT INTO public.music (
-    id, date, title, track, tracktotal, artist, lyricist,
-    composer, arranger, lyrics, genre, album, albumartist, comment,
-    length, discnumber, disctotal, kugolink, type, hascover, qmlink, nelink, nmn_status, updated_at, lyrics_start, dispute_note
-  )
-  SELECT 
-    id, date, title, track, tracktotal, artist, lyricist,
-    composer, arranger, lyrics, genre, album, albumartist, comment,
-    length, discnumber, disctotal, kugolink, type, hascover, qmlink, nelink, nmn_status, updated_at, lyrics_start, dispute_note
-  FROM public.temp
-  WHERE id = temp_id
-  ON CONFLICT (id) DO UPDATE SET
-    date = EXCLUDED.date,
-    title = EXCLUDED.title,
-    track = EXCLUDED.track,
-    tracktotal = EXCLUDED.tracktotal,
-    artist = EXCLUDED.artist,
-    lyricist = EXCLUDED.lyricist,
-    composer = EXCLUDED.composer,
-    arranger = EXCLUDED.arranger,
-    lyrics = EXCLUDED.lyrics,
-    genre = EXCLUDED.genre,
-    album = EXCLUDED.album,
-    albumartist = EXCLUDED.albumartist,
-    comment = EXCLUDED.comment,
-    length = EXCLUDED.length,
-    discnumber = EXCLUDED.discnumber,
-    disctotal = EXCLUDED.disctotal,
-    kugolink = EXCLUDED.kugolink,
-    type = EXCLUDED.type,
-    hascover = EXCLUDED.hascover,
-    qmlink = EXCLUDED.qmlink,
-    nelink = EXCLUDED.nelink,
-    nmn_status = EXCLUDED.nmn_status,
-    updated_at = EXCLUDED.updated_at,
-    lyrics_start = EXCLUDED.lyrics_start,
-    dispute_note = EXCLUDED.dispute_note;
-END;$$;
+CREATE OR REPLACE FUNCTION "public"."assert_role"("allowed" "text"[]) RETURNS "void"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not (public.jwt_role() = any (allowed)) then
+    raise exception '没有权限' using errcode = '42501';
+  end if;
+end;
+$$;
 
 
-ALTER FUNCTION "public"."approve_music_sync"("temp_id" bigint) OWNER TO "postgres";
+ALTER FUNCTION "public"."assert_role"("allowed" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) RETURNS "text"
@@ -187,6 +155,48 @@ $$;
 ALTER FUNCTION "public"."comments_check_reply"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."create_song"("p_fields" "jsonb") RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  f public.song_versions;
+  sid bigint;
+  vid bigint;
+begin
+  perform public.assert_role(array['bot', 'admin', 'super']);
+  f := jsonb_populate_record(null::public.song_versions, p_fields);
+
+  insert into public.songs (created_by) values (auth.uid()) returning id into sid;
+  insert into public.song_versions (
+    song_id, title, date, album, track, tracktotal, discnumber, disctotal,
+    artist, lyricist, composer, arranger, albumartist, genre, type, length,
+    lyrics, lyrics_start, comment, dispute_note, hascover, nmn_status,
+    created_by, updated_by
+  ) values (
+    -- 没给的列用表上的默认值；明确给了 null 的照存 null（与原先往 temp 里 insert 一致）
+    sid, f.title, f.date, f.album,
+    case when p_fields ? 'track' then f.track else 1 end,
+    case when p_fields ? 'tracktotal' then f.tracktotal else 1 end,
+    case when p_fields ? 'discnumber' then f.discnumber else 1 end,
+    case when p_fields ? 'disctotal' then f.disctotal else 1 end,
+    f.artist, f.lyricist, f.composer, f.arranger, f.albumartist,
+    case when p_fields ? 'genre' then f.genre else '{古风}'::text[] end,
+    coalesce(f.type, '{原创}'::text[]),
+    f.length, f.lyrics, f.lyrics_start, f.comment, f.dispute_note, f.hascover,
+    case when p_fields ? 'nmn_status' then f.nmn_status else false end,
+    auth.uid(), auth.uid()
+  ) returning id into vid;
+
+  perform public.log_song_event('CREATE', sid, vid);
+  return sid;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."create_song"("p_fields" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."credit_aliases_no_chain"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -241,6 +251,63 @@ $$;
 ALTER FUNCTION "public"."delete_comment"("p_id" bigint) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."delete_song"("p_song_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  live bigint;
+begin
+  perform public.assert_role(array['super']);
+
+  select live_version_id into live from public.songs where id = p_song_id for update;
+  if not found then
+    raise exception '歌曲不存在' using errcode = 'P0002';
+  end if;
+  if live is not null then
+    raise exception '在线的歌要先下架再删除' using errcode = 'P0001';
+  end if;
+  perform public.log_song_event('DELETE', p_song_id, null);
+  delete from public.songs where id = p_song_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."delete_song"("p_song_id" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."discard_draft"("p_song_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  draft bigint;
+begin
+  perform public.assert_role(array['admin', 'super']);
+  perform 1 from public.songs where id = p_song_id for update;
+
+  select id into draft
+  from public.song_versions
+  where song_id = p_song_id and published_at is null;
+  if draft is null then
+    raise exception '没有草稿' using errcode = 'P0001';
+  end if;
+  if not exists (
+    select 1 from public.song_versions
+    where song_id = p_song_id and published_at is not null
+  ) then
+    raise exception '这首歌从没发布过，不能放弃草稿，要删就删歌' using errcode = 'P0001';
+  end if;
+
+  delete from public.song_versions where id = draft;
+  perform public.log_song_event('DISCARD_DRAFT', p_song_id, draft);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."discard_draft"("p_song_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -257,6 +324,122 @@ $$;
 
 
 ALTER FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."editorial_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  vid bigint;
+begin
+  if tg_op = 'DELETE' then
+    if pg_trigger_depth() > 1 then
+      return old;
+    end if;
+    vid := old.version_id;
+  else
+    if tg_op = 'UPDATE' and new.version_id is distinct from old.version_id then
+      raise exception '编校数据不能换版本' using errcode = '42501';
+    end if;
+    vid := new.version_id;
+  end if;
+
+  if exists (
+    select 1 from public.song_versions v
+    where v.id = vid and v.published_at is not null
+  ) then
+    raise exception '已发布的版本不能修改，先开草稿' using errcode = '42501';
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."editorial_guard"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."ensure_draft"("p_song_id" bigint) RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  draft bigint;
+  src bigint;
+begin
+  perform public.assert_role(array['bot', 'admin', 'super']);
+
+  -- 锁住这首歌，两个请求同时开草稿时只开一份
+  perform 1 from public.songs where id = p_song_id for update;
+  if not found then
+    raise exception '歌曲不存在' using errcode = 'P0002';
+  end if;
+
+  select id into draft
+  from public.song_versions
+  where song_id = p_song_id and published_at is null;
+  if found then
+    return draft;
+  end if;
+
+  select id into src
+  from public.song_versions
+  where song_id = p_song_id
+  order by published_at desc
+  limit 1;
+  if src is null then
+    raise exception '这首歌没有任何版本' using errcode = 'P0002';
+  end if;
+
+  perform set_config('hetu.copying', 'on', true);
+
+  insert into public.song_versions (
+    song_id, title, date, album, track, tracktotal, discnumber, disctotal,
+    artist, lyricist, composer, arranger, albumartist, genre, type, length,
+    lyrics, lyrics_start, comment, dispute_note, hascover, nmn_status,
+    created_by, updated_at, updated_by
+  )
+  select
+    song_id, title, date, album, track, tracktotal, discnumber, disctotal,
+    artist, lyricist, composer, arranger, albumartist, genre, type, length,
+    lyrics, lyrics_start, comment, dispute_note, hascover, nmn_status,
+    auth.uid(), updated_at, updated_by     -- 沿用源版本的 updated_at：打开着的表单不会误报冲突
+  from public.song_versions
+  where id = src
+  returning id into draft;
+
+  insert into public.song_imagery (version_id, id, imagery_id, category_id, lyric_timetag, created_at, created_by)
+  select draft, id, imagery_id, category_id, lyric_timetag, created_at, created_by
+  from public.song_imagery where version_id = src;
+
+  insert into public.song_emotions (version_id, emotion_id, rank, created_at, created_by)
+  select draft, emotion_id, rank, created_at, created_by
+  from public.song_emotions where version_id = src;
+
+  insert into public.song_collations (
+    version_id, id, anchor, anchor_index, anchor_time, anchor_quote, kind, quote,
+    sung, body, date, created_by, updated_by, created_at, updated_at
+  )
+  select
+    draft, id, anchor, anchor_index, anchor_time, anchor_quote, kind, quote,
+    sung, body, date, created_by, updated_by, created_at, updated_at
+  from public.song_collations where version_id = src;
+
+  insert into public.song_collation_revisers (version_id, collation_id, user_id, first_at)
+  select draft, collation_id, user_id, first_at
+  from public.song_collation_revisers where version_id = src;
+
+  perform set_config('hetu.copying', 'off', true);
+  return draft;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."ensure_draft"("p_song_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
@@ -281,41 +464,83 @@ CREATE OR REPLACE FUNCTION "public"."imagery_occurrence_counts"() RETURNS TABLE(
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
-  select o.song_id::bigint, count(*)::bigint
-  from public.imagery_occurrences o
-  group by o.song_id
+  select i.song_id, count(*)::bigint
+  from public.working_song_imagery i
+  group by i.song_id
 $$;
 
 
 ALTER FUNCTION "public"."imagery_occurrence_counts"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."prevent_role_tampering"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+CREATE OR REPLACE FUNCTION "public"."jwt_role"() RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
     AS $$
-BEGIN
-  -- 如果当前操作是由普通登录用户（authenticated）或匿名用户（anon）发起的
-  IF (auth.role() = 'authenticated' OR auth.role() = 'anon') THEN
-    
-    -- 1. 拦截对 is_admin 的篡改：如果新值和旧值不同，强制还原为旧值
-    IF (NEW.is_admin IS DISTINCT FROM OLD.is_admin) THEN
-      NEW.is_admin := OLD.is_admin;
-    END IF;
-    
-    -- 2. 拦截对 is_super 的篡改
-    IF (NEW.is_super IS DISTINCT FROM OLD.is_super) THEN
-      NEW.is_super := OLD.is_super;
-    END IF;
-    
-  END IF;
-
-  RETURN NEW;
-END;
+  select coalesce((select auth.jwt()) -> 'app_metadata' ->> 'role', 'user')
 $$;
 
 
-ALTER FUNCTION "public"."prevent_role_tampering"() OWNER TO "postgres";
+ALTER FUNCTION "public"."jwt_role"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."log_song_event"("p_action" "text", "p_song_id" bigint, "p_version_id" bigint) RETURNS "void"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  insert into public.audit_logs (table_name, action_type, user_id, new_data)
+  values ('songs', p_action, auth.uid(),
+          jsonb_build_object('song_id', p_song_id, 'version_id', p_version_id))
+$$;
+
+
+ALTER FUNCTION "public"."log_song_event"("p_action" "text", "p_song_id" bigint, "p_version_id" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."publish_song"("p_song_id" bigint) RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  draft bigint;
+  latest bigint;
+  live bigint;
+begin
+  perform public.assert_role(array['admin', 'super']);
+
+  select live_version_id into live from public.songs where id = p_song_id for update;
+  if not found then
+    raise exception '歌曲不存在' using errcode = 'P0002';
+  end if;
+
+  select id into draft
+  from public.song_versions
+  where song_id = p_song_id and published_at is null;
+
+  if draft is not null then
+    update public.song_versions set published_at = now() where id = draft;
+    update public.songs set live_version_id = draft where id = p_song_id;
+    perform public.log_song_event('PUBLISH', p_song_id, draft);
+    return draft;
+  end if;
+
+  if live is null then
+    select id into latest
+    from public.song_versions
+    where song_id = p_song_id
+    order by published_at desc
+    limit 1;
+    update public.songs set live_version_id = latest where id = p_song_id;
+    perform public.log_song_event('REPUBLISH', p_song_id, latest);
+    return latest;
+  end if;
+
+  raise exception '没有要发布的改动' using errcode = 'P0001';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."publish_song"("p_song_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."quiz_results_keep_latest"() RETURNS "trigger"
@@ -380,24 +605,35 @@ ALTER FUNCTION "public"."random_user_name"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."record_audit_log"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET "search_path" TO ''
     AS $$
-BEGIN
-    IF (TG_OP = 'DELETE') THEN
-        INSERT INTO public.audit_logs (table_name, action_type, user_id, old_data)
-        VALUES (TG_TABLE_NAME::text, TG_OP, auth.uid(), to_jsonb(OLD));
-        RETURN OLD;
-    ELSIF (TG_OP = 'UPDATE') THEN
-        INSERT INTO public.audit_logs (table_name, action_type, user_id, old_data, new_data)
-        VALUES (TG_TABLE_NAME::text, TG_OP, auth.uid(), to_jsonb(OLD), to_jsonb(NEW));
-        RETURN NEW;
-    ELSIF (TG_OP = 'INSERT') THEN
-        INSERT INTO public.audit_logs (table_name, action_type, user_id, new_data)
-        VALUES (TG_TABLE_NAME::text, TG_OP, auth.uid(), to_jsonb(NEW));
-        RETURN NEW;
-    END IF;
-    RETURN NULL;
-END;
+declare
+  row_data jsonb;
+begin
+  if current_setting('hetu.copying', true) = 'on' then
+    return null;
+  end if;
+  if tg_op = 'DELETE' then
+    row_data := to_jsonb(old);
+    if (row_data ? 'version_id' and not exists (
+          select 1 from public.song_versions where id = (row_data ->> 'version_id')::bigint))
+       or (tg_table_name = 'song_links' and not exists (
+          select 1 from public.songs where id = (row_data ->> 'song_id')::bigint)) then
+      return null;
+    end if;
+  end if;
+  if tg_op = 'DELETE' then
+    insert into public.audit_logs (table_name, action_type, user_id, old_data)
+    values (tg_table_name::text, tg_op, auth.uid(), to_jsonb(old));
+  elsif tg_op = 'UPDATE' then
+    insert into public.audit_logs (table_name, action_type, user_id, old_data, new_data)
+    values (tg_table_name::text, tg_op, auth.uid(), to_jsonb(old), to_jsonb(new));
+  else
+    insert into public.audit_logs (table_name, action_type, user_id, new_data)
+    values (tg_table_name::text, tg_op, auth.uid(), to_jsonb(new));
+  end if;
+  return null;
+end;
 $$;
 
 
@@ -410,8 +646,8 @@ CREATE OR REPLACE FUNCTION "public"."song_collations_record_reviser"() RETURNS "
     AS $$
 begin
   if auth.uid() is not null and auth.uid() is distinct from new.created_by then
-    insert into public.song_collation_revisers (collation_id, user_id)
-    values (new.id, auth.uid())
+    insert into public.song_collation_revisers (version_id, collation_id, user_id)
+    values (new.version_id, new.id, auth.uid())
     on conflict do nothing;
   end if;
   return null;
@@ -426,6 +662,9 @@ CREATE OR REPLACE FUNCTION "public"."song_collations_stamp"() RETURNS "trigger"
     SET "search_path" TO ''
     AS $$
 begin
+  if current_setting('hetu.copying', true) = 'on' then
+    return new;
+  end if;
   if tg_op = 'INSERT' then
     new.created_by := coalesce(auth.uid(), new.created_by);
     new.updated_by := null;
@@ -440,103 +679,74 @@ end $$;
 ALTER FUNCTION "public"."song_collations_stamp"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."sync_music_from_temp"() RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$BEGIN
-  -- 1. 增量同步 (UPSERT)：如果 id 存在则更新，不存在则插入
-  INSERT INTO public.music (
-    id, date, title, track, tracktotal, artist, lyricist,
-    composer, arranger, lyrics, genre, album, albumartist, comment,
-    length, discnumber, disctotal, kugolink, type, hascover, qmlink, nelink, nmn_status, updated_at, lyrics_start, dispute_note
-  )
-  SELECT 
-    id, date, title, track, tracktotal, artist, lyricist,
-    composer, arranger, lyrics, genre, album, albumartist, comment,
-    length, discnumber, disctotal, kugolink, type, hascover, qmlink, nelink, nmn_status, updated_at, lyrics_start, dispute_note
-  FROM public.temp
-  ON CONFLICT (id) DO UPDATE SET
-    date = EXCLUDED.date,
-    title = EXCLUDED.title,
-    track = EXCLUDED.track,
-    tracktotal = EXCLUDED.tracktotal,
-    artist = EXCLUDED.artist,
-    lyricist = EXCLUDED.lyricist,
-    composer = EXCLUDED.composer,
-    arranger = EXCLUDED.arranger,
-    lyrics = EXCLUDED.lyrics,
-    genre = EXCLUDED.genre,
-    album = EXCLUDED.album,
-    albumartist = EXCLUDED.albumartist,
-    comment = EXCLUDED.comment,
-    length = EXCLUDED.length,
-    discnumber = EXCLUDED.discnumber,
-    disctotal = EXCLUDED.disctotal,
-    kugolink = EXCLUDED.kugolink,
-    type = EXCLUDED.type,
-    hascover = EXCLUDED.hascover,
-    qmlink = EXCLUDED.qmlink,
-    nelink = EXCLUDED.nelink,
-    nmn_status = EXCLUDED.nmn_status,
-    updated_at = EXCLUDED.updated_at,
-    lyrics_start = EXCLUDED.lyrics_start,
-    dispute_note = EXCLUDED.dispute_note;
+CREATE OR REPLACE FUNCTION "public"."song_versions_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'DELETE' then
+    if old.published_at is not null and pg_trigger_depth() = 1 then
+      raise exception '已发布的版本不能删除' using errcode = '42501';
+    end if;
+    return old;
+  end if;
 
-  -- 2. 镜像清理 (DELETE)：删除 music 表中有，但 temp 表中已经没有的旧数据
-  DELETE FROM public.music 
-  WHERE id NOT IN (SELECT id FROM public.temp);
-
-  -- 3. 保留你的原有逻辑：重置 temp 表的序列
-  PERFORM setval(pg_get_serial_sequence('public.temp', 'id'), (SELECT COALESCE(MAX(id), 1) FROM public.temp));
-END;$$;
+  if old.published_at is not null then
+    raise exception '已发布的版本不能修改，先开草稿' using errcode = '42501';
+  end if;
+  if new.song_id is distinct from old.song_id then
+    raise exception '版本不能换歌' using errcode = '42501';
+  end if;
+  if new.published_at is distinct from old.published_at then
+    return new;
+  end if;
+  new.updated_at := now();
+  new.updated_by := coalesce(auth.uid(), new.updated_by);
+  return new;
+end;
+$$;
 
 
-ALTER FUNCTION "public"."sync_music_from_temp"() OWNER TO "postgres";
+ALTER FUNCTION "public"."song_versions_guard"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_user_claims_to_auth"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'pg_catalog', 'public'
+    SET "search_path" TO ''
     AS $$
-BEGIN
-    -- 显式指定 auth.users，防止被路径劫持
-    UPDATE auth.users
-    SET raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || 
-        jsonb_build_object(
-            'is_admin', NEW.is_admin,
-            'is_super', NEW.is_super
-        )
-    WHERE id = NEW.id;
-
-    RETURN NEW;
-END;
+begin
+  update auth.users
+  set raw_app_meta_data = (coalesce(raw_app_meta_data, '{}'::jsonb) - 'is_admin' - 'is_super')
+    || jsonb_build_object('role', new.role)
+  where id = new.id;
+  return new;
+end;
 $$;
 
 
 ALTER FUNCTION "public"."sync_user_claims_to_auth"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."update_music_has_audio"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'pg_catalog'
+CREATE OR REPLACE FUNCTION "public"."unpublish_song"("p_song_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
-BEGIN
-    IF (TG_OP = 'INSERT') THEN
-        UPDATE public.music SET has_audio = true WHERE id = NEW.id;
-    ELSIF (TG_OP = 'DELETE') THEN
-        UPDATE public.music SET has_audio = false WHERE id = OLD.id;
-    ELSIF (TG_OP = 'UPDATE') THEN
-        IF (OLD.id IS DISTINCT FROM NEW.id) THEN
-            UPDATE public.music SET has_audio = false WHERE id = OLD.id;
-            UPDATE public.music SET has_audio = true WHERE id = NEW.id;
-        END IF;
-    END IF;
-    RETURN NULL;
-END;
+declare
+  live bigint;
+begin
+  perform public.assert_role(array['super']);
+
+  select live_version_id into live from public.songs where id = p_song_id for update;
+  if live is null then
+    raise exception '这首歌不在线上' using errcode = 'P0001';
+  end if;
+  update public.songs set live_version_id = null where id = p_song_id;
+  perform public.log_song_event('UNPUBLISH', p_song_id, live);
+end;
 $$;
 
 
-ALTER FUNCTION "public"."update_music_has_audio"() OWNER TO "postgres";
+ALTER FUNCTION "public"."unpublish_song"("p_song_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."updated_at"() RETURNS "trigger"
@@ -551,20 +761,6 @@ $$;
 
 
 ALTER FUNCTION "public"."updated_at"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."updated_by"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO 'public'
-    AS $$
-BEGIN
-  NEW.updated_by = auth.uid();
-  RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."updated_by"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."users_guard_can_stream"() RETURNS "trigger"
@@ -589,6 +785,23 @@ $$;
 
 ALTER FUNCTION "public"."users_guard_can_stream"() OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "public"."users_guard_role"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if current_user in ('anon', 'authenticated')
+     and new.role is distinct from old.role then
+    raise exception '角色只能由超级管理员修改' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."users_guard_role"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -606,6 +819,177 @@ CREATE TABLE IF NOT EXISTS "public"."audit_logs" (
 
 
 ALTER TABLE "public"."audit_logs" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."song_audio" (
+    "song_id" bigint NOT NULL,
+    "navid_id" "text" NOT NULL,
+    "suffix" "text",
+    "duration" integer,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."song_audio" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."song_audio" IS 'Navidrome 上的音频（原 navid_song）。has_audio 由视图按有没有这一行算出';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."song_links" (
+    "song_id" bigint NOT NULL,
+    "platform" "text" NOT NULL,
+    "url" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "song_links_platform_check" CHECK (("platform" = ANY (ARRAY['netease'::"text", 'qq'::"text", 'kugou'::"text"]))),
+    CONSTRAINT "song_links_url_check" CHECK (("url" <> ''::"text"))
+);
+
+
+ALTER TABLE "public"."song_links" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."song_links" IS '各平台上的这首歌。挂在歌上，不随版本，保存即生效';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."song_versions" (
+    "id" bigint NOT NULL,
+    "song_id" bigint NOT NULL,
+    "title" "text" NOT NULL,
+    "date" "date",
+    "album" "text",
+    "track" bigint DEFAULT 1,
+    "tracktotal" bigint DEFAULT 1,
+    "discnumber" bigint DEFAULT 1,
+    "disctotal" bigint DEFAULT 1,
+    "artist" "text"[],
+    "lyricist" "text"[],
+    "composer" "text"[],
+    "arranger" "text"[],
+    "albumartist" "text"[],
+    "genre" "text"[] DEFAULT '{古风}'::"text"[],
+    "type" "text"[] DEFAULT '{原创}'::"text"[] NOT NULL,
+    "length" bigint,
+    "lyrics" "text",
+    "lyrics_start" "text",
+    "comment" "text",
+    "dispute_note" "text",
+    "hascover" boolean,
+    "nmn_status" boolean DEFAULT false,
+    "published_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_by" "uuid" DEFAULT "auth"."uid"(),
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid" DEFAULT "auth"."uid"()
+);
+
+
+ALTER TABLE "public"."song_versions" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."song_versions" IS '歌的资料，一个版本一行。published_at 为空是草稿（每首歌至多一个，保存即覆盖），非空是已冻结的版本，历史全部保留';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."songs" (
+    "id" bigint NOT NULL,
+    "live_version_id" bigint,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_by" "uuid" DEFAULT "auth"."uid"()
+);
+
+
+ALTER TABLE "public"."songs" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."songs" IS '歌的身份。live_version_id 指向线上版本，为空表示不在线上（从未发布或已下架）。读者数据、链接、音频挂在这里';
+
+
+
+CREATE OR REPLACE VIEW "public"."published_songs" WITH ("security_invoker"='true') AS
+ SELECT "s"."id",
+    "v"."date",
+    "v"."title",
+    "v"."track",
+    "v"."tracktotal",
+    "v"."artist",
+    "v"."lyricist",
+    "v"."composer",
+    "v"."arranger",
+    "v"."lyrics",
+    "v"."genre",
+    "v"."album",
+    "v"."albumartist",
+    "v"."comment",
+    "v"."length",
+    "v"."discnumber",
+    "v"."disctotal",
+    ( SELECT "l"."url"
+           FROM "public"."song_links" "l"
+          WHERE (("l"."song_id" = "s"."id") AND ("l"."platform" = 'kugou'::"text"))) AS "kugolink",
+    "v"."type",
+    "v"."hascover",
+    ( SELECT "l"."url"
+           FROM "public"."song_links" "l"
+          WHERE (("l"."song_id" = "s"."id") AND ("l"."platform" = 'qq'::"text"))) AS "qmlink",
+    ( SELECT "l"."url"
+           FROM "public"."song_links" "l"
+          WHERE (("l"."song_id" = "s"."id") AND ("l"."platform" = 'netease'::"text"))) AS "nelink",
+    "v"."nmn_status",
+    (EXISTS ( SELECT 1
+           FROM "public"."song_audio" "a"
+          WHERE ("a"."song_id" = "s"."id"))) AS "has_audio",
+    "v"."published_at" AS "updated_at",
+    "v"."lyrics_start",
+    "v"."dispute_note",
+    "v"."id" AS "version_id"
+   FROM ("public"."songs" "s"
+     JOIN "public"."song_versions" "v" ON (("v"."id" = "s"."live_version_id")));
+
+
+ALTER VIEW "public"."published_songs" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."published_songs" IS '线上的歌：线上版本的资料 + 链接 + has_audio。updated_at 是这一版的发布时间';
+
+
+
+CREATE OR REPLACE VIEW "public"."catalog" WITH ("security_invoker"='true') AS
+ SELECT "id",
+    "date",
+    "title",
+    "track",
+    "tracktotal",
+    "artist",
+    "lyricist",
+    "composer",
+    "arranger",
+    "lyrics",
+    "genre",
+    "album",
+    "albumartist",
+    "comment",
+    "length",
+    "discnumber",
+    "disctotal",
+    "kugolink",
+    "type",
+    "hascover",
+    "qmlink",
+    "nelink",
+    "nmn_status",
+    "has_audio",
+    "updated_at",
+    "lyrics_start",
+    "dispute_note",
+    "version_id"
+   FROM "public"."published_songs"
+  WHERE ("dispute_note" IS NULL);
+
+
+ALTER VIEW "public"."catalog" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."collections" (
@@ -754,137 +1138,186 @@ CREATE TABLE IF NOT EXISTS "public"."imagery_motifs" (
 ALTER TABLE "public"."imagery_motifs" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."imagery_occurrences" (
+CREATE TABLE IF NOT EXISTS "public"."song_imagery" (
+    "version_id" bigint NOT NULL,
     "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "lyric_timetag" "jsonb"[] NOT NULL,
-    "song_id" bigint NOT NULL,
     "imagery_id" bigint NOT NULL,
-    "category_id" bigint NOT NULL
+    "category_id" bigint NOT NULL,
+    "lyric_timetag" "jsonb"[] DEFAULT '{}'::"jsonb"[] NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_by" "uuid" DEFAULT "auth"."uid"()
 );
 
 
-ALTER TABLE "public"."imagery_occurrences" OWNER TO "postgres";
+ALTER TABLE "public"."song_imagery" OWNER TO "postgres";
 
 
-CREATE OR REPLACE VIEW "public"."imagery_summary_all" AS
- SELECT "i"."id",
-    "i"."name",
-    ("count"("o"."id"))::integer AS "count",
-    COALESCE("array_agg"(DISTINCT "o"."category_id") FILTER (WHERE ("o"."category_id" IS NOT NULL)), '{}'::bigint[]) AS "categoryIds"
-   FROM ("public"."imagery" "i"
-     LEFT JOIN "public"."imagery_occurrences" "o" ON (("i"."id" = "o"."imagery_id")))
-  GROUP BY "i"."id", "i"."name";
+COMMENT ON TABLE "public"."song_imagery" IS '意象标注（原 imagery_occurrences），挂在版本上。lyric_timetag 第二段起改为读时计算';
+
+
+
+CREATE OR REPLACE VIEW "public"."working_songs" WITH ("security_invoker"='true') AS
+ SELECT "s"."id",
+    "v"."date",
+    "v"."title",
+    "v"."track",
+    "v"."tracktotal",
+    "v"."artist",
+    "v"."lyricist",
+    "v"."composer",
+    "v"."arranger",
+    "v"."lyrics",
+    "v"."genre",
+    "v"."album",
+    "v"."albumartist",
+    "v"."comment",
+    "v"."length",
+    "v"."discnumber",
+    "v"."disctotal",
+    ( SELECT "l"."url"
+           FROM "public"."song_links" "l"
+          WHERE (("l"."song_id" = "s"."id") AND ("l"."platform" = 'kugou'::"text"))) AS "kugolink",
+    "v"."type",
+    "v"."hascover",
+    ( SELECT "l"."url"
+           FROM "public"."song_links" "l"
+          WHERE (("l"."song_id" = "s"."id") AND ("l"."platform" = 'qq'::"text"))) AS "qmlink",
+    ( SELECT "l"."url"
+           FROM "public"."song_links" "l"
+          WHERE (("l"."song_id" = "s"."id") AND ("l"."platform" = 'netease'::"text"))) AS "nelink",
+    "v"."nmn_status",
+    (EXISTS ( SELECT 1
+           FROM "public"."song_audio" "a"
+          WHERE ("a"."song_id" = "s"."id"))) AS "has_audio",
+    "v"."updated_at",
+    "v"."updated_by",
+    "v"."lyrics_start",
+    "v"."dispute_note",
+    "s"."created_at",
+    "v"."id" AS "version_id",
+    ("s"."live_version_id" IS NOT NULL) AS "is_live",
+    ("v"."published_at" IS NULL) AS "has_draft",
+    (EXISTS ( SELECT 1
+           FROM "public"."song_versions" "f"
+          WHERE (("f"."song_id" = "s"."id") AND ("f"."published_at" IS NOT NULL)))) AS "ever_published"
+   FROM ("public"."songs" "s"
+     JOIN LATERAL ( SELECT "x"."id",
+            "x"."song_id",
+            "x"."title",
+            "x"."date",
+            "x"."album",
+            "x"."track",
+            "x"."tracktotal",
+            "x"."discnumber",
+            "x"."disctotal",
+            "x"."artist",
+            "x"."lyricist",
+            "x"."composer",
+            "x"."arranger",
+            "x"."albumartist",
+            "x"."genre",
+            "x"."type",
+            "x"."length",
+            "x"."lyrics",
+            "x"."lyrics_start",
+            "x"."comment",
+            "x"."dispute_note",
+            "x"."hascover",
+            "x"."nmn_status",
+            "x"."published_at",
+            "x"."created_at",
+            "x"."created_by",
+            "x"."updated_at",
+            "x"."updated_by"
+           FROM "public"."song_versions" "x"
+          WHERE ("x"."song_id" = "s"."id")
+          ORDER BY "x"."published_at" DESC
+         LIMIT 1) "v" ON (true));
+
+
+ALTER VIEW "public"."working_songs" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."working_songs" IS '每首歌的工作版本（有草稿用草稿，否则用最新冻结版本）。is_live 在线；has_draft 有未发布的改动；ever_published 发布过';
+
+
+
+CREATE OR REPLACE VIEW "public"."working_song_imagery" WITH ("security_invoker"='true') AS
+ SELECT "w"."id" AS "song_id",
+    "w"."title" AS "song_title",
+    "w"."album" AS "song_album",
+    "i"."version_id",
+    "i"."id",
+    "i"."imagery_id",
+    "im"."name" AS "imagery_name",
+    "i"."category_id",
+    "c"."name" AS "category_name",
+    "i"."lyric_timetag",
+    "i"."created_at"
+   FROM ((("public"."working_songs" "w"
+     JOIN "public"."song_imagery" "i" ON (("i"."version_id" = "w"."version_id")))
+     JOIN "public"."imagery" "im" ON (("im"."id" = "i"."imagery_id")))
+     JOIN "public"."imagery_categories" "c" ON (("c"."id" = "i"."category_id")));
+
+
+ALTER VIEW "public"."working_song_imagery" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."imagery_summary_all" WITH ("security_invoker"='true') AS
+ SELECT "im"."id",
+    "im"."name",
+    ("count"("i"."id"))::integer AS "count",
+    COALESCE("array_agg"(DISTINCT "i"."category_id") FILTER (WHERE ("i"."category_id" IS NOT NULL)), '{}'::bigint[]) AS "categoryIds"
+   FROM ("public"."imagery" "im"
+     LEFT JOIN "public"."working_song_imagery" "i" ON (("i"."imagery_id" = "im"."id")))
+  GROUP BY "im"."id", "im"."name";
 
 
 ALTER VIEW "public"."imagery_summary_all" OWNER TO "postgres";
 
 
-ALTER TABLE "public"."imagery_occurrences" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."lyric_imagery_occurrences_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."music" (
-    "id" bigint NOT NULL,
-    "date" "date",
-    "title" "text" NOT NULL,
-    "track" bigint DEFAULT '1'::bigint,
-    "tracktotal" bigint DEFAULT '1'::bigint,
-    "artist" "text"[],
-    "lyricist" "text"[],
-    "composer" "text"[],
-    "arranger" "text"[],
-    "lyrics" "text",
-    "genre" "text"[] DEFAULT '{古风}'::"text"[],
-    "album" "text",
-    "albumartist" "text"[],
-    "comment" "text",
-    "length" bigint,
-    "discnumber" bigint DEFAULT '1'::bigint,
-    "disctotal" bigint DEFAULT '1'::bigint,
-    "kugolink" "text",
-    "type" "text"[] DEFAULT '{原创}'::"text"[] NOT NULL,
-    "hascover" boolean,
-    "qmlink" "text",
-    "nelink" "text",
-    "nmn_status" boolean DEFAULT false,
-    "has_audio" boolean DEFAULT false NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "lyrics_start" "text",
-    "dispute_note" "text"
-);
-
-
-ALTER TABLE "public"."music" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."music" IS 'main table';
-
-
-
-CREATE OR REPLACE VIEW "public"."music_catalog" WITH ("security_invoker"='true') AS
- SELECT "id",
-    "date",
-    "title",
-    "track",
-    "tracktotal",
-    "artist",
-    "lyricist",
-    "composer",
-    "arranger",
-    "lyrics",
-    "genre",
-    "album",
-    "albumartist",
-    "comment",
-    "length",
-    "discnumber",
-    "disctotal",
-    "kugolink",
-    "type",
-    "hascover",
-    "qmlink",
-    "nelink",
-    "nmn_status",
-    "has_audio",
-    "updated_at",
-    "lyrics_start",
-    "dispute_note"
-   FROM "public"."music"
-  WHERE ("dispute_note" IS NULL);
-
-
-ALTER VIEW "public"."music_catalog" OWNER TO "postgres";
-
-
-ALTER TABLE "public"."music" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."music_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."navid_song" (
+CREATE TABLE IF NOT EXISTS "public"."song_emotions" (
+    "version_id" bigint NOT NULL,
+    "emotion_id" smallint NOT NULL,
+    "rank" smallint NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "id" bigint NOT NULL,
-    "navid_id" "text" NOT NULL,
-    "suffix" "text",
-    "duration" integer
+    "created_by" "uuid" DEFAULT "auth"."uid"(),
+    CONSTRAINT "song_emotions_rank_check" CHECK ((("rank" >= 1) AND ("rank" <= 3)))
 );
 
 
-ALTER TABLE "public"."navid_song" OWNER TO "postgres";
+ALTER TABLE "public"."song_emotions" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."song_emotions" IS '歌的基调：rank 1 为主基调，2、3 为副基调。挂在版本上';
+
+
+
+CREATE OR REPLACE VIEW "public"."published_song_emotions" WITH ("security_invoker"='true') AS
+ SELECT "s"."id" AS "song_id",
+    "e"."version_id",
+    "e"."emotion_id",
+    "e"."rank"
+   FROM ("public"."songs" "s"
+     JOIN "public"."song_emotions" "e" ON (("e"."version_id" = "s"."live_version_id")));
+
+
+ALTER VIEW "public"."published_song_emotions" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."published_song_imagery" WITH ("security_invoker"='true') AS
+ SELECT "s"."id" AS "song_id",
+    "i"."version_id",
+    "i"."id",
+    "i"."imagery_id",
+    "i"."category_id",
+    "i"."lyric_timetag",
+    "i"."created_at"
+   FROM ("public"."songs" "s"
+     JOIN "public"."song_imagery" "i" ON (("i"."version_id" = "s"."live_version_id")));
+
+
+ALTER VIEW "public"."published_song_imagery" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."quiz_results" (
@@ -909,6 +1342,7 @@ ALTER TABLE "public"."quiz_results" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."song_collation_revisers" (
+    "version_id" bigint NOT NULL,
     "collation_id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
     "first_at" timestamp with time zone DEFAULT "now"() NOT NULL
@@ -919,8 +1353,8 @@ ALTER TABLE "public"."song_collation_revisers" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."song_collations" (
+    "version_id" bigint NOT NULL,
     "id" bigint NOT NULL,
-    "song_id" bigint NOT NULL,
     "anchor" "text" DEFAULT 'lyrics'::"text" NOT NULL,
     "anchor_index" integer,
     "anchor_time" numeric,
@@ -929,18 +1363,18 @@ CREATE TABLE IF NOT EXISTS "public"."song_collations" (
     "quote" "text",
     "sung" "text",
     "body" "text" DEFAULT ''::"text" NOT NULL,
+    "date" "text",
     "created_by" "uuid",
     "updated_by" "uuid",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "date" "text",
     CONSTRAINT "song_collations_anchor_check" CHECK (("anchor" = ANY (ARRAY['song'::"text", 'notes'::"text", 'lyrics'::"text", 'score'::"text"]))),
     CONSTRAINT "song_collations_anchor_quote_check" CHECK (("char_length"("anchor_quote") <= 200)),
     CONSTRAINT "song_collations_body_check" CHECK (("char_length"("body") <= 4000)),
     CONSTRAINT "song_collations_check" CHECK ((("sung" IS NULL) OR ("quote" IS NOT NULL))),
     CONSTRAINT "song_collations_check1" CHECK ((("body" <> ''::"text") OR ("sung" IS NOT NULL))),
+    CONSTRAINT "song_collations_check2" CHECK (((("anchor" = 'lyrics'::"text") AND ("kind" = ANY (ARRAY['slip'::"text", 'sung'::"text", 'version'::"text", 'note'::"text"]))) OR (("anchor" = 'song'::"text") AND ("kind" = ANY (ARRAY['release'::"text", 'draft'::"text", 'note'::"text"]))))),
     CONSTRAINT "song_collations_date_check" CHECK (("date" ~ '^\d{4}(-\d{2}(-\d{2})?)?$'::"text")),
-    CONSTRAINT "song_collations_kind_check" CHECK (((("anchor" = 'lyrics'::"text") AND ("kind" = ANY (ARRAY['slip'::"text", 'sung'::"text", 'version'::"text", 'note'::"text"]))) OR (("anchor" = 'song'::"text") AND ("kind" = ANY (ARRAY['release'::"text", 'draft'::"text", 'note'::"text"]))))),
     CONSTRAINT "song_collations_quote_check" CHECK ((("char_length"("quote") >= 1) AND ("char_length"("quote") <= 100))),
     CONSTRAINT "song_collations_sung_check" CHECK ((("char_length"("sung") >= 1) AND ("char_length"("sung") <= 100)))
 );
@@ -949,7 +1383,11 @@ CREATE TABLE IF NOT EXISTS "public"."song_collations" (
 ALTER TABLE "public"."song_collations" OWNER TO "postgres";
 
 
-ALTER TABLE "public"."song_collations" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+COMMENT ON TABLE "public"."song_collations" IS '校记（anchor = lyrics）与补遗（anchor = song），挂在版本上';
+
+
+
+ALTER TABLE "public"."song_collations" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."song_collations_id_seq"
     START WITH 1
     INCREMENT BY 1
@@ -960,18 +1398,37 @@ ALTER TABLE "public"."song_collations" ALTER COLUMN "id" ADD GENERATED ALWAYS AS
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."song_emotions" (
-    "song_id" bigint NOT NULL,
-    "emotion_id" smallint NOT NULL,
-    "rank" smallint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "source" "text" DEFAULT 'human'::"text" NOT NULL,
-    CONSTRAINT "song_emotions_rank_check" CHECK ((("rank" >= 1) AND ("rank" <= 3))),
-    CONSTRAINT "song_emotions_source_check" CHECK (("source" = ANY (ARRAY['human'::"text", 'ai'::"text"])))
+ALTER TABLE "public"."song_imagery" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."song_imagery_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
 );
 
 
-ALTER TABLE "public"."song_emotions" OWNER TO "postgres";
+
+ALTER TABLE "public"."song_versions" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."song_versions_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+ALTER TABLE "public"."songs" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."songs_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."story_qjtx" (
@@ -1024,56 +1481,6 @@ ALTER TABLE "public"."stream_grants" ALTER COLUMN "id" ADD GENERATED ALWAYS AS I
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."temp" (
-    "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "date" "date",
-    "title" "text" NOT NULL,
-    "track" bigint DEFAULT '1'::bigint,
-    "tracktotal" bigint DEFAULT '1'::bigint,
-    "artist" "text"[],
-    "lyricist" "text"[],
-    "composer" "text"[],
-    "arranger" "text"[],
-    "lyrics" "text",
-    "genre" "text"[] DEFAULT '{古风}'::"text"[],
-    "album" "text",
-    "albumartist" "text"[],
-    "comment" "text",
-    "length" bigint,
-    "discnumber" bigint DEFAULT '1'::bigint,
-    "disctotal" bigint DEFAULT '1'::bigint,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "kugolink" "text",
-    "type" "text"[] DEFAULT '{原创}'::"text"[] NOT NULL,
-    "hascover" boolean,
-    "qmlink" "text",
-    "nelink" "text",
-    "updated_by" "uuid" DEFAULT "auth"."uid"(),
-    "nmn_status" boolean DEFAULT false,
-    "lyrics_start" "text",
-    "dispute_note" "text"
-);
-
-
-ALTER TABLE "public"."temp" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."temp" IS 'for admin edit';
-
-
-
-ALTER TABLE "public"."temp" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."temp_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."user_requests" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -1101,13 +1508,17 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "display" boolean DEFAULT false NOT NULL,
     "intro" "text",
     "sort_order" bigint NOT NULL,
-    "is_admin" boolean DEFAULT false NOT NULL,
-    "is_super" boolean DEFAULT false NOT NULL,
-    "can_stream" boolean DEFAULT false NOT NULL
+    "can_stream" boolean DEFAULT false NOT NULL,
+    "role" "text" DEFAULT 'user'::"text" NOT NULL,
+    CONSTRAINT "users_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'bot'::"text", 'admin'::"text", 'super'::"text"])))
 );
 
 
 ALTER TABLE "public"."users" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."users"."role" IS '逐级包含：bot 能读写后台但不能发布、下架、删歌，不处理用户请求；admin 再加发布与放弃草稿；super 再加下架、删歌与用户管理。同步到 JWT 的 app_metadata.role';
+
 
 
 ALTER TABLE "public"."users" ALTER COLUMN "sort_order" ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -1181,33 +1592,8 @@ ALTER TABLE ONLY "public"."imagery"
 
 
 
-ALTER TABLE ONLY "public"."imagery_occurrences"
-    ADD CONSTRAINT "imagery_occurrences_song_imagery_motif" UNIQUE ("song_id", "imagery_id", "category_id");
-
-
-
 ALTER TABLE ONLY "public"."imagery"
     ADD CONSTRAINT "imagery_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."imagery_occurrences"
-    ADD CONSTRAINT "lyric_imagery_occurrences_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."music"
-    ADD CONSTRAINT "music_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."navid_song"
-    ADD CONSTRAINT "navid_song_navid_id_key" UNIQUE ("navid_id");
-
-
-
-ALTER TABLE ONLY "public"."navid_song"
-    ADD CONSTRAINT "navid_song_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1221,23 +1607,68 @@ ALTER TABLE ONLY "public"."quiz_results"
 
 
 
+ALTER TABLE ONLY "public"."song_audio"
+    ADD CONSTRAINT "song_audio_navid_id_key" UNIQUE ("navid_id");
+
+
+
+ALTER TABLE ONLY "public"."song_audio"
+    ADD CONSTRAINT "song_audio_pkey" PRIMARY KEY ("song_id");
+
+
+
 ALTER TABLE ONLY "public"."song_collation_revisers"
-    ADD CONSTRAINT "song_collation_revisers_pkey" PRIMARY KEY ("collation_id", "user_id");
+    ADD CONSTRAINT "song_collation_revisers_pkey" PRIMARY KEY ("version_id", "collation_id", "user_id");
 
 
 
 ALTER TABLE ONLY "public"."song_collations"
-    ADD CONSTRAINT "song_collations_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "song_collations_pkey" PRIMARY KEY ("version_id", "id");
 
 
 
 ALTER TABLE ONLY "public"."song_emotions"
-    ADD CONSTRAINT "song_emotions_pkey" PRIMARY KEY ("song_id", "emotion_id");
+    ADD CONSTRAINT "song_emotions_pkey" PRIMARY KEY ("version_id", "emotion_id");
 
 
 
 ALTER TABLE ONLY "public"."song_emotions"
-    ADD CONSTRAINT "song_emotions_song_id_rank_key" UNIQUE ("song_id", "rank");
+    ADD CONSTRAINT "song_emotions_version_id_rank_key" UNIQUE ("version_id", "rank");
+
+
+
+ALTER TABLE ONLY "public"."song_imagery"
+    ADD CONSTRAINT "song_imagery_pkey" PRIMARY KEY ("version_id", "id");
+
+
+
+ALTER TABLE ONLY "public"."song_imagery"
+    ADD CONSTRAINT "song_imagery_version_id_imagery_id_category_id_key" UNIQUE ("version_id", "imagery_id", "category_id");
+
+
+
+ALTER TABLE ONLY "public"."song_links"
+    ADD CONSTRAINT "song_links_pkey" PRIMARY KEY ("song_id", "platform");
+
+
+
+ALTER TABLE ONLY "public"."song_links"
+    ADD CONSTRAINT "song_links_platform_url_key" UNIQUE ("platform", "url");
+
+
+
+ALTER TABLE ONLY "public"."song_versions"
+    ADD CONSTRAINT "song_versions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."song_versions"
+    ADD CONSTRAINT "song_versions_song_id_id_key" UNIQUE ("song_id", "id");
+
+
+
+ALTER TABLE ONLY "public"."songs"
+    ADD CONSTRAINT "songs_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1248,11 +1679,6 @@ ALTER TABLE ONLY "public"."story_qjtx"
 
 ALTER TABLE ONLY "public"."stream_grants"
     ADD CONSTRAINT "stream_grants_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."temp"
-    ADD CONSTRAINT "temp_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1302,23 +1728,27 @@ CREATE UNIQUE INDEX "imagery_motifs_one_primary" ON "public"."imagery_motifs" US
 
 
 
-CREATE INDEX "imagery_occurrences_category_id" ON "public"."imagery_occurrences" USING "btree" ("category_id");
-
-
-
-CREATE INDEX "imagery_occurrences_imagery_id" ON "public"."imagery_occurrences" USING "btree" ("imagery_id");
-
-
-
 CREATE INDEX "quiz_results_user_created" ON "public"."quiz_results" USING "btree" ("user_id", "created_at" DESC);
 
 
 
-CREATE INDEX "song_collations_song" ON "public"."song_collations" USING "btree" ("song_id");
+CREATE INDEX "song_collation_revisers_user" ON "public"."song_collation_revisers" USING "btree" ("user_id");
 
 
 
 CREATE INDEX "song_emotions_emotion" ON "public"."song_emotions" USING "btree" ("emotion_id");
+
+
+
+CREATE INDEX "song_imagery_category_id" ON "public"."song_imagery" USING "btree" ("category_id");
+
+
+
+CREATE INDEX "song_imagery_imagery_id" ON "public"."song_imagery" USING "btree" ("imagery_id");
+
+
+
+CREATE UNIQUE INDEX "song_versions_one_draft" ON "public"."song_versions" USING "btree" ("song_id") WHERE ("published_at" IS NULL);
 
 
 
@@ -1350,15 +1780,23 @@ CREATE OR REPLACE TRIGGER "imagery_categories_audit_trigger" AFTER INSERT OR DEL
 
 
 
-CREATE OR REPLACE TRIGGER "imagery_occurrences_audit_trigger" AFTER INSERT OR DELETE OR UPDATE ON "public"."imagery_occurrences" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
-
-
-
-CREATE OR REPLACE TRIGGER "on_user_role_change" AFTER INSERT OR UPDATE OF "is_admin", "is_super" ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."sync_user_claims_to_auth"();
+CREATE OR REPLACE TRIGGER "on_user_role_change" AFTER INSERT OR UPDATE OF "role" ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."sync_user_claims_to_auth"();
 
 
 
 CREATE OR REPLACE TRIGGER "quiz_results_keep_latest" AFTER INSERT ON "public"."quiz_results" FOR EACH ROW EXECUTE FUNCTION "public"."quiz_results_keep_latest"();
+
+
+
+CREATE OR REPLACE TRIGGER "song_collation_revisers_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."song_collation_revisers" FOR EACH ROW EXECUTE FUNCTION "public"."editorial_guard"();
+
+
+
+CREATE OR REPLACE TRIGGER "song_collations_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."song_collations" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "song_collations_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."song_collations" FOR EACH ROW EXECUTE FUNCTION "public"."editorial_guard"();
 
 
 
@@ -1370,23 +1808,31 @@ CREATE OR REPLACE TRIGGER "song_collations_stamp" BEFORE INSERT OR UPDATE ON "pu
 
 
 
-CREATE OR REPLACE TRIGGER "temp_audit_trigger" AFTER INSERT OR DELETE OR UPDATE ON "public"."temp" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
+CREATE OR REPLACE TRIGGER "song_emotions_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."song_emotions" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
 
 
 
-CREATE OR REPLACE TRIGGER "trg_prevent_role_tampering" BEFORE UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_role_tampering"();
+CREATE OR REPLACE TRIGGER "song_emotions_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."song_emotions" FOR EACH ROW EXECUTE FUNCTION "public"."editorial_guard"();
 
 
 
-CREATE OR REPLACE TRIGGER "trigger_sync_has_audio" AFTER INSERT OR DELETE OR UPDATE ON "public"."navid_song" FOR EACH ROW EXECUTE FUNCTION "public"."update_music_has_audio"();
+CREATE OR REPLACE TRIGGER "song_imagery_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."song_imagery" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
 
 
 
-CREATE OR REPLACE TRIGGER "updated_at" BEFORE INSERT OR UPDATE ON "public"."temp" FOR EACH ROW EXECUTE FUNCTION "public"."updated_at"();
+CREATE OR REPLACE TRIGGER "song_imagery_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."song_imagery" FOR EACH ROW EXECUTE FUNCTION "public"."editorial_guard"();
 
 
 
-CREATE OR REPLACE TRIGGER "updated_by" BEFORE INSERT OR UPDATE ON "public"."temp" FOR EACH ROW EXECUTE FUNCTION "public"."updated_by"();
+CREATE OR REPLACE TRIGGER "song_links_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."song_links" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "song_versions_audit" AFTER UPDATE ON "public"."song_versions" FOR EACH ROW WHEN ((NOT ("old"."published_at" IS DISTINCT FROM "new"."published_at"))) EXECUTE FUNCTION "public"."record_audit_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "song_versions_guard" BEFORE DELETE OR UPDATE ON "public"."song_versions" FOR EACH ROW EXECUTE FUNCTION "public"."song_versions_guard"();
 
 
 
@@ -1394,8 +1840,12 @@ CREATE OR REPLACE TRIGGER "users_guard_can_stream" BEFORE INSERT OR UPDATE ON "p
 
 
 
+CREATE OR REPLACE TRIGGER "users_guard_role" BEFORE UPDATE OF "role" ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."users_guard_role"();
+
+
+
 ALTER TABLE ONLY "public"."collections"
-    ADD CONSTRAINT "collections_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."music"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "collections_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE CASCADE;
 
 
 
@@ -1420,7 +1870,7 @@ ALTER TABLE ONLY "public"."comments"
 
 
 ALTER TABLE ONLY "public"."comments"
-    ADD CONSTRAINT "comments_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."music"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "comments_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE CASCADE;
 
 
 
@@ -1439,38 +1889,23 @@ ALTER TABLE ONLY "public"."imagery_motifs"
 
 
 
-ALTER TABLE ONLY "public"."imagery_occurrences"
-    ADD CONSTRAINT "imagery_occurrences_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "public"."imagery_categories"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."imagery_occurrences"
-    ADD CONSTRAINT "imagery_occurrences_imagery_id_fkey" FOREIGN KEY ("imagery_id") REFERENCES "public"."imagery"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."imagery_occurrences"
-    ADD CONSTRAINT "imagery_occurrences_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."music"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."navid_song"
-    ADD CONSTRAINT "navid_song_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."music"("id") ON DELETE CASCADE;
-
-
-
 ALTER TABLE ONLY "public"."quiz_results"
     ADD CONSTRAINT "quiz_results_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
-ALTER TABLE ONLY "public"."song_collation_revisers"
-    ADD CONSTRAINT "song_collation_revisers_collation_id_fkey" FOREIGN KEY ("collation_id") REFERENCES "public"."song_collations"("id") ON DELETE CASCADE;
+ALTER TABLE ONLY "public"."song_audio"
+    ADD CONSTRAINT "song_audio_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."song_collation_revisers"
     ADD CONSTRAINT "song_collation_revisers_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_collation_revisers"
+    ADD CONSTRAINT "song_collation_revisers_version_id_collation_id_fkey" FOREIGN KEY ("version_id", "collation_id") REFERENCES "public"."song_collations"("version_id", "id") ON DELETE CASCADE;
 
 
 
@@ -1480,12 +1915,17 @@ ALTER TABLE ONLY "public"."song_collations"
 
 
 ALTER TABLE ONLY "public"."song_collations"
-    ADD CONSTRAINT "song_collations_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."music"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "song_collations_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
 
 
 
 ALTER TABLE ONLY "public"."song_collations"
-    ADD CONSTRAINT "song_collations_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "song_collations_version_id_fkey" FOREIGN KEY ("version_id") REFERENCES "public"."song_versions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_emotions"
+    ADD CONSTRAINT "song_emotions_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
 
 
 
@@ -1495,7 +1935,57 @@ ALTER TABLE ONLY "public"."song_emotions"
 
 
 ALTER TABLE ONLY "public"."song_emotions"
-    ADD CONSTRAINT "song_emotions_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."music"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "song_emotions_version_id_fkey" FOREIGN KEY ("version_id") REFERENCES "public"."song_versions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_imagery"
+    ADD CONSTRAINT "song_imagery_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "public"."imagery_categories"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_imagery"
+    ADD CONSTRAINT "song_imagery_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."song_imagery"
+    ADD CONSTRAINT "song_imagery_imagery_id_fkey" FOREIGN KEY ("imagery_id") REFERENCES "public"."imagery"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_imagery"
+    ADD CONSTRAINT "song_imagery_version_id_fkey" FOREIGN KEY ("version_id") REFERENCES "public"."song_versions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_links"
+    ADD CONSTRAINT "song_links_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_versions"
+    ADD CONSTRAINT "song_versions_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."song_versions"
+    ADD CONSTRAINT "song_versions_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."song_versions"
+    ADD CONSTRAINT "song_versions_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."songs"
+    ADD CONSTRAINT "songs_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."songs"
+    ADD CONSTRAINT "songs_live_version_fkey" FOREIGN KEY ("id", "live_version_id") REFERENCES "public"."song_versions"("song_id", "id");
 
 
 
@@ -1510,7 +2000,7 @@ ALTER TABLE ONLY "public"."user_requests"
 
 
 ALTER TABLE ONLY "public"."user_requests"
-    ADD CONSTRAINT "user_requests_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."music"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "user_requests_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE SET NULL;
 
 
 
@@ -1521,62 +2011,6 @@ ALTER TABLE ONLY "public"."user_requests"
 
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON UPDATE CASCADE ON DELETE CASCADE;
-
-
-
-CREATE POLICY "Admins and supers can insert" ON "public"."imagery" FOR INSERT TO "authenticated" WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can insert" ON "public"."imagery_categories" FOR INSERT TO "authenticated" WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can insert" ON "public"."imagery_occurrences" FOR INSERT TO "authenticated" WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can insert" ON "public"."temp" FOR INSERT TO "authenticated" WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can update" ON "public"."imagery" FOR UPDATE TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE))) WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can update" ON "public"."imagery_categories" FOR UPDATE TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE))) WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can update" ON "public"."imagery_occurrences" FOR UPDATE TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE))) WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can update" ON "public"."temp" FOR UPDATE TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE))) WITH CHECK ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can view" ON "public"."imagery" FOR SELECT TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can view" ON "public"."imagery_categories" FOR SELECT TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can view" ON "public"."imagery_occurrences" FOR SELECT TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can view" ON "public"."music" FOR SELECT TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Admins and supers can view" ON "public"."temp" FOR SELECT TO "authenticated" USING ((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
-
-
-
-CREATE POLICY "Enable users and super admins to view data" ON "public"."users" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "id") OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
 
 
 
@@ -1607,14 +2041,14 @@ CREATE POLICY "comments_select" ON "public"."comments" FOR SELECT USING (((("sta
 ALTER TABLE "public"."credit_aliases" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "credit_aliases_admin" ON "public"."credit_aliases" TO "authenticated" USING (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE)) WITH CHECK (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE));
+CREATE POLICY "credit_aliases_staff" ON "public"."credit_aliases" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
 
 
 
 ALTER TABLE "public"."emotions" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "emotions_admin" ON "public"."emotions" TO "authenticated" USING (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE)) WITH CHECK (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE));
+CREATE POLICY "emotions_admin" ON "public"."emotions" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['admin'::"text", 'super'::"text"])));
 
 
 
@@ -1624,24 +2058,39 @@ ALTER TABLE "public"."imagery" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."imagery_categories" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "imagery_categories_admin_delete" ON "public"."imagery_categories" FOR DELETE TO "authenticated" USING (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE));
+CREATE POLICY "imagery_categories_admin_delete" ON "public"."imagery_categories" FOR DELETE TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['admin'::"text", 'super'::"text"])));
+
+
+
+CREATE POLICY "imagery_categories_staff_insert" ON "public"."imagery_categories" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
+
+
+CREATE POLICY "imagery_categories_staff_select" ON "public"."imagery_categories" FOR SELECT TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
+
+
+CREATE POLICY "imagery_categories_staff_update" ON "public"."imagery_categories" FOR UPDATE TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
 
 
 
 ALTER TABLE "public"."imagery_motifs" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "imagery_motifs_admin" ON "public"."imagery_motifs" TO "authenticated" USING (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE)) WITH CHECK (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE));
+CREATE POLICY "imagery_motifs_staff" ON "public"."imagery_motifs" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
 
 
 
-ALTER TABLE "public"."imagery_occurrences" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "imagery_staff_insert" ON "public"."imagery" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
 
 
-ALTER TABLE "public"."music" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "imagery_staff_select" ON "public"."imagery" FOR SELECT TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
 
 
-ALTER TABLE "public"."navid_song" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "imagery_staff_update" ON "public"."imagery" FOR UPDATE TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
 
 
 ALTER TABLE "public"."quiz_results" ENABLE ROW LEVEL SECURITY;
@@ -1651,20 +2100,63 @@ CREATE POLICY "quiz_results_select_own" ON "public"."quiz_results" FOR SELECT TO
 
 
 
+ALTER TABLE "public"."song_audio" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "song_audio_staff_select" ON "public"."song_audio" FOR SELECT TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
+
+
 ALTER TABLE "public"."song_collation_revisers" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "song_collation_revisers_staff_select" ON "public"."song_collation_revisers" FOR SELECT TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
 
 
 ALTER TABLE "public"."song_collations" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "song_collations_admin" ON "public"."song_collations" TO "authenticated" USING (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE)) WITH CHECK (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE));
+CREATE POLICY "song_collations_staff" ON "public"."song_collations" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
 
 
 
 ALTER TABLE "public"."song_emotions" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "song_emotions_admin" ON "public"."song_emotions" TO "authenticated" USING (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE)) WITH CHECK (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE));
+CREATE POLICY "song_emotions_staff" ON "public"."song_emotions" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
+
+
+ALTER TABLE "public"."song_imagery" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "song_imagery_staff" ON "public"."song_imagery" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
+
+
+ALTER TABLE "public"."song_links" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "song_links_staff" ON "public"."song_links" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
+
+
+ALTER TABLE "public"."song_versions" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "song_versions_staff_select" ON "public"."song_versions" FOR SELECT TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
+
+
+
+CREATE POLICY "song_versions_staff_update" ON "public"."song_versions" FOR UPDATE TO "authenticated" USING (((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])) AND ("published_at" IS NULL))) WITH CHECK (((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])) AND ("published_at" IS NULL)));
+
+
+
+ALTER TABLE "public"."songs" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "songs_staff_select" ON "public"."songs" FOR SELECT TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['bot'::"text", 'admin'::"text", 'super'::"text"])));
 
 
 
@@ -1674,21 +2166,22 @@ ALTER TABLE "public"."story_qjtx" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."stream_grants" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."temp" ENABLE ROW LEVEL SECURITY;
-
-
 ALTER TABLE "public"."user_requests" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "user_requests_select" ON "public"."user_requests" FOR SELECT TO "authenticated" USING ((("user_id" = ( SELECT "auth"."uid"() AS "uid")) OR (((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) AND (("type")::"text" = 'song_feedback'::"text")) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
+CREATE POLICY "user_requests_select" ON "public"."user_requests" FOR SELECT TO "authenticated" USING ((("user_id" = ( SELECT "auth"."uid"() AS "uid")) OR ((( SELECT "public"."jwt_role"() AS "jwt_role") = 'admin'::"text") AND (("type")::"text" = 'song_feedback'::"text")) OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text")));
 
 
 
-CREATE POLICY "user_requests_update" ON "public"."user_requests" FOR UPDATE TO "authenticated" USING (((((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_admin'::"text"))::boolean IS TRUE) AND (("type")::"text" = 'song_feedback'::"text")) OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE))) WITH CHECK (((("type")::"text" = 'song_feedback'::"text") OR ((((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'is_super'::"text"))::boolean IS TRUE)));
+CREATE POLICY "user_requests_update" ON "public"."user_requests" FOR UPDATE TO "authenticated" USING ((((( SELECT "public"."jwt_role"() AS "jwt_role") = 'admin'::"text") AND (("type")::"text" = 'song_feedback'::"text")) OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text"))) WITH CHECK (((("type")::"text" = 'song_feedback'::"text") OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text")));
 
 
 
 ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "users_select" ON "public"."users" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "id") OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text")));
+
 
 
 
@@ -1874,16 +2367,12 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."approve_music_sync"("temp_id" bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."approve_music_sync"("temp_id" bigint) TO "anon";
-GRANT ALL ON FUNCTION "public"."approve_music_sync"("temp_id" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."approve_music_sync"("temp_id" bigint) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."assert_role"("allowed" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."assert_role"("allowed" "text"[]) TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) TO "service_role";
 
 
@@ -1900,6 +2389,11 @@ GRANT ALL ON FUNCTION "public"."comments_check_reply"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."create_song"("p_fields" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."create_song"("p_fields" "jsonb") TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."credit_aliases_no_chain"() TO "anon";
 GRANT ALL ON FUNCTION "public"."credit_aliases_no_chain"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."credit_aliases_no_chain"() TO "service_role";
@@ -1913,10 +2407,29 @@ GRANT ALL ON FUNCTION "public"."delete_comment"("p_id" bigint) TO "service_role"
 
 
 
+GRANT ALL ON FUNCTION "public"."delete_song"("p_song_id" bigint) TO "service_role";
+GRANT ALL ON FUNCTION "public"."delete_song"("p_song_id" bigint) TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."discard_draft"("p_song_id" bigint) TO "service_role";
+GRANT ALL ON FUNCTION "public"."discard_draft"("p_song_id" bigint) TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."editorial_guard"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."ensure_draft"("p_song_id" bigint) TO "service_role";
+GRANT ALL ON FUNCTION "public"."ensure_draft"("p_song_id" bigint) TO "authenticated";
 
 
 
@@ -1927,15 +2440,22 @@ GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."imagery_occurrence_counts"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."imagery_occurrence_counts"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."prevent_role_tampering"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."prevent_role_tampering"() TO "anon";
-GRANT ALL ON FUNCTION "public"."prevent_role_tampering"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."prevent_role_tampering"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."jwt_role"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."jwt_role"() TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."log_song_event"("p_action" "text", "p_song_id" bigint, "p_version_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."log_song_event"("p_action" "text", "p_song_id" bigint, "p_version_id" bigint) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."publish_song"("p_song_id" bigint) TO "service_role";
+GRANT ALL ON FUNCTION "public"."publish_song"("p_song_id" bigint) TO "authenticated";
 
 
 
@@ -1978,10 +2498,7 @@ GRANT ALL ON FUNCTION "public"."song_collations_stamp"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."sync_music_from_temp"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."sync_music_from_temp"() TO "anon";
-GRANT ALL ON FUNCTION "public"."sync_music_from_temp"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."sync_music_from_temp"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."song_versions_guard"() TO "service_role";
 
 
 
@@ -1992,9 +2509,8 @@ GRANT ALL ON FUNCTION "public"."sync_user_claims_to_auth"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."update_music_has_audio"() TO "anon";
-GRANT ALL ON FUNCTION "public"."update_music_has_audio"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."update_music_has_audio"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."unpublish_song"("p_song_id" bigint) TO "service_role";
+GRANT ALL ON FUNCTION "public"."unpublish_song"("p_song_id" bigint) TO "authenticated";
 
 
 
@@ -2004,16 +2520,13 @@ GRANT ALL ON FUNCTION "public"."updated_at"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."updated_by"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."updated_by"() TO "anon";
-GRANT ALL ON FUNCTION "public"."updated_by"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."updated_by"() TO "service_role";
-
-
-
 GRANT ALL ON FUNCTION "public"."users_guard_can_stream"() TO "anon";
 GRANT ALL ON FUNCTION "public"."users_guard_can_stream"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."users_guard_can_stream"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."users_guard_role"() TO "service_role";
 
 
 
@@ -2041,6 +2554,120 @@ GRANT ALL ON FUNCTION "public"."users_guard_can_stream"() TO "service_role";
 GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."audit_logs" TO "anon";
 GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."audit_logs" TO "authenticated";
 GRANT ALL ON TABLE "public"."audit_logs" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."song_audio" TO "service_role";
+GRANT SELECT ON TABLE "public"."song_audio" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."song_links" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."song_links" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."song_versions" TO "service_role";
+GRANT SELECT ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("title") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("date") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("album") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("track") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("tracktotal") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("discnumber") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("disctotal") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("artist") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("lyricist") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("composer") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("arranger") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("albumartist") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("genre") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("type") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("length") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("lyrics") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("lyrics_start") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("comment") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("dispute_note") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("hascover") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT UPDATE("nmn_status") ON TABLE "public"."song_versions" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."songs" TO "service_role";
+GRANT SELECT ON TABLE "public"."songs" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."published_songs" TO "service_role";
+GRANT SELECT ON TABLE "public"."published_songs" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."catalog" TO "service_role";
+GRANT SELECT ON TABLE "public"."catalog" TO "authenticated";
 
 
 
@@ -2103,41 +2730,54 @@ GRANT ALL ON TABLE "public"."imagery_motifs" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery_occurrences" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery_occurrences" TO "authenticated";
-GRANT ALL ON TABLE "public"."imagery_occurrences" TO "service_role";
+GRANT ALL ON TABLE "public"."song_imagery" TO "service_role";
+GRANT SELECT,DELETE ON TABLE "public"."song_imagery" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery_summary_all" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery_summary_all" TO "authenticated";
+GRANT INSERT("version_id") ON TABLE "public"."song_imagery" TO "authenticated";
+
+
+
+GRANT INSERT("imagery_id"),UPDATE("imagery_id") ON TABLE "public"."song_imagery" TO "authenticated";
+
+
+
+GRANT INSERT("category_id"),UPDATE("category_id") ON TABLE "public"."song_imagery" TO "authenticated";
+
+
+
+GRANT INSERT("lyric_timetag"),UPDATE("lyric_timetag") ON TABLE "public"."song_imagery" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."working_songs" TO "service_role";
+GRANT SELECT ON TABLE "public"."working_songs" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."working_song_imagery" TO "service_role";
+GRANT SELECT ON TABLE "public"."working_song_imagery" TO "authenticated";
+
+
+
 GRANT ALL ON TABLE "public"."imagery_summary_all" TO "service_role";
+GRANT SELECT ON TABLE "public"."imagery_summary_all" TO "authenticated";
 
 
 
-GRANT ALL ON SEQUENCE "public"."lyric_imagery_occurrences_id_seq" TO "service_role";
+GRANT ALL ON TABLE "public"."song_emotions" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."song_emotions" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."music" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."music" TO "authenticated";
-GRANT ALL ON TABLE "public"."music" TO "service_role";
+GRANT ALL ON TABLE "public"."published_song_emotions" TO "service_role";
+GRANT SELECT ON TABLE "public"."published_song_emotions" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."music_catalog" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."music_catalog" TO "authenticated";
-GRANT ALL ON TABLE "public"."music_catalog" TO "service_role";
-
-
-
-GRANT ALL ON SEQUENCE "public"."music_id_seq" TO "service_role";
-
-
-
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."navid_song" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."navid_song" TO "authenticated";
-GRANT ALL ON TABLE "public"."navid_song" TO "service_role";
+GRANT ALL ON TABLE "public"."published_song_imagery" TO "service_role";
+GRANT SELECT ON TABLE "public"."published_song_imagery" TO "authenticated";
 
 
 
@@ -2146,19 +2786,17 @@ GRANT ALL ON TABLE "public"."quiz_results" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."song_collation_revisers" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."song_collation_revisers" TO "authenticated";
 GRANT ALL ON TABLE "public"."song_collation_revisers" TO "service_role";
+GRANT SELECT ON TABLE "public"."song_collation_revisers" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."song_collations" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."song_collations" TO "authenticated";
 GRANT ALL ON TABLE "public"."song_collations" TO "service_role";
+GRANT SELECT,DELETE ON TABLE "public"."song_collations" TO "authenticated";
 
 
 
-GRANT INSERT("song_id") ON TABLE "public"."song_collations" TO "authenticated";
+GRANT INSERT("version_id") ON TABLE "public"."song_collations" TO "authenticated";
 
 
 
@@ -2202,9 +2840,15 @@ GRANT ALL ON SEQUENCE "public"."song_collations_id_seq" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."song_emotions" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."song_emotions" TO "authenticated";
-GRANT ALL ON TABLE "public"."song_emotions" TO "service_role";
+GRANT ALL ON SEQUENCE "public"."song_imagery_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."song_versions_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."songs_id_seq" TO "service_role";
 
 
 
@@ -2225,16 +2869,6 @@ GRANT ALL ON TABLE "public"."stream_grants" TO "service_role";
 
 
 GRANT ALL ON SEQUENCE "public"."stream_grants_id_seq" TO "service_role";
-
-
-
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."temp" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."temp" TO "authenticated";
-GRANT ALL ON TABLE "public"."temp" TO "service_role";
-
-
-
-GRANT ALL ON SEQUENCE "public"."temp_id_seq" TO "service_role";
 
 
 
@@ -2273,8 +2907,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQ
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
 
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { assertAdmin, getUserFromRequest, withAuth } from "./server-auth";
+import { isHumanAdmin } from "@/lib/auth/roles";
 
 // withAuth 是全站 40+ 个 admin/auth API 路由共用的鉴权闸门，
 // 这里对 {未登录, 普通用户, admin, superAdmin} × {requireAdmin, requireSuperAdmin, requireCSRF}
@@ -73,28 +74,47 @@ describe("withAuth 权限矩阵", () => {
   });
 
   it("已登录但非 admin 访问 requireAdmin 接口 → 403", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: false } };
+    mockUser = { id: "u1", app_metadata: { role: "user" } };
     const res = await callWithAuth({ requireAdmin: true });
     expect(res.status).toBe(403);
   });
 
   it("admin 访问 requireAdmin 接口 → 200", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: true } };
+    mockUser = { id: "u1", app_metadata: { role: "admin" } };
     const res = await callWithAuth({ requireAdmin: true });
     expect(res.status).toBe(200);
+  });
+
+  it("bot 能过 requireAdmin，过不了 requireHumanAdmin 与 requireSuperAdmin", async () => {
+    mockUser = { id: "bot", app_metadata: { role: "bot" } };
+    expect((await callWithAuth({ requireAdmin: true })).status).toBe(200);
+    expect((await callWithAuth({ requireHumanAdmin: true })).status).toBe(403);
+    expect((await callWithAuth({ requireSuperAdmin: true })).status).toBe(403);
+  });
+
+  it("admin、super 都能过 requireHumanAdmin", async () => {
+    mockUser = { id: "a", app_metadata: { role: "admin" } };
+    expect((await callWithAuth({ requireHumanAdmin: true })).status).toBe(200);
+    mockUser = { id: "s", app_metadata: { role: "super" } };
+    expect((await callWithAuth({ requireHumanAdmin: true })).status).toBe(200);
+  });
+
+  it("JWT 里还是旧的 is_admin、没有 role 时当普通用户 → 403", async () => {
+    mockUser = { id: "u1", app_metadata: { is_admin: true } };
+    expect((await callWithAuth({ requireAdmin: true })).status).toBe(403);
   });
 
   it("admin 但非 super 访问 requireSuperAdmin 接口 → 403", async () => {
     mockUser = {
       id: "u1",
-      app_metadata: { is_admin: true, is_super: false },
+      app_metadata: { role: "admin" },
     };
     const res = await callWithAuth({ requireSuperAdmin: true });
     expect(res.status).toBe(403);
   });
 
   it("superAdmin 访问 requireSuperAdmin 接口 → 200", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: true, is_super: true } };
+    mockUser = { id: "u1", app_metadata: { role: "super" } };
     const res = await callWithAuth({ requireSuperAdmin: true });
     expect(res.status).toBe(200);
   });
@@ -106,7 +126,7 @@ describe("withAuth 权限矩阵", () => {
   });
 
   it("requireCSRF 校验失败 → 403，且不触达业务 handler（即使用户是 admin）", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: true } };
+    mockUser = { id: "u1", app_metadata: { role: "admin" } };
     mockCsrfValid = false;
     const res = await callWithAuth({ requireCSRF: true, requireAdmin: true });
     expect(res.status).toBe(403);
@@ -115,7 +135,7 @@ describe("withAuth 权限矩阵", () => {
   });
 
   it("requireCSRF 校验通过后正常走鉴权 → 200", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: true } };
+    mockUser = { id: "u1", app_metadata: { role: "admin" } };
     mockCsrfValid = true;
     const res = await callWithAuth({ requireCSRF: true, requireAdmin: true });
     expect(res.status).toBe(200);
@@ -138,6 +158,57 @@ describe("withAuth 权限矩阵", () => {
   });
 });
 
+describe("withAuth — Authorization header 与 accessToken", () => {
+  beforeEach(() => {
+    mockUser = { id: "u1", app_metadata: { role: "admin" } };
+    mockCsrfValid = false;
+    mockThrowOnSupabaseCall = false;
+    mockThrowOnCsrfCheck = false;
+  });
+
+  /** 跑一遍 withAuth，返回响应与 handler 收到的 accessToken（没进 handler 为 undefined） */
+  async function run(headers: Record<string, string>) {
+    let received: string | undefined;
+    const handler = withAuth(
+      async (_req, _user, { accessToken }) => {
+        received = accessToken;
+        return NextResponse.json({ ok: true });
+      },
+      { requireCSRF: true, requireAdmin: true },
+    );
+    const res = await handler(
+      new NextRequest("http://localhost/api/test", { method: "POST", headers }),
+    );
+    return { status: res.status, received };
+  }
+
+  it("带合法 Bearer 头时免 CSRF，handler 拿到的是头里的 token", async () => {
+    const { status, received } = await run({
+      authorization: "Bearer abc.def-ghi_123",
+    });
+    expect(status).toBe(200);
+    expect(received).toBe("abc.def-ghi_123");
+  });
+
+  it("Authorization 头格式不对时判未登录，不会退回 cookie 会话绕过 CSRF", async () => {
+    const { status, received } = await run({ authorization: "Basic xyz" });
+    expect(status).toBe(401);
+    expect(received).toBeUndefined();
+  });
+
+  it("没有 Authorization 头时仍要 CSRF", async () => {
+    const { status } = await run({});
+    expect(status).toBe(403);
+  });
+
+  it("cookie 会话通过 CSRF 后，handler 拿到会话里的 token", async () => {
+    mockCsrfValid = true;
+    const { status, received } = await run({});
+    expect(status).toBe(200);
+    expect(received).toBe("test-token");
+  });
+});
+
 describe("getUserFromRequest — Authorization header 分支", () => {
   beforeEach(() => {
     mockUser = null;
@@ -147,7 +218,7 @@ describe("getUserFromRequest — Authorization header 分支", () => {
   });
 
   it("合法 Bearer token 格式时直接用该 token 查用户，不依赖 session", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: true } };
+    mockUser = { id: "u1", app_metadata: { role: "admin" } };
     const request = new NextRequest("http://localhost/api/test", {
       headers: { authorization: "Bearer abc.def-ghi_123" },
     });
@@ -176,13 +247,20 @@ describe("assertAdmin（用于 Server Actions）", () => {
   });
 
   it("已登录但非 admin 时抛出“无权进行此操作”", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: false } };
+    mockUser = { id: "u1", app_metadata: { role: "user" } };
     await expect(assertAdmin()).rejects.toThrow("无权进行此操作");
   });
 
-  it("admin 用户返回该用户对象", async () => {
-    mockUser = { id: "u1", app_metadata: { is_admin: true } };
-    const user = await assertAdmin();
+  it("admin 用户返回该用户与会话的 token", async () => {
+    mockUser = { id: "u1", app_metadata: { role: "admin" } };
+    const { user, accessToken } = await assertAdmin();
     expect(user.id).toBe("u1");
+    expect(accessToken).toBe("test-token");
+  });
+
+  it("bot 能进后台，但发布这类只有人能做的操作拒绝", async () => {
+    mockUser = { id: "bot", app_metadata: { role: "bot" } };
+    await expect(assertAdmin()).resolves.toMatchObject({ user: { id: "bot" } });
+    await expect(assertAdmin(isHumanAdmin)).rejects.toThrow("无权进行此操作");
   });
 });

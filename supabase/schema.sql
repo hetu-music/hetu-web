@@ -67,7 +67,7 @@ $$;
 ALTER FUNCTION "public"."assert_role"("allowed" "text"[]) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) RETURNS "text"
+CREATE OR REPLACE FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" bigint, "p_hour_limit" integer, "p_day_limit" integer) RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -104,7 +104,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) OWNER TO "postgres";
+ALTER FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" bigint, "p_hour_limit" integer, "p_day_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."comment_likes_sync_count"() RETURNS "trigger"
@@ -143,8 +143,8 @@ begin
   if not found
      or p.parent_id is not null
      or p.song_id <> new.song_id
-     or p.visibility <> 0
-     or p.status <> 0 then
+     or p.visibility <> 'public'
+     or p.status <> 'normal' then
     raise exception 'invalid parent comment' using errcode = '23514';
   end if;
   return new;
@@ -224,21 +224,21 @@ declare
   c public.comments;
 begin
   select * into c from public.comments
-    where id = p_id and user_id = auth.uid() and status <> 3;
+    where id = p_id and user_id = auth.uid() and status <> 'deleted';
   if not found then
     raise exception 'comment not found' using errcode = 'P0002';
   end if;
 
   if exists (select 1 from public.comments where parent_id = p_id) then
     update public.comments
-      set status = 3, body = '', edited_at = now()
+      set status = 'deleted', body = '', edited_at = now()
       where id = p_id;
   else
     delete from public.comments where id = p_id;
     if c.parent_id is not null then
       delete from public.comments p
         where p.id = c.parent_id
-          and p.status = 3
+          and p.status = 'deleted'
           and not exists (
             select 1 from public.comments r where r.parent_id = p.id
           );
@@ -315,7 +315,7 @@ CREATE OR REPLACE FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text
 begin
   update public.comments
     set body = p_body, edited_at = now()
-    where id = p_id and user_id = auth.uid() and status in (0, 1);
+    where id = p_id and user_id = auth.uid() and status in ('normal', 'pending');
   if not found then
     raise exception 'comment not found' using errcode = 'P0002';
   end if;
@@ -993,7 +993,6 @@ ALTER VIEW "public"."catalog" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."collections" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "user_id" "uuid" NOT NULL,
     "song_id" bigint NOT NULL
@@ -1023,21 +1022,29 @@ CREATE TABLE IF NOT EXISTS "public"."comments" (
     "anchor_time" numeric(8,3),
     "anchor_quote" "text",
     "body" "text" NOT NULL,
-    "visibility" smallint DEFAULT 0 NOT NULL,
-    "status" smallint DEFAULT 0 NOT NULL,
+    "visibility" "text" DEFAULT 'public'::"text" NOT NULL,
+    "status" "text" DEFAULT 'normal'::"text" NOT NULL,
     "like_count" integer DEFAULT 0 NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "edited_at" timestamp with time zone,
     CONSTRAINT "comments_anchor_check" CHECK (("anchor" = ANY (ARRAY['song'::"text", 'notes'::"text", 'lyrics'::"text", 'score'::"text"]))),
-    CONSTRAINT "comments_body_length" CHECK ((("status" = 3) OR (("char_length"("body") >= 1) AND ("char_length"("body") <= 1000)))),
+    CONSTRAINT "comments_body_length" CHECK ((("status" = 'deleted'::"text") OR (("char_length"("body") >= 1) AND ("char_length"("body") <= 1000)))),
     CONSTRAINT "comments_quote_length" CHECK (("char_length"("anchor_quote") <= 200)),
-    CONSTRAINT "comments_reply_shape" CHECK (((("parent_id" IS NULL) AND ("anchor" IS NOT NULL)) OR (("parent_id" IS NOT NULL) AND ("anchor" IS NULL) AND ("anchor_index" IS NULL) AND ("anchor_time" IS NULL) AND ("anchor_quote" IS NULL) AND ("visibility" = 0)))),
-    CONSTRAINT "comments_status_check" CHECK (("status" = ANY (ARRAY[0, 1, 2, 3]))),
-    CONSTRAINT "comments_visibility_check" CHECK (("visibility" = ANY (ARRAY[0, 1])))
+    CONSTRAINT "comments_reply_shape" CHECK (((("parent_id" IS NULL) AND ("anchor" IS NOT NULL)) OR (("parent_id" IS NOT NULL) AND ("anchor" IS NULL) AND ("anchor_index" IS NULL) AND ("anchor_time" IS NULL) AND ("anchor_quote" IS NULL) AND ("visibility" = 'public'::"text")))),
+    CONSTRAINT "comments_status_check" CHECK (("status" = ANY (ARRAY['normal'::"text", 'pending'::"text", 'hidden'::"text", 'deleted'::"text"]))),
+    CONSTRAINT "comments_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
 );
 
 
 ALTER TABLE "public"."comments" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."comments"."visibility" IS 'public 公开；private 只有作者看得到。回复一律 public';
+
+
+
+COMMENT ON COLUMN "public"."comments"."status" IS 'normal 正常；pending 待审（只有作者看得到）；hidden 被管理员隐藏；deleted 作者删了但还有回复，内容已清空，留作占位';
+
 
 
 ALTER TABLE "public"."comments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
@@ -1390,6 +1397,10 @@ CREATE TABLE IF NOT EXISTS "public"."quiz_results" (
 ALTER TABLE "public"."quiz_results" OWNER TO "postgres";
 
 
+COMMENT ON COLUMN "public"."quiz_results"."song_ids" IS '测验结果的快照：当时推荐的歌。不加外键，歌改了、删了也照原样保留';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."song_collation_revisers" (
     "version_id" bigint NOT NULL,
     "collation_id" bigint NOT NULL,
@@ -1511,7 +1522,7 @@ ALTER TABLE "public"."story_qjtx" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS 
 CREATE TABLE IF NOT EXISTS "public"."stream_grants" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
-    "song_id" integer NOT NULL,
+    "song_id" bigint NOT NULL,
     "issued_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
@@ -1533,18 +1544,18 @@ ALTER TABLE "public"."stream_grants" ALTER COLUMN "id" ADD GENERATED ALWAYS AS I
 CREATE TABLE IF NOT EXISTS "public"."user_requests" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
-    "type" character varying(50) NOT NULL,
+    "type" "text" NOT NULL,
     "song_id" bigint,
-    "category" character varying(100),
+    "category" "text",
     "content" "text" NOT NULL,
-    "status" character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
     "reply" "text",
     "replied_by" "uuid",
     "replied_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "chk_request_status" CHECK ((("status")::"text" = ANY (ARRAY[('pending'::character varying)::"text", ('replied'::character varying)::"text", ('approved'::character varying)::"text", ('rejected'::character varying)::"text"]))),
-    CONSTRAINT "chk_request_type" CHECK ((("type")::"text" = ANY (ARRAY[('song_feedback'::character varying)::"text", ('benefit_apply'::character varying)::"text", ('admin_apply'::character varying)::"text"])))
+    CONSTRAINT "user_requests_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'replied'::"text", 'approved'::"text", 'rejected'::"text"]))),
+    CONSTRAINT "user_requests_type_check" CHECK (("type" = ANY (ARRAY['song_feedback'::"text", 'benefit_apply'::"text", 'admin_apply'::"text"])))
 );
 
 
@@ -1587,12 +1598,7 @@ ALTER TABLE ONLY "public"."audit_logs"
 
 
 ALTER TABLE ONLY "public"."collections"
-    ADD CONSTRAINT "collections_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."collections"
-    ADD CONSTRAINT "collections_user_song_key" UNIQUE ("user_id", "song_id");
+    ADD CONSTRAINT "collections_pkey" PRIMARY KEY ("user_id", "song_id");
 
 
 
@@ -1815,6 +1821,10 @@ CREATE UNIQUE INDEX "song_versions_one_draft" ON "public"."song_versions" USING 
 
 
 
+CREATE INDEX "stream_grants_song_id" ON "public"."stream_grants" USING "btree" ("song_id");
+
+
+
 CREATE INDEX "stream_grants_user_time" ON "public"."stream_grants" USING "btree" ("user_id", "issued_at" DESC);
 
 
@@ -1831,7 +1841,15 @@ CREATE OR REPLACE TRIGGER "comments_check_reply" BEFORE INSERT ON "public"."comm
 
 
 
+CREATE OR REPLACE TRIGGER "credit_aliases_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."credit_aliases" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
+
+
+
 CREATE OR REPLACE TRIGGER "credit_aliases_no_chain" BEFORE INSERT OR UPDATE ON "public"."credit_aliases" FOR EACH ROW EXECUTE FUNCTION "public"."credit_aliases_no_chain"();
+
+
+
+CREATE OR REPLACE TRIGGER "emotions_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."emotions" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
 
 
 
@@ -1840,6 +1858,10 @@ CREATE OR REPLACE TRIGGER "imagery_audit_trigger" AFTER INSERT OR DELETE OR UPDA
 
 
 CREATE OR REPLACE TRIGGER "imagery_categories_audit_trigger" AFTER INSERT OR DELETE OR UPDATE ON "public"."imagery_categories" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "imagery_motifs_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."imagery_motifs" FOR EACH ROW EXECUTE FUNCTION "public"."record_audit_log"();
 
 
 
@@ -1917,7 +1939,7 @@ ALTER TABLE ONLY "public"."collections"
 
 
 ALTER TABLE ONLY "public"."collections"
-    ADD CONSTRAINT "collections_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "collections_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -1962,7 +1984,7 @@ ALTER TABLE ONLY "public"."motifs"
 
 
 ALTER TABLE ONLY "public"."quiz_results"
-    ADD CONSTRAINT "quiz_results_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "quiz_results_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -2062,6 +2084,11 @@ ALTER TABLE ONLY "public"."songs"
 
 
 ALTER TABLE ONLY "public"."stream_grants"
+    ADD CONSTRAINT "stream_grants_song_id_fkey" FOREIGN KEY ("song_id") REFERENCES "public"."songs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."stream_grants"
     ADD CONSTRAINT "stream_grants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
@@ -2077,7 +2104,7 @@ ALTER TABLE ONLY "public"."user_requests"
 
 
 ALTER TABLE ONLY "public"."user_requests"
-    ADD CONSTRAINT "user_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "user_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -2099,14 +2126,10 @@ ALTER TABLE "public"."collections" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."comment_likes" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "comment_likes_select" ON "public"."comment_likes" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
 ALTER TABLE "public"."comments" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "comments_select" ON "public"."comments" FOR SELECT USING (((("status" = 0) AND ("visibility" = 0)) OR (("user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("status" = ANY (ARRAY[0, 1])))));
+CREATE POLICY "comments_select" ON "public"."comments" FOR SELECT TO "authenticated" USING (((("status" = 'normal'::"text") AND ("visibility" = 'public'::"text")) OR (("user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("status" = ANY (ARRAY['normal'::"text", 'pending'::"text"])))));
 
 
 
@@ -2118,10 +2141,6 @@ CREATE POLICY "credit_aliases_staff" ON "public"."credit_aliases" TO "authentica
 
 
 ALTER TABLE "public"."emotions" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE POLICY "emotions_admin" ON "public"."emotions" TO "authenticated" USING ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['admin'::"text", 'super'::"text"]))) WITH CHECK ((( SELECT "public"."jwt_role"() AS "jwt_role") = ANY (ARRAY['admin'::"text", 'super'::"text"])));
-
 
 
 ALTER TABLE "public"."imagery" ENABLE ROW LEVEL SECURITY;
@@ -2248,11 +2267,11 @@ ALTER TABLE "public"."stream_grants" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."user_requests" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "user_requests_select" ON "public"."user_requests" FOR SELECT TO "authenticated" USING ((("user_id" = ( SELECT "auth"."uid"() AS "uid")) OR ((( SELECT "public"."jwt_role"() AS "jwt_role") = 'admin'::"text") AND (("type")::"text" = 'song_feedback'::"text")) OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text")));
+CREATE POLICY "user_requests_select" ON "public"."user_requests" FOR SELECT TO "authenticated" USING ((("user_id" = ( SELECT "auth"."uid"() AS "uid")) OR ((( SELECT "public"."jwt_role"() AS "jwt_role") = 'admin'::"text") AND ("type" = 'song_feedback'::"text")) OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text")));
 
 
 
-CREATE POLICY "user_requests_update" ON "public"."user_requests" FOR UPDATE TO "authenticated" USING ((((( SELECT "public"."jwt_role"() AS "jwt_role") = 'admin'::"text") AND (("type")::"text" = 'song_feedback'::"text")) OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text"))) WITH CHECK (((("type")::"text" = 'song_feedback'::"text") OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text")));
+CREATE POLICY "user_requests_update" ON "public"."user_requests" FOR UPDATE TO "authenticated" USING ((((( SELECT "public"."jwt_role"() AS "jwt_role") = 'admin'::"text") AND ("type" = 'song_feedback'::"text")) OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text"))) WITH CHECK ((("type" = 'song_feedback'::"text") OR (( SELECT "public"."jwt_role"() AS "jwt_role") = 'super'::"text")));
 
 
 
@@ -2451,8 +2470,8 @@ GRANT ALL ON FUNCTION "public"."assert_role"("allowed" "text"[]) TO "service_rol
 
 
 
-REVOKE ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" integer, "p_hour_limit" integer, "p_day_limit" integer) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" bigint, "p_hour_limit" integer, "p_day_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."claim_stream_grant"("p_user_id" "uuid", "p_song_id" bigint, "p_hour_limit" integer, "p_day_limit" integer) TO "service_role";
 
 
 
@@ -2480,7 +2499,6 @@ GRANT ALL ON FUNCTION "public"."credit_aliases_no_chain"() TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "public"."delete_comment"("p_id" bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."delete_comment"("p_id" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."delete_comment"("p_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."delete_comment"("p_id" bigint) TO "service_role";
 
@@ -2497,7 +2515,6 @@ GRANT ALL ON FUNCTION "public"."discard_draft"("p_song_id" bigint) TO "authentic
 
 
 REVOKE ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."edit_comment"("p_id" bigint, "p_body" "text") TO "service_role";
 
@@ -2630,8 +2647,6 @@ GRANT ALL ON FUNCTION "public"."users_guard_role"() TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."audit_logs" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."audit_logs" TO "authenticated";
 GRANT ALL ON TABLE "public"."audit_logs" TO "service_role";
 
 
@@ -2750,20 +2765,17 @@ GRANT SELECT ON TABLE "public"."catalog" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."collections" TO "anon";
-GRANT SELECT,MAINTAIN ON TABLE "public"."collections" TO "authenticated";
 GRANT ALL ON TABLE "public"."collections" TO "service_role";
+GRANT SELECT ON TABLE "public"."collections" TO "authenticated";
 
 
 
-GRANT SELECT,MAINTAIN,UPDATE ON TABLE "public"."comment_likes" TO "authenticated";
 GRANT ALL ON TABLE "public"."comment_likes" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."comments" TO "anon";
-GRANT SELECT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."comments" TO "authenticated";
 GRANT ALL ON TABLE "public"."comments" TO "service_role";
+GRANT SELECT ON TABLE "public"."comments" TO "authenticated";
 
 
 
@@ -2771,21 +2783,17 @@ GRANT ALL ON SEQUENCE "public"."comments_id_seq" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."credit_aliases" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."credit_aliases" TO "authenticated";
 GRANT ALL ON TABLE "public"."credit_aliases" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."credit_aliases" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."emotions" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."emotions" TO "authenticated";
 GRANT ALL ON TABLE "public"."emotions" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery" TO "authenticated";
 GRANT ALL ON TABLE "public"."imagery" TO "service_role";
+GRANT SELECT,INSERT,UPDATE ON TABLE "public"."imagery" TO "authenticated";
 
 
 
@@ -2802,9 +2810,8 @@ GRANT ALL ON SEQUENCE "public"."imagery_id_seq" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery_motifs" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."imagery_motifs" TO "authenticated";
 GRANT ALL ON TABLE "public"."imagery_motifs" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."imagery_motifs" TO "authenticated";
 
 
 
@@ -2864,8 +2871,8 @@ GRANT SELECT ON TABLE "public"."published_song_imagery" TO "authenticated";
 
 
 
-GRANT SELECT,MAINTAIN,UPDATE ON TABLE "public"."quiz_results" TO "authenticated";
 GRANT ALL ON TABLE "public"."quiz_results" TO "service_role";
+GRANT SELECT ON TABLE "public"."quiz_results" TO "authenticated";
 
 
 
@@ -2935,8 +2942,6 @@ GRANT ALL ON SEQUENCE "public"."songs_id_seq" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."story_qjtx" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."story_qjtx" TO "authenticated";
 GRANT ALL ON TABLE "public"."story_qjtx" TO "service_role";
 
 
@@ -2945,8 +2950,6 @@ GRANT ALL ON SEQUENCE "public"."story_qjtx_id_seq" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."stream_grants" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."stream_grants" TO "authenticated";
 GRANT ALL ON TABLE "public"."stream_grants" TO "service_role";
 
 
@@ -2955,19 +2958,33 @@ GRANT ALL ON SEQUENCE "public"."stream_grants_id_seq" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."user_requests" TO "anon";
-GRANT SELECT,MAINTAIN,UPDATE ON TABLE "public"."user_requests" TO "authenticated";
 GRANT ALL ON TABLE "public"."user_requests" TO "service_role";
+GRANT SELECT ON TABLE "public"."user_requests" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."users" TO "anon";
-GRANT SELECT,MAINTAIN ON TABLE "public"."users" TO "authenticated";
+GRANT UPDATE("status") ON TABLE "public"."user_requests" TO "authenticated";
+
+
+
+GRANT UPDATE("reply") ON TABLE "public"."user_requests" TO "authenticated";
+
+
+
+GRANT UPDATE("replied_by") ON TABLE "public"."user_requests" TO "authenticated";
+
+
+
+GRANT UPDATE("replied_at") ON TABLE "public"."user_requests" TO "authenticated";
+
+
+
+GRANT UPDATE("updated_at") ON TABLE "public"."user_requests" TO "authenticated";
+
+
+
 GRANT ALL ON TABLE "public"."users" TO "service_role";
-
-
-
-GRANT SELECT("can_stream") ON TABLE "public"."users" TO "authenticated";
+GRANT SELECT ON TABLE "public"."users" TO "authenticated";
 
 
 
@@ -2998,8 +3015,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLES TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
 
 

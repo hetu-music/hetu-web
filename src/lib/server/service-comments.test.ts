@@ -44,8 +44,8 @@ function row(overrides: Record<string, unknown>) {
     anchor_time: null,
     anchor_quote: null,
     body: "好",
-    visibility: 0,
-    status: 0,
+    visibility: "public",
+    status: "normal",
     like_count: 0,
     created_at: "2026-09-01T00:00:00Z",
     edited_at: null,
@@ -77,7 +77,7 @@ describe("listSongComments", () => {
     );
     expect(comments.eq).toHaveBeenCalledWith("song_id", 7);
     expect(comments.or).toHaveBeenCalledWith(
-      "and(visibility.eq.0,status.in.(0,3))",
+      "and(visibility.eq.public,status.in.(normal,deleted))",
     );
     // 未登录不查点赞
     expect(client.from).toHaveBeenCalledTimes(1);
@@ -97,7 +97,12 @@ describe("listSongComments", () => {
   it("登录后另含自己的私批，并按歌联表查出赞过的", async () => {
     const comments = makeQueryBuilder({
       data: [
-        row({ id: 1, user_id: "me", visibility: 1, author: { name: "我" } }),
+        row({
+          id: 1,
+          user_id: "me",
+          visibility: "private",
+          author: { name: "我" },
+        }),
         row({ id: 2, user_id: "u2", author: { name: "他" } }),
       ],
       error: null,
@@ -109,7 +114,7 @@ describe("listSongComments", () => {
 
     const list = await listSongComments(7, "me");
     expect(comments.or).toHaveBeenCalledWith(
-      "and(visibility.eq.0,status.in.(0,3)),and(user_id.eq.me,status.in.(0,1))",
+      "and(visibility.eq.public,status.in.(normal,deleted)),and(user_id.eq.me,status.in.(normal,pending))",
     );
     expect(likes.eq).toHaveBeenCalledWith("user_id", "me");
     expect(likes.eq).toHaveBeenCalledWith("comments.song_id", 7);
@@ -123,8 +128,8 @@ describe("listSongComments", () => {
   it("已删的批注只在还有回复时保留，且隐去作者与内容", async () => {
     const comments = makeQueryBuilder({
       data: [
-        row({ id: 1, status: 3, body: "", author: { name: "原作者" } }),
-        row({ id: 2, status: 3, body: "" }),
+        row({ id: 1, status: "deleted", body: "", author: { name: "原作者" } }),
+        row({ id: 2, status: "deleted", body: "" }),
         row({ id: 3, parent_id: 1, anchor: null, user_id: "u2" }),
         // 父批注不可见的回复一并丢掉
         row({ id: 4, parent_id: 99, anchor: null }),
@@ -178,7 +183,7 @@ describe("listSongComments 边界", () => {
 
   it("只剩已删且无回复的批注时直接返回空，不再查点赞", async () => {
     const comments = makeQueryBuilder({
-      data: [row({ id: 1, status: 3, body: "" })],
+      data: [row({ id: 1, status: "deleted", body: "" })],
       error: null,
     });
     const client = createMockSupabaseClient([comments]);
@@ -273,7 +278,7 @@ describe("createComment", () => {
       anchor_time: 40,
       anchor_quote: "我搁苍山一柄剑",
       body: "好",
-      visibility: 1,
+      visibility: "private",
     });
   });
 
@@ -406,8 +411,8 @@ describe("likeComment", () => {
       likeComment(createMockSupabaseClient([lookup, insert]), "me", 1),
     ).rejects.toMatchObject({ status: 404 });
     expect(lookup.eq).toHaveBeenCalledWith("id", 1);
-    expect(lookup.eq).toHaveBeenCalledWith("status", 0);
-    expect(lookup.eq).toHaveBeenCalledWith("visibility", 0);
+    expect(lookup.eq).toHaveBeenCalledWith("status", "normal");
+    expect(lookup.eq).toHaveBeenCalledWith("visibility", "public");
     expect(insert.insert).not.toHaveBeenCalled();
   });
 
@@ -487,7 +492,7 @@ describe("listMyComments", () => {
           song_id: 3,
           anchor: "lyrics",
           anchor_quote: "我搁苍山一柄剑",
-          visibility: 1,
+          visibility: "private",
           user_id: "me",
         }),
         row({ id: 3, song_id: 2, parent_id: 9, anchor: null, user_id: "me" }),
@@ -499,7 +504,7 @@ describe("listMyComments", () => {
         {
           id: 1,
           body: "原批",
-          status: 0,
+          status: "normal",
           anchor: "notes",
           anchor_quote: "第一段",
           author: { name: "他" },
@@ -507,7 +512,7 @@ describe("listMyComments", () => {
         {
           id: 9,
           body: "",
-          status: 3,
+          status: "deleted",
           anchor: "song",
           anchor_quote: null,
           author: { name: "他" },

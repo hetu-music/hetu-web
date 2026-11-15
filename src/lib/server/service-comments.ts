@@ -29,11 +29,20 @@ import { z } from "zod";
  *
  * 读取走高权限客户端：要连带取作者名，而 users 表对他人不可读；
  * 可见范围在查询里自行限定（公开且正常的，加上看的人自己的）。
- * 写入一律用用户会话的客户端，由 RLS 与数据库函数把关。
+ * 新建与赞由接口用 service 连接写（库里不给 authenticated 写这两张表），限流与校验在这里；
+ * 改、删自己的用用户会话调数据库函数（edit_comment、delete_comment），函数里按 auth.uid() 把关。
  */
 
-const STATUS = { NORMAL: 0, PENDING: 1, HIDDEN: 2, DELETED: 3 } as const;
-const VISIBILITY = { PUBLIC: 0, PRIVATE: 1 } as const;
+const STATUS = {
+  NORMAL: "normal",
+  PENDING: "pending",
+  HIDDEN: "hidden",
+  DELETED: "deleted",
+} as const;
+const VISIBILITY = { PUBLIC: "public", PRIVATE: "private" } as const;
+
+type CommentStatus = (typeof STATUS)[keyof typeof STATUS];
+type CommentVisibility = (typeof VISIBILITY)[keyof typeof VISIBILITY];
 
 /** 每分钟最多发几条，挡住误触连发与刷屏 */
 const RATE_LIMIT_PER_MINUTE = 5;
@@ -50,8 +59,8 @@ interface CommentRow {
   anchor_time: number | string | null;
   anchor_quote: string | null;
   body: string;
-  visibility: number;
-  status: number;
+  visibility: CommentVisibility;
+  status: CommentStatus;
   like_count: number;
   created_at: string;
   edited_at: string | null;
@@ -89,7 +98,7 @@ export async function listSongComments(
   const db = getServiceClient();
   if (!db) return [];
 
-  // 已删（3）的批注只为留住回复，内容已清空，照样返回占位
+  // 已删的批注只为留住回复，内容已清空，照样返回占位
   const publicFilter = `and(visibility.eq.${VISIBILITY.PUBLIC},status.in.(${STATUS.NORMAL},${STATUS.DELETED}))`;
   const filter = viewerId
     ? `${publicFilter},and(user_id.eq.${viewerId},status.in.(${STATUS.NORMAL},${STATUS.PENDING}))`
@@ -249,7 +258,7 @@ type MyCommentRow = CommentRow & { song_id: number };
 type ParentRow = {
   id: number;
   body: string;
-  status: number;
+  status: CommentStatus;
   anchor: CommentAnchor;
   anchor_quote: string | null;
   author: { name: string | null } | null;

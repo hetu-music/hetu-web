@@ -29,7 +29,7 @@ vi.mock("@/lib/server/server-utils", () => ({
 }));
 
 vi.mock("@/lib/server/service-imagery", () => ({
-  getImageryCategories: vi.fn(),
+  getImageryTaxonomy: vi.fn(),
   createMotif: vi.fn(),
 }));
 
@@ -38,10 +38,7 @@ vi.mock("@/lib/server/server-revalidate", async (importOriginal) => ({
   refreshImagery: vi.fn(async () => ({ failed: [] })),
 }));
 
-import {
-  createMotif,
-  getImageryCategories,
-} from "@/lib/server/service-imagery";
+import { createMotif, getImageryTaxonomy } from "@/lib/server/service-imagery";
 import { GET, POST } from "./route";
 
 function jsonRequest(method: string, body?: unknown) {
@@ -56,35 +53,40 @@ beforeEach(() => {
   mockUser = { id: "admin-1", app_metadata: { role: "admin" } };
   mockCsrfValid = true;
   mockSessionAccessToken = "test-token";
-  vi.mocked(getImageryCategories).mockReset();
+  vi.mocked(getImageryTaxonomy).mockReset();
   vi.mocked(createMotif).mockReset();
 });
 
 describe("GET /api/admin/imagery/categories", () => {
-  it("正常返回分类列表", async () => {
-    vi.mocked(getImageryCategories).mockResolvedValue([
-      { id: 1, name: "自然", parent_id: null, level: 1, description: null },
-    ]);
+  it("正常返回类别与母题", async () => {
+    const taxonomy = {
+      categories: [
+        { id: 2, name: "天象", domain: "自然" as const, description: null },
+      ],
+      motifs: [{ id: 3, name: "月", category_id: 2, description: null }],
+    };
+    vi.mocked(getImageryTaxonomy).mockResolvedValue(taxonomy);
     const res = await GET(jsonRequest("GET"));
     expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(taxonomy);
   });
 
   it("service 层抛异常时返回 500", async () => {
-    vi.mocked(getImageryCategories).mockRejectedValue(new Error("boom"));
+    vi.mocked(getImageryTaxonomy).mockRejectedValue(new Error("boom"));
     const res = await GET(jsonRequest("GET"));
     expect(res.status).toBe(500);
   });
 });
 
 describe("POST /api/admin/imagery/categories", () => {
-  const valid = { name: "汗", parent_id: 2, description: "汗水、汗珠" };
+  const valid = { name: "汗", category_id: 2, description: "汗水、汗珠" };
 
   it("name 为空时返回 400", async () => {
     const res = await POST(jsonRequest("POST", { ...valid, name: "" }));
     expect(res.status).toBe(400);
   });
 
-  it("只能建母题：缺 parent_id 返回 400", async () => {
+  it("只能建母题：缺 category_id 返回 400", async () => {
     const res = await POST(
       jsonRequest("POST", { name: "汗", description: "汗水" }),
     );
@@ -97,16 +99,16 @@ describe("POST /api/admin/imagery/categories", () => {
     expect(createMotif).not.toHaveBeenCalled();
   });
 
-  it("父级不是类别（INVALID_PARENT）时映射为 400 而不是 500", async () => {
+  it("类别不存在（INVALID_CATEGORY）时映射为 400 而不是 500", async () => {
     vi.mocked(createMotif).mockRejectedValue(
-      Object.assign(new Error("母题只能放在类别（第二级）下"), {
-        code: "INVALID_PARENT",
+      Object.assign(new Error("没有这个类别"), {
+        code: "INVALID_CATEGORY",
       }),
     );
     const res = await POST(jsonRequest("POST", valid));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe("母题只能放在类别（第二级）下");
+    expect(body.error).toBe("没有这个类别");
   });
 
   it("其他未预期错误时返回 500，不泄露内部错误码", async () => {
@@ -123,8 +125,7 @@ describe("POST /api/admin/imagery/categories", () => {
     vi.mocked(createMotif).mockResolvedValue({
       id: 9,
       name: "新母题",
-      parent_id: 2,
-      level: 3,
+      category_id: 2,
     } as never);
     const request = new NextRequest(
       "http://localhost/api/admin/imagery/categories",
@@ -146,8 +147,7 @@ describe("POST /api/admin/imagery/categories", () => {
     vi.mocked(createMotif).mockResolvedValue({
       id: 9,
       name: "汗",
-      parent_id: 2,
-      level: 3,
+      category_id: 2,
       description: "汗水、汗珠",
     });
     const res = await POST(jsonRequest("POST", valid));

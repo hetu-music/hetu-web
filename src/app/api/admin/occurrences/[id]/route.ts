@@ -16,7 +16,7 @@ const UpdateOccurrenceSchema = z
   .object({
     imagery_id: z.number().int().positive().optional(),
     imagery_name: z.string().trim().min(1).max(50).optional(),
-    category_id: z.number().int().positive().optional(),
+    motif_id: z.number().int().positive().optional(),
   })
   .refine((v) => v.imagery_id === undefined || v.imagery_name === undefined, {
     message: "imagery_id 与 imagery_name 只能给一个",
@@ -48,7 +48,7 @@ export const PUT = withAuth(
     } catch (e) {
       if (
         e instanceof Error &&
-        ["NOT_MOTIF", "IMAGERY_NOT_IN_LYRICS"].includes(
+        ["NOT_MOTIF", "IMAGERY_NOT_IN_LYRICS", "DUPLICATE_OCCURRENCE"].includes(
           (e as Error & { code?: string }).code ?? "",
         )
       ) {
@@ -73,7 +73,7 @@ export const DELETE = withAuth(
     const id = getIdFromUrl(request);
     if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     try {
-      // 连同补写的「同时算进」一起删，删在草稿上；发布时再刷新
+      // 删在草稿上；发布时再刷新
       await deleteOccurrence(id, accessToken);
       return NextResponse.json({ success: true });
     } catch (e) {

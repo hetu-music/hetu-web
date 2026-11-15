@@ -25,24 +25,19 @@ import type { QuizQuestion } from "./types";
 
 function makeRows(): PoolRows {
   const categories: PoolRows["categories"] = [];
+  const motifs: PoolRows["motifs"] = [];
   let id = 1;
   for (const dim of DIMENSIONS) {
-    const l2 = id++;
-    categories.push({
-      id: l2,
-      name: dim.categories[0],
-      parent_id: null,
-      level: 2,
-    });
+    const categoryId = id++;
+    categories.push({ id: categoryId, name: dim.categories[0] });
     // 天象的母题取名「月」，让「明月」计入招牌意象「月」
-    categories.push({
+    motifs.push({
       id: id++,
       name: dim.key === "tianxiang" ? "月" : `${dim.label}-子类`,
-      parent_id: l2,
-      level: 3,
+      category_id: categoryId,
     });
   }
-  const leafOf = (i: number) => categories[i * 2 + 1].id;
+  const leafOf = (i: number) => motifs[i].id;
 
   const imagery = [
     { id: 1, name: "明月" },
@@ -68,7 +63,7 @@ function makeRows(): PoolRows {
       for (let c = 0; c < n; c += 1) {
         occurrences.push({
           song_id: songId,
-          category_id: leafOf(k),
+          motif_id: leafOf(k),
           imagery_id: dim.key === "tianxiang" && k === i ? 1 : 2,
           lyric_timetag: [`00:${String(10 + c).padStart(2, "0")}.00`],
         });
@@ -110,7 +105,7 @@ function makeRows(): PoolRows {
     for (let c = 0; c < 12; c += 1) {
       occurrences.push({
         song_id: songId,
-        category_id: leafOf(0),
+        motif_id: leafOf(0),
         imagery_id: 2,
         lyric_timetag: null,
       });
@@ -118,12 +113,12 @@ function makeRows(): PoolRows {
   }
   occurrences.push({
     song_id: 902,
-    category_id: leafOf(0),
+    motif_id: leafOf(0),
     imagery_id: 2,
     lyric_timetag: null,
   });
 
-  return { categories, imagery, occurrences, songs };
+  return { categories, motifs, imagery, occurrences, songs };
 }
 
 describe("codec", () => {
@@ -207,7 +202,7 @@ describe("buildPool", () => {
 
   it("除翻唱、参与外的类型及未标类型的作品都入池", () => {
     const rows = makeRows();
-    const leaf = rows.categories.find((c) => c.level === 3)?.id ?? 0;
+    const leaf = rows.motifs[0]?.id ?? 0;
     const extra: Array<[number, string[] | null]> = [
       [910, ["参与"]],
       [911, ["文宣"]],
@@ -230,7 +225,7 @@ describe("buildPool", () => {
       for (let c = 0; c < 12; c += 1) {
         rows.occurrences.push({
           song_id: id,
-          category_id: leaf,
+          motif_id: leaf,
           imagery_id: 2,
           lyric_timetag: null,
         });

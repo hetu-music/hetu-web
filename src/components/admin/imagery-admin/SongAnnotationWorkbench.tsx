@@ -31,14 +31,14 @@ import type { SongOption } from "./types";
 export interface AnnotationDraft {
   imageryId: number | null;
   imageryName: string;
-  categoryId: number;
+  motifId: number;
 }
 
 /** 正在编辑的标注；occurrenceId 为 null 表示新建。出现位置由歌词算出，不在这里 */
 interface EditorState {
   occurrenceId: number | null;
   imageryName: string;
-  categoryId: number | null;
+  motifId: number | null;
 }
 
 type Tone = "draft" | "hover" | "candidate" | "saved";
@@ -114,12 +114,12 @@ function shortPath(path: string): string {
 }
 
 /**
- * 一个词在这首歌里的标注。挂「通常算作」的词会补写「同时算进」的各条（「风雨」写风、雨两条），
- * 它们是一次标注写出来的：界面上合成一行，编辑、删除都按主条
+ * 一个词在这首歌里的标注：一个词一条。挂「通常算作」时它「同时算进」的母题由服务端读时展开
+ *（part_motif_ids，「风雨」挂风时也算雨），跟着这一条显示
  */
 interface WordAnnotation {
   main: OccurrenceWithSong;
-  parts: OccurrenceWithSong[];
+  parts: number[];
 }
 
 function firstSecond(o: OccurrenceWithSong): number {
@@ -140,7 +140,7 @@ export default function SongAnnotationWorkbench({
   items,
   motifs,
   submitting,
-  getCategoryPath,
+  getMotifPath,
   onSave,
   onDelete,
   onReload,
@@ -152,7 +152,7 @@ export default function SongAnnotationWorkbench({
   /** 全部母题，已排好序 */
   motifs: MotifOption[];
   submitting: boolean;
-  getCategoryPath: (categoryId: number) => string;
+  getMotifPath: (motifId: number) => string;
   onSave: (
     occurrenceId: number | null,
     draft: AnnotationDraft,
@@ -176,21 +176,14 @@ export default function SongAnnotationWorkbench({
     () => new Map(items.map((i) => [i.name.toLowerCase(), i])),
     [items],
   );
-  /** 按词合并的标注，主条是不在这个词「同时算进」里的那条，按首次出现排 */
-  const annotations = useMemo(() => {
-    const partsOf = new Map(items.map((i) => [i.id, new Set(i.parts)]));
-    const byWord = new Map<number, OccurrenceWithSong[]>();
-    for (const o of occurrences) {
-      byWord.set(o.imagery_id, [...(byWord.get(o.imagery_id) ?? []), o]);
-    }
-    return [...byWord.values()]
-      .map((rows): WordAnnotation => {
-        const parts = partsOf.get(rows[0].imagery_id) ?? new Set<number>();
-        const main = rows.find((r) => !parts.has(r.category_id)) ?? rows[0];
-        return { main, parts: rows.filter((r) => r !== main) };
-      })
-      .sort((a, b) => firstSecond(a.main) - firstSecond(b.main));
-  }, [items, occurrences]);
+  /** 这首歌的标注，按首次出现排 */
+  const annotations = useMemo(
+    () =>
+      occurrences
+        .map((o): WordAnnotation => ({ main: o, parts: o.part_motif_ids }))
+        .sort((a, b) => firstSecond(a.main) - firstSecond(b.main)),
+    [occurrences],
+  );
   /** 歌词行上的标注，一个词只算一次 */
   const occurrencesByTag = useMemo(() => {
     const map = new Map<string, OccurrenceWithSong[]>();
@@ -271,7 +264,7 @@ export default function SongAnnotationWorkbench({
       : undefined;
   // 挂「通常算作」时会一并算进的母题，编辑时说一声
   const willAlsoCount =
-    editor && resolvedItem && editor.categoryId === resolvedItem.primary
+    editor && resolvedItem && editor.motifId === resolvedItem.primary
       ? resolvedItem.parts
       : [];
 
@@ -292,7 +285,7 @@ export default function SongAnnotationWorkbench({
     setEditor({
       occurrenceId: o.id,
       imageryName: o.imagery_name ?? "",
-      categoryId: o.category_id,
+      motifId: o.motif_id,
     });
     const first = sortTags(o.lyric_timetag).find((t) => lyricTags.has(t));
     if (first) {
@@ -316,7 +309,7 @@ export default function SongAnnotationWorkbench({
     setEditor({
       occurrenceId: null,
       imageryName: name,
-      categoryId: defaultMotif(item),
+      motifId: defaultMotif(item),
     });
   };
 
@@ -327,10 +320,10 @@ export default function SongAnnotationWorkbench({
       ...editor,
       imageryName: name,
       // 新建时跟随词的默认母题；编辑已有标注时不擅自改母题
-      categoryId:
+      motifId:
         editor.occurrenceId === null && defaultMotif(item) !== null
           ? defaultMotif(item)
-          : editor.categoryId,
+          : editor.motifId,
     });
   };
 
@@ -352,11 +345,11 @@ export default function SongAnnotationWorkbench({
   };
 
   const save = async () => {
-    if (!editor || !canSave || editor.categoryId === null) return;
+    if (!editor || !canSave || editor.motifId === null) return;
     const ok = await onSave(editor.occurrenceId, {
       imageryId: resolvedItem?.id ?? null,
       imageryName: editor.imageryName.trim(),
-      categoryId: editor.categoryId,
+      motifId: editor.motifId,
     });
     if (ok) {
       setEditor(null);
@@ -376,7 +369,7 @@ export default function SongAnnotationWorkbench({
   const canSave =
     editor !== null &&
     nameError === null &&
-    editor.categoryId !== null &&
+    editor.motifId !== null &&
     // 歌词没有时间轴时无从核对，不拦
     (lyricLines.length === 0 || draftTags.length > 0) &&
     !submitting;
@@ -627,11 +620,9 @@ export default function SongAnnotationWorkbench({
                 <MotifSelect
                   key={resolvedItem?.id ?? "new"}
                   candidateIds={resolvedItem ? wordMotifIds(resolvedItem) : []}
-                  value={editor.categoryId}
+                  value={editor.motifId}
                   motifs={motifs}
-                  onChange={(categoryId) =>
-                    setEditor({ ...editor, categoryId })
-                  }
+                  onChange={(motifId) => setEditor({ ...editor, motifId })}
                   placeholder="— 选择母题 —"
                   hint
                   className={SELECT_CLASS}
@@ -640,7 +631,7 @@ export default function SongAnnotationWorkbench({
                   <span className="block text-xs text-slate-400 dark:text-slate-500">
                     保存时{WORD_ROLE.part.label}：
                     {willAlsoCount
-                      .map((id) => getCategoryPath(id).split(" / ").pop())
+                      .map((id) => getMotifPath(id).split(" / ").pop())
                       .join("、")}
                   </span>
                 )}
@@ -741,14 +732,10 @@ export default function SongAnnotationWorkbench({
                           {label}
                         </span>
                         <span className="text-[11px] text-slate-400">
-                          {shortPath(getCategoryPath(o.category_id))}
+                          {shortPath(getMotifPath(o.motif_id))}
                           {parts.length > 0 &&
                             ` · ${WORD_ROLE.part.label} ${parts
-                              .map((p) =>
-                                getCategoryPath(p.category_id)
-                                  .split(" / ")
-                                  .pop(),
-                              )
+                              .map((p) => getMotifPath(p).split(" / ").pop())
                               .join("、")}`}
                         </span>
                       </div>

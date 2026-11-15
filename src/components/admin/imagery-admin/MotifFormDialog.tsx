@@ -11,7 +11,7 @@ import {
   type MotifPayload,
   motifFormSchema,
 } from "@/lib/forms/imagery-form";
-import type { ImageryCategory } from "@/lib/types";
+import type { ImageryCategory, Motif } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import {
   INPUT_CLASS,
@@ -22,7 +22,7 @@ import {
 } from "../kit/styles";
 
 export type MotifFormTarget =
-  { type: "add"; parentId: number } | { type: "edit"; motif: ImageryCategory };
+  { type: "add"; categoryId: number } | { type: "edit"; motif: Motif };
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -52,20 +52,15 @@ export default function MotifFormDialog({
 
   useEffect(() => {
     if (target?.type === "add") {
-      form.reset(createMotifFormValues({ parent_id: target.parentId }));
+      form.reset(createMotifFormValues({ category_id: target.categoryId }));
     } else if (target?.type === "edit") {
       form.reset(createMotifFormValues(target.motif));
     }
   }, [form, target]);
 
-  const byId = new Map(categories.map((c) => [c.id, c]));
-  // 母题只能放在类别（第二级）下，选项写成「门类 / 类别」
+  // 选项写成「门类 / 类别」
   const parents = categories
-    .filter((c) => c.level === 2)
-    .map((c) => {
-      const top = c.parent_id === null ? undefined : byId.get(c.parent_id);
-      return { id: c.id, label: top ? `${top.name} / ${c.name}` : c.name };
-    })
+    .map((c) => ({ id: c.id, label: `${c.domain} / ${c.name}` }))
     .sort((a, b) => a.label.localeCompare(b.label, "zh-CN"));
   const busy = submitting || form.formState.isSubmitting;
   const editing = target?.type === "edit" ? target.motif : null;
@@ -118,7 +113,7 @@ export default function MotifFormDialog({
               所属类别 <span className="text-rose-500">*</span>
             </span>
             <select
-              {...form.register("parent_id", { valueAsNumber: true })}
+              {...form.register("category_id", { valueAsNumber: true })}
               className={SELECT_CLASS}
             >
               <option value={0} disabled>
@@ -131,7 +126,7 @@ export default function MotifFormDialog({
               ))}
             </select>
           </label>
-          <FieldError message={form.formState.errors.parent_id?.message} />
+          <FieldError message={form.formState.errors.category_id?.message} />
         </div>
 
         <div>

@@ -43,12 +43,13 @@ function describeWord(word: UnusedMotifWord): string {
 export function CleanupMotifsDialog({
   open,
   onClose,
-  getCategoryPath,
+  categoryLabel,
   onDeleted,
 }: {
   open: boolean;
   onClose: () => void;
-  getCategoryPath: (categoryId: number) => string;
+  /** 类别的路径「门类 / 类别」 */
+  categoryLabel: (categoryId: number) => string;
   onDeleted: (ids: number[]) => void;
 }) {
   const unused = useQuery({
@@ -63,19 +64,19 @@ export function CleanupMotifsDialog({
   const [deleting, setDeleting] = useState(false);
 
   const groups = useMemo(() => {
-    const byParent = new Map<number | null, UnusedMotif[]>();
+    const byCategory = new Map<number, UnusedMotif[]>();
     for (const motif of unused.data ?? []) {
-      const list = byParent.get(motif.parent_id) ?? [];
+      const list = byCategory.get(motif.category_id) ?? [];
       list.push(motif);
-      byParent.set(motif.parent_id, list);
+      byCategory.set(motif.category_id, list);
     }
-    return [...byParent]
-      .map(([parentId, motifs]) => ({
-        path: parentId === null ? "（无上级）" : getCategoryPath(parentId),
+    return [...byCategory]
+      .map(([categoryId, motifs]) => ({
+        path: categoryLabel(categoryId),
         motifs: motifs.sort((a, b) => a.name.localeCompare(b.name, "zh")),
       }))
       .sort((a, b) => a.path.localeCompare(b.path, "zh"));
-  }, [getCategoryPath, unused.data]);
+  }, [categoryLabel, unused.data]);
 
   const selected = (unused.data ?? [])
     .map((m) => m.id)

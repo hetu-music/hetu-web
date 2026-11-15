@@ -4,10 +4,7 @@ import {
   type AuthenticatedUser,
   type AuthContext,
 } from "@/lib/server/server-auth";
-import {
-  getImageryCategories,
-  createMotif,
-} from "@/lib/server/service-imagery";
+import { getImageryTaxonomy, createMotif } from "@/lib/server/service-imagery";
 import {
   refreshImagery,
   withPurgeStatus,
@@ -15,18 +12,20 @@ import {
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/server/parse-body";
 
-/** 只能新建母题：挂在某个类别（第二级）下，说明必填（见 IMAGERY.md） */
+/**
+ * GET 返回类别与母题（{ categories, motifs }）。类别固定，只能新建母题：
+ * 挂在某个类别下，说明必填（见 IMAGERY.md）
+ */
 const CreateMotifSchema = z.object({
   name: z.string().trim().min(1).max(50),
-  parent_id: z.number().int().positive(),
+  category_id: z.number().int().positive(),
   description: z.string().trim().min(1, "写一句这个母题指什么").max(500),
 });
 
 export const GET = withAuth(
   async (_request: NextRequest, _user: AuthenticatedUser) => {
     try {
-      const categories = await getImageryCategories();
-      return NextResponse.json(categories);
+      return NextResponse.json(await getImageryTaxonomy());
     } catch (e) {
       console.error("[GET /api/admin/imagery/categories]", e);
       return NextResponse.json(
@@ -57,7 +56,7 @@ export const POST = withAuth(
     } catch (e) {
       if (
         e instanceof Error &&
-        (e as Error & { code?: string }).code === "INVALID_PARENT"
+        (e as Error & { code?: string }).code === "INVALID_CATEGORY"
       ) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }

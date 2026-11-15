@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import MotifsClient from "@/components/admin/imagery-admin/MotifsClient";
 import { requireAdminPage } from "@/lib/server/admin-page";
-import { getImageryCategories } from "@/lib/server/service-imagery";
+import { getImageryTaxonomy } from "@/lib/server/service-imagery";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,9 @@ type Props = {
 export default async function ImageryAdminPage({ params }: Props) {
   const { locale } = await params;
   await requireAdminPage(locale, "/admin/imagery");
-  const categories = await getImageryCategories().catch(() => []);
-  return <MotifsClient initialCategories={categories} />;
+  const taxonomy = await getImageryTaxonomy().catch(() => ({
+    categories: [],
+    motifs: [],
+  }));
+  return <MotifsClient initialTaxonomy={taxonomy} />;
 }

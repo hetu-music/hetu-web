@@ -72,7 +72,7 @@ function HistoryBadge({ suggestion }: { suggestion: ImagerySuggestion }) {
   const threshold = Math.round(RECOMMEND_THRESHOLD * 100);
   const coveredByLonger =
     !suggestion.recommended &&
-    suggestion.categoryIds.length > 0 &&
+    suggestion.motifIds.length > 0 &&
     (rate === null || rate >= RECOMMEND_THRESHOLD);
   const title = [
     rate === null
@@ -138,9 +138,7 @@ function SuggestionRow({
 }) {
   const renamed = draft.name !== suggestion.name;
   // 词典里有的词用它登记的母题（与手动标注同一份）；AI 补充的新词只有模型挑的那个
-  const candidateIds = resolved
-    ? wordMotifIds(resolved)
-    : suggestion.categoryIds;
+  const candidateIds = resolved ? wordMotifIds(resolved) : suggestion.motifIds;
 
   return (
     <div
@@ -196,9 +194,9 @@ function SuggestionRow({
           <MotifSelect
             key={resolved?.id ?? draft.name}
             candidateIds={candidateIds}
-            value={draft.categoryId}
+            value={draft.motifId}
             motifs={motifs}
-            onChange={(categoryId) => onUpdate({ categoryId })}
+            onChange={(motifId) => onUpdate({ motifId })}
             className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-700 outline-none focus:border-(--tone) dark:border-slate-700 dark:text-slate-200 [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]"
           />
           {/* 统计的是原候选词；改名后不再适用 */}

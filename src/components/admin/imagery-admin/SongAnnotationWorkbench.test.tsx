@@ -55,8 +55,10 @@ function occurrence(
 ): OccurrenceWithSong {
   return {
     song_id: 7,
+    version_id: 70,
     imagery_id: 1,
-    category_id: 100,
+    motif_id: 100,
+    part_motif_ids: [],
     lyric_timetag: [],
     song_title: "测试",
     song_album: null,
@@ -78,7 +80,7 @@ function renderWorkbench(occurrences: OccurrenceWithSong[] = []) {
       items={items}
       motifs={motifs}
       submitting={false}
-      getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
+      getMotifPath={(id) => paths[id] ?? `分类 #${id}`}
       onSave={onSave}
       onDelete={onDelete}
       onReload={onReload}
@@ -126,7 +128,7 @@ describe("SongAnnotationWorkbench", () => {
     expect(onSave).toHaveBeenCalledWith(1, {
       imageryId: 1,
       imageryName: "明月",
-      categoryId: 100,
+      motifId: 100,
     });
   });
 
@@ -142,7 +144,7 @@ describe("SongAnnotationWorkbench", () => {
     expect(onSave).toHaveBeenCalledWith(null, {
       imageryId: 2,
       imageryName: "天涯",
-      categoryId: 200,
+      motifId: 200,
     });
   });
 
@@ -216,7 +218,7 @@ describe("SongAnnotationWorkbench", () => {
     expect(onSave).toHaveBeenCalledWith(null, {
       imageryId: null,
       imageryName: "天地",
-      categoryId: 200,
+      motifId: 200,
     });
   });
 
@@ -236,8 +238,8 @@ describe("SongAnnotationWorkbench", () => {
     expect(screen.getByText("编辑标注 #1")).toBeTruthy();
   });
 
-  it("补写了「同时算进」的词合成一行，编辑、删除都按主条", () => {
-    // 假设「天涯」通常算作区域（200），同时算进星相（100）：库里是两条
+  it("「同时算进」跟着它的标注显示（服务端读时展开），编辑、删除都按这一条", () => {
+    // 假设「天涯」通常算作区域（200），同时算进星相（100）：库里只有一条
     const withPart = items.map((i) =>
       i.id === 2 ? { ...i, parts: [100] } : i,
     );
@@ -246,17 +248,11 @@ describe("SongAnnotationWorkbench", () => {
         song={song}
         occurrences={[
           occurrence({
-            id: 5,
-            imagery_id: 2,
-            imagery_name: "天涯",
-            category_id: 100,
-            lyric_timetag: ["00:10.00", "01:10.00"],
-          }),
-          occurrence({
             id: 4,
             imagery_id: 2,
             imagery_name: "天涯",
-            category_id: 200,
+            motif_id: 200,
+            part_motif_ids: [100],
             lyric_timetag: ["00:10.00", "01:10.00"],
           }),
         ]}
@@ -264,7 +260,7 @@ describe("SongAnnotationWorkbench", () => {
         items={withPart}
         motifs={motifs}
         submitting={false}
-        getCategoryPath={(id) => paths[id] ?? `分类 #${id}`}
+        getMotifPath={(id) => paths[id] ?? `分类 #${id}`}
         onSave={onSave}
         onDelete={onDelete}
         onReload={onReload}
@@ -309,7 +305,7 @@ describe("SongAnnotationWorkbench", () => {
           name: "天涯",
           timetags: ["00:10.00", "01:10.00"],
           lines: ["明月照亮天涯", "明月照亮天涯"],
-          categoryIds: [200],
+          motifIds: [200],
           seen: 10,
           annotated: 5,
           rate: 0.5,
@@ -341,7 +337,7 @@ describe("SongAnnotationWorkbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存选中" }));
     await vi.waitFor(() => expect(onReload).toHaveBeenCalled());
     expect(apiCreateOccurrencesBatch).toHaveBeenCalledWith(7, [
-      { imagery_id: 2, category_id: 200 },
+      { imagery_id: 2, motif_id: 200 },
     ]);
   });
 });

@@ -54,7 +54,7 @@ export const DELETE = withAuth(
       if (invalid) return invalid;
       const result = await deleteUnusedMotifs(input.ids, token);
       if (result.deleted.length === 0) return NextResponse.json(result);
-      // 没有标注的母题不在任何公开页上，但分类树进了意象索引
+      // 没有标注的母题不在任何公开页上，但母题表进了意象索引
       const purge = await refreshImagery();
       return withPurgeStatus(NextResponse.json(result), purge);
     } catch (e) {

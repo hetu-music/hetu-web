@@ -5,7 +5,7 @@
  * 服务端页面、诊断脚本和单元测试共用同一份实现。
  */
 
-/** 意象维度：由若干意象二级分类合并而成 */
+/** 意象维度：由若干意象类别合并而成 */
 export type DimensionKey =
   | "tianxiang"
   | "shanhe"
@@ -21,7 +21,7 @@ export interface Dimension {
   key: DimensionKey;
   /** 维度名，如「天象」 */
   label: string;
-  /** 合并进该维度的意象二级分类名 */
+  /** 合并进该维度的意象类别名 */
   categories: readonly string[];
   /** 结果页的称号 */
   motto: string;

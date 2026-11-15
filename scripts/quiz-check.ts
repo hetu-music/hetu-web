@@ -8,6 +8,10 @@
  *             供定时任务或 CI 使用；待标注歌曲只提示，不算失败。
  */
 import { createClient } from "@supabase/supabase-js";
+import {
+  expandAnnotations,
+  type PublishedAnnotation,
+} from "../src/lib/imagery/consistency";
 import { checkCoverage } from "../src/lib/quiz/coverage";
 import { MIN_OCCURRENCES, type PoolRows } from "../src/lib/quiz/pool";
 
@@ -33,30 +37,45 @@ async function main() {
     }
   }
 
-  const [categories, imagery, occurrences, songs] = await Promise.all([
-    fetchAll<PoolRows["categories"][number]>(
-      "imagery_categories",
-      "id,name,parent_id,level",
-    ),
-    fetchAll<PoolRows["imagery"][number]>("imagery", "id,name"),
-    fetchAll<PoolRows["occurrences"][number]>(
-      "published_song_imagery",
-      "song_id,category_id,imagery_id,lyric_timetag",
-    ),
-    fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
-      // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池
-      "catalog",
-      "id,title,artist,album,hascover,has_audio,type,date,lyrics",
-    ),
-  ]);
-  const report = checkCoverage({ categories, imagery, occurrences, songs });
+  const [categories, motifs, imagery, annotations, lyrics, songs] =
+    await Promise.all([
+      fetchAll<PoolRows["categories"][number]>("imagery_categories", "id,name"),
+      fetchAll<PoolRows["motifs"][number]>("motifs", "id,name,category_id"),
+      fetchAll<PoolRows["imagery"][number]>("imagery", "id,name"),
+      fetchAll<PublishedAnnotation>(
+        "published_song_imagery",
+        "song_id,version_id,imagery_id,motif_id,part_motif_ids",
+      ),
+      fetchAll<{ version_id: number; lyrics: string | null }>(
+        "published_songs",
+        "version_id,lyrics",
+      ),
+      fetchAll<PoolRows["songs"][number] & { lyrics: string | null }>(
+        // 与站内候选池同源：只取计入曲库的歌，资料有争议的不入池
+        "catalog",
+        "id,title,artist,album,hascover,has_audio,type,date,lyrics",
+      ),
+    ]);
+  // 与站内的意象索引一样：「同时算进」展开成行，时间标签按歌词算
+  const occurrences = expandAnnotations(
+    annotations,
+    new Map(lyrics.map((l) => [l.version_id, l.lyrics])),
+    new Map(imagery.map((i) => [i.id, i.name])),
+  );
+  const report = checkCoverage({
+    categories,
+    motifs,
+    imagery,
+    occurrences,
+    songs,
+  });
 
   let problems = 0;
   const section = (title: string) => console.log(`\n■ ${title}`);
 
   section("意象分类与测验维度（dimensions.ts）");
   if (report.unmappedCategories.length === 0) {
-    console.log("  ✓ 所有二级分类都已映射到维度");
+    console.log("  ✓ 所有类别都已映射到维度");
   }
   for (const c of report.unmappedCategories) {
     problems += 1;

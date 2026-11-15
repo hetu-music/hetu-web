@@ -1,10 +1,10 @@
 import { cache } from "react";
-import { PALETTE_FULL, sortLevel1Categories } from "@/lib/imagery/palette";
+import { domainPalette } from "@/lib/imagery/palette";
 import {
   loadImageryIndex,
   type ImageryIndex,
-  type IndexCategory,
 } from "@/lib/server/imagery-index";
+import { IMAGERY_DOMAINS, type ImageryCategory, type Motif } from "@/lib/types";
 import type {
   CloudMotif,
   CloudMotifGroup,
@@ -25,23 +25,19 @@ import { toTraditional, toTraditionalArray } from "@/lib/utils/utils-convert";
 
 function derive(index: ImageryIndex) {
   const catById = new Map(index.categories.map((c) => [c.id, c]));
-  const l1 = sortLevel1Categories(index.categories);
-  // 配色记成 PALETTE_FULL 的下标，客户端据此取深浅两套颜色；-1 为灰
-  const paletteOfL1 = new Map(
-    l1.map((c, i) => [c.id, i % PALETTE_FULL.length]),
-  );
-  const pathOf = (id: number): IndexCategory[] => {
-    const path: IndexCategory[] = [];
-    let cat = catById.get(id);
-    while (cat && path.length < 5) {
-      path.unshift(cat);
-      cat = cat.parent_id !== null ? catById.get(cat.parent_id) : undefined;
-    }
-    return path;
+  const motifById = new Map(index.motifs.map((m) => [m.id, m]));
+  /** 母题与它的类别；查不到的不展示 */
+  const placeOf = (
+    motifId: number,
+  ): { motif: Motif; category: ImageryCategory } | null => {
+    const motif = motifById.get(motifId);
+    const category = motif && catById.get(motif.category_id);
+    return motif && category ? { motif, category } : null;
   };
+  // 配色记成 PALETTE_FULL 的下标，客户端据此取深浅两套颜色；-1 为灰
   const paletteOf = (motifId: number) => {
-    const root = pathOf(motifId)[0];
-    return (root && paletteOfL1.get(root.id)) ?? -1;
+    const place = placeOf(motifId);
+    return place ? domainPalette(place.category.domain) : -1;
   };
 
   const catalog = new Set(index.songs.map((s) => s.id));
@@ -51,23 +47,21 @@ function derive(index: ImageryIndex) {
   const wordMotifSongs = new Map<number, Map<number, Set<number>>>();
   for (const occ of index.occurrences) {
     if (!catalog.has(occ.song_id)) continue;
-    let songs = songsByMotif.get(occ.category_id);
-    if (!songs) songsByMotif.set(occ.category_id, (songs = new Set()));
+    let songs = songsByMotif.get(occ.motif_id);
+    if (!songs) songsByMotif.set(occ.motif_id, (songs = new Set()));
     songs.add(occ.song_id);
     let motifs = motifsBySong.get(occ.song_id);
     if (!motifs) motifsBySong.set(occ.song_id, (motifs = new Set()));
-    motifs.add(occ.category_id);
+    motifs.add(occ.motif_id);
     let byMotif = wordMotifSongs.get(occ.imagery_id);
     if (!byMotif) wordMotifSongs.set(occ.imagery_id, (byMotif = new Map()));
-    let wordSongs = byMotif.get(occ.category_id);
-    if (!wordSongs) byMotif.set(occ.category_id, (wordSongs = new Set()));
+    let wordSongs = byMotif.get(occ.motif_id);
+    if (!wordSongs) byMotif.set(occ.motif_id, (wordSongs = new Set()));
     wordSongs.add(occ.song_id);
   }
   return {
-    catById,
-    l1,
-    paletteOfL1,
-    pathOf,
+    motifById,
+    placeOf,
     paletteOf,
     songsByMotif,
     motifsBySong,
@@ -117,16 +111,17 @@ export const getImageryCloud = cache(async function getImageryCloud(
 
   const groups = new Map<number, CloudMotifGroup>();
   for (const [motifId, songs] of d.songsByMotif) {
-    const [root, l2, motif] = d.pathOf(motifId);
-    if (!root || !l2 || !motif) continue;
-    let group = groups.get(l2.id);
+    const place = d.placeOf(motifId);
+    if (!place) continue;
+    const { motif, category } = place;
+    let group = groups.get(category.id);
     if (!group) {
       groups.set(
-        l2.id,
+        category.id,
         (group = {
-          id: l2.id,
-          name: tr(l2.name),
-          l1: root.id,
+          id: category.id,
+          name: tr(category.name),
+          l1: category.domain,
           palette: d.paletteOf(motifId),
           motifs: [],
         }),
@@ -135,15 +130,14 @@ export const getImageryCloud = cache(async function getImageryCloud(
     const item: CloudMotif = {
       id: motifId,
       name: tr(motif.name),
-      l1: root.id,
-      l2: l2.id,
+      l1: category.domain,
+      l2: category.id,
       palette: group.palette,
       songCount: songs.size,
       wordCount: wordCount.get(motifId) ?? 0,
     };
     group.motifs.push(item);
   }
-  const l1Order = new Map(d.l1.map((c, i) => [c.id, i]));
   const total = (g: CloudMotifGroup) =>
     g.motifs.reduce((s, m) => s + m.songCount, 0);
   const sortedGroups = [...groups.values()]
@@ -153,15 +147,15 @@ export const getImageryCloud = cache(async function getImageryCloud(
     }))
     .sort(
       (a, b) =>
-        (l1Order.get(a.l1) ?? 99) - (l1Order.get(b.l1) ?? 99) ||
+        IMAGERY_DOMAINS.indexOf(a.l1) - IMAGERY_DOMAINS.indexOf(b.l1) ||
         total(b) - total(a),
     );
 
   return {
-    l1: d.l1.map((c) => ({
-      id: c.id,
-      name: tr(c.name),
-      palette: d.paletteOfL1.get(c.id) ?? -1,
+    l1: IMAGERY_DOMAINS.map((domain) => ({
+      id: domain,
+      name: tr(domain),
+      palette: domainPalette(domain),
     })),
     groups: sortedGroups,
     words,
@@ -189,9 +183,10 @@ export const getMotifDetail = cache(async function getMotifDetail(
   const index = await loadImageryIndex();
   const d = derive(index);
   const tr = translator(locale);
-  const motif = d.catById.get(motifId);
+  const place = d.placeOf(motifId);
   const own = d.songsByMotif.get(motifId);
-  if (!motif || motif.level !== 3 || !own) return null;
+  if (!place || !own) return null;
+  const { motif, category } = place;
   const wordName = new Map(index.imagery.map((i) => [i.id, i.name]));
 
   // 写法
@@ -211,7 +206,7 @@ export const getMotifDetail = cache(async function getMotifDetail(
   // 作品：新的在前
   const wordsBySong = new Map<number, Set<number>>();
   for (const occ of index.occurrences) {
-    if (occ.category_id !== motifId || !own.has(occ.song_id)) continue;
+    if (occ.motif_id !== motifId || !own.has(occ.song_id)) continue;
     let set = wordsBySong.get(occ.song_id);
     if (!set) wordsBySong.set(occ.song_id, (set = new Set()));
     set.add(occ.imagery_id);
@@ -237,10 +232,7 @@ export const getMotifDetail = cache(async function getMotifDetail(
   return {
     id: motifId,
     name: tr(motif.name),
-    path: d
-      .pathOf(motifId)
-      .slice(0, -1)
-      .map((c) => tr(c.name)),
+    path: [tr(category.domain), tr(category.name)],
     palette: d.paletteOf(motifId),
     description: motif.description ? tr(motif.description) : null,
     songCount: own.size,
@@ -272,7 +264,7 @@ export async function getMotifCowritten(
     if (lift < COWRITE_MIN_LIFT) continue;
     cowritten.push({
       id: otherId,
-      name: tr(d.catById.get(otherId)?.name ?? ""),
+      name: tr(d.motifById.get(otherId)?.name ?? ""),
       palette: d.paletteOf(otherId),
       both,
       lift,

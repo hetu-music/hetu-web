@@ -7,16 +7,14 @@ import type { DimensionKey, Mood, PoolSong } from "./types";
 
 /** 候选池的原始数据行，字段与数据库表一致 */
 export interface PoolRows {
-  categories: Array<{
-    id: number;
-    name: string;
-    parent_id: number | null;
-    level: number | null;
-  }>;
+  /** 类别（十七个） */
+  categories: Array<{ id: number; name: string }>;
+  /** 母题，挂在类别下 */
+  motifs: Array<{ id: number; name: string; category_id: number }>;
   imagery: Array<{ id: number; name: string }>;
   occurrences: Array<{
     song_id: number;
-    category_id: number;
+    motif_id: number;
     imagery_id: number;
     lyric_timetag: string[] | null;
   }>;
@@ -86,25 +84,15 @@ export function isPoolEligible(song: {
   return !VARIANT_TITLE.test(song.title);
 }
 
-/**
- * 意象挂在三级分类上；返回把任意分类 id 映射到其二级分类名的函数（带缓存）。
- */
-export function createLevel2Resolver(
-  categories: PoolRows["categories"],
-): (categoryId: number) => string | null {
-  const categoryById = new Map(categories.map((c) => [c.id, c]));
-  const cache = new Map<number, string | null>();
-  return (categoryId) => {
-    const cached = cache.get(categoryId);
-    if (cached !== undefined) return cached;
-    let cat = categoryById.get(categoryId);
-    while (cat && (cat.level ?? 0) > 2 && cat.parent_id !== null) {
-      cat = categoryById.get(cat.parent_id);
-    }
-    const name = cat && cat.level === 2 ? cat.name : null;
-    cache.set(categoryId, name);
-    return name;
-  };
+/** 标注挂在母题上；返回把母题 id 映射到它所属类别名的函数 */
+export function createCategoryResolver(
+  rows: Pick<PoolRows, "categories" | "motifs">,
+): (motifId: number) => string | null {
+  const categoryName = new Map(rows.categories.map((c) => [c.id, c.name]));
+  const byMotif = new Map(
+    rows.motifs.map((m) => [m.id, categoryName.get(m.category_id) ?? null]),
+  );
+  return (motifId) => byMotif.get(motifId) ?? null;
 }
 
 function emptyDimCounts(): Record<DimensionKey, number> {
@@ -115,19 +103,19 @@ function emptyDimCounts(): Record<DimensionKey, number> {
 }
 
 /**
- * 把意象标注聚合为候选池。意象挂在三级分类（母题）上：向上找到二级分类后映射到维度，
+ * 把意象标注聚合为候选池。标注挂在母题上：母题所属的类别映射到维度，
  * 母题本身决定是否计入招牌意象。
  */
 export function buildPool(rows: PoolRows): PoolSong[] {
-  const level2Of = createLevel2Resolver(rows.categories);
+  const categoryOf = createCategoryResolver(rows);
   const signatureOf = new Map(
-    rows.categories.flatMap((c) => {
-      const signature = MOTIF_TO_SIGNATURE.get(c.name);
-      return c.level === 3 && signature ? [[c.id, signature] as const] : [];
+    rows.motifs.flatMap((m) => {
+      const signature = MOTIF_TO_SIGNATURE.get(m.name);
+      return signature ? [[m.id, signature] as const] : [];
     }),
   );
-  const resolveDim = (categoryId: number): DimensionKey | null => {
-    const name = level2Of(categoryId);
+  const resolveDim = (motifId: number): DimensionKey | null => {
+    const name = categoryOf(motifId);
     return name === null ? null : (CATEGORY_TO_DIMENSION.get(name) ?? null);
   };
 
@@ -158,9 +146,9 @@ export function buildPool(rows: PoolRows): PoolSong[] {
     const imageryCounts: Record<string, number> = {};
     const occurrences: PoolSong["occurrences"] = [];
     for (const occ of occs) {
-      const dim = resolveDim(occ.category_id);
+      const dim = resolveDim(occ.motif_id);
       if (dim) dimCounts[dim] += 1;
-      const signature = signatureOf.get(occ.category_id) ?? null;
+      const signature = signatureOf.get(occ.motif_id) ?? null;
       if (signature) {
         imageryCounts[signature] = (imageryCounts[signature] ?? 0) + 1;
       }

@@ -23,19 +23,28 @@ import { getSongImagery } from "./service-song-imagery";
 
 // ─── 测试数据 ────────────────────────────────────────────────────────────────
 // 母题「月」写得多（明月、月光都算）、「剑」次之、「江湖」少见；
-// 流云（15）的母题找不到一级分类；风雨（16）是并列词，有风、雨两条标注
+// 流云（15）的母题找不到类别；风雨（16）挂风，「同时算进」雨（读时展开成两行）
 
 const categories = [
-  { id: 1, name: "自然", parent_id: null, level: 1 },
-  { id: 2, name: "天象", parent_id: 1, level: 2 },
-  { id: 3, name: "月", parent_id: 2, level: 3 },
-  { id: 20, name: "风", parent_id: 2, level: 3 },
-  { id: 21, name: "雨", parent_id: 2, level: 3 },
-  { id: 4, name: "人文", parent_id: null, level: 1 },
-  { id: 5, name: "器物", parent_id: 4, level: 2 },
-  { id: 7, name: "剑", parent_id: 5, level: 3 },
-  { id: 8, name: "江湖", parent_id: 4, level: 3 },
-  { id: 6, name: "飘零", parent_id: 99, level: 3 },
+  { id: 2, name: "天象", domain: "自然", description: null },
+  { id: 5, name: "器物", domain: "人文", description: null },
+];
+
+const motifs = [
+  { id: 3, name: "月", category_id: 2, description: null },
+  { id: 20, name: "风", category_id: 2, description: null },
+  { id: 21, name: "雨", category_id: 2, description: null },
+  { id: 7, name: "剑", category_id: 5, description: null },
+  { id: 8, name: "江湖", category_id: 5, description: null },
+  { id: 6, name: "飘零", category_id: 99, description: null },
+];
+
+// 本曲的歌词：时间标签按它算出来
+const lyrics = [
+  {
+    version_id: 1,
+    lyrics: "[00:10.00]明月\n[00:20.00]流云\n[00:30.00]风雨\n[00:40.00]明月",
+  },
 ];
 
 const imagery = [
@@ -63,22 +72,20 @@ const songs = [
 function occ(
   song_id: number,
   imagery_id: number,
-  category_id: number,
-  lyric_timetag: string[] | null = null,
+  motif_id: number,
+  part_motif_ids: number[] = [],
 ) {
-  return { song_id, imagery_id, category_id, lyric_timetag };
+  return { song_id, version_id: song_id, imagery_id, motif_id, part_motif_ids };
 }
 
 const occurrences = [
-  // 本曲：明月出现两次，时间标签合并
-  occ(1, 10, 3, ["00:10.00"]),
-  occ(1, 10, 3, ["00:40.00"]),
+  // 本曲：明月在歌词里出现两次，时间标签两行
+  occ(1, 10, 3),
   occ(1, 11, 7),
   occ(1, 13, 3),
-  occ(1, 15, 6, ["00:20.00"]),
-  // 并列词：两条标注、同一处高亮，时间标签不重复
-  occ(1, 16, 20, ["00:30.00"]),
-  occ(1, 16, 21, ["00:30.00"]),
+  occ(1, 15, 6),
+  // 并列词：一条标注展开成风、雨两行，同一处高亮
+  occ(1, 16, 20, [21]),
   // 纯歌版与原曲同源，不推荐
   occ(2, 10, 3),
   occ(2, 11, 7),
@@ -119,6 +126,8 @@ function mockClient(overrides: Partial<Tables> = {}) {
   };
   const byTable: Record<string, unknown[]> = {
     [TABLES.IMAGERY_CAT]: rows.categories,
+    [TABLES.MOTIFS]: motifs,
+    [TABLES.PUBLISHED_SONGS]: lyrics,
     [TABLES.IMAGERY]: rows.imagery,
     [TABLES.PUBLISHED_SONG_IMAGERY]: rows.occurrences,
     [TABLES.CATALOG]: rows.songs,

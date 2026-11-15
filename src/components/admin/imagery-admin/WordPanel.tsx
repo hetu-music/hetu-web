@@ -9,11 +9,11 @@ import {
   apiSetWordMotifs,
 } from "@/lib/api/client-api";
 import {
-  categoryPath,
+  motifPaths,
   type MotifOption,
   WORD_ROLE,
 } from "@/lib/imagery/word-motifs";
-import type { ImageryCategory, ImageryItem } from "@/lib/types";
+import type { ImageryItem, ImageryTaxonomy } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { ErrorState, LoadingState } from "../kit/parts";
 import {
@@ -34,19 +34,20 @@ type WordMotifs = { primary: number; alternatives: number[]; parts: number[] };
  */
 export default function WordPanel({
   word,
-  categories,
+  taxonomy,
   motifs,
   onClose,
 }: {
   word: ImageryItem;
-  categories: ImageryCategory[];
+  taxonomy: ImageryTaxonomy;
   motifs: MotifOption[];
   onClose?: () => void;
 }) {
   const byId = useMemo(
-    () => new Map(categories.map((c) => [c.id, c])),
-    [categories],
+    () => new Map(taxonomy.motifs.map((m) => [m.id, m])),
+    [taxonomy],
   );
+  const pathOf = useMemo(() => motifPaths(taxonomy), [taxonomy]);
   const setItems = useUpdateCache<ImageryItem>(IMAGERY_KEYS.items);
   const occurrences = useQuery({
     queryKey: ["admin", "imagery", "word-occurrences", word.id],
@@ -58,7 +59,7 @@ export default function WordPanel({
   const annotated = useMemo(() => {
     const counts = new Map<number, number>();
     for (const o of occurrences.data ?? []) {
-      counts.set(o.category_id, (counts.get(o.category_id) ?? 0) + 1);
+      counts.set(o.motif_id, (counts.get(o.motif_id) ?? 0) + 1);
     }
     return counts;
   }, [occurrences.data]);
@@ -73,7 +74,7 @@ export default function WordPanel({
         title: o.song_title,
         motifIds: new Set<number>(),
       };
-      entry.motifIds.add(o.category_id);
+      entry.motifIds.add(o.motif_id);
       bySong.set(o.song_id, entry);
     }
     return [...bySong.values()].sort((a, b) =>
@@ -219,7 +220,7 @@ export default function WordPanel({
           saving={saving}
           disabled={word.primary === null}
           nameOf={nameOf}
-          pathOf={(id) => categoryPath(id, byId)}
+          pathOf={pathOf}
           onAdd={(id) => add(role, id)}
           onRemove={(id) => remove(role, id)}
         />

@@ -42,43 +42,42 @@ import {
   saveQuizRecord,
 } from "./service-quiz";
 
-// ─── 测试数据：每个维度一首「专精」歌曲，歌词与意象时间标签一一对应 ─────────
+// ─── 测试数据：每个维度一首「专精」歌曲。每句歌词是一个标注词，时间标签按歌词算出来就是那一句 ─────────
 
 type Rows = {
   categories: unknown[];
-  imagery: unknown[];
+  motifs: unknown[];
+  imagery: Array<{ id: number; name: string }>;
   occurrences: unknown[];
   songs: Array<Record<string, unknown>>;
-  lyrics: Array<{ id: number; lyrics: string | null }>;
+  lyrics: Array<{ id: number; version_id: number; lyrics: string | null }>;
 };
 
 function makeRows(): Rows {
   const categories: Array<Record<string, unknown>> = [];
+  const motifs: Array<Record<string, unknown>> = [];
   let catId = 1;
   const leafOf: number[] = [];
   for (const dim of DIMENSIONS) {
-    const l2 = catId++;
+    const categoryId = catId++;
     categories.push({
-      id: l2,
+      id: categoryId,
       name: dim.categories[0],
-      parent_id: null,
-      level: 2,
+      domain: "自然",
+      description: null,
     });
     const leaf = catId++;
-    categories.push({
+    motifs.push({
       id: leaf,
-      // 天象的母题取名「月」，让「明月」计入招牌意象「月」
+      // 天象的母题取名「月」，让它计入招牌意象「月」
       name: dim.key === "tianxiang" ? "月" : `${dim.label}子类`,
-      parent_id: l2,
-      level: 3,
+      category_id: categoryId,
+      description: null,
     });
     leafOf.push(leaf);
   }
 
-  const imagery = [
-    { id: 1, name: "明月" },
-    { id: 2, name: "杂项" },
-  ];
+  const imagery: Rows["imagery"] = [];
   const songs: Rows["songs"] = [];
   const occurrences: Array<Record<string, unknown>> = [];
   const lyrics: Rows["lyrics"] = [];
@@ -100,19 +99,23 @@ function makeRows(): Rows {
       const n = k === i ? 10 : 1;
       for (let c = 0; c < n; c += 1) {
         const tag = `0${k}:${String(10 + c).padStart(2, "0")}.00`;
+        const word = `${dim.label}${k}句${c}`;
+        const imageryId = imagery.length + 1;
+        imagery.push({ id: imageryId, name: word });
         occurrences.push({
           song_id: songId,
-          category_id: leafOf[k],
-          imagery_id: dim.key === "tianxiang" && k === i ? 1 : 2,
-          lyric_timetag: [tag],
+          version_id: songId,
+          motif_id: leafOf[k],
+          imagery_id: imageryId,
+          part_motif_ids: [],
         });
-        lrc.push(`[${tag}]${dim.label}${k}句${c}`);
+        lrc.push(`[${tag}]${word}`);
       }
     });
-    lyrics.push({ id: songId, lyrics: lrc.join("\n") });
+    lyrics.push({ id: songId, version_id: songId, lyrics: lrc.join("\n") });
   });
 
-  return { categories, imagery, occurrences, songs, lyrics };
+  return { categories, motifs, imagery, occurrences, songs, lyrics };
 }
 
 /**
@@ -126,6 +129,7 @@ function mockClient(
   const ok = (data: unknown): MockResult => ({ data, error: null });
   const byTable: Record<string, () => unknown> = {
     [TABLES.IMAGERY_CAT]: () => makeQueryBuilder(ok(rows.categories)),
+    [TABLES.MOTIFS]: () => makeQueryBuilder(ok(rows.motifs)),
     [TABLES.IMAGERY]: () => makeQueryBuilder(ok(rows.imagery)),
     [TABLES.PUBLISHED_SONG_IMAGERY]: () =>
       makeQueryBuilder(ok(rows.occurrences)),
@@ -232,7 +236,7 @@ describe("getQuizPoolSize", () => {
     mockClient(rows);
     expect(await getQuizPoolSize()).toBe(0);
     expect(vi.mocked(console.error).mock.calls[0][1]).toMatchObject({
-      message: expect.stringContaining("occurrences"),
+      message: expect.stringContaining("annotations"),
     });
   });
 
@@ -322,12 +326,8 @@ describe("getQuizResult", () => {
     expect(result?.matches.every((m) => m.lines.length === 0)).toBe(true);
   });
 
-  it("时间标签无法解析或对不上歌词时跳过该句", async () => {
+  it("歌词没有了（算不出时间标签）时跳过该句", async () => {
     const rows = makeRows();
-    rows.occurrences = rows.occurrences.map((o) => ({
-      ...(o as Record<string, unknown>),
-      lyric_timetag: ["坏标签"],
-    }));
     rows.lyrics[0].lyrics = null;
     mockClient(rows);
     const result = await getQuizResult(answersFavoring("tianxiang"), "zh-CN");

@@ -21,7 +21,7 @@ export interface SuggestionDraft {
   checked: boolean;
   /** 保存时使用的意象名，默认为候选原名，审核时可改 */
   name: string;
-  categoryId: number | null;
+  motifId: number | null;
 }
 
 export type PanelMessage = { type: "success" | "error"; text: string };
@@ -42,7 +42,7 @@ function initialDraft(
   return {
     checked: s.recommended,
     name: s.name,
-    categoryId: (item && wordMotifIds(item)[0]) ?? s.categoryIds[0] ?? null,
+    motifId: (item && wordMotifIds(item)[0]) ?? s.motifIds[0] ?? null,
   };
 }
 
@@ -186,7 +186,7 @@ export function useImagerySuggestions(
             ...draft,
             name: name.trim(),
             checked: true,
-            categoryId: (entry && wordMotifIds(entry)[0]) ?? draft.categoryId,
+            motifId: (entry && wordMotifIds(entry)[0]) ?? draft.motifId,
           },
         };
       });
@@ -242,7 +242,7 @@ export function useImagerySuggestions(
           name: a.name,
           timetags: a.timetags,
           lines: a.lines,
-          categoryIds: a.categoryId === null ? [] : [a.categoryId],
+          motifIds: a.motifId === null ? [] : [a.motifId],
           seen: 0,
           annotated: 0,
           rate: null,
@@ -298,14 +298,14 @@ export function useImagerySuggestions(
         });
         return;
       }
-      if (draft.categoryId === null) {
+      if (draft.motifId === null) {
         setMessage({ type: "error", text: `「${name}」还没有选择母题` });
         return;
       }
       const entry = resolveName(name);
       items.push({
         ...(entry ? { imagery_id: entry.id } : { imagery_name: name }),
-        category_id: draft.categoryId,
+        motif_id: draft.motifId,
       });
     }
     if (items.length === 0) return;

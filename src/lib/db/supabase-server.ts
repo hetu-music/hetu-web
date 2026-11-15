@@ -59,11 +59,13 @@ export const TABLES = {
   // 意象系统表
   IMAGERY: "imagery",
   IMAGERY_SUMMARY_ALL: "imagery_summary_all", // 视图：全部词及次数，含争议歌曲（后台词典）
-  IMAGERY_CAT: "imagery_categories",
+  IMAGERY_CAT: "imagery_categories", // 十七个类别，带门类 domain；固定，后台只读
+  MOTIFS: "motifs", // 母题：标注与词登记挂的那一层
   IMAGERY_MOTIFS: "imagery_motifs", // 词 → 可取的母题（见 IMAGERY.md）
   EMOTIONS: "emotions", // 基调词表（见 IMAGERY.md）
   // 编校数据挂在版本上（version_id），行的 id 在各版本间不变；只能写在草稿上
   SONG_IMAGERY: "song_imagery", // 意象标注（原 imagery_occurrences）
+  // 两个视图一条标注一行，part_motif_ids 是读时展开的「同时算进」；时间标签由服务端按歌词算
   PUBLISHED_SONG_IMAGERY: "published_song_imagery", // 视图：线上版本的标注，带 song_id
   WORKING_SONG_IMAGERY: "working_song_imagery", // 视图：工作版本的标注，带 song_id、歌名、词名、母题名
   SONG_EMOTIONS: "song_emotions", // 每首歌的主、副基调

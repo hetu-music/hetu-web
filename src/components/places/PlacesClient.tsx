@@ -1,25 +1,30 @@
 "use client";
 
 /**
- * 水系图原型：不画底图，只画河。地点是河上的站，选中后只留同一首歌到过的地方，
+ * 河图志（docs/PLACES.md）：不画底图，只画河。地点是河上的站，选中后只留同一首歌到过的地方，
  * 其余退下去，词句竖排在左栏。窄屏改成从入海口往上读的目录。
+ * 地点与词句来自数据库；河与站的位置是手排的版式（./layout），按地点 id 对应。
+ * 这一页不受 DESIGN.md 约束。
  */
 
 import TopBar from "@/components/shared/topbar/TopBar";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
+import { Link } from "@/i18n/navigation";
+import type { Place } from "@/lib/places/types";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   GROUPS,
   RIVERS,
   SEAS,
-  STOPS,
+  STATIONS,
   TREE,
   VIEW,
   type River,
-  type Stop,
+  type Station,
   type TreeNode,
-} from "./data";
+} from "./layout";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 const FONT = 17;
@@ -28,10 +33,10 @@ const TICK = 8;
 const LABEL_GAP = 13;
 const DRAW_SECONDS = 1.8;
 
-const STOP_BY_ID = new Map(STOPS.map((s) => [s.id, s]));
 const RIVER_BY_ID = new Map(RIVERS.map((r) => [r.id, r]));
-const SONG_COUNT = new Set(STOPS.flatMap((s) => s.entries.map((e) => e.song)))
-  .size;
+
+/** 图上的一站：手排的位置加上数据库里的地点 */
+type Stop = Station & { place: Place };
 
 /**
  * 不用 framer 的 useReducedMotion：它在首屏就读浏览器设置，与服务端渲染的属性对不上。
@@ -62,7 +67,7 @@ function roundedPath(pts: [number, number][], radius = 16): string {
 }
 
 /** 站点在入场动画里出现的时刻：跟着河水从河口往上走到它 */
-function stopDelay(stop: Stop): number {
+function stopDelay(stop: Station): number {
   const river = RIVER_BY_ID.get(stop.river);
   if (!river) return 0;
   let total = 0;
@@ -86,26 +91,18 @@ function stopDelay(stop: Stop): number {
   return river.delay + (toStop / (total || 1)) * DRAW_SECONDS;
 }
 
-function songsOf(stop: Stop): string[] {
-  return stop.entries.map((e) => e.song);
-}
-
-/** 同一首歌到过的其他地方，按表里的次序 */
-function siblingsOf(stop: Stop): Stop[] {
-  const songs = new Set(songsOf(stop));
-  return STOPS.filter(
-    (s) => s.id !== stop.id && s.entries.some((e) => songs.has(e.song)),
-  );
+function songsOf(place: Place): Set<number> {
+  return new Set(place.entries.map((e) => e.songId));
 }
 
 /** 窄屏行尾的地区：省不写，只剩地名本身时才退回写省 */
-function shortRegion(stop: Stop): string {
-  const parts = stop.region.split(" · ");
-  const rest = parts.slice(1).filter((p) => p !== stop.name);
+function shortRegion(place: Place): string {
+  const parts = place.region.split(" · ");
+  const rest = parts.slice(1).filter((p) => p !== place.name);
   return rest.length > 0 ? rest.join(" · ") : parts[0];
 }
 
-/** 引句按句读切开，每个短语一列，句读不再占位 */
+/** 一句按空格与句读切开，每个短语一列，句读不再占位 */
 function phrases(line: string): string[] {
   return line.split(/[，。、！？\s]+/).filter(Boolean);
 }
@@ -249,6 +246,8 @@ function RiverName({ river, dimmed }: { river: River; dimmed: boolean }) {
   );
 }
 
+type StopState = "rest" | "dim" | "kin" | "current";
+
 function StopMark({
   stop,
   state,
@@ -257,13 +256,14 @@ function StopMark({
   onPick,
 }: {
   stop: Stop;
-  state: "rest" | "dim" | "kin" | "current";
+  state: StopState;
   onEnter: () => void;
   onLeave: () => void;
   onPick: () => void;
 }) {
   const reduce = useReduce();
-  const { x, y, side, name } = stop;
+  const { x, y, side, place } = stop;
+  const name = place.name;
   const len = [...name].length;
   const horizontal = side === "l" || side === "r";
   const dir = side === "l" || side === "a" ? -1 : 1;
@@ -296,7 +296,7 @@ function StopMark({
       <g
         role="button"
         tabIndex={0}
-        aria-label={`${stop.full ?? name}，${songsOf(stop).join("、")}`}
+        aria-label={`${place.fullName ?? name}，${place.entries.map((e) => e.title).join("、")}`}
         aria-pressed={state === "current"}
         className="group cursor-pointer outline-none transition-opacity duration-500"
         style={{ opacity: state === "dim" ? 0.22 : 1 }}
@@ -362,7 +362,7 @@ function StopMark({
   );
 }
 
-function labelClass(state: "rest" | "dim" | "kin" | "current"): string {
+function labelClass(state: StopState): string {
   const base = "font-serif transition-colors duration-300";
   if (state === "current") return `${base} fill-(--accent) font-bold`;
   if (state === "kin") return `${base} fill-(--accent)`;
@@ -370,7 +370,7 @@ function labelClass(state: "rest" | "dim" | "kin" | "current"): string {
 }
 
 /** 同一首歌的地点之间牵一条弧线，隔着水系也连得上 */
-function Thread({ from, to }: { from: Stop; to: Stop }) {
+function Thread({ from, to }: { from: Station; to: Station }) {
   const reduce = useReduce();
   const [a, b] = from.y <= to.y ? [from, to] : [to, from];
   const dx = b.x - a.x;
@@ -395,51 +395,80 @@ function Thread({ from, to }: { from: Stop; to: Stop }) {
   );
 }
 
-function Verse({ line, size }: { line: string; size: "lg" | "md" }) {
+function Verse({
+  text,
+  href,
+  size,
+}: {
+  text: string;
+  href: string;
+  size: "lg" | "md";
+}) {
   return (
-    <div
+    <Link
+      href={href}
       className={
         size === "lg"
-          ? "font-kaiti text-[1.7rem] leading-[1.45] tracking-[0.12em] text-slate-800 dark:text-slate-100"
-          : "font-kaiti text-[1.35rem] leading-[1.45] tracking-[0.1em] text-slate-800 dark:text-slate-100"
+          ? "block font-kaiti text-[1.7rem] leading-[1.45] tracking-[0.12em] text-slate-800 transition-colors hover:text-(--accent) dark:text-slate-100"
+          : "block font-kaiti text-[1.35rem] leading-[1.45] tracking-[0.1em] text-slate-800 transition-colors hover:text-(--accent) dark:text-slate-100"
       }
     >
-      {phrases(line).map((p, i) => (
+      {phrases(text).map((p, i) => (
         <div key={i}>{p}</div>
       ))}
-    </div>
+    </Link>
   );
 }
 
 function StopBody({
-  stop,
+  place,
+  siblings,
   onGo,
   size,
 }: {
-  stop: Stop;
-  onGo: (id: string) => void;
+  place: Place;
+  siblings: Place[];
+  onGo: (id: number) => void;
   size: "lg" | "md";
 }) {
-  const sibs = siblingsOf(stop);
+  const t = useTranslations("places");
+  const withVerses = place.entries.filter((e) => e.verses.length > 0);
   return (
     <>
-      <div className="flex max-h-[min(30rem,52svh)] flex-row-reverse justify-end gap-x-8 overflow-hidden">
-        {stop.entries.map((entry) => (
-          <div
-            key={entry.song}
-            className="flex flex-col flex-wrap-reverse gap-x-3 [writing-mode:vertical-rl]"
-          >
-            {entry.lines.map((line) => (
-              <Verse key={line} line={line} size={size} />
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="mt-8 space-y-3">
-        {stop.entries.map((entry) => (
-          <div key={entry.song}>
+      {withVerses.length > 0 && (
+        <div className="mb-8 flex max-h-[min(30rem,52svh)] flex-row-reverse justify-end gap-x-8 overflow-hidden">
+          {withVerses.map((entry) => (
+            <div
+              key={`${entry.songId}-${entry.relation}`}
+              className="flex flex-col flex-wrap-reverse gap-x-3 [writing-mode:vertical-rl]"
+            >
+              {entry.verses.map((verse) => (
+                <Verse
+                  key={verse.index}
+                  text={verse.text}
+                  href={`/song/${entry.songId}?line=${verse.index}`}
+                  size={size}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="space-y-3">
+        {place.entries.map((entry) => (
+          <div key={`${entry.songId}-${entry.relation}`}>
             <p className="font-serif text-base text-slate-900 dark:text-slate-50">
-              《{entry.song}》
+              {entry.relation === "venue" && (
+                <span className="mr-2 text-xs tracking-widest text-slate-400 dark:text-slate-500">
+                  {t("venue")}
+                </span>
+              )}
+              <Link
+                href={`/song/${entry.songId}`}
+                className="transition-colors hover:text-(--accent)"
+              >
+                《{entry.title}》
+              </Link>
             </p>
             {entry.note && (
               <p className="mt-1 font-kaiti text-sm leading-relaxed text-slate-500 dark:text-slate-400">
@@ -448,10 +477,10 @@ function StopBody({
             )}
           </div>
         ))}
-        {sibs.length > 0 && (
+        {siblings.length > 0 && (
           <p className="pt-2 text-xs leading-loose tracking-widest text-slate-400 dark:text-slate-500">
-            同一首歌还到过
-            {sibs.map((s) => (
+            {t("siblings")}
+            {siblings.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -474,21 +503,25 @@ function StopBody({
 /** 窄屏：一行一站，点开就地展开 */
 function TreeRows({
   nodes,
+  placeById,
+  siblingsOf,
   openId,
   kin,
   onToggle,
   onGo,
 }: {
   nodes: TreeNode[];
-  openId: string | null;
-  kin: Set<string>;
-  onToggle: (id: string) => void;
-  onGo: (id: string) => void;
+  placeById: Map<number, Place>;
+  siblingsOf: (place: Place) => Place[];
+  openId: number | null;
+  kin: Set<number>;
+  onToggle: (id: number) => void;
+  onGo: (id: number) => void;
 }) {
   return (
     <ul className="border-l border-(--river)/50">
       {nodes.map((node) => {
-        if (typeof node !== "string") {
+        if (typeof node !== "number") {
           return (
             <li key={node.river} className="relative py-3 pl-6">
               <span
@@ -500,6 +533,8 @@ function TreeRows({
               </p>
               <TreeRows
                 nodes={node.nodes}
+                placeById={placeById}
+                siblingsOf={siblingsOf}
                 openId={openId}
                 kin={kin}
                 onToggle={onToggle}
@@ -508,12 +543,12 @@ function TreeRows({
             </li>
           );
         }
-        const stop = STOP_BY_ID.get(node);
-        if (!stop) return null;
+        const place = placeById.get(node);
+        if (!place) return null;
         const open = openId === node;
         const lit = open || kin.has(node);
         return (
-          <li key={node} id={`stop-${node}`} className="relative scroll-mt-24">
+          <li key={node} id={`place-${node}`} className="relative scroll-mt-24">
             <span
               aria-hidden
               className={`absolute top-[1.3rem] left-0 h-px w-2.5 ${lit ? "bg-(--accent)" : "bg-(--river)"}`}
@@ -527,10 +562,10 @@ function TreeRows({
               <span
                 className={`font-serif text-[1.05rem] transition-colors ${lit ? "text-(--accent)" : "text-slate-800 dark:text-slate-200"}`}
               >
-                {stop.name}
+                {place.name}
               </span>
               <span className="shrink-0 text-[0.7rem] tracking-wider text-slate-400 dark:text-slate-500">
-                {shortRegion(stop)}
+                {shortRegion(place)}
               </span>
             </button>
             <div
@@ -539,7 +574,12 @@ function TreeRows({
               <div className="min-h-0 overflow-hidden">
                 {open && (
                   <div className="pt-3 pb-8 pl-5">
-                    <StopBody stop={stop} onGo={onGo} size="md" />
+                    <StopBody
+                      place={place}
+                      siblings={siblingsOf(place)}
+                      onGo={onGo}
+                      size="md"
+                    />
                   </div>
                 )}
               </div>
@@ -551,47 +591,95 @@ function TreeRows({
   );
 }
 
-export default function RiverMapClient() {
+/** 目录里出现过的地点 id */
+function treeIds(nodes: TreeNode[], out = new Set<number>()): Set<number> {
+  for (const node of nodes) {
+    if (typeof node === "number") out.add(node);
+    else treeIds(node.nodes, out);
+  }
+  return out;
+}
+
+export default function PlacesClient({ places }: { places: Place[] }) {
+  const t = useTranslations("places");
   const reduce = useReduce();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [hoverId, setHoverId] = useState<string | null>(null);
-  const selected = selectedId ? (STOP_BY_ID.get(selectedId) ?? null) : null;
-  const shown = hoverId ? (STOP_BY_ID.get(hoverId) ?? null) : selected;
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [hoverId, setHoverId] = useState<number | null>(null);
+
+  const placeById = useMemo(
+    () => new Map(places.map((p) => [p.id, p])),
+    [places],
+  );
+  // 只画排过版、又有线上歌曲对应的地点
+  const stops = useMemo(
+    () =>
+      STATIONS.flatMap((s) => {
+        const place = placeById.get(s.id);
+        return place ? [{ ...s, place }] : [];
+      }),
+    [placeById],
+  );
+  // 窄屏目录：按水系排的在前，还没排进来的列在「别处」
+  const tree = useMemo(() => {
+    const listed = treeIds(TREE.flatMap((section) => section.nodes));
+    const rest = places.filter((p) => !listed.has(p.id)).map((p) => p.id);
+    return rest.length > 0
+      ? [...TREE, { river: t("elsewhere"), nodes: rest }]
+      : TREE;
+  }, [places, t]);
+  const songCount = useMemo(
+    () => new Set(places.flatMap((p) => [...songsOf(p)])).size,
+    [places],
+  );
+
+  /** 同一首歌到过的其他地方，按 id 次序 */
+  const siblingsOf = useCallback(
+    (place: Place) => {
+      const songs = songsOf(place);
+      return places.filter(
+        (p) => p.id !== place.id && p.entries.some((e) => songs.has(e.songId)),
+      );
+    },
+    [places],
+  );
+
+  const selected = selectedId ? (placeById.get(selectedId) ?? null) : null;
+  const shown = hoverId ? (placeById.get(hoverId) ?? null) : selected;
 
   const kin = useMemo(
-    () => new Set(selected ? siblingsOf(selected).map((s) => s.id) : []),
-    [selected],
+    () => new Set(selected ? siblingsOf(selected).map((p) => p.id) : []),
+    [selected, siblingsOf],
   );
 
   const threads = useMemo(() => {
     if (!selected) return [];
     const pairs: { key: string; from: Stop; to: Stop }[] = [];
-    for (const song of songsOf(selected)) {
-      const places = STOPS.filter((s) =>
-        s.entries.some((e) => e.song === song),
+    for (const songId of songsOf(selected)) {
+      const along = stops.filter((s) =>
+        s.place.entries.some((e) => e.songId === songId),
       );
-      for (let i = 1; i < places.length; i++) {
+      for (let i = 1; i < along.length; i++) {
         pairs.push({
-          key: `${song}-${places[i - 1].id}-${places[i].id}`,
-          from: places[i - 1],
-          to: places[i],
+          key: `${songId}-${along[i - 1].id}-${along[i].id}`,
+          from: along[i - 1],
+          to: along[i],
         });
       }
     }
     return pairs;
-  }, [selected]);
+  }, [selected, stops]);
 
-  const toggle = useCallback((id: string) => {
+  const toggle = useCallback((id: number) => {
     setSelectedId((cur) => (cur === id ? null : id));
   }, []);
 
-  const go = useCallback((id: string) => {
+  const go = useCallback((id: number) => {
     setSelectedId(id);
     setHoverId(null);
     // 窄屏目录里跳到那一站；宽屏这一行不显示，滚动不起作用
     requestAnimationFrame(() => {
       document
-        .getElementById(`stop-${id}`)
+        .getElementById(`place-${id}`)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, []);
@@ -605,6 +693,7 @@ export default function RiverMapClient() {
   }, []);
 
   const dimmed = selected !== null;
+  const count = t("count", { places: places.length, songs: songCount });
 
   return (
     <div className="min-h-svh bg-[#FAFAFA] [--accent:#b5452c] [--river:#394c7f] dark:bg-[#0B0F19] dark:[--accent:#ee9f7e] dark:[--river:#7f93c9]">
@@ -626,9 +715,14 @@ export default function RiverMapClient() {
                   {shown.region}
                 </p>
                 <h2 className="mt-3 mb-10 font-serif text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-                  {shown.full ?? shown.name}
+                  {shown.fullName ?? shown.name}
                 </h2>
-                <StopBody stop={shown} onGo={go} size="lg" />
+                <StopBody
+                  place={shown}
+                  siblings={siblingsOf(shown)}
+                  onGo={go}
+                  size="lg"
+                />
               </motion.div>
             ) : (
               <motion.div
@@ -639,15 +733,16 @@ export default function RiverMapClient() {
                 transition={{ duration: 0.28, ease: EASE }}
               >
                 <h1 className="font-calligraphy text-8xl leading-none text-slate-900 [writing-mode:vertical-rl] dark:text-slate-50">
-                  河图
+                  {t("title")}
                 </h1>
                 <p className="mt-10 font-kaiti text-lg leading-loose text-slate-600 dark:text-slate-400">
-                  歌里写到的地方，
-                  <br />
-                  顺着水都能找到。
+                  {t("tagline")}
                 </p>
                 <p className="mt-6 text-xs tracking-[0.25em] text-slate-400 dark:text-slate-500">
-                  {STOPS.length} 处 · {SONG_COUNT} 首
+                  {count}
+                </p>
+                <p className="mt-2 text-xs tracking-[0.25em] text-slate-400 dark:text-slate-500">
+                  {t("credit")}
                 </p>
               </motion.div>
             )}
@@ -663,7 +758,7 @@ export default function RiverMapClient() {
             key={reduce ? "still" : "draw"}
             viewBox={`0 0 ${VIEW.width} ${VIEW.height}`}
             role="group"
-            aria-label="河图水系图"
+            aria-label={t("mapLabel")}
             className="block h-auto max-h-[calc(100svh-5rem)] min-h-[44rem] w-full select-none"
           >
             {GROUPS.map((g) => (
@@ -702,11 +797,11 @@ export default function RiverMapClient() {
               <RiverName key={r.id} river={r} dimmed={dimmed} />
             ))}
             <AnimatePresence>
-              {threads.map((t) => (
-                <Thread key={t.key} from={t.from} to={t.to} />
+              {threads.map((th) => (
+                <Thread key={th.key} from={th.from} to={th.to} />
               ))}
             </AnimatePresence>
-            {STOPS.map((s) => (
+            {stops.map((s) => (
               <StopMark
                 key={s.id}
                 stop={s}
@@ -731,22 +826,24 @@ export default function RiverMapClient() {
       {/* 窄屏：从入海口往上读 */}
       <main className="px-6 pt-32 pb-24 lg:hidden">
         <h1 className="font-calligraphy text-7xl leading-none text-slate-900 [writing-mode:vertical-rl] dark:text-slate-50">
-          河图
+          {t("title")}
         </h1>
         <p className="mt-8 font-kaiti text-lg leading-loose text-slate-600 dark:text-slate-400">
-          歌里写到的地方，顺着水都能找到。
+          {t("tagline")}
         </p>
         <p className="mt-3 text-xs tracking-[0.25em] text-slate-400 dark:text-slate-500">
-          {STOPS.length} 处 · {SONG_COUNT} 首
+          {count} · {t("credit")}
         </p>
         <div className="mt-16 space-y-14">
-          {TREE.map((section) => (
+          {tree.map((section) => (
             <section key={section.river}>
               <h2 className="mb-4 font-calligraphy text-3xl text-(--river)">
                 {section.river}
               </h2>
               <TreeRows
                 nodes={section.nodes}
+                placeById={placeById}
+                siblingsOf={siblingsOf}
                 openId={selectedId}
                 kin={kin}
                 onToggle={toggle}

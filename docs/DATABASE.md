@@ -16,13 +16,15 @@
 ```
 歌 songs ─┬─ 版本 song_versions ─┬─ song_imagery     意象标注
           │   （资料）            ├─ song_emotions    基调
-          │                      └─ song_collations  校记与补遗（+ 订者名单）
+          │                      ├─ song_collations  校记与补遗（+ 订者名单）
+          │                      └─ song_places      地点对应（→ places）
           ├─ song_links    各平台链接
           ├─ song_audio    音频
           └─ 读者数据       comments · collections · user_requests · stream_grants
 
 意象体系   imagery_categories（类别）─ motifs（母题）─ imagery_motifs ─ imagery（词）
 基调词表   emotions
+地点      places（河图志，见 PLACES.md）
 用户      users
 署名      credit_aliases
 独立内容   story_qjtx · quiz_results · audit_logs
@@ -32,7 +34,7 @@
 
 | | 挂在哪 | 随发布吗 |
 |---|---|---|
-| 资料（含封面、简谱的选项）、意象标注、基调、校记与补遗 | 版本 `song_versions` | 随：在草稿上改，发布时一起上线 |
+| 资料（含封面、简谱的选项）、意象标注、基调、校记与补遗、地点对应 | 版本 `song_versions` | 随：在草稿上改，发布时一起上线 |
 | 链接、音频、读者数据 | 歌 `songs` | 不随：属于这首歌本身，保存即生效 |
 
 新增挂在歌上的表，先判断属于哪一类。随发布的要做三件事：外键指 `song_versions`、加进 `ensure_draft` 的复制、补 `published_` 视图。
@@ -214,7 +216,7 @@ imagery_motifs                            -- 词 → 可取的母题（primary /
 - 后台与 agent：用本人的 JWT，经 RLS；生命周期函数是 `SECURITY DEFINER`，函数里按 JWT 的角色检查。
 - 普通用户的写入：经服务端接口，用 service role（限流、校验都在接口里，直连 PostgREST 写不进去）。本人的读用自己的会话，经 RLS。
 
-**审计。** `record_audit_log` 触发器挂在：草稿的保存、三张编校表、`song_links`、意象体系四张表、`emotions`、`credit_aliases`。`ensure_draft` 的整份复制不记（函数里设会话标记 `hetu.copying`，触发器跳过）；删歌、放弃草稿连带删掉的行也不记。生命周期操作由函数各记一条（`table_name = songs`）。读者数据不审计。日志保留 90 天。
+**审计。** `record_audit_log` 触发器挂在：草稿的保存、三张编校表、`song_places`、`places`、`song_links`、意象体系四张表、`emotions`、`credit_aliases`。`ensure_draft` 的整份复制不记（函数里设会话标记 `hetu.copying`，触发器跳过）；删歌、放弃草稿连带删掉的行也不记。生命周期操作由函数各记一条（`table_name = songs`）。读者数据不审计。日志保留 90 天。
 
 **缓存清单**（存了派生数据的地方）：
 

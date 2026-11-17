@@ -122,10 +122,11 @@ const LYRICS_LINES_API = locales.map(
  * 曲库页搜歌词的数据和 sitemap。歌名、类型、日期等也进了意象索引，
  * 意象页的计数、寻曲候选池、别的歌的相关作品都会变，所以要失效标签；
  * 详情页之外受波及的页面在 CDN 上等到期。
+ * 河图志的地点对应随发布上线，词句取自歌词，也一起失效。
  */
 export async function refreshSongs(songIds: number[]): Promise<PurgeReport> {
   return invalidate({
-    pages: ["", "/imagery", "/quiz", ...songIds.map(songPage)],
+    pages: ["", "/imagery", "/quiz", "/places", ...songIds.map(songPage)],
     paths: ["/sitemap.xml", ...LYRICS_LINES_API, ...songIds.map(songLyricsApi)],
     tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
   });

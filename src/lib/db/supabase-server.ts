@@ -37,6 +37,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   WORKING_*          → getUserClient    (视图，后台读)
 //   SONG_VERSIONS 等    → getUserClient    (后台写草稿，RLS + 冻结触发器把关)
 //   CREDIT_ALIASES     → 公开读 getServiceClient；后台增删 getUserClient
+//   PLACES             → 公开读 getServiceClient；还没有后台，authenticated 未授权
 //   IMAGERY / _CAT / _MOTIFS → 公开读 getServiceClient；后台读写 getUserClient
 //
 // 读者数据：本人的读用用户会话（RLS 隔离）；写一律经服务端接口用 getServiceClient，
@@ -75,6 +76,10 @@ export const TABLES = {
   PUBLISHED_SONG_EMOTIONS: "published_song_emotions", // 视图：线上版本的基调，带 song_id
   SONG_COLLATIONS: "song_collations", // 校记：管理员写在歌词上的勘误
   SONG_COLLATION_REVISERS: "song_collation_revisers", // 校记、补遗的订者名单
+
+  // 河图志（docs/PLACES.md）：地点不分版本；歌与地点的对应挂在版本上
+  PLACES: "places",
+  PUBLISHED_SONG_PLACES: "published_song_places", // 视图：线上版本的对应，带 song_id
 
   // 用户与互动表
   USERS: "users",

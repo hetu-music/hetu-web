@@ -1,0 +1,11 @@
+{
+  "title": "河图志",
+  "description": "河图歌里写到的地方，画在一张水系图上：{places} 处地点，{songs} 首歌，点开读写到它的词句。",
+  "tagline": "歌里写到的地方，顺着水都能找到。",
+  "count": "{places} 处 · {songs} 首",
+  "credit": "地点整理 · 正版雨清",
+  "mapLabel": "河图志水系图",
+  "siblings": "同一首歌还到过",
+  "venue": "演出",
+  "elsewhere": "别处"
+}

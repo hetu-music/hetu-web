@@ -43,6 +43,44 @@ export function scrollToLine(index: number) {
   window.scrollTo({ top, behavior: "smooth" });
 }
 
+/** 链接点名的那一句提亮多久 */
+const FLASH_MS = 2400;
+
+/**
+ * 从别处链到某一句（河图志的词句，docs/PLACES.md 第四节）：`?line=N` 滚到正文第 N 句并短暂提亮，
+ * 再带 `annotate` 时同时打开这一句的批注。
+ * 提亮直接写在那一行的 DOM 上（data-flash），不进 React 状态：只闪一次，不必为它重渲染整篇正文。
+ */
+function useLineLink(
+  lineCount: number,
+  wide: boolean,
+  annotate: (slot: CommentSlot) => void,
+) {
+  const handled = useRef(false);
+  useEffect(() => {
+    if (handled.current) return;
+    // 水合时 wide 先按服务端的「窄屏」算，宽屏上要等它对上了再开批注，不然会误开底部面板
+    if (wide !== window.matchMedia("(min-width: 1024px)").matches) return;
+    handled.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("line");
+    if (raw === null || !/^\d+$/.test(raw)) return;
+    const index = Number(raw);
+    if (index >= lineCount) return;
+
+    scrollToLine(index);
+    if (params.has("annotate")) annotate(lyricsSlot(index));
+    const el = document
+      .getElementById("lyrics")
+      ?.querySelectorAll<HTMLElement>("[data-folio-line]")[index];
+    if (!el) return;
+    el.dataset.flash = "";
+    // 不在 effect 清理时取消：之后 wide、annotate 一变 effect 就重跑，取消了提亮就再也褪不掉
+    window.setTimeout(() => delete el.dataset.flash, FLASH_MS);
+  }, [lineCount, wide, annotate]);
+}
+
 interface LyricsFolioProps {
   songId: number;
   rawLyrics: string | null | undefined;
@@ -132,6 +170,7 @@ export default function LyricsFolio({
     (i: number) => annotateSlot(lyricsSlot(i)),
     [annotateSlot],
   );
+  useLineLink(lines.length, wide, annotateSlot);
 
   // 意象的着重号是圆点（•）。Safari 找这个字形时不会去下载按字符分片的网页字体，
   // 而 Noto Serif SC 里含圆点的那一片正文用不到、不会自己加载，结果一个点也画不出来。
@@ -334,6 +373,8 @@ const FolioRow = memo(function FolioRow({
             isCurrent || selected
               ? "text-slate-950 dark:text-white"
               : "text-slate-700 dark:text-slate-300",
+            // 链接点名的那一句（useLineLink）：与正在播放的一句同样提亮
+            "data-flash:text-slate-950 dark:data-flash:text-white",
             focused && !carriesActive && "opacity-[0.18]",
             seekable &&
               "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
@@ -348,7 +389,9 @@ const FolioRow = memo(function FolioRow({
             aria-hidden
             className={cn(
               "absolute -left-5 top-1/2 h-px bg-(--tone) transition-all duration-500",
-              isCurrent ? "w-3 opacity-100" : "w-0 opacity-0",
+              isCurrent
+                ? "w-3 opacity-100"
+                : "w-0 opacity-0 in-data-flash:w-3 in-data-flash:opacity-100",
             )}
           />
           {carriesActive && !activeHasText && activeMark && (

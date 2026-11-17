@@ -10,4 +10,6 @@
 
 改动接口的缓存头、页面的 `revalidate`、`unstable_cache`、Service Worker 的缓存规则或 CDN 上的规则前，先读 `docs/CACHE.md`（各层缓存、哪些接口缓存、Cloudflare 规则）。
 
+改动地点数据、水系图或打卡前，先读 `docs/PLACES.md`（数据结构、地图与详情页的衔接、打卡复用评论）。
+
 改 `/quiz` 的题目、选项文案或标注前，先读 `docs/QUIZ.md`（出题约束与题目蓝图）。

@@ -12,7 +12,7 @@ type Props = {
 };
 
 export const metadata: Metadata = {
-  title: "首页重设计原型（留声书肆）",
+  title: "首页首屏构想对比（立体唱片台 / 流光声廊）",
   robots: { index: false, follow: false },
 };
 

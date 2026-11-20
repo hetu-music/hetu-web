@@ -1,6 +1,5 @@
 "use client";
 
-import SectionHeading from "@/components/detail/SectionHeading";
 import CoverArt from "@/components/library/CoverArt";
 import LyricsSnippet from "@/components/library/LyricsSnippet";
 import EnqueueButton from "@/components/shared/EnqueueButton";
@@ -31,17 +30,21 @@ import {
   XCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React from "react";
-import { songCreditLine } from "./shared";
+import React, { useMemo } from "react";
+import { FeaturePlate, PoetryPlate } from "./GalleryPlates";
+import {
+  FEATURE_PLATES,
+  type FeaturedEntry,
+  songCreditLine,
+} from "./shared";
 
-interface CatalogSectionProps {
+interface CatalogGalleryProps {
   pageSongs: Song[];
   totalCount: number;
   types: string[];
   activeType: string;
   onTypeChange: (type: string) => void;
   searchInput: string;
-  searchInputRef?: React.RefObject<HTMLInputElement | null>;
   onSearchChange: (q: string) => void;
   onSearchFocus: () => void;
   lyricsState: LyricsSearchState;
@@ -56,26 +59,80 @@ interface CatalogSectionProps {
   onPageChange: (page: number) => void;
   listStartRef: React.RefObject<HTMLDivElement | null>;
   onOpenSong: (songId: number) => void;
+  onHoverSong: (song: Song | null, imgEl?: HTMLImageElement | null) => void;
   getLyricsSnippet: (songId: number) => Snippet | undefined;
   approximate: boolean;
   lyricsPending: boolean;
-  showHeading: boolean;
+  /** 未筛选的第 1 页，在曲库矩阵中自然织入留白诗格与三枚特辑彩插页 */
+  showEditorialPlates: boolean;
+  poetryEntry: FeaturedEntry | null;
+  onCyclePoetry: () => void;
+  canCyclePoetry: boolean;
+}
+
+type GridSlot =
+  | { kind: "song"; song: Song; songIdx: number }
+  | { kind: "poetry" }
+  | { kind: "feature"; featureIdx: number };
+
+/**
+ * 在未筛选第 1 页的唱片流中，按呼吸节奏自然织入 1 枚留白诗格 + 3 枚特辑插页：
+ * 位置选在「第 3 首后（诗格）、第 6 首后（倾尽天下）、第 11 首后（意象词云）、第 16 首后（寻曲）」，
+ * 无论桌面 4 列还是手机 2 列，插页都不会紧挨在一起，始终像精装艺术画册的彩插页。
+ */
+function interleaveEditorialSlots(
+  songs: Song[],
+  includePlates: boolean,
+  hasPoetry: boolean,
+): GridSlot[] {
+  if (!includePlates || songs.length === 0) {
+    return songs.map((song, songIdx) => ({ kind: "song", song, songIdx }));
+  }
+
+  const out: GridSlot[] = [];
+  songs.forEach((song, songIdx) => {
+    out.push({ kind: "song", song, songIdx });
+    if (songIdx === 2 && hasPoetry) {
+      out.push({ kind: "poetry" });
+    } else if (songIdx === 5) {
+      out.push({ kind: "feature", featureIdx: 0 });
+    } else if (songIdx === 10) {
+      out.push({ kind: "feature", featureIdx: 1 });
+    } else if (songIdx === 15) {
+      out.push({ kind: "feature", featureIdx: 2 });
+    }
+  });
+
+  // 曲库极少时兜底附在末尾，确保特辑不会消失
+  if (songs.length <= 5) {
+    if (hasPoetry && !out.some((s) => s.kind === "poetry")) {
+      out.push({ kind: "poetry" });
+    }
+    FEATURE_PLATES.forEach((_, featureIdx) => {
+      if (
+        !out.some((s) => s.kind === "feature" && s.featureIdx === featureIdx)
+      ) {
+        out.push({ kind: "feature", featureIdx });
+      }
+    });
+  }
+
+  return out;
 }
 
 /**
- * 曲目总录（单一形态，彻底取消双视图切换）：
- * - 完整保留类型标签、全文与歌词搜索、年份滑轨与 5 维高级筛选；
- * - 宽屏点击「筛选」在工具栏下平滑展开，窄屏弹出 Base UI 底部抽屉；
- * - 曲库网格：移动端 2 列紧凑唱片墙，平板 3 列，宽屏 4 列。
+ * 联动画册曲库：
+ * - 极轻吸顶检目线（完整类型标签 + 歌词/全文搜索 + 高级筛选；宽屏展开，手机走底部抽屉）；
+ * - 单一形态唱片墙（手机 2 列、平板 3 列、宽屏 4 列），自然织入留白诗格与三枚特辑彩插页；
+ * - 悬停任意封面时通知上层，实时点亮光阴声谱对应年份并晕染整页光色。
  */
-export default function CatalogSection({
+export default function CatalogGallery({
   pageSongs,
   totalCount,
   types,
   activeType,
   onTypeChange,
   searchInput,
-  searchInputRef,
   onSearchChange,
   onSearchFocus,
   lyricsState,
@@ -90,11 +147,15 @@ export default function CatalogSection({
   onPageChange,
   listStartRef,
   onOpenSong,
+  onHoverSong,
   getLyricsSnippet,
   approximate,
   lyricsPending,
-  showHeading,
-}: CatalogSectionProps) {
+  showEditorialPlates,
+  poetryEntry,
+  onCyclePoetry,
+  canCyclePoetry,
+}: CatalogGalleryProps) {
   const tLib = useTranslations("library");
   const tCommon = useTranslations("common");
   const tEnum = useTranslations("enums");
@@ -105,32 +166,29 @@ export default function CatalogSection({
   const { containerRef, hasDraggedRef, dragHandlers } =
     useMouseDragScroll<HTMLDivElement>();
 
+  const slots = useMemo(
+    () =>
+      interleaveEditorialSlots(
+        pageSongs,
+        showEditorialPlates,
+        poetryEntry !== null,
+      ),
+    [pageSongs, showEditorialPlates, poetryEntry],
+  );
+
   return (
     <section>
       <div ref={listStartRef} aria-hidden className="scroll-mt-(--nav-h)" />
 
-      {showHeading && (
-        <SectionHeading label="曲目总录">
-          <span className="font-mono text-xs tabular-nums tracking-[0.2em] text-slate-400 dark:text-slate-500">
-            凡 {totalCount} 曲
-          </span>
-        </SectionHeading>
-      )}
-
-      {/* ── 吸顶检目栏（完整检索 + 筛选入口，无视图切换按钮） ── */}
-      <div
-        className={cn(
-          "sticky top-(--nav-h) z-30 -mx-6 mb-8 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-md md:mb-10 dark:bg-[#0B0F19]/95",
-          showHeading && "mt-5 md:mt-7",
-        )}
-      >
+      {/* ── 吸顶检目线（工具退隐为极轻细线，全功能完整保留） ── */}
+      <div className="sticky top-(--nav-h) z-30 -mx-6 mb-9 bg-[#FAFAFA]/94 px-6 pt-1 backdrop-blur-md md:mb-11 dark:bg-[#0B0F19]/94">
         <div
           className={cn(
             TAB_HAIRLINE_CLASS,
             "flex flex-col-reverse md:h-12 md:flex-row md:gap-8",
           )}
         >
-          {/* 类型标签行 */}
+          {/* 类型标签 */}
           <div
             ref={containerRef}
             {...dragHandlers}
@@ -194,7 +252,7 @@ export default function CatalogSection({
             })}
           </div>
 
-          {/* 搜索框 + 高级筛选触发器 */}
+          {/* 检索与多维筛选 */}
           <div
             className={cn(
               TAB_HAIRLINE_CLASS,
@@ -204,7 +262,6 @@ export default function CatalogSection({
             <label className="group relative flex h-full min-w-0 flex-1 items-center gap-2 md:w-64 md:flex-none">
               <Search size={15} className="shrink-0 text-slate-400" />
               <input
-                ref={searchInputRef}
                 type="text"
                 placeholder={tLib("search.placeholder")}
                 value={searchInput}
@@ -244,15 +301,15 @@ export default function CatalogSection({
               title={tLib("advancedFilter")}
               className={cn(
                 NAV_BUTTON_CLASS,
-                "relative inline-flex shrink-0 items-center gap-1.5",
+                "inline-flex shrink-0 items-center gap-1.5",
                 (advanced || activeAdvancedCount > 0) &&
                   "text-(--tone) dark:text-(--tone)",
               )}
             >
               {advanced && isDesktop ? (
-                <X size={18} />
+                <X size={17} />
               ) : (
-                <SlidersHorizontal size={17} />
+                <SlidersHorizontal size={16} />
               )}
               <span className="text-xs tracking-widest">
                 筛选
@@ -266,7 +323,7 @@ export default function CatalogSection({
           </div>
         </div>
 
-        {/* 桌面端：平滑内联展开完整 SongFilters */}
+        {/* 宽屏：内联展开完整 SongFilters */}
         {advanced && isDesktop && (
           <div className="animate-in slide-in-from-top-2 fade-in border-b border-slate-200/70 pb-6 pt-5 duration-300 dark:border-slate-800">
             {filterPanel}
@@ -274,7 +331,7 @@ export default function CatalogSection({
         )}
       </div>
 
-      {/* 移动端：Base UI 底部抽屉承载完整 SongFilters */}
+      {/* 手机端：Base UI 底部抽屉承载完整 SongFilters */}
       {!isDesktop && (
         <Drawer open={advanced} onOpenChange={onAdvancedChange}>
           <DrawerContent title={tLib("advancedFilter")}>
@@ -300,7 +357,7 @@ export default function CatalogSection({
         </Drawer>
       )}
 
-      {/* ── 单一形态曲库：手机 2 列唱片墙 · 平板 3 列 · 桌面 4 列 ── */}
+      {/* ── 画册唱片墙（手机 2 列 · 平板 3 列 · 桌面 4 列） ── */}
       <div className="min-h-[45vh]">
         {approximate && (
           <p className="mb-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
@@ -309,14 +366,38 @@ export default function CatalogSection({
         )}
 
         {pageSongs.length === 0 ? (
-          <p className="py-20 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+          <p className="py-24 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
             {lyricsPending
               ? tLib("search.lyricsPending")
               : tLib("noFilteredSongs")}
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12 xl:grid-cols-4">
-            {pageSongs.map((song, index) => {
+          <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-11 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12 xl:grid-cols-4">
+            {slots.map((slot) => {
+              if (slot.kind === "poetry" && poetryEntry) {
+                return (
+                  <PoetryPlate
+                    key="editorial-poetry"
+                    entry={poetryEntry}
+                    onOpenSong={onOpenSong}
+                    onCycle={onCyclePoetry}
+                    canCycle={canCyclePoetry}
+                  />
+                );
+              }
+
+              if (slot.kind === "feature") {
+                const feature = FEATURE_PLATES[slot.featureIdx];
+                return (
+                  <FeaturePlate
+                    key={`editorial-feature-${feature.id}`}
+                    item={feature}
+                  />
+                );
+              }
+
+              if (slot.kind !== "song") return null;
+              const { song, songIdx } = slot;
               const fav = isFavorite(song.id);
               const playing = currentTrack?.songId === song.id && isPlaying;
               const snippet = getLyricsSnippet(song.id);
@@ -325,6 +406,11 @@ export default function CatalogSection({
                 <article
                   key={song.id}
                   onClick={() => onOpenSong(song.id)}
+                  onMouseEnter={(e) => {
+                    const img = e.currentTarget.querySelector("img");
+                    onHoverSong(song, img);
+                  }}
+                  onMouseLeave={() => onHoverSong(null)}
                   className="group flex cursor-pointer flex-col"
                 >
                   <div
@@ -332,16 +418,16 @@ export default function CatalogSection({
                       "relative aspect-square w-full overflow-hidden rounded-md bg-slate-100 ring-1 transition-all duration-500 dark:bg-slate-800",
                       playing
                         ? "ring-2 ring-(--tone) shadow-[0_18px_36px_-14px_rgba(15,23,42,0.34)]"
-                        : "ring-slate-900/[0.06] shadow-[0_12px_26px_-14px_rgba(15,23,42,0.22)] group-hover:-translate-y-1.5 group-hover:shadow-[0_24px_46px_-18px_rgba(15,23,42,0.36)] dark:ring-white/10 dark:shadow-black/50",
+                        : "ring-slate-900/[0.06] shadow-[0_12px_26px_-14px_rgba(15,23,42,0.2)] group-hover:-translate-y-1.5 group-hover:shadow-[0_26px_48px_-18px_rgba(15,23,42,0.38)] dark:ring-white/10 dark:shadow-black/55",
                     )}
                   >
                     <CoverArt
                       song={song}
                       sizes="(min-width: 1280px) 284px, (min-width: 1024px) 31vw, 46vw"
-                      priority={index < 4 ? "eager" : undefined}
+                      priority={songIdx < 4 ? "eager" : undefined}
                     />
 
-                    {/* 宽屏悬停底部微暗渐变 + 播放/队列/收藏；手机端保持画面干净 */}
+                    {/* 宽屏悬停底部微暗光影 + 时长/播放/队列/收藏 */}
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-20 bg-linear-to-t from-black/65 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:block" />
 
                     <div
@@ -404,7 +490,7 @@ export default function CatalogSection({
                       </div>
                     </div>
 
-                    {/* 移动端若已收藏或正在播放，仅在右下角给极克制的微标记 */}
+                    {/* 移动端极克制播放/收藏微标记 */}
                     {(playing || fav) && (
                       <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur-xs lg:hidden">
                         {playing && <PlayingBars />}
@@ -418,7 +504,7 @@ export default function CatalogSection({
                     )}
                   </div>
 
-                  {/* 唱片下方排版：在手机 2 列与桌面 4 列下都利落克制 */}
+                  {/* 封面下两行书卷排版：宽屏与手机 2 列皆清爽耐看 */}
                   <div className="mt-2.5 space-y-0.5 sm:mt-3.5 sm:space-y-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <h3

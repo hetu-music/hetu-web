@@ -1,12 +1,14 @@
 import type { GallerySong } from "@/lib/auth-gallery-shared";
+import { FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import {
   FACET_KEYS,
   isSelectionActive,
   type LibraryFilters,
+  type LibraryOptions,
 } from "@/lib/library/filters";
 import type { Song } from "@/lib/types";
 
-export type HeroConcept = "coverflow" | "mosaic";
+export type YearOption = LibraryOptions["years"][number];
 
 export interface FeaturedEntry {
   song: Song;
@@ -20,7 +22,7 @@ export interface ArchiveStats {
   newestYear: number | null;
 }
 
-export interface FeatureTriptychItem {
+export interface FeaturePlateItem {
   id: "qjtx" | "imagery" | "quiz";
   numeral: string;
   href: string;
@@ -33,18 +35,18 @@ export interface FeatureTriptychItem {
   washDark: string;
 }
 
-export const TRIPTYCH_ITEMS: FeatureTriptychItem[] = [
+export const FEATURE_PLATES: FeaturePlateItem[] = [
   {
     id: "qjtx",
     numeral: "零壹",
     href: "/story/qjtx",
     tag: "互动长卷",
     title: "倾尽天下",
-    subtitle: "一曲长歌，随乐声缓步展开江山旧梦",
+    subtitle: "一曲长歌，倾尽天下",
     accentLight: "#9E3636",
     accentDark: "#E46A6A",
-    washLight: "rgba(158, 54, 54, 0.12)",
-    washDark: "rgba(228, 106, 106, 0.18)",
+    washLight: "rgba(158, 54, 54, 0.14)",
+    washDark: "rgba(228, 106, 106, 0.22)",
   },
   {
     id: "imagery",
@@ -52,11 +54,11 @@ export const TRIPTYCH_ITEMS: FeatureTriptychItem[] = [
     href: "/imagery",
     tag: "词中万象",
     title: "意象词云",
-    subtitle: "从长安白雪到孤城旧梦，漫游词中意象谱系",
+    subtitle: "探索词中万千意象",
     accentLight: "#286B62",
     accentDark: "#52BCAE",
-    washLight: "rgba(40, 107, 98, 0.12)",
-    washDark: "rgba(82, 188, 174, 0.18)",
+    washLight: "rgba(40, 107, 98, 0.14)",
+    washDark: "rgba(82, 188, 174, 0.22)",
   },
   {
     id: "quiz",
@@ -64,11 +66,11 @@ export const TRIPTYCH_ITEMS: FeatureTriptychItem[] = [
     href: "/quiz",
     tag: "十二问寻歌",
     title: "寻曲",
-    subtitle: "十二个问题，一段旅程，寻一首懂你的歌",
+    subtitle: "十二问，寻一首懂你的歌",
     accentLight: "#9A6728",
     accentDark: "#DFA95B",
-    washLight: "rgba(154, 103, 40, 0.13)",
-    washDark: "rgba(223, 169, 91, 0.18)",
+    washLight: "rgba(154, 103, 40, 0.15)",
+    washDark: "rgba(223, 169, 91, 0.22)",
   },
 ];
 
@@ -79,10 +81,12 @@ export const FLOATING_IMAGERY_WORDS = [
   "孤城",
   "旧梦",
   "桃花",
+  "残阳",
+  "江湖",
 ];
 
-/** 组合首屏展示用的精选曲目（最多 9 首，保证 3D 扇面两侧始终饱满） */
-export function buildFeaturedEntries(
+/** 从 gallery 与曲库提取带意象摘句的诗格素材 */
+export function buildPoetryEntries(
   songs: Song[],
   gallery: GallerySong[],
 ): FeaturedEntry[] {
@@ -92,19 +96,19 @@ export function buildFeaturedEntries(
 
   for (const g of gallery) {
     const song = byId.get(g.id);
-    if (song && !song.dispute_note && song.hascover) {
-      picked.push({ song, excerpt: g.excerpt || null });
+    if (song && !song.dispute_note && g.excerpt) {
+      picked.push({ song, excerpt: g.excerpt });
       used.add(song.id);
-      if (picked.length >= 9) break;
+      if (picked.length >= 10) break;
     }
   }
 
-  if (picked.length < 9) {
+  if (picked.length === 0) {
     for (const song of songs) {
-      if (used.has(song.id) || song.dispute_note || !song.hascover) continue;
+      if (used.has(song.id) || song.dispute_note) continue;
       picked.push({ song, excerpt: null });
       used.add(song.id);
-      if (picked.length >= 9) break;
+      if (picked.length >= 5) break;
     }
   }
 
@@ -135,13 +139,18 @@ export function computeArchiveStats(songs: Song[]): ArchiveStats {
   };
 }
 
-/** 计算高级筛选中已激活的维度数量（年份区间 + 5 个多选维度） */
+/** 计算高级筛选中已激活的维度数量（含年份区间与 5 个多选维度） */
 export function countActiveAdvancedFilters(filters: LibraryFilters): number {
   let count = filters.year ? 1 : 0;
   for (const key of FACET_KEYS) {
     if (isSelectionActive(filters.facets[key])) count += 1;
   }
   return count;
+}
+
+/** 把歌曲映射到 years 选项数组中的 YearOption key */
+export function songYearOption(song: Song): YearOption {
+  return song.year ?? FILTER_OPTION_UNKNOWN;
 }
 
 /** 卡片副标题：单曲若专辑名同歌名，优先展示词曲或演唱者 */

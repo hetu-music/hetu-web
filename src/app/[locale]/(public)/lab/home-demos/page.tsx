@@ -12,7 +12,7 @@ type Props = {
 };
 
 export const metadata: Metadata = {
-  title: "首页改版方案对比（A / B / C）",
+  title: "首页重设计原型（留声书肆）",
   robots: { index: false, follow: false },
 };
 

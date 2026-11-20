@@ -1,9 +1,5 @@
 import type { GallerySong } from "@/lib/auth-gallery-shared";
-import type { MusicLibraryViewMode } from "@/lib/constants";
 import type { Song } from "@/lib/types";
-import type React from "react";
-
-export type DemoVariant = "A" | "B" | "C";
 
 export interface FeaturedEntry {
   song: Song;
@@ -17,72 +13,55 @@ export interface ArchiveStats {
   newestYear: number | null;
 }
 
-export interface DemoViewProps {
-  songs: Song[];
-  filteredSongs: Song[];
-  pageSongs: Song[];
-  featured: FeaturedEntry[];
-  recentSongs: Song[];
-  wallSongs: GallerySong[];
-  stats: ArchiveStats;
-  types: string[];
-  activeType: string;
-  onTypeChange: (type: string) => void;
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  isFiltering: boolean;
-  onReset: () => void;
-  view: MusicLibraryViewMode;
-  onViewChange: (v: MusicLibraryViewMode) => void;
-  page: number;
-  totalPages: number;
-  onPageChange: (p: number) => void;
-  listStartRef: React.RefObject<HTMLDivElement | null>;
-  onOpenSong: (songId: number) => void;
-  onRandomSong: () => void;
-}
-
-export interface FeatureItem {
+export interface FeatureTriptychItem {
   id: "qjtx" | "imagery" | "quiz";
-  indexNum: string;
+  numeral: string;
   href: string;
   tag: string;
   title: string;
   subtitle: string;
   accentLight: string;
   accentDark: string;
+  washLight: string;
+  washDark: string;
 }
 
-export const FEATURE_ITEMS: FeatureItem[] = [
+export const TRIPTYCH_ITEMS: FeatureTriptychItem[] = [
   {
     id: "qjtx",
-    indexNum: "壹",
+    numeral: "零壹",
     href: "/story/qjtx",
     tag: "互动长卷",
     title: "倾尽天下",
-    subtitle: "一曲长歌，血染江山的画卷，随乐声缓步展开",
+    subtitle: "一曲长歌，随乐声缓步展开江山旧梦",
     accentLight: "#9E3636",
     accentDark: "#E46A6A",
+    washLight: "rgba(158, 54, 54, 0.11)",
+    washDark: "rgba(228, 106, 106, 0.16)",
   },
   {
     id: "imagery",
-    indexNum: "贰",
+    numeral: "零贰",
     href: "/imagery",
     tag: "词中万象",
     title: "意象词云",
-    subtitle: "从长安白雪到孤城旧梦，漫游数百首词作的意象谱系",
+    subtitle: "从长安白雪到孤城旧梦，漫游数百首词作谱系",
     accentLight: "#286B62",
     accentDark: "#52BCAE",
+    washLight: "rgba(40, 107, 98, 0.11)",
+    washDark: "rgba(82, 188, 174, 0.16)",
   },
   {
     id: "quiz",
-    indexNum: "叁",
+    numeral: "零叁",
     href: "/quiz",
     tag: "十二问寻歌",
     title: "寻曲",
     subtitle: "十二个问题，一段旅程，在曲库深处寻一首懂你的歌",
     accentLight: "#9A6728",
     accentDark: "#DFA95B",
+    washLight: "rgba(154, 103, 40, 0.12)",
+    washDark: "rgba(223, 169, 91, 0.16)",
   },
 ];
 
@@ -97,7 +76,7 @@ export const FLOATING_IMAGERY_WORDS = [
   "江湖",
 ];
 
-/** 从 gallery 与全量曲库组合卷首焦点列表；gallery 缺省时自动兜底取有封面的近期作品 */
+/** 从 gallery 与全量曲库组合卷首留声焦点列表（最多 8 首） */
 export function buildFeaturedEntries(
   songs: Song[],
   gallery: GallerySong[],
@@ -111,16 +90,16 @@ export function buildFeaturedEntries(
     if (song && !song.dispute_note && song.hascover) {
       picked.push({ song, excerpt: g.excerpt || null });
       used.add(song.id);
-      if (picked.length >= 6) break;
+      if (picked.length >= 8) break;
     }
   }
 
-  if (picked.length < 6) {
+  if (picked.length < 8) {
     for (const song of songs) {
       if (used.has(song.id) || song.dispute_note || !song.hascover) continue;
       picked.push({ song, excerpt: null });
       used.add(song.id);
-      if (picked.length >= 6) break;
+      if (picked.length >= 8) break;
     }
   }
 
@@ -151,12 +130,33 @@ export function computeArchiveStats(songs: Song[]): ArchiveStats {
   };
 }
 
-/** 卡片副标题：单曲若专辑名同歌名，优先展示词曲或演唱者 */
+/** 按发行年份保持原序分组，用于编年陈列 */
+export interface YearGroup {
+  key: string;
+  year: number | null;
+  songs: Song[];
+}
+
+export function groupSongsByYear(songs: Song[]): YearGroup[] {
+  const groups: YearGroup[] = [];
+  for (const song of songs) {
+    const key = song.year ? String(song.year) : "未知";
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.songs.push(song);
+    } else {
+      groups.push({ key, year: song.year ?? null, songs: [song] });
+    }
+  }
+  return groups;
+}
+
+/** 作品署名或专辑副行 */
 export function songCreditLine(song: Song): string {
   if (song.lyricist?.length && song.composer?.length) {
     const l = song.lyricist.join("、");
     const c = song.composer.join("、");
-    return l === c ? `词曲 ${l}` : `词 ${l} · 曲 ${c}`;
+    return l === c ? `词曲 · ${l}` : `词 ${l} · 曲 ${c}`;
   }
   if (song.album && song.album !== song.title) return `《${song.album}》`;
   return song.artist?.join(" / ") || "单曲";

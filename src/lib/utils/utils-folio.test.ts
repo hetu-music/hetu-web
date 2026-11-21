@@ -177,6 +177,32 @@ describe("markLines", () => {
     expect(marked.map((m) => m.ids.length)).toEqual([0, 0, 1, 0, 0]);
   });
 
+  it("演唱者行与正文时间相近时，挂在写着这个意象的那一句上", () => {
+    const { lines } = buildFolio(
+      [
+        "[00:42.849]【绯村柯北】",
+        "[00:42.850]橱窗里芭比娃娃热销",
+        "[00:48.360]【HITA】",
+        "[00:48.360]看村民春耕忙",
+      ].join("\n"),
+    );
+    const marked = markLines(lines, [
+      { id: 1, name: "橱窗", timetags: ["00:42.850"] },
+      { id: 2, name: "村", timetags: ["00:48.360"] },
+    ]);
+    expect(marked.map((m) => m.ids)).toEqual([[], [1], [], [2]]);
+  });
+
+  it("容差内几句都没写这个意象时取时间最近的", () => {
+    const { lines } = buildFolio(
+      ["[00:10.00]甲", "[00:10.04]乙", "[00:20.00]丙"].join("\n"),
+    );
+    const marked = markLines(lines, [
+      { id: 1, name: "隐逸", timetags: ["00:10.03"] },
+    ]);
+    expect(marked.map((m) => m.ids)).toEqual([[], [1], []]);
+  });
+
   it("同一段文字承载多个意象时合并在一起", () => {
     const marked = markLines(lines, [
       { id: 5, name: "洱海", timetags: ["00:33.64"] },

@@ -65,7 +65,7 @@ interface TopBarProps {
 }
 
 /**
- * 全站唯一的顶栏。右侧顺序固定：常驻按钮 → 用户 → 本页操作 → 安装 → 文字 → 主题，
+ * 全站唯一的顶栏。右侧顺序固定：常驻按钮 → 用户 → 本页操作 → 安装 → 语言 → 主题，
  * 窄屏只留常驻按钮与用户，其余收进「更多」。
  */
 export default function TopBar({
@@ -178,7 +178,7 @@ export default function TopBar({
   );
 }
 
-/** 窄屏的「更多」：本页操作一行一项，下面是主题与文字 */
+/** 窄屏的「更多」：本页操作一行一项，下面是主题与语言 */
 function MoreSheet({
   open,
   onOpenChange,

@@ -39,7 +39,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import ColorTapestry from "./ColorTapestry";
 import YearChapters, { type ReadingMode } from "./YearChapters";
 import { byDate, byDateDesc, groupByYear } from "./timeline";
@@ -204,7 +204,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         {/* 顶部极柔色彩雾面：平时淡墨蓝，滑过色带时轻染那首歌的真实主色 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[44rem] transition-all duration-1000 ease-out"
+          className="pointer-events-none absolute inset-x-0 top-0 h-176 transition-all duration-1000 ease-out"
           style={{
             background: spotlightColor
               ? `radial-gradient(ellipse 68% 46% at 50% 0%, color-mix(in oklab, ${spotlightColor} 22%, transparent), transparent 72%)`
@@ -423,7 +423,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                     NAV_BUTTON_CLASS,
                     "inline-flex shrink-0 items-center gap-1.5",
                     (state.advanced || activeAdvancedCount > 0) &&
-                      "text-(--tone) dark:text-(--tone)",
+                    "text-(--tone) dark:text-(--tone)",
                   )}
                 >
                   {state.advanced && isDesktop ? (

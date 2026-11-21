@@ -17,7 +17,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import React, { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   type YearChapter,
   creditSummary,
@@ -145,7 +145,7 @@ function ChapterBlock({
         data-year-key={yearKey}
         className="flex scroll-mt-[calc(var(--nav-h)+5rem)] items-baseline gap-6 border-t border-slate-200/60 py-4 dark:border-slate-800/70"
       >
-        <span className="w-24 shrink-0 font-serif text-xl tabular-nums tracking-tight text-slate-300 lg:w-[21rem] dark:text-slate-700">
+        <span className="w-24 shrink-0 font-serif text-xl tabular-nums tracking-tight text-slate-300 lg:w-84 dark:text-slate-700">
           {chapter.year ?? "年份未详"}
         </span>
         <span className="font-kaiti text-sm text-slate-300 dark:text-slate-700">
@@ -183,7 +183,7 @@ function ChapterBlock({
             {/* 本年专属微型色带：把这一年的封面色彩凝成一道 3px 细丝 */}
             <div
               aria-hidden
-              className="mt-3.5 flex h-[3px] w-full max-w-[14rem] overflow-hidden rounded-full bg-slate-200/70 lg:mt-4 lg:max-w-none dark:bg-slate-800"
+              className="mt-3.5 flex h-0.75 w-full max-w-56 overflow-hidden rounded-full bg-slate-200/70 lg:mt-4 lg:max-w-none dark:bg-slate-800"
             >
               {chapter.songs.map((s) => {
                 const c = stripeColor(s);
@@ -236,7 +236,7 @@ function ChapterBlock({
             {/* 柔和色彩弥散：浅色模式像淡彩晕纸，深色模式复刻暗展厅灯光 */}
             <div
               aria-hidden
-              className="pointer-events-none absolute -inset-10 rounded-full opacity-25 blur-[64px] transition-colors duration-1000 dark:opacity-40"
+              className="pointer-events-none absolute -inset-10 rounded-full opacity-25 blur-3xl transition-colors duration-1000 dark:opacity-40"
               style={{
                 background: focalColor ?? "var(--tone)",
               }}
@@ -327,8 +327,8 @@ function ChapterBlock({
                   className={cn(
                     "group relative flex cursor-pointer items-start gap-3.5 py-3.5 transition-colors duration-300 sm:items-center sm:gap-5 sm:py-4",
                     isFocal
-                      ? "bg-slate-900/[0.02] dark:bg-white/[0.025]"
-                      : "hover:bg-slate-900/[0.018] dark:hover:bg-white/[0.02]",
+                      ? "bg-slate-900/2 dark:bg-white/2.5"
+                      : "hover:bg-slate-900/[0.018] dark:hover:bg-white/2",
                   )}
                 >
                   {/* 封面色丝微点：1.5px × 14px，克制地把每首歌的颜色编进目录 */}

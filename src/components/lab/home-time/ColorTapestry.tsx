@@ -4,7 +4,7 @@ import type { Song } from "@/lib/types";
 import { cn } from "@/lib/utils/utils";
 import { getCoverUrl } from "@/lib/utils/utils-song";
 import Image from "next/image";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { creditSummary, stripeColor } from "./timeline";
 
 interface ColorTapestryProps {
@@ -177,7 +177,7 @@ export default function ColorTapestry({
             onJumpToYear(songs[idx].year ?? null);
           }
         }}
-        className="relative flex h-[74px] w-full cursor-pointer touch-pan-y items-end overflow-hidden rounded-xs ring-1 ring-slate-900/[0.08] sm:h-[92px] dark:ring-white/[0.1]"
+        className="relative flex h-18.5 w-full cursor-pointer touch-pan-y items-end overflow-hidden rounded-xs ring-1 ring-slate-900/8 sm:h-23 dark:ring-white/10"
       >
         {songs.map((song, idx) => {
           const color = stripeColor(song);
@@ -228,7 +228,7 @@ export default function ColorTapestry({
         {activeIndex !== null && (
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)]"
+            className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)]"
             style={{ left: `${activeLeftPct}%` }}
           />
         )}

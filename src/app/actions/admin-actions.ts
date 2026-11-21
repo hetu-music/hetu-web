@@ -12,7 +12,7 @@ import {
   unpublishSong,
   userDb,
 } from "@/lib/server/service-versions";
-import { refreshImagery, refreshSongs } from "@/lib/server/server-revalidate";
+import { refreshLiveVersion } from "@/lib/server/server-revalidate";
 
 /**
  * 歌曲的生命周期操作（docs/DATABASE.md 第三节）。权限在数据库函数里再查一遍：
@@ -31,11 +31,7 @@ function failure(err: unknown): { success: false; error: string } {
 
 /** 刷新这首歌牵连的公开页面与缓存数据；线上版本变了，前后两版标注挂的母题页都要清 */
 async function refreshLive(songId: number, motifIds: number[]) {
-  const purges = await Promise.all([
-    refreshSongs([songId]),
-    ...(motifIds.length > 0 ? [refreshImagery({ motifIds })] : []),
-  ]);
-  return [...new Set(purges.flatMap((p) => p.failed))];
+  return (await refreshLiveVersion(songId, motifIds)).failed;
 }
 
 /**

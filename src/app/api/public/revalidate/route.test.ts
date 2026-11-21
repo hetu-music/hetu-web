@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import type { PurgeOutcome } from "@/lib/server/server-utils";
+import type { PurgeOutcome, PurgePlan } from "@/lib/server/server-utils";
 
 const revalidatePathMock = vi.fn();
 const revalidateTagMock = vi.fn();
@@ -11,12 +11,12 @@ vi.mock("next/cache", () => ({
 }));
 
 const purgeCloudflareMock = vi.fn(
-  async (_paths: string[]): Promise<PurgeOutcome> => "ok",
+  async (_plan: PurgePlan): Promise<PurgeOutcome> => "ok",
 );
 
 vi.mock("@/lib/server/server-utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/server-utils")>()),
-  purgeCloudflareCache: (paths: string[]) => purgeCloudflareMock(paths),
+  purgeCloudflareCache: (plan: PurgePlan) => purgeCloudflareMock(plan),
   purgeEdgeOneCache: vi.fn(async () => undefined),
   purgeCloudFrontCache: vi.fn(async () => undefined),
 }));
@@ -94,10 +94,11 @@ describe("POST /api/public/revalidate — 鉴权", () => {
   // 部署后预热也要清 CDN，否则边缘节点继续返回引用旧构建产物的 HTML
   it("同时清 CDN 上的这些页面", async () => {
     await POST(makeRequest("POST", { secretHeader: SECRET }));
-    const purged = purgeCloudflareMock.mock.calls.flatMap((c) => c[0]);
-    expect(purged).toEqual(
-      expect.arrayContaining(["/zh-CN", "/", "/zh-CN/imagery", "/sitemap.xml"]),
-    );
+    const [[plan]] = purgeCloudflareMock.mock.calls;
+    expect(plan).toEqual({
+      pages: expect.arrayContaining(["/zh-CN", "/zh-TW/imagery"]),
+      urls: expect.arrayContaining(["/sitemap.xml"]),
+    });
   });
 
   it("Next 刷新了但 CDN 失败时返回 502，让部署脚本看得出来", async () => {

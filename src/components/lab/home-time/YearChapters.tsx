@@ -17,7 +17,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type YearChapter,
   creditSummary,
@@ -25,12 +25,9 @@ import {
   stripeColor,
 } from "./timeline";
 
-export type ReadingMode = "index" | "prose";
-
 interface YearChaptersProps {
   chapters: YearChapter[];
   matched: ReadonlySet<number> | null;
-  readingMode: ReadingMode;
   onOpenSong: (id: number) => void;
   getLyricsSnippet: (id: number) => Snippet | undefined;
   onActiveYearChange?: (yearKey: string) => void;
@@ -39,24 +36,20 @@ interface YearChaptersProps {
 const EASE = [0.23, 1, 0.32, 1] as const;
 
 /**
- * 馆藏编年正文（「一年一画幅 + 右侧书目」）：
- * 彻底告别满墙小方图货架：
- * - 宽屏左栏吸顶：大号年份 + 本年色丝微带 + 唯一一幅带色彩弥散的大画幅（悬停右侧任意歌名，
- *   左栏画幅与光晕实时平滑切换为那首歌的封面与色调！）；
- * - 宽屏右栏：清爽疏朗的编年目录（或诗集式连排），一屏可扫 20+ 首，同时保留词曲、时长、播放与歌词片段；
+ * 馆藏编年目录（「一年一画幅 + 右侧编年行目」，由近及远）：
+ * - 宽屏左栏吸顶：大号年份 + 本年色丝微带 + 一幅带色彩弥散的动态大画幅（悬停右侧任意曲目实时显影）；
+ * - 宽屏右栏：无缩略图货架感的编年目录，承载色丝微点、月日、衬线曲名、楷体词曲、歌词片段与试听；
  * - 筛选无命中的年份折成一行「这一年没有」，二十年时间一根不断。
  */
 export default function YearChapters({
   chapters,
   matched,
-  readingMode,
   onOpenSong,
   getLyricsSnippet,
   onActiveYearChange,
 }: YearChaptersProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 监听当前阅读到哪一年，供右侧悬浮年份标尺高亮
   useEffect(() => {
     if (!onActiveYearChange) return;
     const root = containerRef.current;
@@ -86,12 +79,12 @@ export default function YearChapters({
 
   return (
     <div ref={containerRef} className="relative">
-      {chapters.map((chapter) => (
+      {chapters.map((chapter, index) => (
         <ChapterBlock
           key={chapter.year ?? "unknown"}
           chapter={chapter}
+          isFirst={index === 0}
           matched={matched}
-          readingMode={readingMode}
           onOpenSong={onOpenSong}
           getLyricsSnippet={getLyricsSnippet}
         />
@@ -102,14 +95,14 @@ export default function YearChapters({
 
 function ChapterBlock({
   chapter,
+  isFirst,
   matched,
-  readingMode,
   onOpenSong,
   getLyricsSnippet,
 }: {
   chapter: YearChapter;
+  isFirst: boolean;
   matched: ReadonlySet<number> | null;
-  readingMode: ReadingMode;
   onOpenSong: (id: number) => void;
   getLyricsSnippet: (id: number) => Snippet | undefined;
 }) {
@@ -126,7 +119,6 @@ function ChapterBlock({
   const defaultFocal = pickChapterFocal(shown);
   const [hoveredSong, setHoveredSong] = useState<Song | null>(null);
 
-  // 若右侧正在播放本年里的某首歌，无悬停时默认展示正在播放的那一首
   const playingInChapter =
     isPlaying && currentTrack
       ? (shown.find((s) => s.id === currentTrack.songId) ?? null)
@@ -137,15 +129,18 @@ function ChapterBlock({
       ? hoveredSong
       : (playingInChapter ?? defaultFocal);
 
-  // 无命中年份：折成一行，保留二十年时间的完整脉络
+  // 无命中年份：折成一行，时间不断
   if (shown.length === 0) {
     return (
       <section
         id={`y${yearKey}`}
         data-year-key={yearKey}
-        className="flex scroll-mt-[calc(var(--nav-h)+5rem)] items-baseline gap-6 border-t border-slate-200/60 py-4 dark:border-slate-800/70"
+        className={cn(
+          "flex scroll-mt-[calc(var(--nav-h)+4rem)] items-baseline gap-6 py-4",
+          !isFirst && "border-t border-slate-200/60 dark:border-slate-800/70",
+        )}
       >
-        <span className="w-24 shrink-0 font-serif text-xl tabular-nums tracking-tight text-slate-300 lg:w-84 dark:text-slate-700">
+        <span className="w-24 shrink-0 font-serif text-xl tabular-nums tracking-tight text-slate-300 lg:w-[20rem] xl:w-88 dark:text-slate-700">
           {chapter.year ?? "年份未详"}
         </span>
         <span className="font-kaiti text-sm text-slate-300 dark:text-slate-700">
@@ -162,11 +157,13 @@ function ChapterBlock({
     <section
       id={`y${yearKey}`}
       data-year-key={yearKey}
-      className="grid scroll-mt-[calc(var(--nav-h)+5rem)] gap-y-8 border-t border-slate-200/75 py-12 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 lg:py-20 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80"
+      className={cn(
+        "grid scroll-mt-[calc(var(--nav-h)+4rem)] gap-y-8 py-12 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 lg:py-18 xl:grid-cols-[22rem_minmax(0,1fr)]",
+        !isFirst && "border-t border-slate-200/75 dark:border-slate-800/80",
+      )}
     >
       {/* ── 左栏（宽屏吸顶展幅）/ 顶栏（手机紧凑章头） ── */}
-      <aside className="self-start lg:sticky lg:top-[calc(var(--nav-h)+5.5rem)]">
-        {/* 移动端紧凑章头：左年份 + 本年色丝微带，右一枚小方幅代表作 */}
+      <aside className="self-start lg:sticky lg:top-[calc(var(--nav-h)+4.5rem)]">
         <div className="flex items-center justify-between gap-4 lg:block">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-3">
@@ -180,7 +177,7 @@ function ChapterBlock({
               </span>
             </div>
 
-            {/* 本年专属微型色带：把这一年的封面色彩凝成一道 3px 细丝 */}
+            {/* 本年专属 3px 微色带 */}
             <div
               aria-hidden
               className="mt-3.5 flex h-0.75 w-full max-w-56 overflow-hidden rounded-full bg-slate-200/70 lg:mt-4 lg:max-w-none dark:bg-slate-800"
@@ -203,7 +200,7 @@ function ChapterBlock({
             </div>
           </div>
 
-          {/* 手机端右上角精致代表作缩影（避免占满首屏像详情页） */}
+          {/* 手机端右上角精致代表作缩影 */}
           {defaultFocal && (
             <button
               type="button"
@@ -230,10 +227,9 @@ function ChapterBlock({
           )}
         </div>
 
-        {/* 宽屏独有：一章一幅带色彩弥散的动态大画幅（随右侧悬停实时显影！） */}
+        {/* 宽屏独有：一章一幅带色彩弥散的动态大画幅 */}
         {activeFocal && (
           <div className="relative mt-8 hidden lg:block">
-            {/* 柔和色彩弥散：浅色模式像淡彩晕纸，深色模式复刻暗展厅灯光 */}
             <div
               aria-hidden
               className="pointer-events-none absolute -inset-10 rounded-full opacity-25 blur-3xl transition-colors duration-1000 dark:opacity-40"
@@ -262,7 +258,6 @@ function ChapterBlock({
                       className="transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                     />
                   ) : (
-                    /* 无封面的早期作品：以极简刻字碑拓呈现，不放丑占位图 */
                     <div className="flex h-full w-full flex-col items-center justify-center bg-[#F4F3EF] p-8 dark:bg-[#0E1320]">
                       <span className="font-calligraphy text-4xl tracking-[0.35em] text-slate-700 [writing-mode:vertical-rl] dark:text-slate-200">
                         {activeFocal.title}
@@ -304,183 +299,144 @@ function ChapterBlock({
         )}
       </aside>
 
-      {/* ── 右栏：本年书目（编年行目 / 诗集排印，零缩略图货架感） ── */}
-      <div
-        className="min-w-0"
-        onMouseLeave={() => setHoveredSong(null)}
-      >
-        {readingMode === "index" ? (
-          <ul className="divide-y divide-slate-200/65 border-y border-slate-200/65 dark:divide-slate-800/70 dark:border-slate-800/70">
-            {shown.map((song) => {
-              const color = stripeColor(song);
-              const fav = isFavorite(song.id);
-              const playing = currentTrack?.songId === song.id && isPlaying;
-              const isFocal = activeFocal?.id === song.id;
-              const snippet = getLyricsSnippet(song.id);
-              const monthDay = song.date ? song.date.slice(5).replace("-", ".") : "";
+      {/* ── 右栏：编年目录 ── */}
+      <div className="min-w-0" onMouseLeave={() => setHoveredSong(null)}>
+        <ul className="divide-y divide-slate-200/65 border-y border-slate-200/65 dark:divide-slate-800/70 dark:border-slate-800/70">
+          {shown.map((song) => {
+            const color = stripeColor(song);
+            const fav = isFavorite(song.id);
+            const playing = currentTrack?.songId === song.id && isPlaying;
+            const isFocal = activeFocal?.id === song.id;
+            const snippet = getLyricsSnippet(song.id);
+            const monthDay = song.date
+              ? song.date.slice(5).replace("-", ".")
+              : "";
 
-              return (
-                <li
-                  key={song.id}
-                  onMouseEnter={() => setHoveredSong(song)}
-                  onClick={() => onOpenSong(song.id)}
+            return (
+              <li
+                key={song.id}
+                onMouseEnter={() => setHoveredSong(song)}
+                onClick={() => onOpenSong(song.id)}
+                className={cn(
+                  "group relative flex cursor-pointer items-start gap-3.5 py-3.5 transition-colors duration-300 sm:items-center sm:gap-5 sm:py-4",
+                  isFocal
+                    ? "bg-slate-900/2 dark:bg-white/2.5"
+                    : "hover:bg-slate-900/[0.018] dark:hover:bg-white/2",
+                )}
+              >
+                {/* 封面色丝微点 */}
+                <span
+                  aria-hidden
                   className={cn(
-                    "group relative flex cursor-pointer items-start gap-3.5 py-3.5 transition-colors duration-300 sm:items-center sm:gap-5 sm:py-4",
+                    "mt-1.5 h-3.5 w-[2.5px] shrink-0 rounded-full transition-all duration-300 sm:mt-0",
+                    !color && "bg-slate-300/70 dark:bg-slate-700/70",
                     isFocal
-                      ? "bg-slate-900/2 dark:bg-white/2.5"
-                      : "hover:bg-slate-900/[0.018] dark:hover:bg-white/2",
+                      ? "scale-y-125 opacity-100"
+                      : "opacity-65 group-hover:opacity-100",
                   )}
-                >
-                  {/* 封面色丝微点：1.5px × 14px，克制地把每首歌的颜色编进目录 */}
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mt-1.5 h-3.5 w-[2.5px] shrink-0 rounded-full transition-all duration-300 sm:mt-0",
-                      !color && "bg-slate-300/70 dark:bg-slate-700/70",
-                      isFocal ? "scale-y-125 opacity-100" : "opacity-65 group-hover:opacity-100",
-                    )}
-                    style={{ backgroundColor: color ?? undefined }}
-                  />
+                  style={{ backgroundColor: color ?? undefined }}
+                />
 
-                  {/* 月.日 */}
-                  <span className="mt-1 hidden w-11 shrink-0 font-mono text-[11px] tabular-nums tracking-wider text-slate-400 sm:mt-0 sm:block dark:text-slate-500">
-                    {monthDay || "——"}
-                  </span>
+                {/* 月.日 */}
+                <span className="mt-1 hidden w-11 shrink-0 font-mono text-[11px] tabular-nums tracking-wider text-slate-400 sm:mt-0 sm:block dark:text-slate-500">
+                  {monthDay || "——"}
+                </span>
 
-                  {/* 歌名 + 词曲 + 歌词命中片段 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2.5">
-                      <h3
-                        className={cn(
-                          "truncate font-serif text-[17px] leading-snug text-slate-900 transition-colors sm:text-[19px] dark:text-slate-100",
-                          playing || isFocal
-                            ? "text-(--tone)"
-                            : "group-hover:text-(--tone)",
-                        )}
-                      >
-                        <SongTitleLink
-                          songId={song.id}
-                          onNavigate={() => onOpenSong(song.id)}
-                        >
-                          {song.title}
-                        </SongTitleLink>
-                      </h3>
-                      {playing && <PlayingBars />}
-                    </div>
-
-                    <p className="mt-0.5 flex items-center gap-2 truncate font-kaiti text-[13px] text-slate-500 dark:text-slate-400">
-                      {monthDay && (
-                        <span className="font-mono text-[10px] tabular-nums text-slate-400 sm:hidden dark:text-slate-500">
-                          {monthDay}
-                        </span>
+                {/* 歌名 + 词曲 + 歌词命中片段 */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2.5">
+                    <h3
+                      className={cn(
+                        "truncate font-serif text-[17px] leading-snug text-slate-900 transition-colors sm:text-[19px] dark:text-slate-100",
+                        playing || isFocal
+                          ? "text-(--tone)"
+                          : "group-hover:text-(--tone)",
                       )}
-                      <span className="truncate">
-                        {creditSummary(song) || "单曲"}
-                      </span>
-                    </p>
-
-                    {snippet && (
-                      <LyricsSnippet snippet={snippet} className="mt-1.5" />
-                    )}
-                  </div>
-
-                  {/* 右侧：类型、时长、悬停播放/入列/收藏 */}
-                  <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-                    <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
-                      <PlayButton
-                        songId={song.id}
-                        title={song.title}
-                        artist={song.artist?.join(" / ")}
-                        coverUrl={getCoverUrl(song)}
-                        hasAudio={song.has_audio}
-                        size={14}
-                      />
-                      <EnqueueButton
-                        songId={song.id}
-                        title={song.title}
-                        artist={song.artist?.join(" / ")}
-                        coverUrl={getCoverUrl(song)}
-                        hasAudio={song.has_audio}
-                        size={14}
-                      />
-                    </div>
-
-                    {isLoggedIn && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(song.id);
-                        }}
-                        aria-label={
-                          fav
-                            ? tSong("actions.unfavorite")
-                            : tSong("actions.favorite")
-                        }
-                        className={cn(
-                          "p-1.5 transition-all duration-200",
-                          fav
-                            ? "text-rose-500 opacity-100"
-                            : "text-slate-400 opacity-0 hover:text-rose-500 group-hover:opacity-100 dark:text-slate-500",
-                        )}
-                      >
-                        <Heart
-                          size={14}
-                          className={fav ? "fill-current" : ""}
-                        />
-                      </button>
-                    )}
-
-                    {song.type?.[0] && (
-                      <span className="hidden w-12 text-right text-[11px] tracking-[0.2em] text-slate-400 sm:inline-block dark:text-slate-500">
-                        {enumLabel(tEnum, "type", song.type[0])}
-                      </span>
-                    )}
-
-                    <span className="w-11 text-right font-mono text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
-                      {song.length ? formatTime(song.length) : "—"}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          /* 诗集式排印：大号衬线歌名连排，鼠标扫过左侧大画幅实时显影 */
-          <p className="font-serif text-2xl leading-[2.05] text-slate-800 md:text-[1.85rem] md:leading-[1.95] dark:text-slate-200">
-            {shown.map((song, i) => {
-              const isFocal = activeFocal?.id === song.id;
-              return (
-                <Fragment key={song.id}>
-                  {i > 0 && (
-                    <span
-                      aria-hidden
-                      className="mx-[0.45em] font-light text-slate-300 dark:text-slate-700"
                     >
-                      /
+                      <SongTitleLink
+                        songId={song.id}
+                        onNavigate={() => onOpenSong(song.id)}
+                      >
+                        {song.title}
+                      </SongTitleLink>
+                    </h3>
+                    {playing && <PlayingBars />}
+                  </div>
+
+                  <p className="mt-0.5 flex items-center gap-2 truncate font-kaiti text-[13px] text-slate-500 dark:text-slate-400">
+                    {monthDay && (
+                      <span className="font-mono text-[10px] tabular-nums text-slate-400 sm:hidden dark:text-slate-500">
+                        {monthDay}
+                      </span>
+                    )}
+                    <span className="truncate">
+                      {creditSummary(song) || "单曲"}
+                    </span>
+                  </p>
+
+                  {snippet && (
+                    <LyricsSnippet snippet={snippet} className="mt-1.5" />
+                  )}
+                </div>
+
+                {/* 右侧：类型、时长、悬停播放/入列/收藏 */}
+                <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+                  <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
+                    <PlayButton
+                      songId={song.id}
+                      title={song.title}
+                      artist={song.artist?.join(" / ")}
+                      coverUrl={getCoverUrl(song)}
+                      hasAudio={song.has_audio}
+                      size={14}
+                    />
+                    <EnqueueButton
+                      songId={song.id}
+                      title={song.title}
+                      artist={song.artist?.join(" / ")}
+                      coverUrl={getCoverUrl(song)}
+                      hasAudio={song.has_audio}
+                      size={14}
+                    />
+                  </div>
+
+                  {isLoggedIn && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(song.id);
+                      }}
+                      aria-label={
+                        fav
+                          ? tSong("actions.unfavorite")
+                          : tSong("actions.favorite")
+                      }
+                      className={cn(
+                        "p-1.5 transition-all duration-200",
+                        fav
+                          ? "text-rose-500 opacity-100"
+                          : "text-slate-400 opacity-0 hover:text-rose-500 group-hover:opacity-100 dark:text-slate-500",
+                      )}
+                    >
+                      <Heart size={14} className={fav ? "fill-current" : ""} />
+                    </button>
+                  )}
+
+                  {song.type?.[0] && (
+                    <span className="hidden w-12 text-right text-[11px] tracking-[0.2em] text-slate-400 sm:inline-block dark:text-slate-500">
+                      {enumLabel(tEnum, "type", song.type[0])}
                     </span>
                   )}
-                  <span
-                    onMouseEnter={() => setHoveredSong(song)}
-                    className={cn(
-                      "inline-block whitespace-nowrap transition-colors duration-300",
-                      isFocal
-                        ? "text-(--tone)"
-                        : "hover:text-(--tone)",
-                    )}
-                  >
-                    <SongTitleLink
-                      songId={song.id}
-                      onNavigate={() => onOpenSong(song.id)}
-                    >
-                      {song.title}
-                    </SongTitleLink>
+
+                  <span className="w-11 text-right font-mono text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+                    {song.length ? formatTime(song.length) : "—"}
                   </span>
-                </Fragment>
-              );
-            })}
-          </p>
-        )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );

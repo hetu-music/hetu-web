@@ -2,8 +2,7 @@
 
 import FloatingActionButtons from "@/components/shared/FloatingActionButtons";
 import SiteMark from "@/components/shared/SiteMark";
-import { NAV_BUTTON_CLASS } from "@/components/shared/nav-button";
-import { TAB_HAIRLINE_CLASS } from "@/components/shared/tab-hairline";
+import { FIELD_LABEL_CLASS } from "@/components/shared/form-field";
 import TopBar from "@/components/shared/topbar/TopBar";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { OverlayHostContext } from "@/components/ui/overlay-host";
@@ -12,7 +11,6 @@ import { useLibraryResults } from "@/hooks/library/useLibraryResults";
 import { useLibraryState } from "@/hooks/library/useLibraryState";
 import { useLyricsLines } from "@/hooks/library/useLyricsLines";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
-import { useMouseDragScroll } from "@/hooks/ui/useMouseDragScroll";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { flushUrlState, useUrlState } from "@/hooks/utils/useUrlState";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -20,6 +18,7 @@ import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import {
   buildBaseOptions,
   FACET_KEYS,
+  type FacetKey,
   type FacetOption,
   isSelectionActive,
   mapFacets,
@@ -30,19 +29,11 @@ import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { cn } from "@/lib/utils/utils";
 import { enumLabel } from "@/lib/utils/utils-song";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Mic2,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-  X,
-  XCircle,
-} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import ColorTapestry from "./ColorTapestry";
-import YearChapters, { type ReadingMode } from "./YearChapters";
-import { byDate, byDateDesc, groupByYear } from "./timeline";
+import YearChapters from "./YearChapters";
+import { byDateDesc, groupByYear } from "./timeline";
 
 const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
 
@@ -52,13 +43,19 @@ const FEATURE_LINKS = [
   { href: "/quiz", label: "寻曲", dot: "#9A6728" },
 ];
 
+interface ActiveChip {
+  key: string;
+  label: string;
+  onRemove: () => void;
+}
+
 /**
- * 首页原型「二十年的颜色 · 时间长卷」：
- * 把原先 /lab/time 割裂的「20 屏暗场展厅」与「6 列缩略图货架」熔为一体：
- * 1. 卷首只占半屏以内：用 cover-colors.json 将全部作品织成一条真实色彩光谱（可滑、可点、搜歌实时显影）；
- * 2. 紧贴其下即完整吸顶搜索与高级筛选（宽屏展开，手机走底部抽屉），0 门槛查歌；
- * 3. 正文彻底去货架：一年一章，左栏一幅带色彩弥散的动态大画幅（随右侧悬停实时切换）+ 右栏清疏编年书目；
- * 4. 完整支持浅色宣纸画册与深色暗场展厅双主题，与歌曲详情页无缝衔接。
+ * 首页原型「二十年的颜色 · 时间长卷」（由近及远 · 编年目录 · 书眉式极简检目）：
+ * - 卷首：刊头 + 三径轻入口 + 「二十年的颜色」真实光谱；
+ * - 书眉检目线（思路二）：严格对齐下方 `20–22rem | 1fr` 两栏中轴线，去掉软件感 Tab 与图标，
+ *   左栏一根楷体底线寻曲，右栏静显已激活条件批注与「筛选 / 重置」纯文字按钮；
+ *   「类型」与年份滑轨、5 维多选统一收进筛选面板（宽屏内联展开，手机走 Base UI 底部抽屉）；
+ * - 正文：固定「编年目录 + 由近及远」，一章一画幅 + 右栏编年目录。
  */
 export default function HomeTimeClient({ songs }: { songs: Song[] }) {
   const router = useRouter();
@@ -68,13 +65,9 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
   const tEnum = useTranslations("enums");
   const isDesktop = useIsDesktop();
   const { showScrollTop, scrollToTop } = useScrollTop();
-  const { containerRef: tabRef, hasDraggedRef, dragHandlers } =
-    useMouseDragScroll<HTMLDivElement>();
 
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [newestFirst, setNewestFirst] = useState(true);
-  const [readingMode, setReadingMode] = useState<ReadingMode>("index");
   const [activeYearKey, setActiveYearKey] = useState<string | null>(null);
   const [spotlightColor, setSpotlightColor] = useState<string | null>(null);
 
@@ -118,20 +111,11 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
     [filtering, results],
   );
 
-  // 高级筛选中已激活维度数
-  const activeAdvancedCount = useMemo(() => {
-    let n = state.filters.year ? 1 : 0;
-    for (const k of FACET_KEYS) {
-      if (isSelectionActive(state.filters.facets[k])) n += 1;
-    }
-    return n;
-  }, [state.filters]);
-
-  // ── 二十年时间脉络：光谱与下方分章共享同一时间方向 ──
-  const catalog = useMemo(() => {
-    const valid = songs.filter((s) => !s.dispute_note);
-    return valid.slice().sort(newestFirst ? byDateDesc : byDate);
-  }, [songs, newestFirst]);
+  // ── 二十年时间脉络：固定由近及远（2026 → 2007 → 未详） ──
+  const catalog = useMemo(
+    () => songs.filter((s) => !s.dispute_note).slice().sort(byDateDesc),
+    [songs],
+  );
 
   const { firstYear, lastYear } = useMemo(() => {
     let min = Infinity;
@@ -150,19 +134,87 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
   const chapters = useMemo(() => {
     const years: (number | null)[] = [];
-    for (let y = firstYear; y <= lastYear; y++) years.push(y);
-    if (newestFirst) years.reverse();
+    for (let y = lastYear; y >= firstYear; y--) years.push(y);
     if (songs.some((s) => !s.year && !s.dispute_note)) years.push(null);
     return groupByYear(
       songs.filter((s) => !s.dispute_note),
       years,
-      newestFirst,
+      true,
     );
-  }, [songs, firstYear, lastYear, newestFirst]);
+  }, [songs, firstYear, lastYear]);
 
   const shownCount = matched
     ? results.filter((s) => !s.dispute_note).length
     : catalog.length;
+
+  const { setType, setYearSlider, setFacetChecked, resetAll } = state;
+
+  // 将当前激活的筛选条件整理成书眉上的轻柔文字注脚，点任意一项可直接单项撤回
+  const activeChips = useMemo<ActiveChip[]>(() => {
+    const chips: ActiveChip[] = [];
+
+    if (state.filters.type !== FILTER_OPTION_ALL) {
+      const label =
+        state.filters.type === FILTER_OPTION_UNKNOWN
+          ? tCommon("unknown")
+          : enumLabel(tEnum, "type", state.filters.type);
+      chips.push({
+        key: "type",
+        label,
+        onRemove: () => setType(FILTER_OPTION_ALL),
+      });
+    }
+
+    if (state.filters.year) {
+      const y = state.filters.year;
+      const label =
+        y === "unknown"
+          ? "年份未详"
+          : y.newest !== null && y.newest === y.oldest
+            ? `${y.newest} 年`
+            : `${y.newest ?? lastYear}—${y.oldest ?? firstYear}`;
+      chips.push({
+        key: "year",
+        label,
+        onRemove: () =>
+          setYearSlider([0, Math.max(0, options.years.length - 1)]),
+      });
+    }
+
+    for (const key of FACET_KEYS) {
+      const sel = state.filters.facets[key];
+      if (!isSelectionActive(sel)) continue;
+      const formatVal = (v: string) =>
+        v === FILTER_OPTION_UNKNOWN
+          ? tCommon("unknown")
+          : key === "genre"
+            ? enumLabel(tEnum, "genre", v)
+            : v;
+      const prefix = tLib(`filter.${key}`);
+      const summary =
+        sel.mode === "exclude"
+          ? `除${formatVal(sel.values[0])}${sel.values.length > 1 ? "等" : ""}`
+          : `${formatVal(sel.values[0])}${sel.values.length > 1 ? ` 等${sel.values.length}项` : ""}`;
+      chips.push({
+        key: `facet-${key}`,
+        label: `${prefix} · ${summary}`,
+        onRemove: () => setFacetChecked(key as FacetKey, []),
+      });
+    }
+
+    return chips;
+  }, [
+    state.filters,
+    options.years.length,
+    firstYear,
+    lastYear,
+    tCommon,
+    tEnum,
+    tLib,
+    setType,
+    setYearSlider,
+    setFacetChecked,
+  ]);
 
   const handleOpenSong = useCallback(
     (songId: number) => {
@@ -181,21 +233,66 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
   }, []);
 
   const handleReset = useCallback(() => {
-    state.resetAll();
+    resetAll();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [state]);
+  }, [resetAll]);
 
-  const filterPanel = SongFilters ? (
-    <SongFilters
-      options={options}
-      checked={state.checked}
-      onFacetChange={state.setFacetChecked}
-      available={available}
-      yearSlider={state.yearSlider}
-      onYearChange={state.setYearSlider}
-    />
-  ) : (
-    <div aria-hidden className="h-60 lg:h-26" />
+  // 完整筛选面板：将「类型」作为第一行纯文字书卷选项，与年份滑轨及 5 维筛选浑然一体
+  const fullFilterContent = (
+    <div className="space-y-6">
+      <div className="grid gap-y-2.5 border-b border-slate-200/70 pb-5 lg:grid-cols-[auto_1fr] lg:items-baseline lg:gap-x-8 dark:border-slate-800">
+        <span className={FIELD_LABEL_CLASS}>{tLib("filter.type")}</span>
+        <div className="flex flex-wrap items-baseline gap-y-2">
+          {options.types.map((opt, idx) => {
+            const active = state.filters.type === opt;
+            const label =
+              opt === FILTER_OPTION_ALL
+                ? tCommon("all")
+                : opt === FILTER_OPTION_UNKNOWN
+                  ? tCommon("unknown")
+                  : enumLabel(tEnum, "type", opt);
+            return (
+              <Fragment key={opt}>
+                {idx > 0 && (
+                  <span
+                    aria-hidden
+                    className="mx-2.5 text-slate-300 dark:text-slate-700"
+                  >
+                    ·
+                  </span>
+                )}
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => state.setType(opt)}
+                  className={cn(
+                    "font-serif text-sm tracking-wider transition-colors",
+                    active
+                      ? "text-(--tone)"
+                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                  )}
+                >
+                  {label}
+                </button>
+              </Fragment>
+            );
+          })}
+        </div>
+      </div>
+
+      {SongFilters ? (
+        <SongFilters
+          options={options}
+          checked={state.checked}
+          onFacetChange={state.setFacetChecked}
+          available={available}
+          yearSlider={state.yearSlider}
+          onYearChange={state.setYearSlider}
+        />
+      ) : (
+        <div aria-hidden className="h-56 lg:h-24" />
+      )}
+    </div>
   );
 
   return (
@@ -230,7 +327,6 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                 河图 · 作品勘鉴
               </p>
 
-              {/* 三大特辑作为书眉轻游径：干净克制，绝不劈裂页面 */}
               <nav
                 aria-label="站点特辑"
                 className="flex items-center gap-4 text-xs tracking-[0.22em] text-slate-500 sm:gap-6 dark:text-slate-400"
@@ -255,11 +351,11 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             <div className="mt-5 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
               <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
                 <h1 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-slate-900 sm:text-5xl md:text-6xl dark:text-slate-50">
-                  {newestFirst ? lastYear : firstYear}
+                  {lastYear}
                   <span className="mx-[0.22em] font-light text-slate-300 dark:text-slate-700">
                     —
                   </span>
-                  {newestFirst ? firstYear : lastYear}
+                  {firstYear}
                 </h1>
                 <span className="font-serif text-sm tracking-[0.18em] text-slate-400 sm:text-base dark:text-slate-500">
                   <AnimatePresence mode="wait" initial={false}>
@@ -289,7 +385,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             </div>
           </header>
 
-          {/* ── 2. 二十年的颜色光谱（核心视觉与时间索引） ── */}
+          {/* ── 2. 二十年的颜色光谱（由近及远，核心视觉与时间索引） ── */}
           <ColorTapestry
             songs={catalog}
             matched={matched}
@@ -297,164 +393,192 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             onSpotlightColor={setSpotlightColor}
           />
 
-          {/* ── 3. 完整吸顶检目栏（紧贴光谱之下，0 门槛查歌与筛选） ── */}
-          <div className="sticky top-(--nav-h) z-30 -mx-6 mt-6 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-md dark:bg-[#0B0F19]/95">
-            <div
-              className={cn(
-                TAB_HAIRLINE_CLASS,
-                "flex flex-col-reverse md:h-12 md:flex-row md:gap-8",
-              )}
-            >
-              {/* 类型标签 */}
-              <div
-                ref={tabRef}
-                {...dragHandlers}
-                className="no-scrollbar flex h-11 min-w-0 cursor-grab gap-6 overflow-x-auto mask-[linear-gradient(to_right,black_calc(100%-2rem),transparent)] after:w-2 after:shrink-0 active:cursor-grabbing md:h-full md:mask-none md:after:hidden"
-              >
-                {options.types.map((opt) => {
-                  if (opt === FILTER_OPTION_ALL && state.isAnyFilterActive) {
-                    return (
-                      <button
-                        key="reset"
-                        type="button"
-                        onClick={(event) => {
-                          if (hasDraggedRef.current) {
-                            event.preventDefault();
-                            return;
-                          }
-                          handleReset();
-                        }}
-                        className="relative flex h-full shrink-0 items-center gap-1.5 whitespace-nowrap font-serif text-[15px] tracking-wider text-(--tone) transition-opacity hover:opacity-75"
-                      >
-                        <RotateCcw size={13} />
-                        {tLib("reset")}
-                      </button>
-                    );
-                  }
-
-                  const active = state.filters.type === opt;
-                  const label =
-                    opt === FILTER_OPTION_ALL
-                      ? tCommon("all")
-                      : opt === FILTER_OPTION_UNKNOWN
-                        ? tCommon("unknown")
-                        : enumLabel(tEnum, "type", opt);
-
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => {
-                        if (hasDraggedRef.current) return;
-                        state.setType(opt);
-                      }}
-                      className={cn(
-                        "relative flex h-full shrink-0 items-center whitespace-nowrap font-serif text-[15px] tracking-wider transition-colors select-none",
-                        active
-                          ? "text-slate-900 dark:text-slate-100"
-                          : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
-                      )}
-                    >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) transition-opacity",
-                          active ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 搜索 + 高级筛选 */}
-              <div
-                className={cn(
-                  TAB_HAIRLINE_CLASS,
-                  "flex h-11 items-center gap-1 md:ml-auto md:h-full md:before:hidden",
-                )}
-              >
-                <label className="group relative flex h-full min-w-0 flex-1 items-center gap-2 md:w-64 md:flex-none">
-                  <Search size={15} className="shrink-0 text-slate-400" />
+          {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
+          <div className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA]/92 px-6 backdrop-blur-md dark:bg-[#0B0F19]/92">
+            <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
+              {/* 左栏（与下方年份 & 大画幅严格左齐）：一根楷体寻曲底线，无图标堆砌 */}
+              <div className="flex items-center justify-between gap-4">
+                <label className="group relative flex min-w-0 flex-1 items-center gap-2 py-1">
                   <input
                     type="text"
-                    placeholder={tLib("search.placeholder")}
+                    placeholder="寻歌、词人或一句歌词……"
                     value={state.searchInput}
                     onFocus={handleSearchFocus}
                     onChange={(e) => state.setSearchInput(e.target.value)}
-                    className="h-full min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
+                    className="w-full min-w-0 bg-transparent font-kaiti text-[15px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                   {state.searchInput ? (
                     <button
                       type="button"
                       onClick={() => state.setSearchInput("")}
-                      aria-label="清空搜索"
-                      className="shrink-0 p-1 text-slate-300 transition-colors hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
+                      className="shrink-0 text-[11px] tracking-[0.2em] text-slate-400 transition-colors hover:text-slate-800 dark:text-slate-500 dark:hover:text-slate-200"
                     >
-                      <XCircle size={14} />
+                      清空
                     </button>
                   ) : lyrics.state === "loading" ? (
-                    <span className="block h-3 w-3 shrink-0 animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600" />
-                  ) : lyrics.state === "ready" ? (
-                    <Mic2
-                      size={13}
-                      className="shrink-0 text-(--tone) opacity-55"
+                    <span
+                      aria-label="歌词检索准备中"
+                      className="block h-2.5 w-2.5 shrink-0 animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600"
                     />
+                  ) : lyrics.state === "ready" ? (
+                    <span className="shrink-0 text-[10px] tracking-[0.2em] text-(--tone)/65">
+                      含词
+                    </span>
                   ) : null}
+
+                  {/* 聚焦时细底线才缓缓亮起强调色 */}
                   <span
                     aria-hidden
-                    className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-(--tone) opacity-0 transition-opacity group-focus-within:opacity-100"
+                    className="pointer-events-none absolute inset-x-0 -bottom-2.5 h-[1.5px] bg-(--tone) opacity-0 transition-opacity duration-300 group-focus-within:opacity-100"
                   />
                 </label>
 
-                <span
-                  aria-hidden
-                  className="mx-2 h-4 w-px shrink-0 bg-slate-200 dark:bg-slate-800"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => state.setAdvanced(!state.advanced)}
-                  aria-pressed={state.advanced}
-                  title={tLib("advancedFilter")}
-                  className={cn(
-                    NAV_BUTTON_CLASS,
-                    "inline-flex shrink-0 items-center gap-1.5",
-                    (state.advanced || activeAdvancedCount > 0) &&
-                    "text-(--tone) dark:text-(--tone)",
+                {/* 窄屏把「筛选 / 重置」紧贴同一行右侧，整条检目线只占一行 */}
+                <div className="flex shrink-0 items-center gap-3 lg:hidden">
+                  {state.isAnyFilterActive && (
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="text-xs tracking-[0.22em] text-(--tone) transition-opacity hover:opacity-75"
+                    >
+                      重置
+                    </button>
                   )}
-                >
-                  {state.advanced && isDesktop ? (
-                    <X size={17} />
-                  ) : (
-                    <SlidersHorizontal size={16} />
-                  )}
-                  <span className="text-xs tracking-widest">
+                  <button
+                    type="button"
+                    onClick={() => state.setAdvanced(!state.advanced)}
+                    aria-pressed={state.advanced}
+                    className={cn(
+                      "text-xs tracking-[0.25em] transition-colors",
+                      state.advanced || activeChips.length > 0
+                        ? "text-(--tone)"
+                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                    )}
+                  >
                     筛选
-                    {activeAdvancedCount > 0 && (
+                    {activeChips.length > 0 && (
                       <span className="ml-1 font-mono tabular-nums">
-                        ({activeAdvancedCount})
+                        · {activeChips.length}
                       </span>
                     )}
-                  </span>
-                </button>
+                  </button>
+                </div>
+              </div>
+
+              {/* 右栏（宽屏，与下方编年目录严格左齐）：已选条件轻注脚 + 「筛选」纯文字开关 */}
+              <div className="hidden items-center justify-between gap-6 lg:flex">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-y-1 text-xs">
+                  {activeChips.length > 0 ? (
+                    activeChips.map((chip, idx) => (
+                      <Fragment key={chip.key}>
+                        {idx > 0 && (
+                          <span
+                            aria-hidden
+                            className="mx-2.5 text-slate-300 dark:text-slate-700"
+                          >
+                            ·
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={chip.onRemove}
+                          title="点击撤回此项筛选"
+                          className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-slate-600 transition-colors hover:text-(--tone) dark:text-slate-300"
+                        >
+                          <span>{chip.label}</span>
+                          <span className="font-sans text-[11px] text-slate-400 transition-colors group-hover:text-(--tone) dark:text-slate-500">
+                            ×
+                          </span>
+                        </button>
+                      </Fragment>
+                    ))
+                  ) : (
+                    <span className="font-kaiti text-[13px] text-slate-400/80 dark:text-slate-500/80">
+                      按初发年月倒序编目
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex shrink-0 items-center gap-4 text-xs tracking-[0.28em]">
+                  {state.isAnyFilterActive && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleReset}
+                        className="text-(--tone) transition-opacity hover:opacity-75"
+                      >
+                        重置
+                      </button>
+                      <span
+                        aria-hidden
+                        className="text-slate-300 dark:text-slate-700"
+                      >
+                        ·
+                      </span>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => state.setAdvanced(!state.advanced)}
+                    aria-pressed={state.advanced}
+                    className={cn(
+                      "transition-colors",
+                      state.advanced || activeChips.length > 0
+                        ? "text-(--tone)"
+                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                    )}
+                  >
+                    {state.advanced
+                      ? "收起筛选"
+                      : activeChips.length > 0
+                        ? `筛选 · ${activeChips.length}`
+                        : "筛选"}
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* 窄屏已选筛选注脚行：仅在真的有筛选条件时才轻轻露出一行 */}
+            {activeChips.length > 0 && (
+              <div className="flex flex-wrap items-baseline gap-y-1 border-b border-slate-200/60 py-2 text-xs lg:hidden dark:border-slate-800/70">
+                {activeChips.map((chip, idx) => (
+                  <Fragment key={chip.key}>
+                    {idx > 0 && (
+                      <span
+                        aria-hidden
+                        className="mx-2 text-slate-300 dark:text-slate-700"
+                      >
+                        ·
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={chip.onRemove}
+                      className="inline-flex items-baseline gap-1 font-kaiti text-xs text-slate-600 dark:text-slate-300"
+                    >
+                      <span>{chip.label}</span>
+                      <span className="font-sans text-[10px] text-slate-400">
+                        ×
+                      </span>
+                    </button>
+                  </Fragment>
+                ))}
+              </div>
+            )}
+
+            {/* 宽屏内联展开完整筛选（类型 + 年份滑轨 + 5 维多选） */}
             {state.advanced && isDesktop && (
-              <div className="animate-in slide-in-from-top-2 fade-in border-b border-slate-200/70 pb-6 pt-5 duration-300 dark:border-slate-800">
-                {filterPanel}
+              <div className="animate-in slide-in-from-top-2 fade-in border-b border-slate-200/75 pb-7 pt-6 duration-300 dark:border-slate-800">
+                {fullFilterContent}
               </div>
             )}
           </div>
 
-          {/* 移动端底部抽屉承载高级筛选 */}
+          {/* 移动端底部抽屉承载完整筛选（类型 + 年份滑轨 + 5 维多选） */}
           {!isDesktop && (
             <Drawer open={state.advanced} onOpenChange={state.setAdvanced}>
               <DrawerContent title={tLib("advancedFilter")}>
-                <div className="pt-2">{filterPanel}</div>
+                <div className="pt-2">{fullFilterContent}</div>
                 <div className="mt-8 flex items-center justify-between border-t border-slate-200/75 pt-4 dark:border-slate-800">
                   <button
                     type="button"
@@ -476,64 +600,13 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             </Drawer>
           )}
 
-          {/* 极轻的阅读次序与书目排版微切换（方便你对比行目 vs 排印） */}
-          <div className="mt-5 mb-2 flex flex-wrap items-center justify-between gap-4 text-xs tracking-[0.22em]">
-            <div className="flex items-center gap-4">
-              {(
-                [
-                  ["index", "编年目录"],
-                  ["prose", "诗集排印"],
-                ] as const
-              ).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  aria-pressed={readingMode === mode}
-                  onClick={() => setReadingMode(mode)}
-                  className={cn(
-                    "transition-colors",
-                    readingMode === mode
-                      ? "text-(--tone)"
-                      : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-4">
-              {(
-                [
-                  [true, "由近及远"],
-                  [false, "由远及近"],
-                ] as const
-              ).map(([desc, label]) => (
-                <button
-                  key={String(desc)}
-                  type="button"
-                  aria-pressed={newestFirst === desc}
-                  onClick={() => setNewestFirst(desc)}
-                  className={cn(
-                    "transition-colors",
-                    newestFirst === desc
-                      ? "text-(--tone)"
-                      : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {approximate && (
-            <p className="mt-4 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+            <p className="mt-6 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
               {tLib("search.approximate")}
             </p>
           )}
 
-          {/* ── 4. 编年分章正文（一年一画幅 + 右侧书目，零货架感） ── */}
+          {/* ── 4. 编年目录正文（由近及远，一年一画幅 + 右侧编年行目） ── */}
           {shownCount === 0 ? (
             <p className="py-24 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
               {lyricsPending
@@ -544,7 +617,6 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             <YearChapters
               chapters={chapters}
               matched={matched}
-              readingMode={readingMode}
               onOpenSong={handleOpenSong}
               getLyricsSnippet={getLyricsSnippet}
               onActiveYearChange={setActiveYearKey}
@@ -565,7 +637,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           </footer>
         </main>
 
-        {/* 宽屏右侧悬浮年份标尺：随时跨越二十年 */}
+        {/* 宽屏右侧悬浮年份标尺：由近及远，随时跨越二十年 */}
         <nav
           aria-label="年份标尺"
           className="fixed right-4 top-1/2 z-20 hidden -translate-y-1/2 flex-col items-end gap-1 xl:flex"

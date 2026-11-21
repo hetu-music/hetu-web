@@ -60,7 +60,14 @@ interface ActiveChip {
  *   「类型」与年份滑轨、5 维多选统一收进筛选面板（宽屏内联展开，手机走 Base UI 底部抽屉）；
  * - 正文：固定「编年目录 + 由近及远」，一章一画幅 + 右栏编年目录。
  */
-export default function HomeTimeClient({ songs }: { songs: Song[] }) {
+export default function HomeTimeClient({
+  songs,
+  serverMonthDay,
+}: {
+  songs: Song[];
+  /** 服务端渲染时的 "MM-DD"（北京时间），给「这个时节」唱片架用 */
+  serverMonthDay: string;
+}) {
   const router = useRouter();
   const locale = useLocale();
   const tLib = useTranslations("library");
@@ -363,11 +370,10 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
           <FeatureRibbonB items={CORE_FEATURES} />
 
-          {/* ── 2. 实体唱片架（由近及远，滑过抽碟，点选入卷或按年跳章） ── */}
+          {/* ── 2. 这个时节：历年此时前后的歌立成一小排唱片架（不随筛选变化） ── */}
           <ColorTapestry
             songs={catalog}
-            matched={matched}
-            onJumpToYear={jumpToYear}
+            serverMonthDay={serverMonthDay}
             onOpenSong={handleOpenSong}
             onSpotlightColor={setSpotlightColor}
           />

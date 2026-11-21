@@ -83,3 +83,65 @@ export function creditSummary(song: Song): string {
   if (song.album && song.album !== song.title) return `《${song.album}》`;
   return song.artist?.join(" / ") || "";
 }
+
+// ── 这个时节：把二十年折叠到今天这个日子上 ──
+
+/** "MM-DD" → 一年中的第几天（按平年算；2 月 29 日并入 3 月 1 日） */
+function dayOfYear(monthDay: string): number {
+  const [m, d] = monthDay.split("-").map(Number);
+  return Math.round((Date.UTC(2001, m - 1, d) - Date.UTC(2001, 0, 1)) / 864e5);
+}
+
+/** 两个日子在年历上相隔几天（跨年环绕） */
+function dayDistance(a: number, b: number): number {
+  const x = Math.abs(a - b);
+  return Math.min(x, 365 - x);
+}
+
+/** 窗口从半个月起，太冷清的日子逐步放宽 */
+const SEASON_WINDOWS = [15, 30, 45];
+const SEASON_MIN = 12;
+
+export interface Season {
+  songs: Song[];
+  /** 实际用的窗口：前后各多少天 */
+  days: number;
+}
+
+/** 历年在今天前后发布的歌，由近及远。只算有完整日期的歌 */
+export function pickSeason(songs: Song[], monthDay: string): Season {
+  const today = dayOfYear(monthDay);
+  const dated = songs.filter(
+    (s): s is Song & { date: string } =>
+      !!s.date && /^\d{4}-\d{2}-\d{2}$/.test(s.date),
+  );
+  let picked: Song[] = [];
+  let days = SEASON_WINDOWS[0];
+  for (const w of SEASON_WINDOWS) {
+    days = w;
+    picked = dated.filter(
+      (s) => dayDistance(dayOfYear(s.date.slice(5)), today) <= w,
+    );
+    if (picked.length >= SEASON_MIN) break;
+  }
+  return { songs: picked.sort(byDateDesc), days };
+}
+
+const MONTHS = "一二三四五六七八九十";
+function monthName(m: number): string {
+  return m <= 10 ? MONTHS[m - 1] : `十${MONTHS[m - 11]}`;
+}
+
+/** 展签上的时节名：窗口半个月以内说「十一月下旬」，放宽了就说「十一月前后」 */
+export function seasonName(monthDay: string, days: number): string {
+  const [m, d] = monthDay.split("-").map(Number);
+  const month = `${monthName(m)}月`;
+  if (days > 15) return `${month}前后`;
+  return `${month}${d <= 10 ? "上旬" : d <= 20 ? "中旬" : "下旬"}`;
+}
+
+/** 访客本地的 "MM-DD" */
+export function localMonthDay(): string {
+  const now = new Date();
+  return `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}

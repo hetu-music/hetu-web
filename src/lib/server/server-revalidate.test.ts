@@ -6,9 +6,9 @@ vi.mock("next/cache", () => ({
 }));
 
 vi.mock("@/lib/server/server-utils", () => ({
-  purgeCloudflareCache: vi.fn(async () => undefined),
-  purgeEdgeOneCache: vi.fn(async () => undefined),
-  purgeCloudFrontCache: vi.fn(async () => undefined),
+  purgeCloudflareCache: vi.fn(async () => "ok"),
+  purgeEdgeOneCache: vi.fn(async () => "ok"),
+  purgeCloudFrontCache: vi.fn(async () => "ok"),
 }));
 
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -16,70 +16,74 @@ import {
   purgeCloudflareCache,
   purgeCloudFrontCache,
   purgeEdgeOneCache,
+  type PurgePlan,
 } from "@/lib/server/server-utils";
 import {
+  PURGE_ALL_ABOVE,
   refreshAudio,
   refreshCredits,
   refreshImagery,
+  refreshLiveVersion,
+  refreshPublicPages,
   refreshSongs,
   withPurgeStatus,
 } from "@/lib/server/server-revalidate";
 
-const purged = () =>
-  vi.mocked(purgeCloudflareCache).mock.calls.flatMap(([paths]) => paths);
+/** 这次交给 CDN 的清单（三家拿到的是同一份） */
+const plan = (): PurgePlan => {
+  const calls = vi.mocked(purgeCloudflareCache).mock.calls;
+  expect(calls).toHaveLength(1);
+  return calls[0][0];
+};
+/** 清单里的页面与地址；整站时为空 */
+const purged = (): string[] => {
+  const p = plan();
+  return p.all ? [] : [...p.pages, ...p.urls];
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("invalidate", () => {
-  it("Next 只刷带语言前缀的路由，CDN 另外清无前缀的旧 URL", async () => {
-    await refreshSongs([1]);
-    const paths = vi.mocked(revalidatePath).mock.calls.map(([p]) => p);
-    expect(paths).toEqual(
-      expect.arrayContaining(["/zh-CN", "/zh-TW/song/1", "/sitemap.xml"]),
-    );
-    expect(paths).not.toContain("/song/1");
-    expect(purged()).toEqual(
-      expect.arrayContaining(["/zh-CN/song/1", "/", "/song/1", "/sitemap.xml"]),
-    );
-  });
-
-  it("CloudFront 一次提交全部路径，并连带清带语言前缀页面的查询串变体", async () => {
+  it("Next 与 CDN 都只清带语言前缀的页面，不清无前缀的 301", async () => {
     await refreshCredits([1]);
-    expect(purgeCloudFrontCache).toHaveBeenCalledTimes(1);
-    const [paths, pagePaths] = vi.mocked(purgeCloudFrontCache).mock.calls[0];
-    expect(paths).toEqual(expect.arrayContaining(["/zh-CN/song/1", "/song/1"]));
-    // 无前缀的旧 URL 只是 301，没有站内跳转的变体
-    expect(pagePaths).toEqual([
+    const paths = vi.mocked(revalidatePath).mock.calls.map(([p]) => p);
+    expect(paths).toEqual([
       "/zh-CN",
       "/zh-CN/song/1",
       "/zh-TW",
       "/zh-TW/song/1",
     ]);
+    expect(plan()).toEqual({ pages: paths, urls: [] });
   });
 
-  it("Cloudflare 与 EdgeOne 按每批 30 条拆分", async () => {
-    await refreshCredits(Array.from({ length: 20 }, (_, i) => i + 1));
-    for (const fn of [purgeCloudflareCache, purgeEdgeOneCache]) {
-      const calls = vi.mocked(fn).mock.calls;
-      expect(calls.length).toBeGreaterThan(1);
-      expect(calls.every(([paths]) => paths.length <= 30)).toBe(true);
+  it("三家 CDN 拿到同一份清单，各提交一次", async () => {
+    await refreshSongs([1]);
+    const p = plan();
+    for (const fn of [purgeEdgeOneCache, purgeCloudFrontCache]) {
+      expect(vi.mocked(fn).mock.calls).toEqual([[p]]);
     }
+  });
+
+  it(`页面与地址合计超过 ${PURGE_ALL_ABOVE} 条时清整站`, async () => {
+    await refreshCredits(Array.from({ length: 20 }, (_, i) => i + 1));
+    expect(plan()).toEqual({ all: true });
+    // Next 照样逐页失效
+    expect(revalidatePath).toHaveBeenCalledWith("/zh-TW/song/20");
+  });
+
+  it("部署后的预热不到阈值，按页清", async () => {
+    await refreshPublicPages();
+    expect(plan().all).toBeFalsy();
   });
 });
 
 describe("清 CDN 的结果", () => {
-  it("没启用的 CDN 不算失败；任一批失败就把那家记为失败", async () => {
-    vi.mocked(purgeCloudflareCache)
-      .mockResolvedValueOnce("ok")
-      .mockResolvedValueOnce("failed");
-    vi.mocked(purgeEdgeOneCache).mockResolvedValue("skipped");
-    vi.mocked(purgeCloudFrontCache).mockResolvedValue("ok");
-    // 20 首歌 × 2 种语言，超过 30 条，Cloudflare 分两批
-    const report = await refreshCredits(
-      Array.from({ length: 20 }, (_, i) => i + 1),
-    );
+  it("没启用的 CDN 不算失败；失败的那家记下来", async () => {
+    vi.mocked(purgeCloudflareCache).mockResolvedValueOnce("failed");
+    vi.mocked(purgeEdgeOneCache).mockResolvedValueOnce("skipped");
+    const report = await refreshCredits([1]);
     expect(report).toEqual({ failed: ["Cloudflare"] });
   });
 
@@ -116,6 +120,23 @@ describe("refreshSongs", () => {
         "/sitemap.xml",
       ]),
     );
+  });
+});
+
+describe("refreshLiveVersion", () => {
+  it("歌曲与母题合成一次提交，意象页、寻曲页不重复", async () => {
+    await refreshLiveVersion(5, []);
+    expect(purgeCloudflareCache).toHaveBeenCalledTimes(1);
+    const list = purged();
+    expect(list.filter((p) => p === "/zh-CN/imagery")).toHaveLength(1);
+    expect(list).toContain("/zh-CN/song/5");
+  });
+
+  it("牵涉母题时超过阈值，清整站", async () => {
+    await refreshLiveVersion(5, [9, 10]);
+    expect(plan()).toEqual({ all: true });
+    expect(revalidatePath).toHaveBeenCalledWith("/zh-TW/imagery/10");
+    expect(revalidatePath).toHaveBeenCalledWith("/api/imagery/motifs/9");
   });
 });
 

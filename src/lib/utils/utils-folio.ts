@@ -262,9 +262,7 @@ export function markLines(
     for (const tag of mark.timetags) {
       const t = timetagToSeconds(tag);
       if (t === null) continue;
-      const hit = lines.find(
-        (l) => l.time !== null && Math.abs(l.time - t) < 0.05,
-      );
+      const hit = lineAt(lines, t, mark.name);
       if (hit) texts.add(hit.text);
     }
     lines.forEach((line, i) => {
@@ -278,6 +276,37 @@ export function markLines(
   return lines.map((line, i) =>
     splitSegments(line.text, idsByLine[i], nameById),
   );
+}
+
+/** 时间标签的容差：两位与三位小数的写法差几毫秒 */
+const TIMETAG_TOLERANCE = 0.05;
+
+/**
+ * 时间标签对应的那一句。演唱者行（「【某某】」）常与正文同一时刻或只早 1 毫秒，
+ * 容差内有几句时，先取写着这个意象的，再取时间最近的；
+ * 取容差内的第一句会把标注挂到上面的演唱者行上。
+ */
+function lineAt(
+  lines: FolioLine[],
+  t: number,
+  name: string,
+): FolioLine | undefined {
+  let best: { line: FolioLine; missing: boolean; distance: number } | null =
+    null;
+  for (const line of lines) {
+    if (line.time === null) continue;
+    const distance = Math.abs(line.time - t);
+    if (distance >= TIMETAG_TOLERANCE) continue;
+    const missing = locateNeedle(line.text, name) === null;
+    if (
+      !best ||
+      (best.missing && !missing) ||
+      (best.missing === missing && distance < best.distance)
+    ) {
+      best = { line, missing, distance };
+    }
+  }
+  return best?.line;
 }
 
 function splitSegments(

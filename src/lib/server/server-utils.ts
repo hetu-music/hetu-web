@@ -9,12 +9,40 @@ import { fetchWithTimeout } from "@/lib/utils/utils-common";
 
 // 各家 CDN 的刷新接口串在发布流程的 Promise.all 上，卡住就卡住整个发布
 const PURGE_TIMEOUT_MS = 10000;
-const CLOUDFLARE_PURGE_BATCH = 30;
+/** Cloudflare 免费套餐按 URL 清每次最多 30 条；EdgeOne 的上限看套餐，也按这个拆 */
+const URL_PURGE_BATCH = 30;
 // CloudFront 同一时间最多 15 条通配路径在处理中，留些余量给紧接着的下一次刷新
 const CLOUDFRONT_MAX_WILDCARDS = 10;
 
 /** 一家 CDN 这次刷新的结果；skipped 表示没启用这家（凭证一个都没配） */
 export type PurgeOutcome = "ok" | "skipped" | "failed";
+
+/**
+ * 这次要清什么，三家 CDN 共用一份，各自翻译成自己的接口（docs/CACHE.md）。
+ * 由 server-revalidate 的 invalidate 算出，调用方不直接拼。
+ *
+ * - pages：带语言前缀的页面路径。语义是「这个页面，连同它带查询串的变体」
+ * - urls：精确地址，如带固定参数的公开接口，只清这一个
+ * - all：整站
+ */
+export type PurgePlan =
+  { all: true } | { all?: false; pages: string[]; urls: string[] };
+
+/** 语言首页（/zh-CN）：只有一段的页面路径 */
+const LOCALE_ROOT = /^\/[^/]*$/;
+
+function absoluteUrls(siteUrl: string, paths: string[]): string[] {
+  const base = siteUrl.replace(/\/$/, "");
+  return paths.map((p) => `${base}${p.startsWith("/") ? p : `/${p}`}`);
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+}
 
 /**
  * 读一家 CDN 的环境变量。
@@ -238,11 +266,14 @@ export async function verifyTurnstileToken(
 }
 
 /**
- * 清除 Cloudflare CDN 的指定绝对路径缓存
- * @param paths 相对地址路径数组，如 ['/', '/song/123']
+ * 清 Cloudflare 的缓存。
+ *
+ * 页面与地址都按 URL 清（每次最多 30 条）：站内跳转的 ?_rsc= 在 Cloudflare 上不进缓存，
+ * 不用按前缀清，也就不占按前缀清与清全站共用的那份每分钟 5 次的配额。
+ * 整站用 purge_everything。
  */
 export async function purgeCloudflareCache(
-  paths: string[],
+  plan: PurgePlan,
 ): Promise<PurgeOutcome> {
   const env = readCdnEnv(
     "Cloudflare",
@@ -252,18 +283,16 @@ export async function purgeCloudflareCache(
   if (typeof env === "string") return env;
   const zoneId = env.CLOUDFLARE_ZONE_ID;
   const token = env.CLOUDFLARE_API_TOKEN;
-  const siteUrl = env.NEXT_PUBLIC_SITE_URL;
 
-  // 拼接绝对 URL 列表
-  const urls = paths.map((p) => {
-    const cleanPath = p.startsWith("/") ? p : `/${p}`;
-    return `${siteUrl.replace(/\/$/, "")}${cleanPath}`;
-  });
+  const bodies: object[] = plan.all
+    ? [{ purge_everything: true }]
+    : chunk(
+        absoluteUrls(env.NEXT_PUBLIC_SITE_URL, [...plan.pages, ...plan.urls]),
+        URL_PURGE_BATCH,
+      ).map((files) => ({ files }));
 
-  // 按 URL 清缓存每次最多 30 条（免费套餐），署名别名一改就可能牵动几十首歌
   let outcome: PurgeOutcome = "ok";
-  for (let i = 0; i < urls.length; i += CLOUDFLARE_PURGE_BATCH) {
-    const batch = urls.slice(i, i + CLOUDFLARE_PURGE_BATCH);
+  for (const body of bodies) {
     try {
       const res = await fetchWithTimeout(
         `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`,
@@ -273,7 +302,7 @@ export async function purgeCloudflareCache(
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ files: batch }),
+          body: JSON.stringify(body),
         },
         PURGE_TIMEOUT_MS,
       );
@@ -284,7 +313,7 @@ export async function purgeCloudflareCache(
         outcome = "failed";
       } else {
         // eslint-disable-next-line no-console
-        console.log("[Cloudflare] 成功刷新 CDN 缓存:", batch);
+        console.log("[Cloudflare] 成功刷新 CDN 缓存:", body);
       }
     } catch (err) {
       console.error("[Cloudflare] 刷新 CDN 缓存出错:", err);
@@ -295,11 +324,12 @@ export async function purgeCloudflareCache(
 }
 
 /**
- * 清除腾讯云 EdgeOne (TEO) CDN 的指定路径缓存
- * @param paths 相对地址路径数组，如 ['/', '/song/123']
+ * 清腾讯云 EdgeOne (TEO) 的缓存。
+ *
+ * 页面与地址都按 URL 清（purge_url，每次 30 条）；整站用 purge_all。
  */
 export async function purgeEdgeOneCache(
-  paths: string[],
+  plan: PurgePlan,
 ): Promise<PurgeOutcome> {
   const env = readCdnEnv(
     "EdgeOne",
@@ -307,29 +337,46 @@ export async function purgeEdgeOneCache(
     ["EDGEONE_SITE_URL"],
   );
   if (typeof env === "string") return env;
-  const secretId = env.EDGEONE_SECRET_ID;
-  const secretKey = env.EDGEONE_SECRET_KEY;
   const zoneId = env.EDGEONE_ZONE_ID;
-  const siteUrl = env.EDGEONE_SITE_URL;
 
-  // 拼接 EdgeOne 对应的绝对 URL 列表
-  const urls = paths.map((p) => {
-    const cleanPath = p.startsWith("/") ? p : `/${p}`;
-    return `${siteUrl.replace(/\/$/, "")}${cleanPath}`;
-  });
+  const payloads: object[] = plan.all
+    ? // 整站只让边缘节点回源校验（invalidate），不硬删，减轻源站压力
+      [{ ZoneId: zoneId, Type: "purge_all", Method: "invalidate" }]
+    : chunk(
+        absoluteUrls(env.EDGEONE_SITE_URL, [...plan.pages, ...plan.urls]),
+        URL_PURGE_BATCH,
+      ).map((targets) => ({
+        ZoneId: zoneId,
+        Type: "purge_url",
+        Targets: targets,
+        // 直接物理删除缓存 (hard purge)，确保客户端下一次访问强行获取最新数据
+        Method: "delete",
+      }));
 
+  const results = await Promise.all(
+    payloads.map((payload) =>
+      createEdgeOnePurgeTask(
+        env.EDGEONE_SECRET_ID,
+        env.EDGEONE_SECRET_KEY,
+        payload,
+      ),
+    ),
+  );
+  return results.every(Boolean) ? "ok" : "failed";
+}
+
+/** 提交一个 EdgeOne 刷新任务（TC3-HMAC-SHA256 签名）；失败只记日志，返回 false */
+async function createEdgeOnePurgeTask(
+  secretId: string,
+  secretKey: string,
+  payload: object,
+): Promise<boolean> {
   const host = "teo.intl.tencentcloudapi.com"; // 对应 edgeone.ai 国际站的 API 域名
   const service = "teo";
   const action = "CreatePurgeTask";
   const version = "2022-09-01";
   const region = "ap-singapore";
   const timestamp = Math.floor(Date.now() / 1000);
-  const payload = {
-    ZoneId: zoneId,
-    Type: "purge_url",
-    Targets: urls,
-    Method: "delete", // 直接物理删除缓存 (hard purge)，确保客户端下一次访问强行获取最新数据
-  };
 
   try {
     const date = new Date(timestamp * 1000).toISOString().split("T")[0];
@@ -400,17 +447,17 @@ export async function purgeEdgeOneCache(
         resData.Response.Error.Code,
         resData.Response.Error.Message,
       );
-      return "failed";
+      return false;
     }
     // eslint-disable-next-line no-console
     console.log(
       "[EdgeOne] 成功提交刷新任务，任务 ID:",
       resData.Response?.JobId,
     );
-    return "ok";
+    return true;
   } catch (err) {
     console.error("[EdgeOne] 刷新 CDN 缓存出错:", err);
-    return "failed";
+    return false;
   }
 }
 
@@ -447,42 +494,39 @@ async function createCloudFrontInvalidation(
 }
 
 /**
- * 清除 Amazon CloudFront 的指定路径缓存
- *
- * 分两次提交：精确路径一次；页面带查询串的变体（站内跳转的 ?_rsc=…）
- * 用 `路径?*` 通配另提交一次。通配路径同时处理中的数量有上限，超了只丢
- * 这一次的变体，页面本身照常刷新；变体太多时改成整站 `/*`。
- *
- * 不用 `路径*`：首页 /zh-CN 加上 * 会匹配整个语言版本。
- *
- * @param paths     相对地址路径数组，如 ['/', '/song/123']
- * @param pagePaths 其中要连带清查询串变体的页面路径
+ * CloudFront 要提交的路径。按条计费（每月免费 1000 条，一条通配也只算 1 条），
+ * 所以页面用 `路径*` 一条连带清掉查询串变体（站内跳转的 ?_rsc=…）；
+ * `/zh-CN/song/1*` 也会匹配 /zh-CN/song/12，多清几页无妨。
+ * 语言首页例外，`/zh-CN*` 会匹配整个语言版本，改用本身加 `?*` 两条。
+ * 通配路径同时处理中的数量有上限，超过 CLOUDFRONT_MAX_WILDCARDS 时改成整站 `/*`。
  */
+export function cloudFrontPaths(plan: PurgePlan): string[] {
+  if (plan.all) return ["/*"];
+  const pages = plan.pages.flatMap((p) =>
+    LOCALE_ROOT.test(p) ? [p, `${p}?*`] : [`${p}*`],
+  );
+  if (pages.length > CLOUDFRONT_MAX_WILDCARDS) return ["/*"];
+  return [...pages, ...plan.urls];
+}
+
+/** 清 Amazon CloudFront 的缓存，一次提交（路径见 cloudFrontPaths） */
 export async function purgeCloudFrontCache(
-  paths: string[],
-  pagePaths: string[] = [],
+  plan: PurgePlan,
 ): Promise<PurgeOutcome> {
   // 访问密钥不在这里检查：SDK 还能从别处取凭证，缺了会在提交时报错
   const env = readCdnEnv("CloudFront", ["CLOUDFRONT_DISTRIBUTION_ID"]);
   if (typeof env === "string") return env;
-  const distributionId = env.CLOUDFRONT_DISTRIBUTION_ID;
+
+  const items = cloudFrontPaths(plan);
+  if (items.length === 0) return "ok";
 
   // 访问密钥走 SDK 默认凭证链（AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY）；
   // CloudFront 是全局服务，API 固定在 us-east-1
   cloudFrontClient ??= new CloudFrontClient({ region: "us-east-1" });
-  const client = cloudFrontClient;
-
-  const variants =
-    pagePaths.length > CLOUDFRONT_MAX_WILDCARDS
-      ? ["/*"]
-      : pagePaths.map((p) => `${p}?*`);
-
-  const results = await Promise.all(
-    [paths, variants]
-      .filter((items) => items.length > 0)
-      .map((items) =>
-        createCloudFrontInvalidation(client, distributionId, items),
-      ),
+  const ok = await createCloudFrontInvalidation(
+    cloudFrontClient,
+    env.CLOUDFRONT_DISTRIBUTION_ID,
+    items,
   );
-  return results.every(Boolean) ? "ok" : "failed";
+  return ok ? "ok" : "failed";
 }

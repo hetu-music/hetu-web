@@ -14,14 +14,18 @@ const DialogClose = BaseDialog.Close;
 /**
  * 公开页的浮层题头：一行加粗的衬线小字（与章节题头一样，字重来自 globals.css 的标题样式），右侧收起。居中弹窗与底部面板共用
  * （Drawer 的 Title、Close 就是 Dialog 的同一份实现）。
+ * 底部面板不放收起按钮：下拖、点遮罩都能收起。
  */
 function PanelHeader({
   title,
   description,
+  closable = true,
 }: {
   title: string;
   /** 只给读屏用的说明 */
   description?: string;
+  /** 右侧放收起按钮；底部面板传 false */
+  closable?: boolean;
 }) {
   const tNav = useTranslations("common.nav");
   return (
@@ -34,12 +38,14 @@ function PanelHeader({
           {description}
         </BaseDialog.Description>
       )}
-      <BaseDialog.Close
-        aria-label={tNav("close")}
-        className="p-1 -mr-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-      >
-        <X size={18} />
-      </BaseDialog.Close>
+      {closable && (
+        <BaseDialog.Close
+          aria-label={tNav("close")}
+          className="p-1 -mr-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+        >
+          <X size={18} />
+        </BaseDialog.Close>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   purgeCloudFrontCache,
   purgeEdgeOneCache,
   type PurgeOutcome,
+  type PurgePlan,
 } from "@/lib/server/server-utils";
 
 /**
@@ -23,21 +24,27 @@ import {
  *   一条让页面和公开接口按源站头进缓存（排除 /api/admin、/api/auth），
  *   一条让站内跳转请求（?_rsc= 或 rsc: 1）绕过缓存。
  *   规则原文和待加的缓存键设置见 docs/CACHE.md。
- *   只能按 URL 清，所以受影响的页面和接口要逐个列出来。
- *   站内跳转的 ?_rsc=… 变体只有 CloudFront 能按通配清。
+ *
+ * 清 CDN 时三家共用一份清单（PurgePlan）：要清的页面、精确地址，或者整站。
+ * 牵涉的页面与地址合起来超过 PURGE_ALL_ABOVE 条就清整站，各家怎么翻译见
+ * server-utils 里的 purge 函数。CloudFront 按条计费，这样一次最多花十几条。
  *
  * 只能靠标签波及、列不出 URL 的页面（如改分类牵动全部详情页），
  * CDN 上的副本要等 s-maxage 到期，最多 6 小时。
  *
  * 下面每个 refresh 函数对应一类数据变动，受牵连的页面、接口和标签都写在函数里，
- * 调用方只说改了哪些歌、哪些母题，不自己补路径。
+ * 调用方只说改了哪些歌、哪些母题，不自己补路径。一次操作牵动几类数据时，
+ * 要合成一次提交（见 refreshLiveVersion），不要分头调几个 refresh。
  *
  * 服务端缓存只有一份全库意象索引（及由它算出的寻曲候选池），用 IMAGERY_INDEX_TAG；
  * 索引里有歌曲资料、has_audio、标注和基调，这几类变动都要失效它。
  */
 
-/** Cloudflare 免费套餐单次按 URL 清缓存的上限，EdgeOne 也按这个拆 */
-const CDN_PURGE_BATCH = 30;
+/**
+ * 页面与地址合计超过这么多条就清整站。整站清过之后全部回源，
+ * 源站给的是 Next 的 ISR 缓存与压好的封面，扛得住
+ */
+export const PURGE_ALL_ABOVE = 15;
 
 type Targets = {
   /** 不带语言前缀的页面路径（首页为 ""），会展开到每种语言 */
@@ -47,6 +54,14 @@ type Targets = {
   /** unstable_cache 的标签 */
   tags?: string[];
 };
+
+function mergeTargets(...targets: Targets[]): Targets {
+  return {
+    pages: targets.flatMap((t) => t.pages ?? []),
+    paths: targets.flatMap((t) => t.paths ?? []),
+    tags: targets.flatMap((t) => t.tags ?? []),
+  };
+}
 
 /** 这次没刷成功的 CDN；为空表示都刷成功了，或者没启用 */
 export type PurgeReport = { failed: string[] };
@@ -66,42 +81,47 @@ export function withPurgeStatus<T extends Response>(
 
 const songPage = (id: number) => `/song/${id}`;
 
-async function invalidate({
-  pages = [],
-  paths = [],
-  tags = [],
-}: Targets): Promise<PurgeReport> {
-  // Next 侧：只有带 locale 前缀的路由真实存在。无前缀的 /、/song/:id
-  // 在 next.config 的 redirects() 里是 301，Next 没有对应的缓存条目。
-  const localized = locales.flatMap((locale) =>
-    pages.map((page) => `/${locale}${page}`),
-  );
-  for (const path of new Set([...localized, ...paths])) revalidatePath(path);
-  for (const tag of tags) revalidateTag(tag, { expire: 0 });
+/**
+ * 三家 CDN 共用的清单。只有带语言前缀的页面：无前缀的 /、/song/:id 在
+ * next.config 的 redirects() 里是固定的 301，数据变了跳转也不变，不用清。
+ */
+export function purgePlan(pages: string[], urls: string[]): PurgePlan {
+  return pages.length + urls.length > PURGE_ALL_ABOVE
+    ? { all: true }
+    : { pages, urls };
+}
 
-  // CDN 侧：还要额外清掉无前缀的旧 URL——边缘节点会把那些 301 响应缓存下来。
-  const cdnPaths = [
-    ...new Set([...localized, ...pages.map((page) => page || "/"), ...paths]),
+async function invalidate(targets: Targets): Promise<PurgeReport> {
+  // Next 侧：只有带 locale 前缀的路由真实存在
+  const pages = [
+    ...new Set(
+      locales.flatMap((locale) =>
+        (targets.pages ?? []).map((page) => `/${locale}${page}`),
+      ),
+    ),
   ];
-  const batches: string[][] = [];
-  for (let i = 0; i < cdnPaths.length; i += CDN_PURGE_BATCH) {
-    batches.push(cdnPaths.slice(i, i + CDN_PURGE_BATCH));
+  const urls = [...new Set(targets.paths ?? [])];
+  for (const path of [...pages, ...urls]) revalidatePath(path);
+  for (const tag of new Set(targets.tags ?? [])) {
+    revalidateTag(tag, { expire: 0 });
   }
-  // 各家 CDN 互不依赖，并行刷新，缩短等待时间。CloudFront 单次可提交上千条，
-  // 不用拆；页面另外连带清站内跳转的查询串变体
+  if (pages.length + urls.length === 0) return NOTHING_FAILED;
+
+  // 各家 CDN 互不依赖，并行刷新，缩短等待时间
+  const plan = purgePlan(pages, urls);
   const [cloudflare, edgeOne, cloudFront] = await Promise.all([
-    Promise.all(batches.map((batch) => purgeCloudflareCache(batch))),
-    Promise.all(batches.map((batch) => purgeEdgeOneCache(batch))),
-    purgeCloudFrontCache(cdnPaths, localized),
+    purgeCloudflareCache(plan),
+    purgeEdgeOneCache(plan),
+    purgeCloudFrontCache(plan),
   ]);
-  const outcomes: [string, PurgeOutcome[]][] = [
+  const outcomes: [string, PurgeOutcome][] = [
     ["Cloudflare", cloudflare],
     ["EdgeOne", edgeOne],
-    ["CloudFront", [cloudFront]],
+    ["CloudFront", cloudFront],
   ];
   return {
     failed: outcomes
-      .filter(([, results]) => results.includes("failed"))
+      .filter(([, outcome]) => outcome === "failed")
       .map(([cdn]) => cdn),
   };
 }
@@ -124,11 +144,28 @@ const LYRICS_LINES_API = locales.map(
  * 详情页之外受波及的页面在 CDN 上等到期。
  */
 export async function refreshSongs(songIds: number[]): Promise<PurgeReport> {
-  return invalidate({
+  return invalidate(songTargets(songIds));
+}
+
+function songTargets(songIds: number[]): Targets {
+  return {
     pages: ["", "/imagery", "/quiz", ...songIds.map(songPage)],
     paths: ["/sitemap.xml", ...LYRICS_LINES_API, ...songIds.map(songLyricsApi)],
     tags: [IMAGERY_INDEX_TAG, LYRICS_LINES_TAG],
-  });
+  };
+}
+
+/**
+ * 线上版本变了（发布、重新上线、下架）：歌曲资料与前后两版标注挂的母题一起变，
+ * 合成一次提交，免得意象页、寻曲页各清两遍
+ */
+export async function refreshLiveVersion(
+  songId: number,
+  motifIds: number[],
+): Promise<PurgeReport> {
+  return invalidate(
+    mergeTargets(songTargets([songId]), imageryTargets({ motifIds })),
+  );
 }
 
 /**
@@ -160,7 +197,17 @@ export async function refreshImagery({
   songIds = [],
   motifIds = [],
 }: { songIds?: number[]; motifIds?: number[] } = {}): Promise<PurgeReport> {
-  return invalidate({
+  return invalidate(imageryTargets({ songIds, motifIds }));
+}
+
+function imageryTargets({
+  songIds = [],
+  motifIds = [],
+}: {
+  songIds?: number[];
+  motifIds?: number[];
+}): Targets {
+  return {
     pages: [
       "/imagery",
       "/quiz",
@@ -172,7 +219,7 @@ export async function refreshImagery({
       `/api/imagery/motifs/${id}?locale=zh-TW`,
     ]),
     tags: [IMAGERY_INDEX_TAG],
-  });
+  };
 }
 
 /**

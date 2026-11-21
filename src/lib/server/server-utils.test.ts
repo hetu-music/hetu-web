@@ -6,6 +6,8 @@ import {
   purgeCloudflareCache,
   purgeEdgeOneCache,
   purgeCloudFrontCache,
+  cloudFrontPaths,
+  type PurgePlan,
   safeCompareSecret,
   serverErrorResponse,
   setCSRFCookie,
@@ -226,6 +228,10 @@ describe("verifyTurnstileToken", () => {
   });
 });
 
+/** 只清几个精确地址的清单 */
+const urlPlan = (...urls: string[]): PurgePlan => ({ pages: [], urls });
+const ALL: PurgePlan = { all: true };
+
 describe("purgeCloudflareCache", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -238,7 +244,7 @@ describe("purgeCloudflareCache", () => {
   it("环境变量未配置时跳过，不发起请求", async () => {
     vi.stubEnv("CLOUDFLARE_ZONE_ID", "");
     vi.stubEnv("CLOUDFLARE_API_TOKEN", "");
-    await expect(purgeCloudflareCache(["/"])).resolves.toBe("skipped");
+    await expect(purgeCloudflareCache(urlPlan("/"))).resolves.toBe("skipped");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -251,7 +257,7 @@ describe("purgeCloudflareCache", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
 
-    await expect(purgeCloudflareCache(["/"])).resolves.toBe("failed");
+    await expect(purgeCloudflareCache(urlPlan("/"))).resolves.toBe("failed");
     expect(fetch).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining("NEXT_PUBLIC_SITE_URL"),
@@ -268,7 +274,9 @@ describe("purgeCloudflareCache", () => {
       json: async () => ({}),
     } as Response);
 
-    await expect(purgeCloudflareCache(["/song/1", "/"])).resolves.toBe("ok");
+    await expect(purgeCloudflareCache(urlPlan("/song/1", "/"))).resolves.toBe(
+      "ok",
+    );
 
     expect(fetch).toHaveBeenCalledWith(
       "https://api.cloudflare.com/client/v4/zones/zone123/purge_cache",
@@ -295,7 +303,7 @@ describe("purgeCloudflareCache", () => {
     } as Response);
 
     const paths = Array.from({ length: 65 }, (_, i) => `/song/${i}`);
-    await purgeCloudflareCache(paths);
+    await purgeCloudflareCache(urlPlan(...paths));
 
     const sizes = vi
       .mocked(fetch)
@@ -303,6 +311,28 @@ describe("purgeCloudflareCache", () => {
         ([, init]) => JSON.parse(init?.body as string).files.length,
       );
     expect(sizes).toEqual([30, 30, 5]);
+  });
+
+  it("页面也按 URL 清；整站用 purge_everything", async () => {
+    vi.stubEnv("CLOUDFLARE_ZONE_ID", "zone123");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "token456");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.com");
+    vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
+
+    await purgeCloudflareCache({ pages: ["/zh-CN/song/1"], urls: ["/a?x=1"] });
+    await purgeCloudflareCache(ALL);
+    const bodies = vi
+      .mocked(fetch)
+      .mock.calls.map(([, init]) => JSON.parse(init?.body as string));
+    expect(bodies).toEqual([
+      {
+        files: [
+          "https://example.com/zh-CN/song/1",
+          "https://example.com/a?x=1",
+        ],
+      },
+      { purge_everything: true },
+    ]);
   });
 
   it("Cloudflare 返回非 2xx 时记录失败但不抛异常（不影响调用方主流程）", async () => {
@@ -314,7 +344,7 @@ describe("purgeCloudflareCache", () => {
       text: async () => "invalid token",
     } as Response);
 
-    await expect(purgeCloudflareCache(["/"])).resolves.toBe("failed");
+    await expect(purgeCloudflareCache(urlPlan("/"))).resolves.toBe("failed");
   });
 
   it("fetch 本身抛异常（网络故障）时不向上抛出", async () => {
@@ -323,7 +353,7 @@ describe("purgeCloudflareCache", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.com");
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
-    await expect(purgeCloudflareCache(["/"])).resolves.toBe("failed");
+    await expect(purgeCloudflareCache(urlPlan("/"))).resolves.toBe("failed");
   });
 });
 
@@ -340,7 +370,7 @@ describe("purgeEdgeOneCache", () => {
     vi.stubEnv("EDGEONE_SECRET_ID", "");
     vi.stubEnv("EDGEONE_SECRET_KEY", "");
     vi.stubEnv("EDGEONE_ZONE_ID", "");
-    await expect(purgeEdgeOneCache(["/"])).resolves.toBe("skipped");
+    await expect(purgeEdgeOneCache(urlPlan("/"))).resolves.toBe("skipped");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -353,7 +383,7 @@ describe("purgeEdgeOneCache", () => {
       json: async () => ({ Response: { JobId: "job-1" } }),
     } as Response);
 
-    await expect(purgeEdgeOneCache(["/song/1"])).resolves.toBe("ok");
+    await expect(purgeEdgeOneCache(urlPlan("/song/1"))).resolves.toBe("ok");
 
     expect(fetch).toHaveBeenCalledWith(
       "https://teo.intl.tencentcloudapi.com",
@@ -380,7 +410,7 @@ describe("purgeEdgeOneCache", () => {
       }),
     } as Response);
 
-    await expect(purgeEdgeOneCache(["/"])).resolves.toBe("failed");
+    await expect(purgeEdgeOneCache(urlPlan("/"))).resolves.toBe("failed");
   });
 
   it("fetch 本身抛异常时不向上抛出", async () => {
@@ -390,7 +420,7 @@ describe("purgeEdgeOneCache", () => {
     vi.stubEnv("EDGEONE_SITE_URL", "https://example.com");
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
-    await expect(purgeEdgeOneCache(["/"])).resolves.toBe("failed");
+    await expect(purgeEdgeOneCache(urlPlan("/"))).resolves.toBe("failed");
   });
 });
 
@@ -407,51 +437,81 @@ describe("purgeCloudFrontCache", () => {
 
   it("未配置分发 ID 时跳过，不发起请求", async () => {
     vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "");
-    await expect(purgeCloudFrontCache(["/"])).resolves.toBe("skipped");
+    await expect(purgeCloudFrontCache(urlPlan("/"))).resolves.toBe("skipped");
     expect(cloudFrontSend).not.toHaveBeenCalled();
   });
 
-  it("精确路径与页面的查询串变体分两次提交", async () => {
+  it("一次提交：页面用一条通配连带查询串变体，地址照原样", async () => {
     vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
     cloudFrontSend.mockResolvedValue({ Invalidation: { Id: "I1" } });
 
-    await purgeCloudFrontCache(["/zh-CN", "/", "/sitemap.xml"], ["/zh-CN"]);
+    await purgeCloudFrontCache({
+      pages: ["/zh-CN", "/zh-CN/song/1"],
+      urls: ["/sitemap.xml"],
+    });
 
     const [command] = cloudFrontSend.mock.calls[0];
     expect(command.input.DistributionId).toBe("E123");
     expect(submitted()).toEqual([
-      ["/zh-CN", "/", "/sitemap.xml"],
-      ["/zh-CN?*"],
+      // 语言首页加 * 会匹配整个语言版本，用本身加 ?* 两条
+      ["/zh-CN", "/zh-CN?*", "/zh-CN/song/1*", "/sitemap.xml"],
     ]);
   });
 
   it("每次提交的 CallerReference 都不同", async () => {
     vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
     cloudFrontSend.mockResolvedValue({});
-    await purgeCloudFrontCache(["/a"], ["/a"]);
+    await purgeCloudFrontCache(urlPlan("/a"));
+    await purgeCloudFrontCache(urlPlan("/a"));
     const refs = cloudFrontSend.mock.calls.map(
       ([command]) => command.input.InvalidationBatch.CallerReference,
     );
     expect(new Set(refs).size).toBe(2);
   });
 
-  it("变体超过 10 条时改成整站 /*，避免撞上通配路径的并发上限", async () => {
+  it("SDK 抛异常时记为失败，不向上抛出", async () => {
     vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
-    cloudFrontSend.mockResolvedValue({});
-    const pages = Array.from({ length: 11 }, (_, i) => `/zh-CN/song/${i}`);
-    await purgeCloudFrontCache(pages, pages);
-    expect(submitted()[1]).toEqual(["/*"]);
+    cloudFrontSend.mockRejectedValueOnce(
+      new Error("TooManyInvalidationsInProgress"),
+    );
+    await expect(purgeCloudFrontCache(urlPlan("/a"))).resolves.toBe("failed");
+  });
+});
+
+describe("cloudFrontPaths", () => {
+  it("整站是 /*", () => {
+    expect(cloudFrontPaths(ALL)).toEqual(["/*"]);
   });
 
-  it("SDK 抛异常时不向上抛出，另一批照常提交", async () => {
-    vi.stubEnv("CLOUDFRONT_DISTRIBUTION_ID", "E123");
-    cloudFrontSend
-      .mockResolvedValueOnce({})
-      .mockRejectedValueOnce(new Error("TooManyInvalidationsInProgress"));
-    await expect(purgeCloudFrontCache(["/zh-CN"], ["/zh-CN"])).resolves.toBe(
-      "failed",
-    );
-    expect(cloudFrontSend).toHaveBeenCalledTimes(2);
+  it("通配超过 10 条时改成整站 /*，避免撞上通配路径的并发上限", () => {
+    const pages = Array.from({ length: 11 }, (_, i) => `/zh-CN/song/${i}`);
+    expect(cloudFrontPaths({ pages, urls: [] })).toEqual(["/*"]);
+  });
+});
+
+describe("purgeEdgeOneCache 整站", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("整站用 purge_all，不带 Targets", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubEnv("EDGEONE_SECRET_ID", "id123");
+    vi.stubEnv("EDGEONE_SECRET_KEY", "key456");
+    vi.stubEnv("EDGEONE_ZONE_ID", "zone789");
+    vi.stubEnv("EDGEONE_SITE_URL", "https://example.com");
+    vi.mocked(fetch).mockResolvedValue({
+      json: async () => ({ Response: { JobId: "job-1" } }),
+    } as Response);
+
+    await expect(purgeEdgeOneCache(ALL)).resolves.toBe("ok");
+    const [, init = {}] = vi.mocked(fetch).mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({
+      ZoneId: "zone789",
+      Type: "purge_all",
+      Method: "invalidate",
+    });
   });
 });
 

@@ -23,7 +23,7 @@
 
 换封面时地址不变（`/cover/{id}.jpg`），上传流程也不清压好的图，新封面最多 6 小时后显示。
 
-数据变了，一律经 `src/lib/server/server-revalidate.ts` 失效：它同时失效 Next 的 ISR 条目、数据缓存的标签，并按地址清各家 CDN。不在别处直接调 `revalidatePath`。
+数据变了，一律经 `src/lib/server/server-revalidate.ts` 失效：它同时失效 Next 的 ISR 条目、数据缓存的标签，并清各家 CDN（规则见「四」）。不在别处直接调 `revalidatePath`。
 
 ## 二、接口
 
@@ -57,3 +57,22 @@
    ```
    Eligible for cache，时长看源站的 `Cache-Control`。Cloudflare 默认不缓存 HTML 和 JSON，没有这条，页面和接口都不会进 CDN。
 2. **站内跳转请求绕过缓存**：带 `?_rsc=` 或请求头 `rsc: 1` 的请求不缓存。
+
+## 四、清 CDN
+
+三家 CDN（Cloudflare、EdgeOne、CloudFront）共用一份清单（`PurgePlan`），由 `server-revalidate.ts` 的 `invalidate` 算出，再交给 `server-utils.ts` 里各家的 purge 函数翻译成自己的接口：
+
+| 清单项                                      | Cloudflare                                  | EdgeOne                               | CloudFront                                                               |
+| ------------------------------------------- | ------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------ |
+| 页面（带语言前缀，连同它带查询串的变体）    | 按 URL（`?_rsc=` 本就不进 Cloudflare 缓存） | `purge_url`                           | `路径*` 一条；语言首页用本身加 `?*` 两条（`/zh-CN*` 会匹配整个语言版本） |
+| 地址（带固定参数的公开接口、`sitemap.xml`） | 按 URL                                      | `purge_url`                           | 原样一条                                                                 |
+| 整站                                        | `purge_everything`                          | `purge_all`（`invalidate`，回源校验） | `/*`                                                                     |
+
+几条规矩：
+
+- **页面与地址合计超过 `PURGE_ALL_ABOVE`（15）条就清整站。** 发布一首歌牵涉母题时、Navidrome 同步、改署名别名都会走到这里。整站清过之后全部回源一次，源站给的是 Next 的 ISR 缓存与压好的封面，扛得住。
+- **为什么要省条数**：CloudFront 按提交的路径条数计费，每月免费 1000 条，一条通配也只算 1 条；按页逐条清时，发布一首歌要 40–60 条。Cloudflare 免费套餐按 URL 清很宽松，但按前缀清与清全站共用每分钟 5 次（可攒到 25 次）的配额，所以页面在 Cloudflare 上仍按 URL 清。
+- **CloudFront 通配路径同时处理中最多 15 条**：一次的通配超过 10 条，CloudFront 自己改成 `/*`。
+- **不清无前缀的旧地址**（`/`、`/song/:id`）：它们是 `next.config.ts` 里固定的 301，数据变了跳转也不变。
+- **一次操作牵动几类数据，合成一次提交。** 比如发布、下架用 `refreshLiveVersion`（歌曲资料加前后两版的母题），不要分头调 `refreshSongs` 和 `refreshImagery`，否则意象页、寻曲页各清两遍，CloudFront 也多一批。
+- Cloudflare 与 EdgeOne 按 URL 清时每次最多 30 条，各家函数里自己拆批。

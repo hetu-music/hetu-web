@@ -65,7 +65,7 @@ interface TopBarProps {
 }
 
 /**
- * 全站唯一的顶栏。右侧顺序固定：常驻按钮 → 用户 → 本页操作 → 安装 → 文字 → 主题，
+ * 全站唯一的顶栏。右侧顺序固定：常驻按钮 → 用户 → 本页操作 → 安装 → 语言 → 主题，
  * 窄屏只留常驻按钮与用户，其余收进「更多」。
  */
 export default function TopBar({
@@ -178,7 +178,7 @@ export default function TopBar({
   );
 }
 
-/** 窄屏的「更多」：本页操作一行一项，下面是主题与文字 */
+/** 窄屏的「更多」：回主页与本页操作一行一项，下面是主题与语言 */
 function MoreSheet({
   open,
   onOpenChange,
@@ -204,8 +204,8 @@ function MoreSheet({
   const scriptChoice = useScriptChoice();
   const onClose = () => onOpenChange(false);
 
+  // 回主页是出口，排在本页操作前面
   const rows: TopBarAction[] = [
-    ...actions,
     ...(home
       ? [
           {
@@ -216,6 +216,7 @@ function MoreSheet({
           },
         ]
       : []),
+    ...actions,
     ...(install && installAction.available
       ? [
           {

@@ -141,12 +141,13 @@ describe("runAudioSync", () => {
     expect(plan.upserts.map((u) => u.song.id)).toEqual([1]);
     expect(revalidatePath).toHaveBeenCalledWith("/zh-CN/song/1");
     expect(revalidateTag).toHaveBeenCalledWith("imagery-index", { expire: 0 });
-    expect(purgeCloudflareCache).toHaveBeenCalledWith(
-      expect.arrayContaining(["/", "/song/1"]),
-    );
+    expect(purgeCloudflareCache).toHaveBeenCalledWith({
+      pages: expect.arrayContaining(["/zh-CN", "/zh-TW/song/1"]),
+      urls: [],
+    });
   });
 
-  it("CDN 清缓存按每批 30 条拆分", async () => {
+  it("变化的歌多时 CDN 清整站", async () => {
     vi.mocked(applySyncPlan).mockResolvedValue({
       upserted: 0,
       deleted: 0,
@@ -154,9 +155,7 @@ describe("runAudioSync", () => {
       hasAudioChanged: Array.from({ length: 20 }, (_, i) => i + 1),
     });
     await runAudioSync();
-    const calls = vi.mocked(purgeEdgeOneCache).mock.calls;
-    expect(calls.length).toBeGreaterThan(1);
-    expect(calls.every(([paths]) => paths.length <= 30)).toBe(true);
+    expect(purgeEdgeOneCache).toHaveBeenCalledWith({ all: true });
   });
 
   it("has_audio 没有变化时不刷新缓存", async () => {

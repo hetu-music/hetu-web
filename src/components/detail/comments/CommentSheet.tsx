@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import { X } from "lucide-react";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useComments } from "./CommentsContext";
@@ -56,12 +50,6 @@ export default function CommentSheet() {
                   </p>
                 )}
               </div>
-              <DrawerClose
-                aria-label={t("close")}
-                className="p-1 -mr-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-              >
-                <X size={18} />
-              </DrawerClose>
             </div>
             <div className="overflow-y-auto overscroll-contain px-6 py-5">
               <SlotPanel slot={slot} />

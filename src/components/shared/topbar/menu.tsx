@@ -13,7 +13,7 @@ export interface MenuItem {
   label: string;
 }
 
-/** 竖排的选项列表（目录、板块、主题、文字）：当前项只变色，左侧一道强调色短线 */
+/** 竖排的选项列表（目录、板块、主题、语言）：当前项只变色，左侧一道强调色短线 */
 export function MenuList({
   items,
   active,
@@ -59,7 +59,7 @@ export function MenuList({
   );
 }
 
-/** 一行里用「·」隔开的文字选项，底部面板里的主题与文字用 */
+/** 一行里用「·」隔开的文字选项，底部面板里的主题与语言用 */
 export function InlineOptions({
   items,
   active,

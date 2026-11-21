@@ -138,20 +138,9 @@ export default function ColorTapestry({
             </div>
           </div>
         ) : (
-          <div className="flex min-w-0 items-baseline gap-3">
-            <span className="text-[11px] tracking-[0.3em] text-(--tone)">
-              二十年的颜色
-            </span>
-            <span
-              aria-hidden
-              className="h-2.5 w-px bg-slate-200 dark:bg-slate-800"
-            />
-            <span className="truncate font-kaiti text-[13px] text-slate-400 dark:text-slate-500">
-              {matched
-                ? `光谱中已为你点亮 ${matched.size} 道色丝，滑过观曲，点选入章`
-                : "每一道色丝皆取自封面主色，滑过细听光阴流转，点击直达该年"}
-            </span>
-          </div>
+          <span className="text-[11px] tracking-[0.3em] text-(--tone)">
+            二十年的颜色
+          </span>
         )}
 
         {activeSong && (

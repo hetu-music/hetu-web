@@ -13,7 +13,7 @@ import { useLyricsLines } from "@/hooks/library/useLyricsLines";
 import { useIsDesktop } from "@/hooks/ui/useIsDesktop";
 import { useScrollTop } from "@/hooks/ui/useScrollTop";
 import { flushUrlState, useUrlState } from "@/hooks/utils/useUrlState";
-import { Link, useRouter } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { FILTER_OPTION_ALL, FILTER_OPTION_UNKNOWN } from "@/lib/constants";
 import {
   buildBaseOptions,
@@ -32,16 +32,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import { Fragment, useCallback, useMemo, useState } from "react";
 import ColorTapestry from "./ColorTapestry";
+import { CORE_FEATURES, FeatureRibbonB } from "./FeatureEntrances";
 import YearChapters from "./YearChapters";
 import { byDateDesc, groupByYear } from "./timeline";
 
 const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
-
-const FEATURE_LINKS = [
-  { href: "/story/qjtx", label: "倾尽天下", dot: "#9E3636" },
-  { href: "/imagery", label: "意象词云", dot: "#286B62" },
-  { href: "/quiz", label: "寻曲", dot: "#9A6728" },
-];
 
 interface ActiveChip {
   key: string;
@@ -320,70 +315,40 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         />
 
         <main className="relative mx-auto max-w-7xl px-6 pb-28 pt-26 md:pt-32">
-          {/* ── 1. 卷首：极凝练刊头 + 三径轻入口 ── */}
-          <header className="pb-8 md:pb-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <p className="text-[11px] tracking-[0.38em] text-(--tone) sm:text-xs">
-                河图 · 作品勘鉴
-              </p>
-
-              <nav
-                aria-label="站点特辑"
-                className="flex items-center gap-4 text-xs tracking-[0.22em] text-slate-500 sm:gap-6 dark:text-slate-400"
-              >
-                {FEATURE_LINKS.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="group inline-flex items-center gap-1.5 transition-colors hover:text-slate-900 dark:hover:text-slate-100"
-                  >
-                    <span
-                      aria-hidden
-                      className="h-1.5 w-1.5 rounded-full opacity-75 transition-transform duration-300 group-hover:scale-125"
-                      style={{ backgroundColor: item.dot }}
-                    />
-                    <span className="font-serif">{item.label}</span>
-                  </Link>
-                ))}
-              </nav>
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
-                <h1 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-slate-900 sm:text-5xl md:text-6xl dark:text-slate-50">
-                  {lastYear}
-                  <span className="mx-[0.22em] font-light text-slate-300 dark:text-slate-700">
-                    —
-                  </span>
-                  {firstYear}
-                </h1>
-                <span className="font-serif text-sm tracking-[0.18em] text-slate-400 sm:text-base dark:text-slate-500">
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.span
-                      key={shownCount}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
-                      transition={{ duration: 0.25 }}
-                      className={cn(
-                        "inline-block font-semibold tabular-nums",
-                        matched
-                          ? "text-(--tone)"
-                          : "text-slate-800 dark:text-slate-200",
-                      )}
-                    >
-                      {shownCount}
-                    </motion.span>
-                  </AnimatePresence>
-                  {matched ? ` / ${catalog.length}` : ""} 曲
+          {/* ── 1. 卷首：年代跨度与曲数 + 横向展签长带（方案 B） ── */}
+          <header className="pb-7 md:pb-8">
+            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+              <h1 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-slate-900 sm:text-5xl md:text-6xl dark:text-slate-50">
+                {lastYear}
+                <span className="mx-[0.22em] font-light text-slate-300 dark:text-slate-700">
+                  —
                 </span>
-              </div>
-
-              <p className="hidden font-kaiti text-sm text-slate-400 lg:block dark:text-slate-500">
-                从二〇〇七年的第一首，唱到二〇二六年的这一首。
-              </p>
+                {firstYear}
+              </h1>
+              <span className="font-serif text-sm tracking-[0.18em] text-slate-400 sm:text-base dark:text-slate-500">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={shownCount}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.25 }}
+                    className={cn(
+                      "inline-block font-semibold tabular-nums",
+                      matched
+                        ? "text-(--tone)"
+                        : "text-slate-800 dark:text-slate-200",
+                    )}
+                  >
+                    {shownCount}
+                  </motion.span>
+                </AnimatePresence>
+                {matched ? ` / ${catalog.length}` : ""} 曲
+              </span>
             </div>
           </header>
+
+          <FeatureRibbonB items={CORE_FEATURES} />
 
           {/* ── 2. 二十年的颜色光谱（由近及远，核心视觉与时间索引） ── */}
           <ColorTapestry
@@ -468,35 +433,29 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
               {/* 右栏（宽屏，与下方编年目录严格左齐）：已选条件轻注脚 + 「筛选」纯文字开关 */}
               <div className="hidden items-center justify-between gap-6 lg:flex">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-y-1 text-xs">
-                  {activeChips.length > 0 ? (
-                    activeChips.map((chip, idx) => (
-                      <Fragment key={chip.key}>
-                        {idx > 0 && (
-                          <span
-                            aria-hidden
-                            className="mx-2.5 text-slate-300 dark:text-slate-700"
-                          >
-                            ·
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={chip.onRemove}
-                          title="点击撤回此项筛选"
-                          className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-slate-600 transition-colors hover:text-(--tone) dark:text-slate-300"
+                  {activeChips.map((chip, idx) => (
+                    <Fragment key={chip.key}>
+                      {idx > 0 && (
+                        <span
+                          aria-hidden
+                          className="mx-2.5 text-slate-300 dark:text-slate-700"
                         >
-                          <span>{chip.label}</span>
-                          <span className="font-sans text-[11px] text-slate-400 transition-colors group-hover:text-(--tone) dark:text-slate-500">
-                            ×
-                          </span>
-                        </button>
-                      </Fragment>
-                    ))
-                  ) : (
-                    <span className="font-kaiti text-[13px] text-slate-400/80 dark:text-slate-500/80">
-                      按初发年月倒序编目
-                    </span>
-                  )}
+                          ·
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={chip.onRemove}
+                        title="点击撤回此项筛选"
+                        className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-slate-600 transition-colors hover:text-(--tone) dark:text-slate-300"
+                      >
+                        <span>{chip.label}</span>
+                        <span className="font-sans text-[11px] text-slate-400 transition-colors group-hover:text-(--tone) dark:text-slate-500">
+                          ×
+                        </span>
+                      </button>
+                    </Fragment>
+                  ))}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-4 text-xs tracking-[0.28em]">

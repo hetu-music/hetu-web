@@ -2,14 +2,10 @@ import type { Song } from "@/lib/types";
 import coverColors from "./cover-colors.json";
 
 /**
- * 原型用：每首歌封面的主色，离线从封面算好（按饱和度加权的色相分箱，取最重的一箱）。
- * 正式做时应在上传封面时算好存库，而不是放一份 JSON。
+ * 原型用：每首歌封面的主色，离线从封面算好（按饱和度加权的色相分箱，取最重的一箱），
+ * 用作色彩弥散的底色。正式做时应在上传封面时算好存库，而不是放一份 JSON。
  */
 const COLORS = coverColors as Record<string, string>;
-
-/** 没有封面的歌：在色带里是一道留白 */
-export const BLANK_LIGHT = "#E2E8F0";
-export const BLANK_DARK = "#1E293B";
 
 export function stripeColor(song: Song): string | null {
   if (song.hascover !== true) return null;
@@ -38,20 +34,34 @@ export function groupByYear(songs: Song[], years: (number | null)[]) {
     const list = map.get(s.year ?? null);
     if (list) list.push(s);
   }
-  return years.map(
-    (year): YearChapter => ({
-      year,
-      songs: (map.get(year) ?? []).slice().sort(byDate),
-    }),
-  );
+  return years.map((year): YearChapter => ({
+    year,
+    songs: (map.get(year) ?? []).slice().sort(byDate),
+  }));
 }
 
-const CN_DIGITS = "〇一二三四五六七八九";
-
-/** 2016 → 二〇一六 */
-export function yearInHanzi(year: number): string {
-  return String(year)
-    .split("")
-    .map((d) => CN_DIGITS[Number(d)])
-    .join("");
+/**
+ * 原型用：每年自动挑一件展品。有封面、原创、有音频的优先，同分取最早发行的。
+ * 正式做时应由人来挑，并配一句短评。
+ */
+export function pickExhibits(songs: Song[]): Song[] {
+  const byYear = new Map<number, Song[]>();
+  for (const s of songs) {
+    if (!s.year || s.dispute_note) continue;
+    const list = byYear.get(s.year) ?? [];
+    list.push(s);
+    byYear.set(s.year, list);
+  }
+  const score = (s: Song) =>
+    (stripeColor(s) ? 4 : 0) +
+    (s.type?.includes("原创") ? 2 : 0) +
+    (s.has_audio ? 1 : 0);
+  return [...byYear.keys()]
+    .sort((a, b) => a - b)
+    .map((y) => {
+      const list = byYear.get(y) ?? [];
+      return list
+        .slice()
+        .sort((a, b) => score(b) - score(a) || byDate(a, b))[0];
+    });
 }

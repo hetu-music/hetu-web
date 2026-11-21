@@ -23,18 +23,18 @@ import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { cn } from "@/lib/utils/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocale } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
-import TimeBand from "./TimeBand";
-import { byDate, groupByYear } from "./timeline";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Exhibit, ExhibitRail, FilmGrain, Overture } from "./Stage";
+import { byDate, groupByYear, pickExhibits, stripeColor } from "./timeline";
 import YearChapters from "./YearChapters";
 
 const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
 
 /**
- * 首页原型「二十年的颜色」：
- * 首屏是一条色带，一首歌一根，颜色取自封面，从 2007 排到 2026；
- * 往下是一年一章的曲库，每章的题头是这一年的那一段色带。
- * 搜索与筛选沿用现有曲库的全部逻辑，命中的歌在色带和正文里亮着，没有命中的年份折成一行。
+ * 首页原型「暗场」：
+ * 开场全黑，一束光照亮最近的一件作品；往下是「二十年，二十件」，每年一件，
+ * 进到画面中央时灯亮起、封面的颜色在黑暗里晕开，离开时暗下去；
+ * 最后是全部馆藏，沿用现有曲库的搜索与筛选。整页固定为深色。
  */
 export default function HomeTimeClient({ songs }: { songs: Song[] }) {
   const router = useRouter();
@@ -45,8 +45,8 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
   const [newestFirst, setNewestFirst] = useState(false);
   const handleSearchFocus = useCallback(() => setSearchFocused(true), []);
 
-  // ── 曲库状态：与现有首页同一套 ──
-  const [params] = useUrlState();
+  // ── 馆藏：与现有首页同一套状态 ──
+  const [params, , urlSynced] = useUrlState();
   const deferred = useLibraryDeferred(
     songs,
     searchFocused || needsDeferred(params),
@@ -82,13 +82,39 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
     [filtering, results],
   );
 
-  // ── 时间 ──
-  const bandSongs = useMemo(
+  // ── 展 ──
+  const catalog = useMemo(
     () => songs.filter((s) => s.year && !s.dispute_note).sort(byDate),
     [songs],
   );
-  const firstYear = bandSongs[0]?.year ?? 2007;
-  const lastYear = bandSongs[bandSongs.length - 1]?.year ?? 2026;
+  const exhibits = useMemo(() => pickExhibits(songs), [songs]);
+  const overtureSong = useMemo(
+    () => [...catalog].reverse().find((s) => stripeColor(s)) ?? catalog[0],
+    [catalog],
+  );
+  const [activeExhibit, setActiveExhibit] = useState(0);
+  const [railVisible, setRailVisible] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const collectionRef = useRef<HTMLElement>(null);
+
+  // 展线只在看展的那一段出现
+  useEffect(() => {
+    const onScroll = () => {
+      const stage = stageRef.current;
+      if (!stage) return;
+      const r = stage.getBoundingClientRect();
+      setRailVisible(
+        r.top < window.innerHeight * 0.4 && r.bottom > window.innerHeight * 0.6,
+      );
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // ── 馆藏分章 ──
+  const firstYear = catalog[0]?.year ?? 2007;
+  const lastYear = catalog[catalog.length - 1]?.year ?? 2026;
   const chapters = useMemo(() => {
     const years: (number | null)[] = [];
     for (let y = firstYear; y <= lastYear; y++) years.push(y);
@@ -97,10 +123,9 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
     return groupByYear(songs, years);
   }, [songs, firstYear, lastYear, newestFirst]);
 
-  const catalogCount = bandSongs.length;
   const shownCount = matched
     ? results.filter((s) => !s.dispute_note).length
-    : catalogCount;
+    : catalog.length;
   const playKey = useMemo(
     () => JSON.stringify([state.query, state.filters]),
     [state.query, state.filters],
@@ -115,11 +140,21 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
     [router],
   );
 
-  const jumpToYear = useCallback((year: number) => {
-    document
-      .getElementById(`y${year}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  const scrollToEl = (el: Element | null) =>
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const goCollection = useCallback(() => scrollToEl(collectionRef.current), []);
+  const goExhibit = useCallback(
+    (year: number) => scrollToEl(document.getElementById(`ex${year}`)),
+    [],
+  );
+
+  // 带着搜索或筛选打开（比如从详情页返回），直接落在馆藏
+  const landedRef = useRef(false);
+  useEffect(() => {
+    if (landedRef.current || !urlSynced) return;
+    landedRef.current = true;
+    if (filtering) collectionRef.current?.scrollIntoView({ block: "start" });
+  }, [urlSynced, filtering]);
 
   const handleReset = useCallback(() => {
     state.resetAll();
@@ -141,114 +176,127 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
   return (
     <OverlayHostContext.Provider value={overlayHost}>
-      <div className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] dark:bg-[#0B0F19]">
+      <div className="dark relative min-h-screen overflow-x-clip bg-[#07090F] text-slate-200">
         <TopBar exit={{ kind: "logo", onClick: handleReset }} />
+        <FilmGrain />
 
-        {/* ── 首屏：二十年的颜色 ── */}
-        <section className="flex min-h-svh flex-col pt-[calc(var(--nav-h)+2.5rem)] pb-10 md:pt-[calc(var(--nav-h)+4rem)]">
-          <div className="mx-auto w-full max-w-7xl px-6">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <p className="text-xs tracking-[0.35em] text-(--tone)">
-                河图 · 作品勘鉴
-              </p>
-              <h1 className="mt-5 font-serif text-5xl font-semibold leading-[1.1] tracking-tight tabular-nums text-slate-900 sm:text-7xl xl:text-8xl dark:text-slate-50">
-                {firstYear}
-                <span className="mx-[0.3em] font-light text-slate-300 dark:text-slate-700">
-                  —
-                </span>
-                {lastYear}
-              </h1>
-              <p className="mt-5 font-kaiti text-base text-slate-500 md:text-lg dark:text-slate-400">
-                二十年，
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={shownCount}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    transition={{ duration: 0.28 }}
-                    className={cn(
-                      "inline-block font-serif tabular-nums",
-                      matched && "text-(--tone)",
-                    )}
-                  >
-                    {shownCount}
-                  </motion.span>
-                </AnimatePresence>
-                {matched ? ` / ${catalogCount} 首。` : " 首歌，一首一色。"}
-              </p>
-            </motion.div>
+        {overtureSong && (
+          <Overture
+            song={overtureSong}
+            total={catalog.length}
+            onOpenSong={handleOpenSong}
+            onEnter={() => goExhibit(exhibits[0]?.year ?? firstYear)}
+            onCollection={goCollection}
+          />
+        )}
+
+        {/* ── 二十年，二十件 ── */}
+        <div ref={stageRef}>
+          <div className="mx-auto max-w-7xl px-6 pt-24 pb-4">
+            <p className="text-xs tracking-[0.5em] text-white/35">
+              二十年 · 二十件
+            </p>
           </div>
-
-          <div className="mt-auto w-full px-0 pt-12 sm:px-6 lg:px-12">
-            <TimeBand
-              songs={bandSongs}
-              matched={matched}
+          {exhibits.map((song, i) => (
+            <Exhibit
+              key={song.id}
+              song={song}
+              index={i}
+              count={exhibits.length}
               onOpenSong={handleOpenSong}
-              onJumpYear={jumpToYear}
+              onActive={setActiveExhibit}
             />
+          ))}
+        </div>
+
+        <ExhibitRail
+          years={exhibits.map((s) => s.year ?? 0)}
+          active={activeExhibit}
+          visible={railVisible}
+          onJump={goExhibit}
+          onCollection={goCollection}
+        />
+
+        {/* ── 馆藏 ── */}
+        <section
+          ref={collectionRef}
+          className="scroll-mt-(--nav-h) bg-gradient-to-b from-[#07090F] to-[#0B0F19] to-[40rem]"
+        >
+          <div className="mx-auto max-w-7xl px-6 pb-28">
+            <header className="pt-32 pb-14">
+              <p className="text-xs tracking-[0.5em] text-white/35">馆藏</p>
+              <h2 className="mt-5 font-serif text-4xl font-semibold tracking-tight text-white md:text-5xl">
+                全部作品
+                <span className="ml-5 align-middle font-serif text-xl font-normal tabular-nums text-white/40">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={shownCount}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      transition={{ duration: 0.28 }}
+                      className={cn("inline-block", matched && "text-(--tone)")}
+                    >
+                      {shownCount}
+                    </motion.span>
+                  </AnimatePresence>
+                  {matched ? ` / ${catalog.length}` : ""} 首
+                </span>
+              </h2>
+            </header>
+
+            <LibraryToolbar
+              types={options.types}
+              type={state.filters.type}
+              onTypeChange={state.setType}
+              isAnyFilterActive={state.isAnyFilterActive}
+              onReset={handleReset}
+              searchInput={state.searchInput}
+              onSearchChange={state.setSearchInput}
+              onSearchFocus={handleSearchFocus}
+              lyricsState={lyrics.state}
+              advanced={state.advanced}
+              onAdvancedChange={state.setAdvanced}
+              view={state.view}
+              onViewChange={state.setView}
+            >
+              {filterPanel}
+            </LibraryToolbar>
+
+            <div className="-mt-4 mb-2 flex justify-end gap-5 text-xs tracking-widest">
+              {[false, true].map((desc) => (
+                <button
+                  key={String(desc)}
+                  type="button"
+                  aria-pressed={newestFirst === desc}
+                  onClick={() => setNewestFirst(desc)}
+                  className={cn(
+                    "transition-colors",
+                    newestFirst === desc
+                      ? "text-(--tone)"
+                      : "text-slate-500 hover:text-slate-200",
+                  )}
+                >
+                  {desc ? "由近及远" : "由远及近"}
+                </button>
+              ))}
+            </div>
+
+            <YearChapters
+              chapters={chapters}
+              matched={matched}
+              view={state.view}
+              playKey={playKey}
+              onOpenSong={handleOpenSong}
+              getLyricsSnippet={getLyricsSnippet}
+            />
+
+            <footer className="mt-10 flex items-baseline justify-between border-t border-slate-800 pt-8">
+              <SiteMark />
+              <p className="font-kaiti text-sm text-slate-500">未完。</p>
+            </footer>
           </div>
         </section>
-
-        {/* ── 正文：一年一章 ── */}
-        <main className="mx-auto max-w-7xl px-6 pb-28">
-          <LibraryToolbar
-            types={options.types}
-            type={state.filters.type}
-            onTypeChange={state.setType}
-            isAnyFilterActive={state.isAnyFilterActive}
-            onReset={handleReset}
-            searchInput={state.searchInput}
-            onSearchChange={state.setSearchInput}
-            onSearchFocus={handleSearchFocus}
-            lyricsState={lyrics.state}
-            advanced={state.advanced}
-            onAdvancedChange={state.setAdvanced}
-            view={state.view}
-            onViewChange={state.setView}
-          >
-            {filterPanel}
-          </LibraryToolbar>
-
-          <div className="-mt-4 mb-2 flex justify-end gap-5 text-xs tracking-widest">
-            {[false, true].map((desc) => (
-              <button
-                key={String(desc)}
-                type="button"
-                aria-pressed={newestFirst === desc}
-                onClick={() => setNewestFirst(desc)}
-                className={cn(
-                  "transition-colors",
-                  newestFirst === desc
-                    ? "text-(--tone)"
-                    : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
-                )}
-              >
-                {desc ? "由近及远" : "由远及近"}
-              </button>
-            ))}
-          </div>
-
-          <YearChapters
-            chapters={chapters}
-            matched={matched}
-            view={state.view}
-            playKey={playKey}
-            onOpenSong={handleOpenSong}
-            getLyricsSnippet={getLyricsSnippet}
-          />
-
-          <footer className="mt-10 flex items-baseline justify-between border-t border-slate-200/70 pt-8 dark:border-slate-800">
-            <SiteMark />
-            <p className="font-kaiti text-sm text-slate-400 dark:text-slate-500">
-              未完。
-            </p>
-          </footer>
-        </main>
 
         <FloatingActionButtons
           showScrollTop={showScrollTop}

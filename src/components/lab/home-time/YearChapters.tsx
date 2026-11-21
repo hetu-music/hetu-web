@@ -32,7 +32,7 @@ const PLATE_SIZES =
 const EASE = [0.23, 1, 0.32, 1] as const;
 
 /**
- * 正文：一年一章。左边是年份和这一年的那一段色带，右边是作品。
+ * 馆藏：一年一章。左边是年份，右边是作品。
  * 筛选时没有命中的年份折成一行，时间不断。
  */
 export default function YearChapters({
@@ -88,26 +88,6 @@ export default function YearChapters({
               <h2 className="font-serif text-5xl leading-none tracking-tight tabular-nums text-slate-900 md:text-6xl dark:text-slate-100">
                 {ch.year ?? "未详"}
               </h2>
-              {/* 这一年的那一段色带：一首一根，宽度就是产量 */}
-              {ch.year && (
-                <div className="mt-6 flex h-12 flex-wrap [--blank:#E2E8F0] dark:[--blank:#1E293B]">
-                  {ch.songs.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      aria-label={s.title}
-                      title={s.title}
-                      onClick={() => onOpenSong(s.id)}
-                      className={cn(
-                        "h-full w-1.5 transition-opacity duration-700 ease-page hover:opacity-60",
-                        matched && !matched.has(s.id) && "opacity-[0.08]",
-                      )}
-                      style={{ background: stripeColor(s) ?? "var(--blank)" }}
-                    />
-                  ))}
-                </div>
-              )}
-
               <p className="mt-3 text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
                 {matched
                   ? `${shown.length} / ${ch.songs.length} 首`

@@ -17,7 +17,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   type YearChapter,
   creditSummary,
@@ -41,7 +41,7 @@ const EASE = [0.23, 1, 0.32, 1] as const;
  * - 宽屏右栏：无缩略图货架感的编年目录，承载色丝微点、月日、衬线曲名、楷体词曲、歌词片段与试听；
  * - 筛选无命中的年份折成一行「这一年没有」，二十年时间一根不断。
  */
-export default function YearChapters({
+function YearChapters({
   chapters,
   matched,
   onOpenSong,
@@ -93,7 +93,9 @@ export default function YearChapters({
   );
 }
 
-function ChapterBlock({
+export default memo(YearChapters);
+
+const ChapterBlock = memo(function ChapterBlock({
   chapter,
   isFirst,
   matched,
@@ -106,10 +108,10 @@ function ChapterBlock({
   onOpenSong: (id: number) => void;
   getLyricsSnippet: (id: number) => Snippet | undefined;
 }) {
-  const tEnum = useTranslations("enums");
-  const tSong = useTranslations("song");
   const { isFavorite, toggleFavorite, isLoggedIn } = useFavorites();
-  const { currentTrack, isPlaying } = usePlayerStore();
+  // 逐项订阅：播放器其他状态（音量、队列、加载中……）变化不重渲整章
+  const currentSongId = usePlayerStore((s) => s.currentTrack?.songId ?? null);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
 
   const shown = matched
     ? chapter.songs.filter((s) => matched.has(s.id))
@@ -120,8 +122,8 @@ function ChapterBlock({
   const [hoveredSong, setHoveredSong] = useState<Song | null>(null);
 
   const playingInChapter =
-    isPlaying && currentTrack
-      ? (shown.find((s) => s.id === currentTrack.songId) ?? null)
+    isPlaying && currentSongId !== null
+      ? (shown.find((s) => s.id === currentSongId) ?? null)
       : null;
 
   const activeFocal =
@@ -207,7 +209,9 @@ function ChapterBlock({
               onClick={() => onOpenSong(defaultFocal.id)}
               aria-label={`进入《${defaultFocal.title}》详情页`}
               className="relative h-14 w-14 shrink-0 overflow-hidden rounded-sm bg-slate-100 ring-1 ring-slate-900/10 lg:hidden dark:bg-slate-800 dark:ring-white/15"
-              style={{ backgroundColor: stripeColor(defaultFocal) ?? undefined }}
+              style={{
+                backgroundColor: stripeColor(defaultFocal) ?? undefined,
+              }}
             >
               {defaultFocal.hascover ? (
                 <Image
@@ -302,142 +306,168 @@ function ChapterBlock({
       {/* ── 右栏：编年目录 ── */}
       <div className="min-w-0" onMouseLeave={() => setHoveredSong(null)}>
         <ul className="divide-y divide-slate-200/65 border-y border-slate-200/65 dark:divide-slate-800/70 dark:border-slate-800/70">
-          {shown.map((song) => {
-            const color = stripeColor(song);
-            const fav = isFavorite(song.id);
-            const playing = currentTrack?.songId === song.id && isPlaying;
-            const isFocal = activeFocal?.id === song.id;
-            const snippet = getLyricsSnippet(song.id);
-            const monthDay = song.date
-              ? song.date.slice(5).replace("-", ".")
-              : "";
-
-            return (
-              <li
-                key={song.id}
-                onMouseEnter={() => setHoveredSong(song)}
-                onClick={() => onOpenSong(song.id)}
-                className={cn(
-                  "group relative flex cursor-pointer items-start gap-3.5 py-3.5 transition-colors duration-300 sm:items-center sm:gap-5 sm:py-4",
-                  isFocal
-                    ? "bg-slate-900/2 dark:bg-white/2.5"
-                    : "hover:bg-slate-900/[0.018] dark:hover:bg-white/2",
-                )}
-              >
-                {/* 封面色丝微点 */}
-                <span
-                  aria-hidden
-                  className={cn(
-                    "mt-1.5 h-3.5 w-[2.5px] shrink-0 rounded-full transition-all duration-300 sm:mt-0",
-                    !color && "bg-slate-300/70 dark:bg-slate-700/70",
-                    isFocal
-                      ? "scale-y-125 opacity-100"
-                      : "opacity-65 group-hover:opacity-100",
-                  )}
-                  style={{ backgroundColor: color ?? undefined }}
-                />
-
-                {/* 月.日 */}
-                <span className="mt-1 hidden w-11 shrink-0 font-mono text-[11px] tabular-nums tracking-wider text-slate-400 sm:mt-0 sm:block dark:text-slate-500">
-                  {monthDay || "——"}
-                </span>
-
-                {/* 歌名 + 词曲 + 歌词命中片段 */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2.5">
-                    <h3
-                      className={cn(
-                        "truncate font-serif text-[17px] leading-snug text-slate-900 transition-colors sm:text-[19px] dark:text-slate-100",
-                        playing || isFocal
-                          ? "text-(--tone)"
-                          : "group-hover:text-(--tone)",
-                      )}
-                    >
-                      <SongTitleLink
-                        songId={song.id}
-                        onNavigate={() => onOpenSong(song.id)}
-                      >
-                        {song.title}
-                      </SongTitleLink>
-                    </h3>
-                    {playing && <PlayingBars />}
-                  </div>
-
-                  <p className="mt-0.5 flex items-center gap-2 truncate font-kaiti text-[13px] text-slate-500 dark:text-slate-400">
-                    {monthDay && (
-                      <span className="font-mono text-[10px] tabular-nums text-slate-400 sm:hidden dark:text-slate-500">
-                        {monthDay}
-                      </span>
-                    )}
-                    <span className="truncate">
-                      {creditSummary(song) || "单曲"}
-                    </span>
-                  </p>
-
-                  {snippet && (
-                    <LyricsSnippet snippet={snippet} className="mt-1.5" />
-                  )}
-                </div>
-
-                {/* 右侧：类型、时长、悬停播放/入列/收藏 */}
-                <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-                  <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
-                    <PlayButton
-                      songId={song.id}
-                      title={song.title}
-                      artist={song.artist?.join(" / ")}
-                      coverUrl={getCoverUrl(song)}
-                      hasAudio={song.has_audio}
-                      size={14}
-                    />
-                    <EnqueueButton
-                      songId={song.id}
-                      title={song.title}
-                      artist={song.artist?.join(" / ")}
-                      coverUrl={getCoverUrl(song)}
-                      hasAudio={song.has_audio}
-                      size={14}
-                    />
-                  </div>
-
-                  {isLoggedIn && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(song.id);
-                      }}
-                      aria-label={
-                        fav
-                          ? tSong("actions.unfavorite")
-                          : tSong("actions.favorite")
-                      }
-                      className={cn(
-                        "p-1.5 transition-all duration-200",
-                        fav
-                          ? "text-rose-500 opacity-100"
-                          : "text-slate-400 opacity-0 hover:text-rose-500 group-hover:opacity-100 dark:text-slate-500",
-                      )}
-                    >
-                      <Heart size={14} className={fav ? "fill-current" : ""} />
-                    </button>
-                  )}
-
-                  {song.type?.[0] && (
-                    <span className="hidden w-12 text-right text-[11px] tracking-[0.2em] text-slate-400 sm:inline-block dark:text-slate-500">
-                      {enumLabel(tEnum, "type", song.type[0])}
-                    </span>
-                  )}
-
-                  <span className="w-11 text-right font-mono text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
-                    {song.length ? formatTime(song.length) : "—"}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
+          {shown.map((song) => (
+            <ChapterRow
+              key={song.id}
+              song={song}
+              fav={isFavorite(song.id)}
+              playing={currentSongId === song.id && isPlaying}
+              isFocal={activeFocal?.id === song.id}
+              isLoggedIn={isLoggedIn}
+              onOpenSong={onOpenSong}
+              onHover={setHoveredSong}
+              onToggleFavorite={toggleFavorite}
+              getLyricsSnippet={getLyricsSnippet}
+            />
+          ))}
         </ul>
       </div>
     </section>
   );
-}
+});
+
+/** 目录一行。memo：悬停换焦点时只有焦点前后两行重渲 */
+const ChapterRow = memo(function ChapterRow({
+  song,
+  fav,
+  playing,
+  isFocal,
+  isLoggedIn,
+  onOpenSong,
+  onHover,
+  onToggleFavorite,
+  getLyricsSnippet,
+}: {
+  song: Song;
+  fav: boolean;
+  playing: boolean;
+  isFocal: boolean;
+  isLoggedIn: boolean;
+  onOpenSong: (id: number) => void;
+  onHover: (song: Song) => void;
+  onToggleFavorite: (id: number) => void;
+  getLyricsSnippet: (id: number) => Snippet | undefined;
+}) {
+  const tEnum = useTranslations("enums");
+  const tSong = useTranslations("song");
+  const color = stripeColor(song);
+  const snippet = getLyricsSnippet(song.id);
+  const monthDay = song.date ? song.date.slice(5).replace("-", ".") : "";
+
+  return (
+    <li
+      onMouseEnter={() => onHover(song)}
+      onClick={() => onOpenSong(song.id)}
+      className={cn(
+        "group relative flex cursor-pointer items-start gap-3.5 py-3.5 transition-colors duration-300 sm:items-center sm:gap-5 sm:py-4",
+        isFocal
+          ? "bg-slate-900/2 dark:bg-white/2.5"
+          : "hover:bg-slate-900/[0.018] dark:hover:bg-white/2",
+      )}
+    >
+      {/* 封面色丝微点 */}
+      <span
+        aria-hidden
+        className={cn(
+          "mt-1.5 h-3.5 w-[2.5px] shrink-0 rounded-full transition-all duration-300 sm:mt-0",
+          !color && "bg-slate-300/70 dark:bg-slate-700/70",
+          isFocal
+            ? "scale-y-125 opacity-100"
+            : "opacity-65 group-hover:opacity-100",
+        )}
+        style={{ backgroundColor: color ?? undefined }}
+      />
+
+      {/* 月.日 */}
+      <span className="mt-1 hidden w-11 shrink-0 font-mono text-[11px] tabular-nums tracking-wider text-slate-400 sm:mt-0 sm:block dark:text-slate-500">
+        {monthDay || "——"}
+      </span>
+
+      {/* 歌名 + 词曲 + 歌词命中片段 */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2.5">
+          <h3
+            className={cn(
+              "truncate font-serif text-[17px] leading-snug text-slate-900 transition-colors sm:text-[19px] dark:text-slate-100",
+              playing || isFocal
+                ? "text-(--tone)"
+                : "group-hover:text-(--tone)",
+            )}
+          >
+            <SongTitleLink
+              songId={song.id}
+              onNavigate={() => onOpenSong(song.id)}
+            >
+              {song.title}
+            </SongTitleLink>
+          </h3>
+          {playing && <PlayingBars />}
+        </div>
+
+        <p className="mt-0.5 flex items-center gap-2 truncate font-kaiti text-[13px] text-slate-500 dark:text-slate-400">
+          {monthDay && (
+            <span className="font-mono text-[10px] tabular-nums text-slate-400 sm:hidden dark:text-slate-500">
+              {monthDay}
+            </span>
+          )}
+          <span className="truncate">{creditSummary(song) || "单曲"}</span>
+        </p>
+
+        {snippet && <LyricsSnippet snippet={snippet} className="mt-1.5" />}
+      </div>
+
+      {/* 右侧：类型、时长、悬停播放/入列/收藏 */}
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
+          <PlayButton
+            songId={song.id}
+            title={song.title}
+            artist={song.artist?.join(" / ")}
+            coverUrl={getCoverUrl(song)}
+            hasAudio={song.has_audio}
+            size={14}
+          />
+          <EnqueueButton
+            songId={song.id}
+            title={song.title}
+            artist={song.artist?.join(" / ")}
+            coverUrl={getCoverUrl(song)}
+            hasAudio={song.has_audio}
+            size={14}
+          />
+        </div>
+
+        {isLoggedIn && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(song.id);
+            }}
+            aria-label={
+              fav ? tSong("actions.unfavorite") : tSong("actions.favorite")
+            }
+            className={cn(
+              "p-1.5 transition-all duration-200",
+              fav
+                ? "text-rose-500 opacity-100"
+                : "text-slate-400 opacity-0 hover:text-rose-500 group-hover:opacity-100 dark:text-slate-500",
+            )}
+          >
+            <Heart size={14} className={fav ? "fill-current" : ""} />
+          </button>
+        )}
+
+        {song.type?.[0] && (
+          <span className="hidden w-12 text-right text-[11px] tracking-[0.2em] text-slate-400 sm:inline-block dark:text-slate-500">
+            {enumLabel(tEnum, "type", song.type[0])}
+          </span>
+        )}
+
+        <span className="w-11 text-right font-mono text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+          {song.length ? formatTime(song.length) : "—"}
+        </span>
+      </div>
+    </li>
+  );
+});

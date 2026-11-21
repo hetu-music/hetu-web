@@ -26,13 +26,18 @@ export default function PlayButton({
   size = 15,
 }: PlayButtonProps) {
   const { user, loaded } = useUserContext();
-  const { currentTrack, isPlaying, play, toggle } = usePlayerStore();
+  // 逐项订阅：列表里常有几百个按钮，整店订阅会让任何播放器状态变化都重渲全部
+  const isCurrentSong = usePlayerStore(
+    (s) => s.currentTrack?.songId === songId,
+  );
+  const isThisPlaying = usePlayerStore(
+    (s) => s.isPlaying && s.currentTrack?.songId === songId,
+  );
+  const play = usePlayerStore((s) => s.play);
+  const toggle = usePlayerStore((s) => s.toggle);
 
   const hasBenefits = loaded && !!user?.hasBenefits;
   if (!hasBenefits || !hasAudio) return null;
-
-  const isCurrentSong = currentTrack?.songId === songId;
-  const isThisPlaying = isCurrentSong && isPlaying;
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

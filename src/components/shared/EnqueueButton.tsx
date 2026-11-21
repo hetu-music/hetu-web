@@ -26,13 +26,15 @@ export default function EnqueueButton({
   size = 15,
 }: EnqueueButtonProps) {
   const { user, loaded } = useUserContext();
-  const { queue, enqueue } = usePlayerStore();
+  // 逐项订阅：只在「是否已在队列」翻转时重渲
+  const alreadyInQueue = usePlayerStore((s) =>
+    s.queue.some((t) => t.songId === songId),
+  );
+  const enqueue = usePlayerStore((s) => s.enqueue);
   const [justAdded, setJustAdded] = useState(false);
 
   const hasBenefits = loaded && !!user?.hasBenefits;
   if (!hasBenefits || !hasAudio) return null;
-
-  const alreadyInQueue = queue.some((t) => t.songId === songId);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

@@ -30,11 +30,19 @@ import { cn } from "@/lib/utils/utils";
 import { enumLabel } from "@/lib/utils/utils-song";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
-import { Fragment, useCallback, useMemo, useState } from "react";
+import {
+  Fragment,
+  type Ref,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ColorTapestry from "./ColorTapestry";
 import { CORE_FEATURES, FeatureRibbonB } from "./FeatureEntrances";
 import YearChapters from "./YearChapters";
-import { byDateDesc, groupByYear } from "./timeline";
+import { type YearChapter, byDateDesc, groupByYear } from "./timeline";
 
 const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
 
@@ -63,8 +71,17 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [activeYearKey, setActiveYearKey] = useState<string | null>(null);
-  const [spotlightColor, setSpotlightColor] = useState<string | null>(null);
+  // 顶部光晕与年份标尺各管各的状态：滑过唱片架、滚过年份时只重渲它们自己，不牵动整页
+  const fogRef = useRef<StateHandle<string | null>>(null);
+  const rulerRef = useRef<StateHandle<string | null>>(null);
+  const setSpotlightColor = useCallback(
+    (color: string | null) => fogRef.current?.set(color),
+    [],
+  );
+  const setActiveYearKey = useCallback(
+    (key: string) => rulerRef.current?.set(key),
+    [],
+  );
 
   const handleSearchFocus = useCallback(() => setSearchFocused(true), []);
 
@@ -108,7 +125,11 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
   // ── 二十年时间脉络：固定由近及远（2026 → 2007 → 未详） ──
   const catalog = useMemo(
-    () => songs.filter((s) => !s.dispute_note).slice().sort(byDateDesc),
+    () =>
+      songs
+        .filter((s) => !s.dispute_note)
+        .slice()
+        .sort(byDateDesc),
     [songs],
   );
 
@@ -294,15 +315,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
     <OverlayHostContext.Provider value={overlayHost}>
       <div className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
         {/* 顶部极柔色彩雾面：平时淡墨蓝，滑过色带时轻染那首歌的真实主色 */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-176 transition-all duration-1000 ease-out"
-          style={{
-            background: spotlightColor
-              ? `radial-gradient(ellipse 68% 46% at 50% 0%, color-mix(in oklab, ${spotlightColor} 22%, transparent), transparent 72%)`
-              : "radial-gradient(ellipse 68% 46% at 24% 0%, color-mix(in oklab, var(--tone) 13%, transparent), transparent 72%)",
-          }}
-        />
+        <TopFog ref={fogRef} />
 
         <TopBar
           exit={{ kind: "logo", onClick: handleReset, tooltip: "回到卷首" }}
@@ -360,7 +373,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           />
 
           {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
-          <div className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA]/92 px-6 backdrop-blur-md dark:bg-[#0B0F19]/92">
+          <div className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA] px-6 dark:bg-[#0B0F19]">
             <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
               {/* 左栏（与下方年份 & 大画幅严格左齐）：一根楷体寻曲底线，无图标堆砌 */}
               <div className="flex items-center justify-between gap-4">
@@ -598,35 +611,12 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         </main>
 
         {/* 宽屏右侧悬浮年份标尺：由近及远，随时跨越二十年 */}
-        <nav
-          aria-label="年份标尺"
-          className="fixed right-4 top-1/2 z-20 hidden -translate-y-1/2 flex-col items-end gap-1 xl:flex"
-        >
-          {chapters.map((ch) => {
-            const key = String(ch.year ?? "unknown");
-            const active = activeYearKey === key;
-            const hasHit =
-              matched === null || ch.songs.some((s) => matched.has(s.id));
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => jumpToYear(ch.year)}
-                className={cn(
-                  "flex items-center gap-1.5 font-mono text-[10px] tabular-nums tracking-wider transition-colors duration-300",
-                  active
-                    ? "text-(--tone)"
-                    : hasHit
-                      ? "text-slate-400/60 hover:text-slate-800 dark:text-slate-500/60 dark:hover:text-slate-200"
-                      : "text-slate-300/40 dark:text-slate-700/50",
-                )}
-              >
-                {active && <span className="h-px w-3 bg-(--tone)" />}
-                {ch.year ?? "未详"}
-              </button>
-            );
-          })}
-        </nav>
+        <YearRuler
+          ref={rulerRef}
+          chapters={chapters}
+          matched={matched}
+          onJump={jumpToYear}
+        />
 
         <FloatingActionButtons
           showScrollTop={showScrollTop}
@@ -635,5 +625,72 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         <div ref={setOverlayHost} />
       </div>
     </OverlayHostContext.Provider>
+  );
+}
+
+/** 子组件对外暴露的 setter：父组件只转发，不持有这份状态 */
+interface StateHandle<T> {
+  set: (value: T) => void;
+}
+
+function TopFog({ ref }: { ref: Ref<StateHandle<string | null>> }) {
+  const [color, setColor] = useState<string | null>(null);
+  useImperativeHandle(ref, () => ({ set: setColor }), []);
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 h-176 transition-all duration-1000 ease-out"
+      style={{
+        background: color
+          ? `radial-gradient(ellipse 68% 46% at 50% 0%, color-mix(in oklab, ${color} 22%, transparent), transparent 72%)`
+          : "radial-gradient(ellipse 68% 46% at 24% 0%, color-mix(in oklab, var(--tone) 13%, transparent), transparent 72%)",
+      }}
+    />
+  );
+}
+
+function YearRuler({
+  ref,
+  chapters,
+  matched,
+  onJump,
+}: {
+  ref: Ref<StateHandle<string | null>>;
+  chapters: YearChapter[];
+  matched: ReadonlySet<number> | null;
+  onJump: (year: number | null) => void;
+}) {
+  const [activeYearKey, setActiveYearKey] = useState<string | null>(null);
+  useImperativeHandle(ref, () => ({ set: setActiveYearKey }), []);
+  return (
+    <nav
+      aria-label="年份标尺"
+      className="fixed right-4 top-1/2 z-20 hidden -translate-y-1/2 flex-col items-end gap-1 xl:flex"
+    >
+      {chapters.map((ch) => {
+        const key = String(ch.year ?? "unknown");
+        const active = activeYearKey === key;
+        const hasHit =
+          matched === null || ch.songs.some((s) => matched.has(s.id));
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onJump(ch.year)}
+            className={cn(
+              "flex items-center gap-1.5 font-mono text-[10px] tabular-nums tracking-wider transition-colors duration-300",
+              active
+                ? "text-(--tone)"
+                : hasHit
+                  ? "text-slate-400/60 hover:text-slate-800 dark:text-slate-500/60 dark:hover:text-slate-200"
+                  : "text-slate-300/40 dark:text-slate-700/50",
+            )}
+          >
+            {active && <span className="h-px w-3 bg-(--tone)" />}
+            {ch.year ?? "未详"}
+          </button>
+        );
+      })}
+    </nav>
   );
 }

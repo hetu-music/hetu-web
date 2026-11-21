@@ -344,30 +344,21 @@ const Disc = memo(function Disc({
               ? "shadow-[0_24px_42px_-12px_rgba(15,23,42,0.55)] ring-slate-900/15 dark:shadow-[0_26px_48px_-10px_rgba(0,0,0,0.92)] dark:ring-white/25"
               : "shadow-[-6px_6px_14px_-4px_rgba(15,23,42,0.28)] ring-slate-900/10 dark:shadow-[-8px_8px_18px_-4px_rgba(0,0,0,0.75)] dark:ring-white/12",
           )}
-          style={{ backgroundColor: bg ?? undefined }}
+          style={{ backgroundColor: bg }}
         >
-          {song.hascover ? (
-            <Image
-              src={getCoverUrl(song)}
-              alt={song.title}
-              width={200}
-              height={200}
-              sizes="152px"
-              className={cn(
-                "h-full w-full object-cover transition-[filter] duration-300",
-                isAct
-                  ? "brightness-100 saturate-100"
-                  : "brightness-95 saturate-[0.88] dark:brightness-90",
-              )}
-            />
-          ) : (
-            /* 无封面的早期作品：素纸封套 + 竖排曲题 */
-            <div className="flex h-full w-full items-start justify-start bg-[#ECEAE4] p-3 dark:bg-[#151B28]">
-              <span className="line-clamp-4 font-serif text-xs leading-tight tracking-[0.22em] text-slate-600 [writing-mode:vertical-rl] dark:text-slate-300">
-                {song.title}
-              </span>
-            </div>
-          )}
+          <Image
+            src={getCoverUrl(song)}
+            alt={song.title}
+            width={200}
+            height={200}
+            sizes="152px"
+            className={cn(
+              "h-full w-full object-cover transition-[filter] duration-300",
+              isAct
+                ? "brightness-100 saturate-100"
+                : "brightness-95 saturate-[0.88] dark:brightness-90",
+            )}
+          />
 
           {/* 封脊左缘极细纸边高光，模拟真实封套厚度 */}
           <span

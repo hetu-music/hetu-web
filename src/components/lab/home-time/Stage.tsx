@@ -38,7 +38,6 @@ function usePlaying(songId: number) {
 
 /**
  * 色彩弥散：把封面本身放大、极度模糊，铺在作品后面，像光打在彩色幕布上。
- * 没有封面就用一团冷灰的光。
  */
 function Diffusion({
   song,
@@ -66,23 +65,17 @@ function Diffusion({
       }
       className={cn("pointer-events-none absolute", className)}
     >
-      {color ? (
-        <>
-          <div
-            className="absolute inset-[12%] rounded-full blur-[110px]"
-            style={{ background: color }}
-          />
-          <Image
-            src={getCoverUrl(song)}
-            alt=""
-            fill
-            sizes="160px"
-            className="scale-110 object-cover opacity-80 blur-[90px] saturate-[1.7]"
-          />
-        </>
-      ) : (
-        <div className="absolute inset-[15%] rounded-full bg-slate-500/40 blur-[110px]" />
-      )}
+      <div
+        className="absolute inset-[12%] rounded-full blur-[110px]"
+        style={{ background: color }}
+      />
+      <Image
+        src={getCoverUrl(song)}
+        alt=""
+        fill
+        sizes="160px"
+        className="scale-110 object-cover opacity-80 blur-[90px] saturate-[1.7]"
+      />
     </motion.div>
   );
 }
@@ -157,17 +150,6 @@ function credits(song: Song): string[] {
   add("编", song.arranger);
   add("唱", song.artist);
   return out;
-}
-
-/** 没有封面的展品：在灯下只放歌名 */
-function TitleObject({ song }: { song: Song }) {
-  return (
-    <div className="flex aspect-square w-full items-center justify-center ring-1 ring-white/10">
-      <span className="font-serif text-4xl tracking-[0.3em] text-white/85 [writing-mode:vertical-rl] md:text-5xl">
-        {song.title}
-      </span>
-    </div>
-  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -323,7 +305,6 @@ export function Exhibit({
   const ref = useRef<HTMLElement>(null);
   const lit = useInView(ref, { amount: 0.55 });
   const playing = usePlaying(song.id);
-  const hasCover = !!stripeColor(song);
   const album =
     song.album && song.album !== song.title ? `收于《${song.album}》` : null;
 
@@ -358,13 +339,9 @@ export function Exhibit({
           onClick={() => onOpenSong(song.id)}
           className="relative w-full max-w-[500px] cursor-pointer justify-self-center shadow-[0_50px_120px_-30px_rgba(0,0,0,0.95)] md:justify-self-end"
         >
-          {hasCover ? (
-            <div className="relative aspect-square">
-              <CoverArt song={song} sizes="(min-width: 768px) 500px, 88vw" />
-            </div>
-          ) : (
-            <TitleObject song={song} />
-          )}
+          <div className="relative aspect-square">
+            <CoverArt song={song} sizes="(min-width: 768px) 500px, 88vw" />
+          </div>
         </motion.div>
 
         <motion.div

@@ -7,9 +7,17 @@ import coverColors from "./cover-colors.json";
  */
 const COLORS = coverColors as Record<string, string>;
 
-export function stripeColor(song: Song): string | null {
-  if (song.hascover !== true) return null;
-  return COLORS[String(song.id)] ?? null;
+/**
+ * 没有自己封面的歌也有封面：共用图床上的 proto.jpg（确定没有）或 default.jpg（还没核对），
+ * 见 getCoverFilename。这两张的主色同样离线算好
+ */
+const PROTO_COLOR = "#1c3240";
+const DEFAULT_COLOR = "#d07f9a";
+
+/** 封面主色。每首歌都有封面，所以总有颜色 */
+export function stripeColor(song: Song): string {
+  if (song.hascover === true) return COLORS[String(song.id)] ?? DEFAULT_COLOR;
+  return song.hascover === false ? PROTO_COLOR : DEFAULT_COLOR;
 }
 
 /** 按发行日期升序：同一天按 id */
@@ -50,11 +58,11 @@ export function groupByYear(
   }));
 }
 
-/** 为某一章挑出默认展示的焦点作品：有封面、原创、有音频的优先 */
+/** 为某一章挑出默认展示的焦点作品：有自己封面（不是共用的）、原创、有音频的优先 */
 export function pickChapterFocal(songs: Song[]): Song | null {
   if (songs.length === 0) return null;
   const score = (s: Song) =>
-    (stripeColor(s) ? 4 : 0) +
+    (s.hascover === true ? 4 : 0) +
     (s.type?.includes("原创") ? 2 : 0) +
     (s.has_audio ? 1 : 0);
 

@@ -153,7 +153,6 @@ const ChapterBlock = memo(function ChapterBlock({
   }
 
   const focalColor = activeFocal ? stripeColor(activeFocal) : null;
-  const focalHasCover = !!activeFocal?.hascover;
 
   return (
     <section
@@ -192,10 +191,9 @@ const ChapterBlock = memo(function ChapterBlock({
                     key={s.id}
                     className={cn(
                       "block h-full flex-1 transition-opacity duration-300",
-                      !c && "bg-slate-300/60 dark:bg-slate-700/60",
                       matched && !hit && "opacity-15 grayscale",
                     )}
-                    style={{ backgroundColor: c ?? undefined }}
+                    style={{ backgroundColor: c }}
                   />
                 );
               })}
@@ -209,24 +207,16 @@ const ChapterBlock = memo(function ChapterBlock({
               onClick={() => onOpenSong(defaultFocal.id)}
               aria-label={`进入《${defaultFocal.title}》详情页`}
               className="relative h-14 w-14 shrink-0 overflow-hidden rounded-sm bg-slate-100 ring-1 ring-slate-900/10 lg:hidden dark:bg-slate-800 dark:ring-white/15"
-              style={{
-                backgroundColor: stripeColor(defaultFocal) ?? undefined,
-              }}
+              style={{ backgroundColor: stripeColor(defaultFocal) }}
             >
-              {defaultFocal.hascover ? (
-                <Image
-                  src={getCoverUrl(defaultFocal)}
-                  alt={defaultFocal.title}
-                  width={112}
-                  height={112}
-                  sizes="56px"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center font-serif text-xs text-slate-500 dark:text-slate-400">
-                  {defaultFocal.title.slice(0, 2)}
-                </span>
-              )}
+              <Image
+                src={getCoverUrl(defaultFocal)}
+                alt={defaultFocal.title}
+                width={112}
+                height={112}
+                sizes="56px"
+                className="h-full w-full object-cover"
+              />
             </button>
           )}
         </div>
@@ -255,19 +245,11 @@ const ChapterBlock = memo(function ChapterBlock({
                   onClick={() => onOpenSong(activeFocal.id)}
                   className="group relative aspect-square w-full cursor-pointer overflow-hidden rounded-md bg-slate-100 shadow-[0_28px_60px_-24px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/[0.07] dark:bg-slate-900 dark:shadow-[0_32px_70px_-22px_rgba(0,0,0,0.88)] dark:ring-white/12"
                 >
-                  {focalHasCover ? (
-                    <CoverArt
-                      song={activeFocal}
-                      sizes="352px"
-                      className="transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center bg-[#F4F3EF] p-8 dark:bg-[#0E1320]">
-                      <span className="font-calligraphy text-4xl tracking-[0.35em] text-slate-700 [writing-mode:vertical-rl] dark:text-slate-200">
-                        {activeFocal.title}
-                      </span>
-                    </div>
-                  )}
+                  <CoverArt
+                    song={activeFocal}
+                    sizes="352px"
+                    className="transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                  />
                 </div>
 
                 <figcaption className="mt-4 flex items-baseline justify-between gap-3">
@@ -370,12 +352,11 @@ const ChapterRow = memo(function ChapterRow({
         aria-hidden
         className={cn(
           "mt-1.5 h-3.5 w-[2.5px] shrink-0 rounded-full transition-all duration-300 sm:mt-0",
-          !color && "bg-slate-300/70 dark:bg-slate-700/70",
           isFocal
             ? "scale-y-125 opacity-100"
             : "opacity-65 group-hover:opacity-100",
         )}
-        style={{ backgroundColor: color ?? undefined }}
+        style={{ backgroundColor: color }}
       />
 
       {/* 月.日 */}

@@ -111,9 +111,9 @@
 
 - 浮层的行为（焦点、Esc、点外面收起、锁滚动、拖动收起）一律交给 Base UI，样式只在 `src/components/ui/` 的封装里写一次，业务组件不直接用库，也不手写遮罩和 `fixed` 面板：
   - 宽屏下拉：`ui/popover.tsx`。页面底色，`rounded-xl border border-slate-200/70 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)]`；选项用 `topbar/menu.tsx` 的 `MenuList`。
-  - 窄屏底部面板：`ui/drawer.tsx`。页面底色、`rounded-t-2xl`、背后一层轻遮罩（顶栏那一截裁掉，交界落在顶栏下沿，状态栏不用跟着变），往下拖可以收起。题头一行加粗的衬线小字，内容写成一行行文字；成组的选项（主题、文字）写成 `dl`，选项用 `·` 隔开的文字按钮（`InlineOptions`）。不用毛玻璃、分段卡片、徽章。
+  - 窄屏底部面板：`ui/drawer.tsx`。页面底色、`rounded-t-2xl`、背后一层轻遮罩（顶栏那一截裁掉，交界落在顶栏下沿，状态栏不用跟着变），往下拖、点遮罩可以收起，不放收起按钮（×）。题头一行加粗的衬线小字，内容写成一行行文字；成组的选项（主题、文字）写成 `dl`，选项用 `·` 隔开的文字按钮（`InlineOptions`）。不用毛玻璃、分段卡片、徽章。
   - 「宽屏下拉、窄屏底部面板」的组合：`ui/responsive-panel.tsx`。
-  - 居中弹窗：`ui/dialog.tsx`，题头与底部面板同一种（`PanelHeader`）。
+  - 居中弹窗：`ui/dialog.tsx`，题头与底部面板同一种（`PanelHeader`），只是右侧多一个收起按钮。
   - 操作结果提示：`ui/toast.tsx`（Base UI Toast，全局一个 `toastManager`，组件外也能 `addToast`）。底部居中，页面底色加细框，出错只把字换成 rose。
   - 带搜索的选择（只能从候选里选）：`ui/combobox.tsx`。可以挂在输入框下方（`ComboboxPopup`，如反馈表单选歌），也可以 inline 放进别的浮层（如首页筛选）。能自由输入文字的搜索框才用 Autocomplete。
   - 浮层的进出场只用 CSS 过渡（`data-starting-style` / `data-ending-style`，缓动 `ease-page`），不用 framer-motion：底部面板拖动时的位移由 Base UI 写进 `transform`，JS 动画会和它抢。

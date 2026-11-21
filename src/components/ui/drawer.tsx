@@ -76,7 +76,13 @@ function DrawerContent({
               aria-hidden
               className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-slate-300/80 dark:bg-slate-700"
             />
-            {title && <PanelHeader title={title} description={description} />}
+            {title && (
+              <PanelHeader
+                title={title}
+                description={description}
+                closable={false}
+              />
+            )}
           </div>
           <BaseDrawer.Content
             className={cn(

@@ -85,7 +85,7 @@ export default function QueueControl() {
         className="max-h-[70vh]"
         contentClassName="flex flex-col overflow-hidden px-0 pb-[env(safe-area-inset-bottom)]"
       >
-        <QueueList Title={DrawerTitle} onClose={close} />
+        <QueueList Title={DrawerTitle} />
       </DrawerContent>
     </Drawer>
   );
@@ -98,7 +98,8 @@ function QueueList({
 }: {
   /** 浮层自己的标题组件，读屏据此念出面板的名字 */
   Title: React.ElementType<{ className?: string; children?: React.ReactNode }>;
-  onClose: () => void;
+  /** 给了才放收起按钮；底部面板不给，下拖、点遮罩收起 */
+  onClose?: () => void;
 }) {
   const t = useTranslations("common.player");
   const queue = usePlayerStore((s) => s.queue);
@@ -147,14 +148,16 @@ function QueueList({
           >
             {clearConfirm.confirming ? t("confirmClear") : t("clear")}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("close")}
-            className="-mr-1 p-1 text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
-          >
-            <X size={16} />
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t("close")}
+              className="-mr-1 p-1 text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
       </div>
       <div className="mx-5 h-px shrink-0 bg-slate-200/70 dark:bg-slate-800" />

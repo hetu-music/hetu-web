@@ -350,11 +350,12 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
           <FeatureRibbonB items={CORE_FEATURES} />
 
-          {/* ── 2. 二十年的颜色光谱（由近及远，核心视觉与时间索引） ── */}
+          {/* ── 2. 实体唱片架（由近及远，滑过抽碟，点选入卷或按年跳章） ── */}
           <ColorTapestry
             songs={catalog}
             matched={matched}
             onJumpToYear={jumpToYear}
+            onOpenSong={handleOpenSong}
             onSpotlightColor={setSpotlightColor}
           />
 

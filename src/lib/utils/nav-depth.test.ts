@@ -1,10 +1,21 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bumpNavDepth, popNavDepth, readNavDepth } from "./nav-depth";
 
 beforeEach(() => sessionStorage.clear());
+afterEach(() => vi.unstubAllGlobals());
 
-describe("站内导航深度", () => {
+describe("支持 Navigation API 时", () => {
+  it("看上一条历史是不是本站，不看手动记的深度", () => {
+    vi.stubGlobal("navigation", { canGoBack: true });
+    expect(popNavDepth()).toBe(true);
+    vi.stubGlobal("navigation", { canGoBack: false });
+    bumpNavDepth();
+    expect(popNavDepth()).toBe(false);
+  });
+});
+
+describe("不支持时退回站内导航深度", () => {
   it("进入内页加一，返回退一层，退到底回主页", () => {
     expect(readNavDepth()).toBe(0);
     bumpNavDepth();

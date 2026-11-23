@@ -71,13 +71,8 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
-  // 顶部光晕与年份标尺各管各的状态：滑过唱片架、滚过年份时只重渲它们自己，不牵动整页
-  const fogRef = useRef<StateHandle<string | null>>(null);
+  // 年份标尺自己管当前年份：滚过年份时只重渲标尺，不牵动整页
   const rulerRef = useRef<StateHandle<string | null>>(null);
-  const setSpotlightColor = useCallback(
-    (color: string | null) => fogRef.current?.set(color),
-    [],
-  );
   const setActiveYearKey = useCallback(
     (key: string) => rulerRef.current?.set(key),
     [],
@@ -314,9 +309,6 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
   return (
     <OverlayHostContext.Provider value={overlayHost}>
       <div className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
-        {/* 顶部极柔色彩雾面：平时淡墨蓝，滑过色带时轻染那首歌的真实主色 */}
-        <TopFog ref={fogRef} />
-
         <TopBar
           exit={{ kind: "logo", onClick: handleReset, tooltip: "回到卷首" }}
           nav={
@@ -368,11 +360,10 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             songs={catalog}
             matched={matched}
             onOpenSong={handleOpenSong}
-            onSpotlightColor={setSpotlightColor}
           />
 
           {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
-          <div className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA] px-6 dark:bg-[#0B0F19]">
+          <div className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95">
             <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
               {/* 左栏（与下方年份 & 大画幅严格左齐）：一根楷体寻曲底线，无图标堆砌 */}
               <div className="flex items-center justify-between gap-4">
@@ -630,22 +621,6 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 /** 子组件对外暴露的 setter：父组件只转发，不持有这份状态 */
 interface StateHandle<T> {
   set: (value: T) => void;
-}
-
-function TopFog({ ref }: { ref: Ref<StateHandle<string | null>> }) {
-  const [color, setColor] = useState<string | null>(null);
-  useImperativeHandle(ref, () => ({ set: setColor }), []);
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-x-0 top-0 h-176 transition-all duration-1000 ease-out"
-      style={{
-        background: color
-          ? `radial-gradient(ellipse 68% 46% at 50% 0%, color-mix(in oklab, ${color} 22%, transparent), transparent 72%)`
-          : "radial-gradient(ellipse 68% 46% at 24% 0%, color-mix(in oklab, var(--tone) 13%, transparent), transparent 72%)",
-      }}
-    />
-  );
 }
 
 function YearRuler({

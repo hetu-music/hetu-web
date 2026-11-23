@@ -24,8 +24,6 @@ interface ColorTapestryProps {
   matched: ReadonlySet<number> | null;
   /** 点选抽起的碟时打开该曲详情 */
   onOpenSong: (id: number) => void;
-  /** 抽起碟片时，把封面主色轻染到页面顶部光晕 */
-  onSpotlightColor?: (color: string | null) => void;
 }
 
 /** 首屏（服务端渲染、尚未量过尺寸时）先完整画出的碟数，最宽的屏也够铺满 */
@@ -127,12 +125,7 @@ type Source = "pointer" | "keyboard" | "scroll";
  * 性能：每张碟是独立的 memo 组件，换碟时只有姿态改变的几张重渲；
  * 只有视口附近的碟画出封套，其余只留同尺寸的空插槽。
  */
-function ColorTapestry({
-  songs,
-  matched,
-  onOpenSong,
-  onSpotlightColor,
-}: ColorTapestryProps) {
+function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const isTouch = useSyncExternalStore(
@@ -195,13 +188,8 @@ function ColorTapestry({
       activeRef.current = idx;
       ix.current.source = idx === null ? null : source;
       setActive(idx);
-      onSpotlightColor?.(
-        idx !== null && visibleSongs[idx]
-          ? stripeColor(visibleSongs[idx])
-          : null,
-      );
     },
-    [visibleSongs, onSpotlightColor],
+    [],
   );
 
   const stripX = useCallback(

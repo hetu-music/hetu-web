@@ -338,6 +338,7 @@ const ChapterRow = memo(function ChapterRow({
 
   return (
     <li
+      aria-current={isFocal ? "true" : undefined}
       onMouseEnter={() => onHover(song)}
       onClick={() => onOpenSong(song.id)}
       className={cn(
@@ -369,10 +370,12 @@ const ChapterRow = memo(function ChapterRow({
         <div className="flex items-baseline gap-2.5">
           <h3
             className={cn(
-              "truncate font-serif text-[17px] leading-snug text-slate-900 transition-colors sm:text-[19px] dark:text-slate-100",
+              "truncate font-serif text-[17px] leading-snug transition-colors sm:text-[19px]",
+              // 当前项（焦点、正在放）与悬停只改文字颜色。当前项不能和带 dark: 的常态色写在一起：
+              // 两者优先级相同而 dark: 排在后面，深色下强调色会被盖住（悬停多一个 :hover，不受影响）
               playing || isFocal
                 ? "text-(--tone)"
-                : "group-hover:text-(--tone)",
+                : "text-slate-900 group-hover:text-(--tone) dark:text-slate-100",
             )}
           >
             <SongTitleLink

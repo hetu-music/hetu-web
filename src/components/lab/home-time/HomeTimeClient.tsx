@@ -45,6 +45,7 @@ import {
   HeaderDemoB,
   HeaderDemoC,
   HeaderDemoD,
+  HeaderDemoE,
   HeaderDemoSwitcher,
   type HeaderVariant,
 } from "./HeaderDemos";
@@ -317,6 +318,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
     matched,
     catalog,
     onOpenSong: handleOpenSong,
+    onJumpYear: jumpToYear,
   };
 
   return (
@@ -325,7 +327,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         <TopBar
           exit={{ kind: "logo", onClick: handleReset, tooltip: "回到卷首" }}
           nav={
-            headerVariant === "d" ? (
+            headerVariant === "d" || headerVariant === "e" ? (
               <DemoTopBarNavD onReset={handleReset} />
             ) : (
               <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
@@ -335,7 +337,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             )
           }
         >
-          {headerVariant === "d" && (
+          {(headerVariant === "d" || headerVariant === "e") && (
             <DemoTopBarMobileStripD onReset={handleReset} />
           )}
         </TopBar>
@@ -343,7 +345,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         <main
           className={cn(
             "relative mx-auto max-w-7xl px-6 pb-28",
-            headerVariant === "d"
+            headerVariant === "d" || headerVariant === "e"
               ? "pt-34 md:pt-32"
               : headerVariant === "c"
                 ? "pt-23 md:pt-25"
@@ -355,12 +357,13 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           {headerVariant === "b" && <HeaderDemoB {...headerProps} />}
           {headerVariant === "c" && <HeaderDemoC {...headerProps} />}
           {headerVariant === "d" && <HeaderDemoD {...headerProps} />}
+          {headerVariant === "e" && <HeaderDemoE {...headerProps} />}
 
           {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
           <div
             className={cn(
               "sticky z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95",
-              headerVariant === "d"
+              headerVariant === "d" || headerVariant === "e"
                 ? "top-[calc(var(--nav-h)+2.125rem)] md:top-(--nav-h)"
                 : "top-(--nav-h)",
             )}
@@ -599,10 +602,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         />
 
         {/* 左下角原型切换浮条：不侵入任何一套卷首版式，支持键盘 1–4 切换 */}
-        <HeaderDemoSwitcher
-          value={headerVariant}
-          onChange={setHeaderVariant}
-        />
+        <HeaderDemoSwitcher value={headerVariant} onChange={setHeaderVariant} />
 
         <FloatingActionButtons
           showScrollTop={showScrollTop}

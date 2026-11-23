@@ -7,8 +7,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import React, { Fragment, useEffect, useState } from "react";
 import ColorTapestry from "./ColorTapestry";
 import { CORE_FEATURES, type FeatureEntranceItem } from "./FeatureEntrances";
+import { HeaderDemoE as ScreenHeader } from "./HeaderDemoE";
 
-export type HeaderVariant = "a" | "b" | "c" | "d";
+export type HeaderVariant = "a" | "b" | "c" | "d" | "e";
 
 export const HEADER_VARIANTS: readonly {
   id: HeaderVariant;
@@ -16,10 +17,36 @@ export const HEADER_VARIANTS: readonly {
   label: string;
   note: string;
 }[] = [
-  { id: "a", code: "A", label: "别册同架", note: "左正面展册、右侧插唱片，同立一条架面" },
-  { id: "b", code: "B", label: "中式书扉", note: "复刻歌曲页竖排刻本基因重构卷首" },
-  { id: "c", code: "C", label: "唱片顶置", note: "开卷即见满架色彩，铭牌退居架下" },
-  { id: "d", code: "D", label: "升格顶栏", note: "特辑进全站一级导航，卷首至纯" },
+  {
+    id: "a",
+    code: "A",
+    label: "别册同架",
+    note: "左正面展册、右侧插唱片，同立一条架面",
+  },
+  {
+    id: "b",
+    code: "B",
+    label: "中式书扉",
+    note: "复刻歌曲页竖排刻本基因重构卷首",
+  },
+  {
+    id: "c",
+    code: "C",
+    label: "唱片顶置",
+    note: "开卷即见满架色彩，铭牌退居架下",
+  },
+  {
+    id: "d",
+    code: "D",
+    label: "升格顶栏",
+    note: "特辑进全站一级导航，卷首至纯",
+  },
+  {
+    id: "e",
+    code: "E",
+    label: "二十扇屏",
+    note: "一年一幅并排成屏，指向哪年展开哪年",
+  },
 ];
 
 const EASE = [0.23, 1, 0.32, 1] as const;
@@ -32,6 +59,7 @@ interface SharedHeaderProps {
   matched: ReadonlySet<number> | null;
   catalog: Song[];
   onOpenSong: (id: number) => void;
+  onJumpYear: (year: number) => void;
 }
 
 /** 曲数动态跳变（四个原型复用，保持筛选反馈一致） */
@@ -367,10 +395,7 @@ export function HeaderDemoB({
             aria-label="站点特辑"
             className="hidden shrink-0 flex-row-reverse items-start gap-7 pt-1 md:flex"
           >
-            <span
-              aria-hidden
-              className="mt-1 h-16 w-px bg-(--tone)/55"
-            />
+            <span aria-hidden className="mt-1 h-16 w-px bg-(--tone)/55" />
             {CORE_FEATURES.map((item, i) => {
               const isSelf = hovered?.id === item.id;
               const isDimmed = hovered !== null && !isSelf;
@@ -597,7 +622,10 @@ export function DemoTopBarMobileStripD({ onReset }: { onReset: () => void }) {
         </button>
         {CORE_FEATURES.map((item) => (
           <Fragment key={item.id}>
-            <span aria-hidden className="mx-3 shrink-0 font-sans text-ink-faint">
+            <span
+              aria-hidden
+              className="mx-3 shrink-0 font-sans text-ink-faint"
+            >
               ·
             </span>
             <Link
@@ -658,6 +686,35 @@ export function HeaderDemoD({
   );
 }
 
+// ── 方向 E：二十扇屏（特辑同 D 进顶栏） ──────────────────────────────────────
+
+export function HeaderDemoE({
+  firstYear,
+  lastYear,
+  shownCount,
+  totalCount,
+  matched,
+  catalog,
+  onJumpYear,
+}: SharedHeaderProps) {
+  return (
+    <ScreenHeader
+      firstYear={firstYear}
+      lastYear={lastYear}
+      catalog={catalog}
+      matched={matched}
+      onJumpYear={onJumpYear}
+      countSlot={
+        <SongCount
+          shownCount={shownCount}
+          totalCount={totalCount}
+          matched={matched}
+        />
+      }
+    />
+  );
+}
+
 // ── 原型切换浮条（左下角极简胶囊，不侵入任何一套头部版式） ──────────────────────
 
 export function HeaderDemoSwitcher({
@@ -678,6 +735,7 @@ export function HeaderDemoSwitcher({
         "2": "b",
         "3": "c",
         "4": "d",
+        "5": "e",
       };
       const next = map[e.key];
       if (next) onChange(next);
@@ -708,10 +766,7 @@ export function HeaderDemoSwitcher({
           return (
             <Fragment key={v.id}>
               {idx > 0 && (
-                <span
-                  aria-hidden
-                  className="mx-0.5 text-[10px] text-ink-faint"
-                >
+                <span aria-hidden className="mx-0.5 text-[10px] text-ink-faint">
                   ·
                 </span>
               )}

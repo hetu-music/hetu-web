@@ -24,6 +24,14 @@ interface ColorTapestryProps {
   matched: ReadonlySet<number> | null;
   /** 点选抽起的碟时打开该曲详情 */
   onOpenSong: (id: number) => void;
+  /** 唱片封套尺寸：large 用于方向 C「唱片架顶置」 */
+  size?: "default" | "large";
+  /** 常态（未抽起时）顶行左侧提示文案 */
+  idleLabel?: string;
+  /** 宽屏下是否向左出血到页面边缘；嵌在两栏右栏时关掉，使首张碟与下方右栏严格左齐 */
+  bleedLeftDesktop?: boolean;
+  /** 宽屏下是否隐藏自带架面承托线（由外层同架布局统一画一根贯通细线） */
+  hideShelfLineDesktop?: boolean;
 }
 
 /** 首屏（服务端渲染、尚未量过尺寸时）先完整画出的碟数，最宽的屏也够铺满 */
@@ -125,7 +133,15 @@ type Source = "pointer" | "keyboard" | "scroll";
  * 性能：每张碟是独立的 memo 组件，换碟时只有姿态改变的几张重渲；
  * 只有视口附近的碟画出封套，其余只留同尺寸的空插槽。
  */
-function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
+function ColorTapestry({
+  songs,
+  matched,
+  onOpenSong,
+  size = "default",
+  idleLabel = "架上唱片",
+  bleedLeftDesktop = true,
+  hideShelfLineDesktop = false,
+}: ColorTapestryProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const isTouch = useSyncExternalStore(
@@ -232,7 +248,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
     setLive((prev) => (prev[0] === lo && prev[1] === hi ? prev : [lo, hi]));
   }, []);
 
-  // 架上的碟换了（筛选）或换了输入方式：绘制前同步量一次，避免露出一帧空架；
+  // 架上的碟换了（筛选）、尺寸切换或换了输入方式：绘制前同步量一次，避免露出一帧空架；
   // 原来的下标已不指同一首，焦点重新定
   useLayoutEffect(() => {
     isTouchRef.current = isTouch;
@@ -244,7 +260,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
       "scroll",
       true,
     );
-  }, [visibleSongs, isTouch, measure, updateLive, activate]);
+  }, [visibleSongs, isTouch, size, measure, updateLive, activate]);
 
   const stopInertia = useCallback(() => {
     cancelAnimationFrame(ix.current.inertia);
@@ -461,7 +477,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
   const activeSong = safeActive !== null ? visibleSongs[safeActive] : null;
 
   return (
-    <section aria-label="唱片架" className="relative select-none">
+    <section aria-label="唱片架" className="relative min-w-0 select-none">
       {/* 顶行：常态安静，抽起碟片时浮现曲名、日期与词曲；右侧可左右推架（触屏直接滑） */}
       <div className="mb-1 flex min-h-11 items-center justify-between gap-4">
         {activeSong ? (
@@ -486,7 +502,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
           </button>
         ) : (
           <span className="text-[11px] tracking-[0.3em] text-(--tone)">
-            架上唱片
+            {idleLabel}
           </span>
         )}
 
@@ -511,7 +527,12 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
       </div>
 
       {/* ── 唱片架横向轨道 ── */}
-      <div className="relative -mx-6">
+      <div
+        className={cn(
+          "relative -mx-6",
+          !bleedLeftDesktop && "lg:-ml-2 lg:-mr-6",
+        )}
+      >
         <div
           ref={scrollerRef}
           tabIndex={0}
@@ -533,7 +554,9 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
           onKeyDown={handleKeyDown}
           className={cn(
             // isolate：碟片的 z-index 不越出架子，不压到吸顶的检目线上
-            "no-scrollbar relative isolate flex items-end overflow-x-auto px-6 pt-11 pb-6 outline-none",
+            "no-scrollbar relative isolate flex items-end overflow-x-auto px-6 pb-6 outline-none",
+            !bleedLeftDesktop && "lg:pl-2 lg:pr-6",
+            size === "large" ? "pt-12 sm:pt-14" : "pt-11",
             isTouch
               ? "snap-x snap-mandatory scroll-pl-6"
               : safeActive !== null
@@ -547,7 +570,11 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
             ref={stripRef}
             className={cn(
               "relative flex items-end",
-              isTouch ? "pr-[calc(100vw-3rem)]" : "pr-28 sm:pr-32",
+              isTouch
+                ? "pr-[calc(100vw-3rem)]"
+                : size === "large"
+                  ? "pr-36 sm:pr-44"
+                  : "pr-28 sm:pr-32",
             )}
           >
             {visibleSongs.map((song, idx) => (
@@ -564,6 +591,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
                 yearLabel={yearStartMap.get(idx)}
                 live={idx >= live[0] && idx <= live[1]}
                 snap={isTouch}
+                size={size}
               />
             ))}
           </div>
@@ -572,7 +600,10 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
         {/* 两端渐隐（页面底色），代替整条架子上的 mask：滚动时不必每帧重算遮罩 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-linear-to-r from-[#FAFAFA] to-transparent dark:from-[#0B0F19]"
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-linear-to-r from-[#FAFAFA] to-transparent dark:from-[#0B0F19]",
+            !bleedLeftDesktop && "lg:w-3",
+          )}
         />
         <div
           aria-hidden
@@ -582,7 +613,10 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
         {/* 架面承托细线 */}
         <div
           aria-hidden
-          className="pointer-events-none mx-6 -mt-3 h-px bg-linear-to-r from-transparent via-slate-300/85 to-transparent dark:via-slate-700/80"
+          className={cn(
+            "pointer-events-none mx-6 -mt-3 h-px bg-linear-to-r from-transparent via-slate-300/85 to-transparent dark:via-slate-700/80",
+            hideShelfLineDesktop && "lg:hidden",
+          )}
         />
       </div>
     </section>
@@ -590,6 +624,16 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
 }
 
 export default memo(ColorTapestry);
+
+const SLOT_SIZE = {
+  default: "h-25 w-5.5 sm:h-29.5 sm:w-6.5",
+  large: "h-29 w-6 sm:h-36 sm:w-7.5",
+} as const;
+
+const COVER_SIZE = {
+  default: "h-25 w-25 sm:h-29.5 sm:w-29.5",
+  large: "h-29 w-29 sm:h-36 sm:w-36",
+} as const;
 
 /**
  * 一张碟。dist 是到焦点碟的距离，3 代表「3 及更远」（姿态都一样）；
@@ -604,6 +648,7 @@ const Disc = memo(function Disc({
   yearLabel,
   live,
   snap,
+  size,
 }: {
   song: Song;
   idx: number;
@@ -612,6 +657,7 @@ const Disc = memo(function Disc({
   yearLabel: number | null | undefined;
   live: boolean;
   snap: boolean;
+  size: "default" | "large";
 }) {
   const isAct = dist === 0;
   const bg = stripeColor(song);
@@ -629,7 +675,8 @@ const Disc = memo(function Disc({
       aria-label={song.title}
       data-disc-idx={idx}
       className={cn(
-        "relative h-25 w-5.5 shrink-0 sm:h-29.5 sm:w-6.5",
+        "relative shrink-0",
+        SLOT_SIZE[size],
         yearLabel !== undefined && idx > 0 && "ml-5 sm:ml-6",
         snap && "snap-start",
       )}
@@ -653,7 +700,10 @@ const Disc = memo(function Disc({
       {/* 唱片封套本体（绕左脊旋转，露出真实封面与立体厚度阴影） */}
       {live && (
         <div
-          className="pointer-events-none absolute bottom-0 left-0 h-25 w-25 sm:h-29.5 sm:w-29.5"
+          className={cn(
+            "pointer-events-none absolute bottom-0 left-0",
+            COVER_SIZE[size],
+          )}
           style={{
             transformOrigin: "left center",
             transform: `translateY(${translateY}px) rotateY(${rotateY}deg) scale(${scale})`,
@@ -688,7 +738,7 @@ const Disc = memo(function Disc({
               alt=""
               width={160}
               height={160}
-              sizes="118px"
+              sizes={size === "large" ? "144px" : "118px"}
               draggable={false}
               loading={idx < 32 ? "eager" : "lazy"}
               className={cn(

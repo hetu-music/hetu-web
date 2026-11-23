@@ -28,7 +28,6 @@ import type { Song } from "@/lib/types";
 import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { cn } from "@/lib/utils/utils";
 import { enumLabel } from "@/lib/utils/utils-song";
-import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Fragment,
@@ -39,8 +38,16 @@ import {
   useRef,
   useState,
 } from "react";
-import ColorTapestry from "./ColorTapestry";
-import { CORE_FEATURES, FeatureRibbonB } from "./FeatureEntrances";
+import {
+  DemoTopBarMobileStripD,
+  DemoTopBarNavD,
+  HeaderDemoA,
+  HeaderDemoB,
+  HeaderDemoC,
+  HeaderDemoD,
+  HeaderDemoSwitcher,
+  type HeaderVariant,
+} from "./HeaderDemos";
 import YearChapters from "./YearChapters";
 import { type YearChapter, byDateDesc, groupByYear } from "./timeline";
 
@@ -71,6 +78,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
 
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [headerVariant, setHeaderVariant] = useState<HeaderVariant>("a");
   // 年份标尺自己管当前年份：滚过年份时只重渲标尺，不牵动整页
   const rulerRef = useRef<StateHandle<string | null>>(null);
   const setActiveYearKey = useCallback(
@@ -301,60 +309,62 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
     </div>
   );
 
+  const headerProps = {
+    firstYear,
+    lastYear,
+    shownCount,
+    totalCount: catalog.length,
+    matched,
+    catalog,
+    onOpenSong: handleOpenSong,
+  };
+
   return (
     <OverlayHostContext.Provider value={overlayHost}>
       <div className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
         <TopBar
           exit={{ kind: "logo", onClick: handleReset, tooltip: "回到卷首" }}
           nav={
-            <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
-              <span aria-hidden>/</span>
-              <span>二十年的颜色</span>
-            </span>
-          }
-        />
-
-        <main className="relative mx-auto max-w-7xl px-6 pb-28 pt-26 md:pt-32">
-          {/* ── 1. 卷首：年代跨度与曲数 + 横向展签长带（方案 B） ── */}
-          <header className="pb-7 md:pb-8">
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
-              <h1 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-ink sm:text-5xl md:text-6xl">
-                {lastYear}
-                <span className="mx-[0.22em] font-light text-ink-faint">—</span>
-                {firstYear}
-              </h1>
-              <span className="font-serif text-sm tracking-[0.18em] text-ink-meta sm:text-base">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={shownCount}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    transition={{ duration: 0.25 }}
-                    className={cn(
-                      "inline-block font-semibold tabular-nums",
-                      matched ? "text-(--tone)" : "text-ink-body",
-                    )}
-                  >
-                    {shownCount}
-                  </motion.span>
-                </AnimatePresence>
-                {matched ? ` / ${catalog.length}` : ""} 曲
+            headerVariant === "d" ? (
+              <DemoTopBarNavD onReset={handleReset} />
+            ) : (
+              <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
+                <span aria-hidden>/</span>
+                <span>二十年的颜色</span>
               </span>
-            </div>
-          </header>
+            )
+          }
+        >
+          {headerVariant === "d" && (
+            <DemoTopBarMobileStripD onReset={handleReset} />
+          )}
+        </TopBar>
 
-          <FeatureRibbonB items={CORE_FEATURES} />
-
-          {/* ── 2. 唱片架（由近及远，滑过抽碟，点选入卷；随检索与筛选只留命中的碟） ── */}
-          <ColorTapestry
-            songs={catalog}
-            matched={matched}
-            onOpenSong={handleOpenSong}
-          />
+        <main
+          className={cn(
+            "relative mx-auto max-w-7xl px-6 pb-28",
+            headerVariant === "d"
+              ? "pt-34 md:pt-32"
+              : headerVariant === "c"
+                ? "pt-23 md:pt-25"
+                : "pt-26 md:pt-32",
+          )}
+        >
+          {/* ── 1 & 2. 卷首与唱片架（A 别册同架 / B 中式书扉 / C 唱片顶置 / D 升格顶栏） ── */}
+          {headerVariant === "a" && <HeaderDemoA {...headerProps} />}
+          {headerVariant === "b" && <HeaderDemoB {...headerProps} />}
+          {headerVariant === "c" && <HeaderDemoC {...headerProps} />}
+          {headerVariant === "d" && <HeaderDemoD {...headerProps} />}
 
           {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
-          <div className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95">
+          <div
+            className={cn(
+              "sticky z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95",
+              headerVariant === "d"
+                ? "top-[calc(var(--nav-h)+2.125rem)] md:top-(--nav-h)"
+                : "top-(--nav-h)",
+            )}
+          >
             <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
               {/* 左栏（与下方年份 & 大画幅严格左齐）：一根楷体寻曲底线，无图标堆砌 */}
               <div className="flex items-center justify-between gap-4">
@@ -586,6 +596,12 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           chapters={chapters}
           matched={matched}
           onJump={jumpToYear}
+        />
+
+        {/* 左下角原型切换浮条：不侵入任何一套卷首版式，支持键盘 1–4 切换 */}
+        <HeaderDemoSwitcher
+          value={headerVariant}
+          onChange={setHeaderVariant}
         />
 
         <FloatingActionButtons

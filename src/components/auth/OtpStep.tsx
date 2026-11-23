@@ -25,10 +25,7 @@ const RESEND_COOLDOWN = 60;
 type ActionResult = Promise<string | null | undefined>;
 
 /** 提示行里的文字按钮：比一般的次要按钮深一档，免得淹没在同色的提示语里 */
-const HINT_BUTTON_CLASS = cn(
-  TEXT_BUTTON_CLASS,
-  "ml-1.5 text-slate-600 dark:text-slate-300",
-);
+const HINT_BUTTON_CLASS = cn(TEXT_BUTTON_CLASS, "ml-1.5 text-ink-prose");
 
 /**
  * 填邮箱验证码的一步：注册、找回密码、改邮箱共用。
@@ -128,7 +125,7 @@ export default function OtpStep({
             key={index}
             ref={index === 0 ? firstInputRef : undefined}
             aria-label={t("digit", { n: index + 1 })}
-            className="w-10 sm:w-11 pb-1.5 bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:border-(--tone) focus:outline-none text-center font-serif text-3xl tabular-nums text-slate-900 dark:text-slate-50 transition-colors disabled:opacity-50"
+            className="w-10 sm:w-11 pb-1.5 bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:border-(--tone) focus:outline-none text-center font-serif text-3xl tabular-nums text-ink transition-colors disabled:opacity-50"
           />
         ))}
       </OTPField.Root>
@@ -144,7 +141,7 @@ export default function OtpStep({
       </SubmitButton>
 
       {(onResend || onRestart || children) && (
-        <div className="space-y-2 pt-6 text-xs text-slate-400 dark:text-slate-500">
+        <div className="space-y-2 pt-6 text-xs text-ink-meta">
           {onResend && (
             <ResendLine
               onResend={onResend}

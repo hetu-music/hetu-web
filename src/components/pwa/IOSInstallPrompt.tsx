@@ -29,9 +29,7 @@ export default function IOSInstallPrompt({
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent title={t("title")} className="mx-auto max-w-md">
-        <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-          {t("intro")}
-        </p>
+        <p className="text-sm leading-relaxed text-ink-muted">{t("intro")}</p>
 
         <ol className="mt-5 space-y-4">
           {steps.map(({ text, hint, icon: Icon }, i) => (
@@ -40,18 +38,18 @@ export default function IOSInstallPrompt({
                 {NUMERALS[i]}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-sm leading-6 text-slate-800 dark:text-slate-200">
+                <p className="flex items-center gap-2 text-sm leading-6 text-ink-body">
                   {text}
                   {Icon && (
                     <Icon
                       size={16}
                       aria-hidden
-                      className="shrink-0 text-slate-400 dark:text-slate-500"
+                      className="shrink-0 text-ink-meta"
                     />
                   )}
                 </p>
                 {hint && (
-                  <p className="mt-0.5 text-xs leading-5 text-slate-400 dark:text-slate-500">
+                  <p className="mt-0.5 text-xs leading-5 text-ink-meta">
                     {hint}
                   </p>
                 )}

@@ -126,7 +126,7 @@ export default function GridCard({
                 "rounded-full bg-white/80 p-1.5 backdrop-blur-sm transition-all duration-200 dark:bg-slate-900/80",
                 active
                   ? "text-rose-500"
-                  : "text-slate-500 hover:text-rose-500 hover:bg-rose-50/80 dark:hover:bg-rose-500/10 dark:text-slate-400",
+                  : "text-ink-muted hover:text-rose-500 hover:bg-rose-50/80 dark:hover:bg-rose-500/10",
               )}
             >
               <Heart size={14} className={active ? "fill-current" : ""} />
@@ -139,7 +139,7 @@ export default function GridCard({
         <div className="flex items-start justify-between gap-4">
           <h3
             className={cn(
-              "line-clamp-1 min-w-0 flex-1 text-xl leading-tight text-slate-900 transition-colors dark:text-slate-100",
+              "line-clamp-1 min-w-0 flex-1 text-xl leading-tight text-ink transition-colors",
               isActive ? "text-(--tone)" : "group-hover:text-(--tone)",
             )}
             title={song.title}
@@ -148,17 +148,17 @@ export default function GridCard({
               {song.title}
             </SongTitleLink>
           </h3>
-          <span className="shrink-0 text-xs tabular-nums tracking-wider text-slate-400 dark:text-slate-500">
+          <span className="shrink-0 text-xs tabular-nums tracking-wider text-ink-meta">
             {song.year || FILTER_OPTION_UNKNOWN}
           </span>
         </div>
-        <p className="flex items-center gap-2 overflow-hidden text-sm font-normal text-slate-500 dark:text-slate-400">
+        <p className="flex items-center gap-2 overflow-hidden text-sm font-normal text-ink-muted">
           <span className="truncate">{subtitle}</span>
           {song.type?.[0] && (
             <>
               <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600" />
               {/* 类型只作文字说明，不再逐类上色（各类的解释见「关于」） */}
-              <span className="shrink-0 text-sm font-normal tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="shrink-0 text-sm font-normal tracking-wider text-ink-meta">
                 {enumLabel(tEnum, "type", song.type[0])}
               </span>
             </>

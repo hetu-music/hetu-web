@@ -90,14 +90,14 @@ export default function AuthShell({
                 <p className="text-xs tracking-[0.35em] text-(--tone) mb-5">
                   {tSite("name")}
                 </p>
-                <h1 className="font-serif text-5xl md:text-6xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50">
+                <h1 className="font-serif text-5xl md:text-6xl font-semibold leading-[1.1] tracking-tight text-ink">
                   {heading}
                 </h1>
-                <p className="mt-5 font-kaiti text-[15px] leading-[2.05] text-slate-600 dark:text-slate-400">
+                <p className="mt-5 font-kaiti text-[15px] leading-[2.05] text-ink-muted">
                   {subtitle}
                 </p>
                 {email && (
-                  <p className="mt-1 font-serif text-base text-slate-900 dark:text-slate-100 wrap-break-word">
+                  <p className="mt-1 font-serif text-base text-ink wrap-break-word">
                     {email}
                   </p>
                 )}

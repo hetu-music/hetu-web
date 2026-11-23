@@ -192,14 +192,14 @@ export default function SongCollationTab({
                   disabled={editingHere}
                   className="group flex w-full items-baseline gap-3 rounded px-2 -mx-2 py-0.5 text-left hover:bg-slate-100/60 active:bg-slate-100 dark:hover:bg-slate-900/60 dark:active:bg-slate-900 disabled:pointer-events-none"
                 >
-                  <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                  <span className="min-w-0 flex-1 text-sm leading-relaxed text-ink-prose">
                     {line.text}
                   </span>
                   {!editingHere && (
                     <span
                       className={cn(
                         TEXT_BUTTON_CLASS,
-                        "shrink-0 group-hover:text-slate-700 dark:group-hover:text-slate-200",
+                        "shrink-0 group-hover:text-ink-prose",
                         !relinking &&
                           "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
                       )}
@@ -281,10 +281,8 @@ function CollationItem({
 
   return (
     <div className="space-y-1 text-sm">
-      {quoteLine && (
-        <p className="text-slate-500 dark:text-slate-400">「{quoteLine}」</p>
-      )}
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-slate-700 dark:text-slate-200">
+      {quoteLine && <p className="text-ink-muted">「{quoteLine}」</p>}
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-ink-prose">
         <span className={TAG_CLASS}>{KIND_LABEL[c.kind]}</span>
         {c.quote && c.sung && (
           <span>

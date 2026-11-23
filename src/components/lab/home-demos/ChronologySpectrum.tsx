@@ -56,8 +56,7 @@ export default function ChronologySpectrum({
 
   const count = years.length;
   const [selLeft, selRight] = dragRange ?? yearSlider;
-  const isYearRangeActive =
-    count > 1 && (selLeft > 0 || selRight < count - 1);
+  const isYearRangeActive = count > 1 && (selLeft > 0 || selRight < count - 1);
 
   // 按年份聚合总曲库（远山底稿）与当前命中结果（墨光星图）
   const { buckets, maxTotal } = useMemo(() => {
@@ -263,9 +262,7 @@ export default function ChronologySpectrum({
           <span
             className={cn(
               "shrink-0 font-mono tracking-[0.2em] transition-colors duration-300",
-              whisper.accent
-                ? "text-(--tone)"
-                : "text-slate-400 dark:text-slate-500",
+              whisper.accent ? "text-(--tone)" : "text-ink-meta",
             )}
           >
             {whisper.primary}
@@ -274,7 +271,7 @@ export default function ChronologySpectrum({
             aria-hidden
             className="h-2.5 w-px shrink-0 bg-slate-200 dark:bg-slate-800"
           />
-          <span className="truncate font-kaiti text-[13px] text-slate-500 dark:text-slate-400">
+          <span className="truncate font-kaiti text-[13px] text-ink-muted">
             {whisper.secondary}
           </span>
         </div>
@@ -351,7 +348,8 @@ export default function ChronologySpectrum({
             bucket.matchedCount > 0
               ? Math.max(
                   0.12,
-                  totalRatio * (bucket.matchedCount / Math.max(1, bucket.totalCount)),
+                  totalRatio *
+                    (bucket.matchedCount / Math.max(1, bucket.totalCount)),
                 )
               : 0;
 
@@ -434,9 +432,7 @@ export default function ChronologySpectrum({
                       : idx === count - 1
                         ? "text-right"
                         : "text-center",
-                    active
-                      ? "text-(--tone)"
-                      : "text-slate-400/85 dark:text-slate-500/85",
+                    active ? "text-(--tone)" : "text-ink-meta/85",
                   )}
                 >
                   {labelOf(bucket.option)}

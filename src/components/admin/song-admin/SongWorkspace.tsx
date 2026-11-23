@@ -296,7 +296,7 @@ function SaveBar({ ws }: { ws: SongWorkspaceState }) {
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:justify-end">
-      <span className="text-xs text-slate-400 dark:text-slate-500">
+      <span className="text-xs text-ink-meta">
         {ws.isDirty ? (
           <span className={WARN_TEXT_CLASS}>有未暂存的修改</span>
         ) : ws.song ? (
@@ -417,7 +417,7 @@ function CollationsTab({
       </section>
       <section>
         <SectionHeading label="争议" />
-        <div className="mt-4 space-y-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+        <div className="mt-4 space-y-1 text-xs leading-relaxed text-ink-muted">
           <p>
             填了就算标为争议，清空即取消。和资料一样要先暂存，发布后才生效。标为争议后：
           </p>
@@ -531,11 +531,9 @@ function MissingList({
 
   return (
     <div>
-      <h3 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
-        待完善
-      </h3>
+      <h3 className="text-xs tracking-[0.2em] text-ink-meta">待完善</h3>
       {groups.length === 0 ? (
-        <p className="mt-2 font-kaiti text-slate-400">资料都填好了</p>
+        <p className="mt-2 font-kaiti text-ink-meta">资料都填好了</p>
       ) : (
         <dl className="mt-2 space-y-1.5 leading-relaxed">
           {groups.map((g) => (
@@ -543,7 +541,7 @@ function MissingList({
               <dt className="shrink-0">
                 <a
                   href={`#${sectionIdOf(g.fields[0].key)}`}
-                  className="text-slate-700 transition-colors hover:text-(--tone) dark:text-slate-200"
+                  className="text-ink-prose transition-colors hover:text-(--tone)"
                 >
                   {g.label}
                 </a>
@@ -594,13 +592,11 @@ function SideList({
 }) {
   return (
     <div>
-      <h3 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
-        {title}
-      </h3>
+      <h3 className="text-xs tracking-[0.2em] text-ink-meta">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-2 font-kaiti text-slate-400">{empty}</p>
+        <p className="mt-2 font-kaiti text-ink-meta">{empty}</p>
       ) : (
-        <p className="mt-2 leading-relaxed text-slate-600 dark:text-slate-300">
+        <p className="mt-2 leading-relaxed text-ink-prose">
           {items.join("、")}
         </p>
       )}
@@ -631,7 +627,7 @@ function AssetsTab({ ws, song }: { ws: SongWorkspaceState; song: SongDetail }) {
           square
         />
         <AssetUpload kind="cover" songId={song.id} preset={coverPreset} />
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-ink-meta">
           上传定制封面后，记得把封面设为「定制封面」并暂存
         </p>
       </AssetSection>

@@ -200,10 +200,10 @@ export default function MotifsClient({
           item.id === wordId
             ? "text-(--tone)"
             : matches(item)
-              ? "font-medium text-slate-900 dark:text-slate-50"
+              ? "font-medium text-ink"
               : muted
-                ? "text-slate-400 dark:text-slate-500"
-                : "text-slate-700 dark:text-slate-300",
+                ? "text-ink-meta"
+                : "text-ink-prose",
         )}
       >
         {item.name}
@@ -226,18 +226,18 @@ export default function MotifsClient({
             type="button"
             onClick={() => setForm({ type: "edit", motif })}
             title="编辑母题"
-            className="shrink-0 font-serif text-base text-slate-900 hover:text-(--tone) dark:text-slate-100"
+            className="shrink-0 font-serif text-base text-ink hover:text-(--tone)"
           >
             {motif.name}
           </button>
-          <span className="min-w-0 flex-1 truncate text-xs text-slate-400 dark:text-slate-500">
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-meta">
             {motif.description || (
               <span className="text-amber-600 dark:text-amber-400">
                 还没有说明
               </span>
             )}
           </span>
-          <span className="shrink-0 text-xs tabular-nums text-slate-400">
+          <span className="shrink-0 text-xs tabular-nums text-ink-meta">
             {main.length} 个词
           </span>
         </div>
@@ -255,17 +255,17 @@ export default function MotifsClient({
                 onClick={() =>
                   setExpanded((current) => new Set(current).add(motif.id))
                 }
-                className="text-xs text-slate-400 hover:text-(--tone)"
+                className="text-xs text-ink-meta hover:text-(--tone)"
               >
                 还有 {main.length - WORDS_SHOWN} 个
               </button>
             )}
           </div>
         ) : (
-          <p className="mt-1.5 text-xs text-slate-400">还没有词通常算作它</p>
+          <p className="mt-1.5 text-xs text-ink-meta">还没有词通常算作它</p>
         )}
         {other.length > 0 && (
-          <p className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-slate-400">
+          <p className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-ink-meta">
             <span>也会算到这里：</span>
             {other.map((item) => wordButton(item, true))}
           </p>
@@ -351,7 +351,7 @@ export default function MotifsClient({
           />
           {groupRows.map(({ domain, groups }) => (
             <div key={domain} className="flex items-baseline gap-3">
-              <span className="w-8 shrink-0 text-xs text-slate-400">
+              <span className="w-8 shrink-0 text-xs text-ink-meta">
                 {domain}
               </span>
               <AdminOptions
@@ -397,7 +397,7 @@ export default function MotifsClient({
                       (i === 0 ||
                         shown[i - 1].category_id !== motif.category_id) && (
                         <li className="pt-6 first:pt-0">
-                          <h2 className="font-serif text-sm text-slate-500 dark:text-slate-400">
+                          <h2 className="font-serif text-sm text-ink-muted">
                             {categoryLabel(motif.category_id)}
                           </h2>
                         </li>
@@ -417,23 +417,23 @@ export default function MotifsClient({
               )}
             >
               {panel ?? (
-                <div className="space-y-3 text-sm text-slate-500 dark:text-slate-400">
+                <div className="space-y-3 text-sm text-ink-muted">
                   <p>点左边的词，查看并修改它算到哪些母题：</p>
                   <dl className="space-y-2 text-xs">
                     {(["primary", "alternative", "part"] as const).map(
                       (role) => (
                         <div key={role}>
-                          <dt className="text-slate-700 dark:text-slate-300">
+                          <dt className="text-ink-prose">
                             {WORD_ROLE[role].label}
                           </dt>
-                          <dd className="text-slate-400 dark:text-slate-500">
+                          <dd className="text-ink-meta">
                             {WORD_ROLE[role].help}
                           </dd>
                         </div>
                       ),
                     )}
                   </dl>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                  <p className="text-xs text-ink-meta">
                     词旁的 <sup className="text-(--tone)">+</sup>{" "}
                     表示它还有「有时也指」或「同时算进」，悬停可看。
                   </p>

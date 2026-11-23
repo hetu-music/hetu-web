@@ -91,11 +91,11 @@ export default function EmailForm() {
       {step === "view" && (
         <div>
           <span className={FIELD_LABEL_CLASS}>{t("current")}</span>
-          <p className="mt-2 py-1.5 text-[15px] text-slate-800 dark:text-slate-200 wrap-break-word">
+          <p className="mt-2 py-1.5 text-[15px] text-ink-body wrap-break-word">
             {email}
           </p>
           {pendingEmail && (
-            <p className="mt-1 text-xs leading-relaxed text-slate-400 dark:text-slate-500 wrap-break-word">
+            <p className="mt-1 text-xs leading-relaxed text-ink-meta wrap-break-word">
               {t("pending", { email: pendingEmail })}
               <button
                 type="button"
@@ -128,7 +128,7 @@ export default function EmailForm() {
 
       {(step === "new" || step === "current") && (
         <div>
-          <p className="mb-8 text-sm leading-relaxed text-slate-600 dark:text-slate-400 wrap-break-word">
+          <p className="mb-8 text-sm leading-relaxed text-ink-muted wrap-break-word">
             {step === "new"
               ? t("sentNew", { email: pendingEmail })
               : t("sentCurrent", { email })}

@@ -16,7 +16,7 @@ export function AccountBlock({
     <div>
       <GroupHeading label={title} />
       {description && (
-        <p className="mt-2 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+        <p className="mt-2 text-xs leading-relaxed text-ink-meta">
           {description}
         </p>
       )}

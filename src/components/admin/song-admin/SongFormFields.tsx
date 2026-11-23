@@ -44,7 +44,7 @@ function CreatorFieldArrayInput({ fieldKey }: { fieldKey: CreatorFieldKey }) {
           <button
             type="button"
             onClick={() => remove(index)}
-            className="p-1 text-slate-300 transition-colors hover:text-rose-500 dark:text-slate-600"
+            className="p-1 text-ink-faint transition-colors hover:text-rose-500"
             aria-label="移除这一项"
           >
             <X size={14} />

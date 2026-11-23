@@ -30,11 +30,7 @@ function CommentItem({
   const deleteConfirm = useTwoStepConfirm();
 
   if (comment.deleted) {
-    return (
-      <p className="font-kaiti text-sm text-slate-400 dark:text-slate-600">
-        {t("deleted")}
-      </p>
-    );
+    return <p className="font-kaiti text-sm text-ink-meta">{t("deleted")}</p>;
   }
 
   if (editing) {
@@ -53,8 +49,7 @@ function CommentItem({
     );
   }
 
-  const action =
-    "hover:text-slate-700 dark:hover:text-slate-200 transition-colors";
+  const action = "hover:text-ink-prose transition-colors";
 
   return (
     <article>
@@ -62,14 +57,14 @@ function CommentItem({
         className={cn(
           "font-kaiti text-[15px] leading-[1.85] whitespace-pre-line wrap-break-word",
           comment.private || comment.pending
-            ? "text-slate-500 dark:text-slate-400"
-            : "text-slate-700 dark:text-slate-300",
+            ? "text-ink-muted"
+            : "text-ink-prose",
         )}
       >
         {comment.body}
       </p>
-      <footer className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 dark:text-slate-500">
-        <span className="text-slate-500 dark:text-slate-400">
+      <footer className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-meta">
+        <span className="text-ink-muted">
           {comment.author || t("anonymous")}
         </span>
         {comment.private && (
@@ -149,7 +144,7 @@ export default function CommentThread({ thread }: { thread: Thread }) {
   return (
     <div>
       {orphanQuote && (
-        <blockquote className="mb-2 pl-3 border-l border-slate-300 dark:border-slate-700 font-serif text-xs leading-relaxed text-slate-400 dark:text-slate-500 line-clamp-2">
+        <blockquote className="mb-2 pl-3 border-l border-slate-300 dark:border-slate-700 font-serif text-xs leading-relaxed text-ink-meta line-clamp-2">
           <span className="mr-1.5">{t("orphan")}</span>
           {orphanQuote}
         </blockquote>

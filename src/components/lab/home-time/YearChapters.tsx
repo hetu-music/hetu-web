@@ -142,12 +142,10 @@ const ChapterBlock = memo(function ChapterBlock({
           !isFirst && "border-t border-slate-200/60 dark:border-slate-800/70",
         )}
       >
-        <span className="w-24 shrink-0 font-serif text-xl tabular-nums tracking-tight text-slate-300 lg:w-[20rem] xl:w-88 dark:text-slate-700">
+        <span className="w-24 shrink-0 font-serif text-xl tabular-nums tracking-tight text-ink-faint lg:w-[20rem] xl:w-88">
           {chapter.year ?? "年份未详"}
         </span>
-        <span className="font-kaiti text-sm text-slate-300 dark:text-slate-700">
-          这一年没有
-        </span>
+        <span className="font-kaiti text-sm text-ink-faint">这一年没有</span>
       </section>
     );
   }
@@ -168,10 +166,10 @@ const ChapterBlock = memo(function ChapterBlock({
         <div className="flex items-center justify-between gap-4 lg:block">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-3">
-              <h2 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-slate-900 lg:text-5xl dark:text-slate-50">
+              <h2 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-ink lg:text-5xl">
                 {chapter.year ?? "未详"}
               </h2>
-              <span className="font-mono text-xs tabular-nums tracking-[0.2em] text-slate-400 dark:text-slate-500">
+              <span className="font-mono text-xs tabular-nums tracking-[0.2em] text-ink-meta">
                 {matched
                   ? `${shown.length} / ${chapter.songs.length} 曲`
                   : `${chapter.songs.length} 曲`}
@@ -257,11 +255,11 @@ const ChapterBlock = memo(function ChapterBlock({
                     <button
                       type="button"
                       onClick={() => onOpenSong(activeFocal.id)}
-                      className="block max-w-full truncate text-left font-serif text-base text-slate-900 transition-colors hover:text-(--tone) dark:text-slate-100"
+                      className="block max-w-full truncate text-left font-serif text-base text-ink transition-colors hover:text-(--tone)"
                     >
                       《{activeFocal.title}》
                     </button>
-                    <p className="mt-0.5 truncate font-kaiti text-xs text-slate-400 dark:text-slate-500">
+                    <p className="mt-0.5 truncate font-kaiti text-xs text-ink-meta">
                       {creditSummary(activeFocal) ||
                         (activeFocal.date
                           ? activeFocal.date.replaceAll("-", ".")
@@ -361,7 +359,7 @@ const ChapterRow = memo(function ChapterRow({
       />
 
       {/* 月.日 */}
-      <span className="mt-1 hidden w-11 shrink-0 font-mono text-[11px] tabular-nums tracking-wider text-slate-400 sm:mt-0 sm:block dark:text-slate-500">
+      <span className="mt-1 hidden w-11 shrink-0 font-mono text-[11px] tabular-nums tracking-wider text-ink-meta sm:mt-0 sm:block">
         {monthDay || "——"}
       </span>
 
@@ -375,7 +373,7 @@ const ChapterRow = memo(function ChapterRow({
               // 两者优先级相同而 dark: 排在后面，深色下强调色会被盖住（悬停多一个 :hover，不受影响）
               playing || isFocal
                 ? "text-(--tone)"
-                : "text-slate-900 group-hover:text-(--tone) dark:text-slate-100",
+                : "text-ink group-hover:text-(--tone)",
             )}
           >
             <SongTitleLink
@@ -388,9 +386,9 @@ const ChapterRow = memo(function ChapterRow({
           {playing && <PlayingBars />}
         </div>
 
-        <p className="mt-0.5 flex items-center gap-2 truncate font-kaiti text-[13px] text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 flex items-center gap-2 truncate font-kaiti text-[13px] text-ink-muted">
           {monthDay && (
-            <span className="font-mono text-[10px] tabular-nums text-slate-400 sm:hidden dark:text-slate-500">
+            <span className="font-mono text-[10px] tabular-nums text-ink-meta sm:hidden">
               {monthDay}
             </span>
           )}
@@ -435,7 +433,7 @@ const ChapterRow = memo(function ChapterRow({
               "p-1.5 transition-all duration-200",
               fav
                 ? "text-rose-500 opacity-100"
-                : "text-slate-400 opacity-0 hover:text-rose-500 group-hover:opacity-100 dark:text-slate-500",
+                : "text-ink-meta opacity-0 hover:text-rose-500 group-hover:opacity-100",
             )}
           >
             <Heart size={14} className={fav ? "fill-current" : ""} />
@@ -443,12 +441,12 @@ const ChapterRow = memo(function ChapterRow({
         )}
 
         {song.type?.[0] && (
-          <span className="hidden w-12 text-right text-[11px] tracking-[0.2em] text-slate-400 sm:inline-block dark:text-slate-500">
+          <span className="hidden w-12 text-right text-[11px] tracking-[0.2em] text-ink-meta sm:inline-block">
             {enumLabel(tEnum, "type", song.type[0])}
           </span>
         )}
 
-        <span className="w-11 text-right font-mono text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+        <span className="w-11 text-right font-mono text-[11px] tabular-nums text-ink-meta">
           {song.length ? formatTime(song.length) : "—"}
         </span>
       </div>

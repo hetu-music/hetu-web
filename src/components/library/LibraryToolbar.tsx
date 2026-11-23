@@ -50,9 +50,7 @@ function TypeTab({
       aria-pressed={active}
       className={cn(
         TYPE_TAB_CLASS,
-        active
-          ? "text-slate-900 dark:text-slate-100"
-          : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+        active ? "text-ink" : "text-ink-muted hover:text-ink",
       )}
     >
       <span
@@ -192,7 +190,7 @@ export default function LibraryToolbar({
         >
           {/* 搜索：平时没有边框，只靠放大镜与占位字辨认；聚焦时细线上亮一段强调色 */}
           <label className="group relative flex h-full min-w-0 flex-1 items-center gap-2 md:w-60 md:flex-none">
-            <Search size={15} className="shrink-0 text-slate-400" />
+            <Search size={15} className="shrink-0 text-ink-meta" />
             <input
               type="text"
               // 固定提到歌词：点了搜索框才拉歌词，没点之前它永远没到
@@ -200,13 +198,13 @@ export default function LibraryToolbar({
               value={searchInput}
               onFocus={onSearchFocus}
               onChange={(event) => onSearchChange(event.target.value)}
-              className="h-full min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
+              className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink-body outline-none placeholder:text-ink-meta"
             />
             {searchInput ? (
               <button
                 type="button"
                 onClick={() => onSearchChange("")}
-                className="shrink-0 p-1 text-slate-300 transition-colors hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
+                className="shrink-0 p-1 text-ink-faint transition-colors hover:text-ink-muted"
               >
                 <XCircle size={14} />
               </button>

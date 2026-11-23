@@ -125,7 +125,7 @@ export default function QuizSaveButton({ slug, className, onSaved }: Props) {
         {saving ? t("saving") : t("save")}
       </button>
       {oldest && (
-        <p className="basis-full text-center font-serif text-xs tracking-wider text-slate-400 dark:text-slate-500">
+        <p className="basis-full text-center font-serif text-xs tracking-wider text-ink-meta">
           {t("replaceHint", {
             count: MAX_RECORDS,
             ...savedMonth(oldest.savedAt),

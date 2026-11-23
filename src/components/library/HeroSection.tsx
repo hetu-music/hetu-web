@@ -71,7 +71,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
     >
       {/* 左侧：标题与子标题 */}
       <div className="flex flex-col justify-between flex-1 gap-12 md:gap-0">
-        <h2 className="text-5xl md:text-6xl text-slate-900 dark:text-slate-50 italic tracking-tight leading-[0.8] -mt-1 lg:-mt-1.5">
+        <h2 className="text-5xl md:text-6xl text-ink italic tracking-tight leading-[0.8] -mt-1 lg:-mt-1.5">
           {t("title")}{" "}
           <AnimatePresence mode="wait">
             <motion.span
@@ -94,7 +94,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
           </AnimatePresence>
         </h2>
 
-        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 mt-auto -mb-1 lg:-mb-1.5 min-h-6">
+        <div className="flex items-center gap-3 text-ink-muted mt-auto -mb-1 lg:-mb-1.5 min-h-6">
           <span
             aria-hidden
             className="text-(--tone) font-mono text-lg leading-none relative top-[-0.5px] md:-top-0.5 select-none"
@@ -117,7 +117,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
                 duration: 0.35,
                 ease: [0.25, 1, 0.5, 1],
               }}
-              className="font-light text-base md:text-[18px] leading-relaxed mb-0 flex flex-wrap items-center select-none font-kaiti text-slate-600 dark:text-slate-400"
+              className="font-light text-base md:text-[18px] leading-relaxed mb-0 flex flex-wrap items-center select-none font-kaiti text-ink-muted"
             >
               {currentText.split("").map((char, i) => (
                 <motion.span
@@ -160,7 +160,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
                       repeat: Infinity,
                       ease: "easeInOut",
                     }}
-                    className="select-none inline-block ml-1 font-normal text-slate-400 dark:text-slate-500"
+                    className="select-none inline-block ml-1 font-normal text-ink-meta"
                   >
                     ……
                   </motion.span>
@@ -174,7 +174,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
                     delay: currentText.length * 0.08,
                     ease: "easeOut",
                   }}
-                  className="ml-1 text-slate-400 dark:text-slate-500 inline-block"
+                  className="ml-1 text-ink-meta inline-block"
                 >
                   ……
                 </motion.span>
@@ -265,7 +265,7 @@ export default function HeroSection({ songCount }: HeroSectionProps) {
           {/* 主副标题与入口间的分界线 - 古典编排风格的高级分界线 */}
           <div className="flex items-center w-full mt-2 mb-1 opacity-80">
             <div className="flex-1 h-px bg-linear-to-r from-transparent to-slate-300 dark:to-slate-700" />
-            <div className="mx-4 flex items-center justify-center gap-1.5 text-slate-400 dark:text-slate-600">
+            <div className="mx-4 flex items-center justify-center gap-1.5 text-ink-meta">
               <div className="h-0.5 w-0.5 rounded-full bg-current" />
               <div className="h-1 w-1 rounded-xs bg-current rotate-45" />
               <div className="h-0.5 w-0.5 rounded-full bg-current" />

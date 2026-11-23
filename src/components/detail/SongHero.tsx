@@ -83,7 +83,7 @@ export default function SongHero({
           className="group relative block shrink-0 w-(--cover) lg:w-full aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 shadow-[0_30px_60px_-20px_rgba(15,23,42,0.35)] dark:shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)] ring-1 ring-slate-900/5 dark:ring-white/10"
         >
           {coverFailed ? (
-            <span className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+            <span className="absolute inset-0 flex flex-col items-center justify-center text-ink-meta">
               <Disc size={40} className="mb-2 opacity-50" />
               <span className="text-xs">{t("noCover")}</span>
             </span>
@@ -114,7 +114,7 @@ export default function SongHero({
 
         <h1
           id={SONG_TITLE_ID}
-          className="font-serif text-5xl md:text-6xl xl:text-7xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50 text-balance"
+          className="font-serif text-5xl md:text-6xl xl:text-7xl font-semibold leading-[1.1] tracking-tight text-ink text-balance"
         >
           {song.title}
         </h1>
@@ -124,12 +124,10 @@ export default function SongHero({
           <dl className="mt-7 flex flex-wrap gap-x-7 gap-y-2 text-[15px]">
             {credits.map(([key, names]) => (
               <div key={key} className="flex items-baseline gap-2">
-                <dt className="text-xs text-slate-400 dark:text-slate-500">
+                <dt className="text-xs text-ink-meta">
                   {t(`folio.credits.${key}`)}
                 </dt>
-                <dd className="text-slate-800 dark:text-slate-200">
-                  {names.join(" / ")}
-                </dd>
+                <dd className="text-ink-body">{names.join(" / ")}</dd>
               </div>
             ))}
           </dl>
@@ -142,7 +140,7 @@ export default function SongHero({
               <React.Fragment key={mark.id}>
                 {i > 0 && (
                   <span
-                    className="hidden lg:inline text-slate-300 dark:text-slate-700 px-1.5"
+                    className="hidden lg:inline text-ink-faint px-1.5"
                     aria-hidden
                   >
                     ·
@@ -155,7 +153,7 @@ export default function SongHero({
                     "font-calligraphy text-2xl leading-none transition-colors duration-300",
                     activeImagery === mark.id
                       ? ""
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
+                      : "text-ink-muted hover:text-ink",
                   )}
                   style={
                     activeImagery === mark.id
@@ -168,7 +166,7 @@ export default function SongHero({
               </React.Fragment>
             ))}
             {imageryTotal > stripMarks.length && (
-              <span className="basis-full lg:basis-auto lg:ml-3 text-xs text-slate-400 dark:text-slate-500 tracking-wider">
+              <span className="basis-full lg:basis-auto lg:ml-3 text-xs text-ink-meta tracking-wider">
                 <span className="hidden lg:inline">
                   {t("folio.imageryMore")} ·{" "}
                 </span>
@@ -199,7 +197,7 @@ export default function SongHero({
             {excerptColumns.map((col, i) => (
               <span
                 key={i}
-                className="font-calligraphy text-[1.7rem] leading-none tracking-[0.35em] text-slate-700/85 dark:text-slate-300/85 [writing-mode:vertical-rl]"
+                className="font-calligraphy text-[1.7rem] leading-none tracking-[0.35em] text-ink-prose/85 [writing-mode:vertical-rl]"
                 style={{ marginTop: i * 3 + "rem" }}
               >
                 {col}
@@ -244,7 +242,7 @@ function CompactExcerpt({ columns }: { columns: string[] }) {
       {columns.map((col, i) => (
         <span
           key={i}
-          className="font-calligraphy leading-none text-slate-700/85 dark:text-slate-300/85 [writing-mode:vertical-rl]"
+          className="font-calligraphy leading-none text-ink-prose/85 [writing-mode:vertical-rl]"
           style={{
             letterSpacing: `${COMPACT_TRACKING}em`,
             marginTop: `${i * COMPACT_STAGGER}em`,

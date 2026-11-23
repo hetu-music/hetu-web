@@ -89,7 +89,7 @@ export default function SongColophon({
         <div>
           {links.length > 0 && (
             <>
-              <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500 mb-4">
+              <h3 className="text-xs tracking-[0.3em] text-ink-meta mb-4">
                 {t("folio.listen")}
               </h3>
               <ul className="space-y-2.5">
@@ -99,12 +99,12 @@ export default function SongColophon({
                       href={link.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group inline-flex items-center gap-1 text-sm text-slate-700 dark:text-slate-300 hover:text-(--tone) transition-colors"
+                      className="group inline-flex items-center gap-1 text-sm text-ink-prose hover:text-(--tone) transition-colors"
                     >
                       {link.label}
                       <ArrowUpRight
                         size={14}
-                        className="text-slate-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-(--tone)"
+                        className="text-ink-meta transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-(--tone)"
                       />
                     </a>
                   </li>
@@ -118,10 +118,10 @@ export default function SongColophon({
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-6">
             {rows.map((row) => (
               <div key={row.label} className="min-w-0">
-                <dt className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                <dt className="text-xs tracking-[0.2em] text-ink-meta">
                   {row.label}
                 </dt>
-                <dd className="mt-1.5 text-sm text-slate-800 dark:text-slate-200 wrap-break-word">
+                <dd className="mt-1.5 text-sm text-ink-body wrap-break-word">
                   {/* 只有含别署的一栏才需要虚线与注 */}
                   {song.aliasOf && row.names?.some((n) => song.aliasOf?.[n]) ? (
                     <CreditNames names={row.names} aliasOf={song.aliasOf} />
@@ -135,16 +135,14 @@ export default function SongColophon({
 
           {production.length > 0 && (
             <div>
-              <h3 className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500 mb-4">
+              <h3 className="text-xs tracking-[0.3em] text-ink-meta mb-4">
                 {t("folio.production")}
               </h3>
               <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-[13px]">
                 {production.map((c, i) => (
                   <div key={i} className="flex gap-3 min-w-0">
-                    <dt className="text-slate-400 dark:text-slate-500 shrink-0">
-                      {c.role}
-                    </dt>
-                    <dd className="min-w-0 text-slate-600 dark:text-slate-400 wrap-break-word">
+                    <dt className="text-ink-meta shrink-0">{c.role}</dt>
+                    <dd className="min-w-0 text-ink-muted wrap-break-word">
                       {c.names}
                     </dd>
                   </div>
@@ -154,7 +152,7 @@ export default function SongColophon({
           )}
 
           {notices.length > 0 && (
-            <div className="space-y-1 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+            <div className="space-y-1 text-xs leading-relaxed text-ink-meta">
               {notices.map((notice, i) => (
                 <p key={i}>{notice}</p>
               ))}

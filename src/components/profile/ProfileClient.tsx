@@ -51,7 +51,7 @@ export default function ProfileClient({
       <TopBar
         exit={{ kind: "back" }}
         nav={
-          <h1 className="px-2 min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="px-2 min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-ink">
             {t("title")}
           </h1>
         }
@@ -136,9 +136,7 @@ function Catalog({
                   horizontal
                     ? "pb-3 text-[15px]"
                     : "w-full py-2.5 pl-4 text-left text-base",
-                  current
-                    ? "text-slate-900 dark:text-slate-100"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100",
+                  current ? "text-ink" : "text-ink-muted hover:text-ink",
                 )}
               >
                 <span

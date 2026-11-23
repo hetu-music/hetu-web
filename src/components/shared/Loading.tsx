@@ -25,7 +25,7 @@ export default function Loading() {
         } as React.CSSProperties
       }
     >
-      <p className="font-serif text-sm tracking-[0.4em] text-slate-500 dark:text-slate-400">
+      <p className="font-serif text-sm tracking-[0.4em] text-ink-muted">
         {t("nav.loading")}
       </p>
       <span
@@ -37,7 +37,7 @@ export default function Loading() {
 
       <p
         aria-hidden
-        className="absolute bottom-12 inset-x-6 text-center font-kaiti italic text-[15px] tracking-wider text-slate-400 dark:text-slate-500"
+        className="absolute bottom-12 inset-x-6 text-center font-kaiti italic text-[15px] tracking-wider text-ink-meta"
       >
         {tHero("defaultDesc")}……
       </p>

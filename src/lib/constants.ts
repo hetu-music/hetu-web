@@ -151,7 +151,7 @@ const typeCardStyleMap: Record<string, string> = {
 const genreTagStyleMap: Record<string, string> = {
   流行: "bg-transparent text-rose-500/60 dark:text-rose-400/60 border-rose-200/50 dark:border-rose-500/20",
   古风: "bg-transparent text-blue-500/60 dark:text-blue-400/60 border-blue-200/50 dark:border-blue-500/20",
-  摇滚: "bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+  摇滚: "bg-transparent text-ink-muted border-slate-200 dark:border-slate-700",
   民谣: "bg-transparent text-emerald-500/60 dark:text-emerald-400/60 border-emerald-200/50 dark:border-emerald-500/20",
   电子: "bg-transparent text-purple-500/60 dark:text-purple-400/60 border-purple-200/50 dark:border-purple-500/20",
   说唱: "bg-transparent text-orange-500/60 dark:text-orange-400/60 border-orange-200/50 dark:border-orange-500/20",
@@ -161,14 +161,14 @@ const genreTagStyleMap: Record<string, string> = {
   布鲁斯:
     "bg-transparent text-cyan-500/60 dark:text-cyan-400/60 border-cyan-200/50 dark:border-cyan-500/20",
   新世纪:
-    "bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+    "bg-transparent text-ink-muted border-slate-200 dark:border-slate-700",
 };
 
 // 流派标签强调样式映射（用于详情页等需要突出显示的场景）
 const genreTagEmphasizedStyleMap: Record<string, string> = {
   流行: "bg-white dark:bg-slate-800/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30",
   古风: "bg-white dark:bg-slate-800/50 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/30",
-  摇滚: "bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+  摇滚: "bg-white dark:bg-slate-800/50 text-ink-muted border-slate-200 dark:border-slate-700",
   民谣: "bg-white dark:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30",
   电子: "bg-white dark:bg-slate-800/50 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/30",
   说唱: "bg-white dark:bg-slate-800/50 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/30",
@@ -178,12 +178,12 @@ const genreTagEmphasizedStyleMap: Record<string, string> = {
   布鲁斯:
     "bg-white dark:bg-slate-800/50 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-500/30",
   新世纪:
-    "bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+    "bg-white dark:bg-slate-800/50 text-ink-muted border-slate-200 dark:border-slate-700",
 };
 
 // 默认标签样式
 const defaultTagStyle =
-  "bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+  "bg-white dark:bg-slate-800/50 text-ink-prose border-slate-200 dark:border-slate-700";
 
 /**
  * 获取类型标签的样式类名

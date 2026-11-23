@@ -20,14 +20,14 @@ export default function CommentsSection() {
     <section id="comments" className="py-16 md:py-20">
       <SectionHeading label={t("sections.comments")} />
       <div className="mt-12 grid gap-10 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-x-16">
-        <div className="text-xs leading-relaxed tracking-wider text-slate-400 dark:text-slate-500 space-y-2">
+        <div className="text-xs leading-relaxed tracking-wider text-ink-meta space-y-2">
           <p>{t("comments.intro")}</p>
           {total > 0 && <p>{t("comments.count", { count: total })}</p>}
         </div>
         <div className="min-w-0 max-w-[40em]">
           <SlotPanel slot={SONG_SLOT} composerFirst />
           {songCount === 0 && (
-            <p className="mt-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+            <p className="mt-8 font-kaiti text-[15px] text-ink-meta">
               {t("comments.empty")}
             </p>
           )}

@@ -426,20 +426,20 @@ export default function SongAnnotationWorkbench({
                   : "border-transparent hover:bg-slate-100/60 dark:hover:bg-slate-900/60",
         )}
       >
-        <span className="w-16 shrink-0 font-mono text-[11px] text-slate-400">
+        <span className="w-16 shrink-0 font-mono text-[11px] text-ink-meta">
           {line.tag}
         </span>
-        <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+        <span className="min-w-0 flex-1 text-sm leading-relaxed text-ink-prose">
           {highlight(line.text, marks)}
         </span>
         {hidden.length > 0 && (
-          <span className="shrink-0 text-[11px] text-slate-400">
+          <span className="shrink-0 text-[11px] text-ink-meta">
             {hidden.map((o) => o.imagery_name).join("、")}
           </span>
         )}
         {onLine.length > 0 && (
           <span
-            className="shrink-0 text-[10px] tabular-nums text-slate-400"
+            className="shrink-0 text-[10px] tabular-nums text-ink-meta"
             title={onLine.map((o) => o.imagery_name).join("、")}
           >
             {onLine.length}
@@ -453,12 +453,12 @@ export default function SongAnnotationWorkbench({
     <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       {/* ── 左：歌词 ── */}
       <section className={cn(PANEL_CLASS, "flex min-h-0 flex-col")}>
-        <header className="flex flex-wrap items-center gap-2 border-b border-slate-200/70 px-4 py-3 text-xs text-slate-500 dark:border-slate-800">
-          <span className="text-slate-700 dark:text-slate-200">歌词</span>
+        <header className="flex flex-wrap items-center gap-2 border-b border-slate-200/70 px-4 py-3 text-xs text-ink-muted dark:border-slate-800">
+          <span className="text-ink-prose">歌词</span>
           <span>
             {lines.length} 行 · 已标注 {annotatedLineCount} 行
           </span>
-          <span className="ml-auto text-slate-400">
+          <span className="ml-auto text-ink-meta">
             {view === "suggestions"
               ? "淡黄底为已勾选的候选，下划线为已存的标注"
               : editor
@@ -468,7 +468,7 @@ export default function SongAnnotationWorkbench({
         </header>
         {selection && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-200/70 bg-(--tone)/5 px-4 py-2 text-sm dark:border-slate-800">
-            <span className="text-slate-600 dark:text-slate-300">
+            <span className="text-ink-prose">
               已选「<strong>{selection.text}</strong>」
             </span>
             <button
@@ -497,7 +497,7 @@ export default function SongAnnotationWorkbench({
             <button
               type="button"
               onClick={() => setSelection(null)}
-              className="ml-auto text-slate-400 hover:text-slate-600"
+              className="ml-auto text-ink-meta hover:text-ink-prose"
               aria-label="取消选择"
             >
               <X size={14} />
@@ -511,7 +511,7 @@ export default function SongAnnotationWorkbench({
           {lines.length > 0 ? (
             lines.map(renderLine)
           ) : (
-            <p className="px-4 py-10 text-center text-sm text-slate-400">
+            <p className="px-4 py-10 text-center text-sm text-ink-meta">
               这首歌没有带时间标签的歌词，先在「资料」里补全。
             </p>
           )}
@@ -595,7 +595,7 @@ export default function SongAnnotationWorkbench({
                   {nameError ? (
                     <span className="text-rose-500">{nameError}</span>
                   ) : resolvedItem ? (
-                    <span className="text-slate-400">
+                    <span className="text-ink-meta">
                       词典里已有 · 标注 {resolvedItem.count} 处
                     </span>
                   ) : (
@@ -628,7 +628,7 @@ export default function SongAnnotationWorkbench({
                   className={SELECT_CLASS}
                 />
                 {willAlsoCount.length > 0 && (
-                  <span className="block text-xs text-slate-400 dark:text-slate-500">
+                  <span className="block text-xs text-ink-meta">
                     保存时{WORD_ROLE.part.label}：
                     {willAlsoCount
                       .map((id) => getMotifPath(id).split(" / ").pop())
@@ -642,7 +642,7 @@ export default function SongAnnotationWorkbench({
                   出现位置 {draftTags.length} 处（词在歌词里字面出现的行）
                 </span>
                 {lyricLines.length === 0 ? (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-ink-meta">
                     歌词没有时间轴，无法定位
                   </p>
                 ) : draftTags.length === 0 ? (
@@ -658,10 +658,10 @@ export default function SongAnnotationWorkbench({
                         key={tag}
                         className="flex items-center gap-2 border-b border-slate-200/70 py-1 text-xs last:border-0 dark:border-slate-800"
                       >
-                        <span className="font-mono text-[10px] text-slate-400">
+                        <span className="font-mono text-[10px] text-ink-meta">
                           {tag}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-slate-600 dark:text-slate-300">
+                        <span className="min-w-0 flex-1 truncate text-ink-prose">
                           {textByTag.get(tag)}
                         </span>
                       </li>
@@ -695,11 +695,11 @@ export default function SongAnnotationWorkbench({
 
           <div className="max-h-[70vh] space-y-2 overflow-y-auto">
             {loading ? (
-              <p className="py-6 text-center text-sm text-slate-400">
+              <p className="py-6 text-center text-sm text-ink-meta">
                 加载标注中…
               </p>
             ) : annotations.length === 0 ? (
-              <p className="py-8 text-center font-kaiti text-base text-slate-400">
+              <p className="py-8 text-center font-kaiti text-base text-ink-meta">
                 还没有标注。在左侧划选词语，或点「新增标注」开始。
               </p>
             ) : (
@@ -728,10 +728,8 @@ export default function SongAnnotationWorkbench({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-2">
-                        <span className="text-slate-900 dark:text-slate-100">
-                          {label}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-ink">{label}</span>
+                        <span className="text-[11px] text-ink-meta">
                           {shortPath(getMotifPath(o.motif_id))}
                           {parts.length > 0 &&
                             ` · ${WORD_ROLE.part.label} ${parts
@@ -739,7 +737,7 @@ export default function SongAnnotationWorkbench({
                               .join("、")}`}
                         </span>
                       </div>
-                      <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                      <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-ink-meta">
                         <span>{o.lyric_timetag.length} 处</span>
                         {orphans.length > 0 && (
                           <span

@@ -46,7 +46,7 @@ const SHOW_COUNT_FROM = CONTENT_MAX - 200;
 
 /** 状态只用文字颜色区分；已拒绝用 rose，其余不另加色 */
 const STATUS_CLASS: Record<RequestStatus, string> = {
-  pending: "text-slate-400 dark:text-slate-500",
+  pending: "text-ink-meta",
   replied: "text-(--tone)",
   approved: "text-(--tone)",
   rejected: "text-rose-500 dark:text-rose-400",
@@ -85,7 +85,7 @@ export default function FeedbackSection() {
       <div className="mt-20">
         <GroupHeading label={t("feedback.historyTitle")}>
           {history.isSuccess && (
-            <span className="text-xs text-slate-400 dark:text-slate-500">
+            <span className="text-xs text-ink-meta">
               {t("feedback.historyCount", { count: requests.length })}
             </span>
           )}
@@ -152,14 +152,14 @@ export function SongPicker({
   if (value) {
     return (
       <div className="flex items-center gap-2 py-1.5 border-b border-(--tone)/40">
-        <span className="flex-1 min-w-0 truncate font-serif text-[15px] text-slate-900 dark:text-slate-100">
+        <span className="flex-1 min-w-0 truncate font-serif text-[15px] text-ink">
           {value.title}
         </span>
         <button
           type="button"
           onClick={() => onChange(null)}
           aria-label={t("clearSong")}
-          className="shrink-0 p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+          className="shrink-0 p-0.5 text-ink-meta hover:text-ink-prose transition-colors"
         >
           <X size={14} />
         </button>
@@ -200,7 +200,7 @@ export function SongPicker({
         {loading && (
           <Loader2
             size={14}
-            className="absolute right-0 top-1/2 -translate-y-1/2 animate-spin text-slate-400"
+            className="absolute right-0 top-1/2 -translate-y-1/2 animate-spin text-ink-meta"
           />
         )}
       </div>
@@ -211,7 +211,7 @@ export function SongPicker({
             <ComboboxItem
               key={song.id}
               value={song}
-              className="block truncate font-serif text-slate-700 dark:text-slate-300 data-highlighted:text-(--tone) dark:data-highlighted:text-(--tone)"
+              className="block truncate font-serif text-ink-prose data-highlighted:text-(--tone) dark:data-highlighted:text-(--tone)"
             >
               {song.title}
             </ComboboxItem>
@@ -354,7 +354,7 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                 "text-sm tracking-wider transition-colors",
                 type === v
                   ? "text-(--tone)"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200",
+                  : "text-ink-muted hover:text-ink-body",
               )}
             >
               {t(`types.${v}`)}
@@ -379,7 +379,7 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
           <label className="block">
             <span className={FIELD_LABEL_CLASS}>
               {t("category")}
-              <span className="ml-1 tracking-normal text-slate-300 dark:text-slate-600">
+              <span className="ml-1 tracking-normal text-ink-faint">
                 {t("optional")}
               </span>
             </span>
@@ -431,7 +431,7 @@ function SubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
         )}
         <span className="flex-1" />
         {length >= SHOW_COUNT_FROM && (
-          <span className="text-xs tabular-nums text-slate-400">
+          <span className="text-xs tabular-nums text-ink-meta">
             {length}/{CONTENT_MAX}
           </span>
         )}
@@ -476,7 +476,7 @@ function RequestList({
   if (failed && requests.length === 0) {
     return (
       <div>
-        <p className="mt-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+        <p className="mt-8 font-kaiti text-[15px] text-ink-meta">
           {t("historyError")}
         </p>
         {refreshButton}
@@ -485,12 +485,12 @@ function RequestList({
   }
 
   if (pending) {
-    return <Loader2 size={20} className="mt-8 animate-spin text-slate-400" />;
+    return <Loader2 size={20} className="mt-8 animate-spin text-ink-meta" />;
   }
 
   if (requests.length === 0) {
     return (
-      <p className="mt-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+      <p className="mt-8 font-kaiti text-[15px] text-ink-meta">
         {t("historyEmpty")}
       </p>
     );
@@ -544,11 +544,11 @@ function RequestRow({
         className="group w-full text-left"
       >
         <span className="flex items-baseline gap-3 text-xs">
-          <span className="tracking-[0.2em] text-slate-400 dark:text-slate-500">
+          <span className="tracking-[0.2em] text-ink-meta">
             {t(`types.${req.type}`)}
           </span>
           {req.song_title && (
-            <span className="min-w-0 truncate font-serif text-slate-600 dark:text-slate-300">
+            <span className="min-w-0 truncate font-serif text-ink-prose">
               {req.song_title}
             </span>
           )}
@@ -559,7 +559,7 @@ function RequestRow({
         </span>
         <span
           className={cn(
-            "mt-2 block font-kaiti text-[15px] leading-[1.85] text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors wrap-break-word",
+            "mt-2 block font-kaiti text-[15px] leading-[1.85] text-ink-prose group-hover:text-ink transition-colors wrap-break-word",
             expanded ? "whitespace-pre-wrap" : "line-clamp-2",
           )}
         >
@@ -578,19 +578,13 @@ function RequestRow({
           <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs">
             {req.category && (
               <div className="flex gap-2">
-                <dt className="text-slate-400 dark:text-slate-500">
-                  {t("detail.category")}
-                </dt>
-                <dd className="text-slate-600 dark:text-slate-300">
-                  {req.category}
-                </dd>
+                <dt className="text-ink-meta">{t("detail.category")}</dt>
+                <dd className="text-ink-prose">{req.category}</dd>
               </div>
             )}
             <div className="flex gap-2">
-              <dt className="text-slate-400 dark:text-slate-500">
-                {t("detail.submittedAt")}
-              </dt>
-              <dd className="tabular-nums text-slate-600 dark:text-slate-300">
+              <dt className="text-ink-meta">{t("detail.submittedAt")}</dt>
+              <dd className="tabular-nums text-ink-prose">
                 {formatTime(req.created_at)}
               </dd>
             </div>
@@ -601,11 +595,11 @@ function RequestRow({
               <p className="text-xs tracking-[0.2em] text-(--tone)">
                 {t("detail.reply")}
               </p>
-              <p className="mt-1.5 font-kaiti text-[15px] leading-[1.85] text-slate-700 dark:text-slate-300 whitespace-pre-wrap wrap-break-word">
+              <p className="mt-1.5 font-kaiti text-[15px] leading-[1.85] text-ink-prose whitespace-pre-wrap wrap-break-word">
                 {req.reply}
               </p>
               {req.replied_at && (
-                <p className="mt-1 text-xs tabular-nums text-slate-400 dark:text-slate-500">
+                <p className="mt-1 text-xs tabular-nums text-ink-meta">
                   {formatTime(req.replied_at)}
                 </p>
               )}

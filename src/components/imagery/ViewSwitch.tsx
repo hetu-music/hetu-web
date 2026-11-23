@@ -194,9 +194,7 @@ export default function ViewSwitch({
           aria-pressed={on}
           onClick={() => !on && onChoose(view)}
           className={`relative transition-colors duration-700 ${
-            on
-              ? "text-slate-900 dark:text-white"
-              : "hover:text-slate-700 dark:hover:text-slate-200"
+            on ? "text-ink" : "hover:text-ink-prose"
           }`}
         >
           {t(view)}
@@ -211,13 +209,13 @@ export default function ViewSwitch({
       ref={rootRef}
       role="group"
       aria-label={t("label")}
-      className={`text-slate-400 dark:text-slate-500 ${className ?? ""}`}
+      className={`text-ink-meta ${className ?? ""}`}
       style={style}
     >
       {option("motifs")}
       <span
         aria-hidden
-        className="text-slate-300 dark:text-slate-700"
+        className="text-ink-faint"
         style={{ marginInline: "1em" }}
       >
         ·

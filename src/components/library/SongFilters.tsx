@@ -85,7 +85,7 @@ const SongFilters: React.FC<SongFiltersProps> = ({
       <div className="col-span-full grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 lg:grid-cols-[auto_1fr_auto]">
         <span className={FIELD_LABEL_CLASS}>{t("yearRange")}</span>
         {/* 区间文字定宽右对齐，拖动时滑轨长度不跟着变 */}
-        <span className="text-right text-xs tabular-nums tracking-wider text-slate-700 dark:text-slate-300 lg:order-last lg:min-w-28">
+        <span className="text-right text-xs tabular-nums tracking-wider text-ink-prose lg:order-last lg:min-w-28">
           {left === right
             ? yearLabel(left)
             : `${yearLabel(left)} — ${yearLabel(right)}`}

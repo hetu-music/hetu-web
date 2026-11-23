@@ -38,9 +38,7 @@ export function MenuList({
               className={cn(
                 "relative w-full pl-4 text-left font-serif tracking-wider whitespace-nowrap transition-colors",
                 size === "sm" ? "py-2 text-sm" : "py-3 text-base",
-                current
-                  ? "text-slate-900 dark:text-slate-100"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100",
+                current ? "text-ink" : "text-ink-muted hover:text-ink",
               )}
             >
               <span
@@ -78,7 +76,7 @@ export function InlineOptions({
         return (
           <React.Fragment key={item.id}>
             {i > 0 && (
-              <span aria-hidden className="text-slate-300 dark:text-slate-600">
+              <span aria-hidden className="text-ink-faint">
                 ·
               </span>
             )}
@@ -91,7 +89,7 @@ export function InlineOptions({
                 "py-2 text-sm tracking-widest transition-colors disabled:opacity-40 disabled:cursor-wait",
                 current
                   ? "text-(--tone)"
-                  : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
+                  : "text-ink-meta hover:text-ink-prose",
               )}
             >
               {item.label}

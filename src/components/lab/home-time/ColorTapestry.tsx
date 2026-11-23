@@ -471,7 +471,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
             className="group min-w-0 text-left"
           >
             <div className="flex items-baseline gap-2.5">
-              <span className="truncate font-serif text-[15px] text-slate-900 transition-colors group-hover:text-(--tone) sm:text-base dark:text-slate-100">
+              <span className="truncate font-serif text-[15px] text-ink transition-colors group-hover:text-(--tone) sm:text-base">
                 《{activeSong.title}》
               </span>
               <span className="shrink-0 font-mono text-[11px] tabular-nums text-(--tone)">
@@ -480,7 +480,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
                   "未详"}
               </span>
             </div>
-            <p className="truncate font-kaiti text-xs text-slate-500 dark:text-slate-400">
+            <p className="truncate font-kaiti text-xs text-ink-muted">
               {creditSummary(activeSong) || "点此入卷"}
             </p>
           </button>
@@ -495,7 +495,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
             type="button"
             onClick={() => scrollRack(-1)}
             aria-label="向左推架"
-            className="p-1.5 text-slate-400 transition-colors hover:text-(--tone) dark:text-slate-500"
+            className="p-1.5 text-ink-meta transition-colors hover:text-(--tone)"
           >
             <ChevronLeft size={16} />
           </button>
@@ -503,7 +503,7 @@ function ColorTapestry({ songs, matched, onOpenSong }: ColorTapestryProps) {
             type="button"
             onClick={() => scrollRack(1)}
             aria-label="向右推架"
-            className="p-1.5 text-slate-400 transition-colors hover:text-(--tone) dark:text-slate-500"
+            className="p-1.5 text-ink-meta transition-colors hover:text-(--tone)"
           >
             <ChevronRight size={16} />
           </button>
@@ -643,7 +643,7 @@ const Disc = memo(function Disc({
       {yearLabel !== undefined && (
         <span
           aria-hidden
-          className="pointer-events-none absolute -top-7 left-0 flex items-center gap-1 font-mono text-[10px] tabular-nums tracking-wider text-slate-400/90 dark:text-slate-500"
+          className="pointer-events-none absolute -top-7 left-0 flex items-center gap-1 font-mono text-[10px] tabular-nums tracking-wider text-ink-meta/90"
         >
           <span className="inline-block h-2.5 w-px bg-slate-300 dark:bg-slate-700" />
           {yearLabel ?? "未详"}

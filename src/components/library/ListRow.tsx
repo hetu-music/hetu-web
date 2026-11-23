@@ -63,7 +63,7 @@ export default function ListRow({
       <div className="grow min-w-0 flex flex-col justify-center translate-y-[-1.5px] md:translate-y-0">
         <h3
           className={cn(
-            "truncate text-lg text-slate-900 transition-colors dark:text-slate-100",
+            "truncate text-lg text-ink transition-colors",
             isActive ? "text-(--tone)" : "group-hover:text-(--tone)",
           )}
         >
@@ -71,13 +71,13 @@ export default function ListRow({
             {song.title}
           </SongTitleLink>
         </h3>
-        <p className="truncate text-sm font-normal text-slate-500 dark:text-slate-400">
+        <p className="truncate text-sm font-normal text-ink-muted">
           {song.lyricist?.join(" ") || "-"}{" "}
           <span className="mx-1 opacity-50">/</span>{" "}
           {song.composer?.join(" ") || "-"}
         </p>
         {song.year && (
-          <p className="mt-1 text-[11px] leading-none tabular-nums text-slate-400 dark:text-slate-500 md:hidden">
+          <p className="mt-1 text-[11px] leading-none tabular-nums text-ink-meta md:hidden">
             {song.year}
           </p>
         )}
@@ -86,7 +86,7 @@ export default function ListRow({
         )}
       </div>
 
-      <div className="hidden shrink-0 items-center gap-8 text-sm text-slate-500 dark:text-slate-400 md:flex">
+      <div className="hidden shrink-0 items-center gap-8 text-sm text-ink-muted md:flex">
         <div className="flex w-8 items-center justify-center">
           <PlayButton
             songId={song.id}
@@ -122,7 +122,7 @@ export default function ListRow({
                 "rounded-lg p-2 transition-all duration-200",
                 active
                   ? "text-rose-500"
-                  : "text-slate-400 opacity-100 hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 dark:text-slate-500 lg:opacity-0 lg:group-hover:opacity-100",
+                  : "text-ink-meta opacity-100 hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 lg:opacity-0 lg:group-hover:opacity-100",
               )}
             >
               <Heart size={16} className={active ? "fill-current" : ""} />
@@ -132,10 +132,10 @@ export default function ListRow({
         <MultiTagDisplay tags={song.type} type="type" />
         <MultiTagDisplay tags={song.genre} type="genre" />
         {/* 表头已写明年份、时长，这里不再配图标 */}
-        <span className="w-16 text-xs tabular-nums text-slate-400 dark:text-slate-500">
+        <span className="w-16 text-xs tabular-nums text-ink-meta">
           {song.year || "-"}
         </span>
-        <span className="w-16 text-xs tabular-nums text-slate-400 dark:text-slate-500">
+        <span className="w-16 text-xs tabular-nums text-ink-meta">
           {formatTime(song.length)}
         </span>
       </div>
@@ -155,7 +155,7 @@ export default function ListRow({
               "rounded-lg p-2 transition-all duration-200",
               active
                 ? "text-rose-500"
-                : "text-slate-400 hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 dark:text-slate-500",
+                : "text-ink-meta hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10",
             )}
           >
             <Heart size={16} className={active ? "fill-current" : ""} />

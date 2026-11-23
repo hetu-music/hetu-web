@@ -206,7 +206,7 @@ function EmailStep({
         <SubmitButton pending={isSubmitting} className="text-sm">
           {t("recovery.submit")}
         </SubmitButton>
-        <p className="text-xs text-slate-400 dark:text-slate-500">
+        <p className="text-xs text-ink-meta">
           {t("recovery.rememberPrompt")}
           <Link href={loginHref} className={cn(PRIMARY_BUTTON_CLASS, "ml-1.5")}>
             {t("register.switchLink")}

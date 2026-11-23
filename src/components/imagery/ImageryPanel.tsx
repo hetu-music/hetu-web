@@ -47,10 +47,10 @@ function PanelHeader({
   const palette = paletteAt(motif.palette);
   const meta = (
     <div className="space-y-1">
-      <p className="font-serif text-xs tracking-[0.2em] text-slate-500 dark:text-slate-400">
+      <p className="font-serif text-xs tracking-[0.2em] text-ink-muted">
         {motif.path.join(" · ")}
       </p>
-      <p className="font-kaiti text-sm text-slate-600 dark:text-slate-300">
+      <p className="font-kaiti text-sm text-ink-prose">
         {t("meta", { songs: motif.songCount, words: motif.words.length })}
       </p>
     </div>
@@ -116,7 +116,7 @@ function PanelBody({
 
   if (error && !motif) {
     return (
-      <p className="text-center font-kaiti text-sm py-16 text-slate-400 dark:text-slate-500">
+      <p className="text-center font-kaiti text-sm py-16 text-ink-meta">
         {t("panel.loadError")}
       </p>
     );
@@ -172,7 +172,7 @@ function PanelBody({
               <button
                 type="button"
                 onClick={() => setUnfolded((v) => !v)}
-                className="text-[11px] tracking-widest text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors py-1"
+                className="text-[11px] tracking-widest text-ink-meta hover:text-ink-prose transition-colors py-1"
               >
                 {unfolded
                   ? t("panel.fold")
@@ -225,10 +225,10 @@ function PanelBody({
                   className="flex items-center justify-between py-4 px-6 border-b border-slate-100/80 dark:border-slate-800/50 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group"
                 >
                   <div className="min-w-0 pr-4">
-                    <div className="font-serif text-sm text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors truncate tracking-wide">
+                    <div className="font-serif text-sm text-ink-prose group-hover:text-ink transition-colors truncate tracking-wide">
                       {song.title}
                     </div>
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate tracking-wide">
+                    <div className="text-[11px] text-ink-meta mt-1 truncate tracking-wide">
                       {[
                         song.year,
                         song.lyricist?.join("  ·  ") || tCommon("unknown"),
@@ -239,7 +239,7 @@ function PanelBody({
                   </div>
                   <ChevronRight
                     size={14}
-                    className="text-slate-300 dark:text-slate-600 group-hover:text-slate-400 dark:group-hover:text-slate-400 transition-all duration-300 transform group-hover:translate-x-0.5"
+                    className="text-ink-faint group-hover:text-ink-meta transition-all duration-300 transform group-hover:translate-x-0.5"
                   />
                 </Link>
               </motion.div>

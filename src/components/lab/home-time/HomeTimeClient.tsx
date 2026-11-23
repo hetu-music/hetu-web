@@ -265,10 +265,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
             return (
               <Fragment key={opt}>
                 {idx > 0 && (
-                  <span
-                    aria-hidden
-                    className="mx-2.5 text-slate-300 dark:text-slate-700"
-                  >
+                  <span aria-hidden className="mx-2.5 text-ink-faint">
                     ·
                   </span>
                 )}
@@ -278,9 +275,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                   onClick={() => state.setType(opt)}
                   className={cn(
                     "font-serif text-sm tracking-wider transition-colors",
-                    active
-                      ? "text-(--tone)"
-                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                    active ? "text-(--tone)" : "text-ink-muted hover:text-ink",
                   )}
                 >
                   {label}
@@ -312,7 +307,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
         <TopBar
           exit={{ kind: "logo", onClick: handleReset, tooltip: "回到卷首" }}
           nav={
-            <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-slate-400 sm:inline-flex dark:text-slate-500">
+            <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
               <span aria-hidden>/</span>
               <span>二十年的颜色</span>
             </span>
@@ -323,14 +318,12 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           {/* ── 1. 卷首：年代跨度与曲数 + 横向展签长带（方案 B） ── */}
           <header className="pb-7 md:pb-8">
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
-              <h1 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-slate-900 sm:text-5xl md:text-6xl dark:text-slate-50">
+              <h1 className="font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums text-ink sm:text-5xl md:text-6xl">
                 {lastYear}
-                <span className="mx-[0.22em] font-light text-slate-300 dark:text-slate-700">
-                  —
-                </span>
+                <span className="mx-[0.22em] font-light text-ink-faint">—</span>
                 {firstYear}
               </h1>
-              <span className="font-serif text-sm tracking-[0.18em] text-slate-400 sm:text-base dark:text-slate-500">
+              <span className="font-serif text-sm tracking-[0.18em] text-ink-meta sm:text-base">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
                     key={shownCount}
@@ -340,9 +333,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                     transition={{ duration: 0.25 }}
                     className={cn(
                       "inline-block font-semibold tabular-nums",
-                      matched
-                        ? "text-(--tone)"
-                        : "text-slate-800 dark:text-slate-200",
+                      matched ? "text-(--tone)" : "text-ink-body",
                     )}
                   >
                     {shownCount}
@@ -374,13 +365,13 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                     value={state.searchInput}
                     onFocus={handleSearchFocus}
                     onChange={(e) => state.setSearchInput(e.target.value)}
-                    className="w-full min-w-0 bg-transparent font-kaiti text-[15px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
+                    className="w-full min-w-0 bg-transparent font-kaiti text-[15px] text-ink-body outline-none placeholder:text-ink-meta"
                   />
                   {state.searchInput ? (
                     <button
                       type="button"
                       onClick={() => state.setSearchInput("")}
-                      className="shrink-0 text-[11px] tracking-[0.2em] text-slate-400 transition-colors hover:text-slate-800 dark:text-slate-500 dark:hover:text-slate-200"
+                      className="shrink-0 text-[11px] tracking-[0.2em] text-ink-meta transition-colors hover:text-ink-body"
                     >
                       清空
                     </button>
@@ -421,7 +412,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                       "text-xs tracking-[0.25em] transition-colors",
                       state.advanced || activeChips.length > 0
                         ? "text-(--tone)"
-                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                        : "text-ink-muted hover:text-ink",
                     )}
                   >
                     筛选
@@ -440,10 +431,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                   {activeChips.map((chip, idx) => (
                     <Fragment key={chip.key}>
                       {idx > 0 && (
-                        <span
-                          aria-hidden
-                          className="mx-2.5 text-slate-300 dark:text-slate-700"
-                        >
+                        <span aria-hidden className="mx-2.5 text-ink-faint">
                           ·
                         </span>
                       )}
@@ -451,10 +439,10 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                         type="button"
                         onClick={chip.onRemove}
                         title="点击撤回此项筛选"
-                        className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-slate-600 transition-colors hover:text-(--tone) dark:text-slate-300"
+                        className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-ink-prose transition-colors hover:text-(--tone)"
                       >
                         <span>{chip.label}</span>
-                        <span className="font-sans text-[11px] text-slate-400 transition-colors group-hover:text-(--tone) dark:text-slate-500">
+                        <span className="font-sans text-[11px] text-ink-meta transition-colors group-hover:text-(--tone)">
                           ×
                         </span>
                       </button>
@@ -472,10 +460,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                       >
                         重置
                       </button>
-                      <span
-                        aria-hidden
-                        className="text-slate-300 dark:text-slate-700"
-                      >
+                      <span aria-hidden className="text-ink-faint">
                         ·
                       </span>
                     </>
@@ -488,7 +473,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                       "transition-colors",
                       state.advanced || activeChips.length > 0
                         ? "text-(--tone)"
-                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                        : "text-ink-muted hover:text-ink",
                     )}
                   >
                     {state.advanced
@@ -507,20 +492,17 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                 {activeChips.map((chip, idx) => (
                   <Fragment key={chip.key}>
                     {idx > 0 && (
-                      <span
-                        aria-hidden
-                        className="mx-2 text-slate-300 dark:text-slate-700"
-                      >
+                      <span aria-hidden className="mx-2 text-ink-faint">
                         ·
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={chip.onRemove}
-                      className="inline-flex items-baseline gap-1 font-kaiti text-xs text-slate-600 dark:text-slate-300"
+                      className="inline-flex items-baseline gap-1 font-kaiti text-xs text-ink-prose"
                     >
                       <span>{chip.label}</span>
-                      <span className="font-sans text-[10px] text-slate-400">
+                      <span className="font-sans text-[10px] text-ink-meta">
                         ×
                       </span>
                     </button>
@@ -547,7 +529,7 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
                     type="button"
                     onClick={handleReset}
                     disabled={!state.isAnyFilterActive}
-                    className="text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 disabled:opacity-40 dark:text-slate-500 dark:hover:text-slate-200"
+                    className="text-xs tracking-widest text-ink-meta transition-colors hover:text-ink-prose disabled:opacity-40"
                   >
                     {tLib("filter.clearAll")}
                   </button>
@@ -564,14 +546,14 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           )}
 
           {approximate && (
-            <p className="mt-6 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+            <p className="mt-6 font-kaiti text-[15px] text-ink-meta">
               {tLib("search.approximate")}
             </p>
           )}
 
           {/* ── 4. 编年目录正文（由近及远，一年一画幅 + 右侧编年行目） ── */}
           {shownCount === 0 ? (
-            <p className="py-24 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+            <p className="py-24 text-center font-kaiti text-[15px] text-ink-meta">
               {lyricsPending
                 ? tLib("search.lyricsPending")
                 : tLib("noFilteredSongs")}
@@ -587,16 +569,14 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           )}
 
           {lyricsPending && shownCount > 0 && (
-            <p className="mt-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+            <p className="mt-8 font-kaiti text-[15px] text-ink-meta">
               {tLib("search.lyricsPending")}
             </p>
           )}
 
           <footer className="mt-14 flex flex-wrap items-baseline justify-between gap-4 border-t border-slate-200/75 pt-8 dark:border-slate-800">
             <SiteMark />
-            <p className="font-kaiti text-sm text-slate-400 dark:text-slate-500">
-              未完。
-            </p>
+            <p className="font-kaiti text-sm text-ink-meta">未完。</p>
           </footer>
         </main>
 
@@ -656,8 +636,8 @@ function YearRuler({
               active
                 ? "text-(--tone)"
                 : hasHit
-                  ? "text-slate-400/60 hover:text-slate-800 dark:text-slate-500/60 dark:hover:text-slate-200"
-                  : "text-slate-300/40 dark:text-slate-700/50",
+                  ? "text-ink-meta/60 hover:text-ink-body"
+                  : "text-ink-faint/40",
             )}
           >
             {active && <span className="h-px w-3 bg-(--tone)" />}

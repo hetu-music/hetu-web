@@ -279,7 +279,7 @@ export default function ImageryClient({
   }, [cloud.words, motifs, view, seed]);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-slate-800 dark:text-slate-200">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0F19] text-ink-body">
       <TopBar exit={{ kind: "logo" }} />
 
       {/* ── hero ── */}
@@ -295,7 +295,7 @@ export default function ImageryClient({
           <HeroTitle
             text={t("title")}
             mounted={mounted}
-            className="font-serif text-5xl md:text-7xl text-slate-800 dark:text-slate-100 mb-4 flex justify-center items-center gap-4 sm:gap-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.05)]"
+            className="font-serif text-5xl md:text-7xl text-ink-body mb-4 flex justify-center items-center gap-4 sm:gap-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.05)]"
           />
           <ViewSwitch
             active={switching ?? view}
@@ -381,7 +381,7 @@ export default function ImageryClient({
         }
       >
         {items.length === 0 ? (
-          <div className="text-center font-kaiti text-sm py-24 text-slate-400 dark:text-slate-500">
+          <div className="text-center font-kaiti text-sm py-24 text-ink-meta">
             {t("noData")}
           </div>
         ) : (
@@ -398,7 +398,7 @@ export default function ImageryClient({
               bloom={bloom}
             />
             <div className="mt-12 flex justify-center">
-              <p className="text-xs text-slate-300 dark:text-slate-700 tracking-[0.2em] select-none font-serif">
+              <p className="text-xs text-ink-faint tracking-[0.2em] select-none font-serif">
                 {view === "motifs"
                   ? t("motifTotal", { count: items.length })
                   : t("wordTotal", { count: items.length })}

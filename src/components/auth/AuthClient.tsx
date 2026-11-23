@@ -203,7 +203,7 @@ export default function AuthClient({
             <SubmitButton pending={isSubmitting} className="text-sm">
               {t(isLogin ? "login.submit" : "register.submit")}
             </SubmitButton>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-ink-meta">
               {t(isLogin ? "login.switchPrompt" : "register.switchPrompt")}
               <Link
                 href={authPathFor(isLogin ? "/register" : "/login", next)}

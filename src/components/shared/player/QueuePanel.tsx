@@ -22,10 +22,10 @@ import { useTranslations } from "next-intl";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 const ICON_BUTTON =
-  "flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-700 md:size-9 dark:text-slate-500 dark:hover:text-slate-200";
+  "flex size-8 items-center justify-center rounded-full text-ink-meta transition-colors hover:text-ink-prose md:size-9";
 
 const TEXT_BUTTON =
-  "text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200";
+  "text-xs tracking-widest text-ink-meta transition-colors hover:text-ink-prose";
 
 /**
  * 播放条右侧的「队列」按钮与队列面板。
@@ -130,7 +130,7 @@ function QueueList({
         {/* 面板的名字只是「播放队列」，曲数放在标题外 */}
         <div className="font-serif text-xs tracking-[0.4em] text-(--tone)">
           <Title className="inline text-xs">{t("queueTitle")}</Title>
-          <span className="ml-2 font-sans tracking-wider text-slate-400 dark:text-slate-500">
+          <span className="ml-2 font-sans tracking-wider text-ink-meta">
             {t("queueCount", { count: queue.length })}
           </span>
         </div>
@@ -153,7 +153,7 @@ function QueueList({
               type="button"
               onClick={onClose}
               aria-label={t("close")}
-              className="-mr-1 p-1 text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
+              className="-mr-1 p-1 text-ink-meta transition-colors hover:text-ink-prose"
             >
               <X size={16} />
             </button>
@@ -187,9 +187,7 @@ function QueueList({
                     <span
                       className={cn(
                         "text-xs tabular-nums",
-                        current
-                          ? "text-(--tone)"
-                          : "text-slate-400 dark:text-slate-500",
+                        current ? "text-(--tone)" : "text-ink-meta",
                       )}
                     >
                       {i + 1}
@@ -202,12 +200,12 @@ function QueueList({
                       "block truncate font-serif text-sm transition-colors",
                       current
                         ? "text-(--tone)"
-                        : "text-slate-800 group-hover:text-slate-900 dark:text-slate-200 dark:group-hover:text-white",
+                        : "text-ink-body group-hover:text-ink",
                     )}
                   >
                     {track.title}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs tracking-wider text-slate-400 dark:text-slate-500">
+                  <span className="mt-0.5 block truncate text-xs tracking-wider text-ink-meta">
                     {track.artist || t("unknownArtist")}
                   </span>
                 </span>
@@ -218,7 +216,7 @@ function QueueList({
                 onClick={() => removeFromQueue(i)}
                 aria-label={t("remove")}
                 title={t("remove")}
-                className="mr-3 shrink-0 p-2 text-slate-300 transition-[color,opacity] hover:text-rose-500 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:text-slate-600 dark:hover:text-rose-500"
+                className="mr-3 shrink-0 p-2 text-ink-faint transition-[color,opacity] hover:text-rose-500 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:hover:text-rose-500"
               >
                 <X size={14} />
               </button>

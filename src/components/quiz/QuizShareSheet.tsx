@@ -248,13 +248,13 @@ export default function QuizShareSheet({ open, onOpenChange, result }: Props) {
               className="max-h-[55dvh] w-auto rounded-md ring-1 ring-slate-900/5 dark:ring-white/10"
             />
             {!isDesktop && (
-              <p className="mt-4 font-kaiti text-sm text-slate-400">
+              <p className="mt-4 font-kaiti text-sm text-ink-meta">
                 {t("card.hint")}
               </p>
             )}
           </>
         ) : (
-          <p className="font-kaiti text-slate-400">
+          <p className="font-kaiti text-ink-meta">
             {card === "error" ? t("card.failed") : t("card.generating")}
           </p>
         )}

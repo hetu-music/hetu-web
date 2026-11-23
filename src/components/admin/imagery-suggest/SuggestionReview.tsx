@@ -34,12 +34,12 @@ function NameEditor({
         type="button"
         onClick={() => setEditing(true)}
         title="点击修改意象"
-        className="group/name flex items-center gap-1 text-slate-900 hover:text-(--tone) dark:text-slate-100"
+        className="group/name flex items-center gap-1 text-ink hover:text-(--tone)"
       >
         {name}
         <Pencil
           size={12}
-          className="text-slate-300 group-hover/name:text-(--tone)"
+          className="text-ink-faint group-hover/name:text-(--tone)"
         />
       </button>
     );
@@ -61,7 +61,7 @@ function NameEditor({
         if (e.key === "Enter") finish(e.currentTarget.value);
         if (e.key === "Escape") setEditing(false);
       }}
-      className="w-28 rounded-md border border-(--tone) bg-transparent px-2 py-0.5 text-sm text-slate-900 outline-none dark:text-slate-100"
+      className="w-28 rounded-md border border-(--tone) bg-transparent px-2 py-0.5 text-sm text-ink outline-none"
     />
   );
 }
@@ -84,10 +84,7 @@ function HistoryBadge({ suggestion }: { suggestion: ImagerySuggestion }) {
     .filter(Boolean)
     .join("\n");
   return (
-    <span
-      title={title}
-      className="ml-auto shrink-0 text-[11px] text-slate-400 dark:text-slate-500"
-    >
+    <span title={title} className="ml-auto shrink-0 text-[11px] text-ink-meta">
       {rate === null
         ? "其他歌未出现"
         : `出现 ${seen} 首 · 标注 ${annotated} 首`}
@@ -100,7 +97,7 @@ function AiChip({ note }: { note: AiNote }) {
     note.kind === "addition"
       ? ["AI 补充", "text-(--tone)"]
       : note.keep
-        ? ["AI 保留", "text-slate-500 dark:text-slate-400"]
+        ? ["AI 保留", "text-ink-muted"]
         : ["AI 剔除", "text-rose-600 dark:text-rose-400"];
   return (
     <span
@@ -168,7 +165,7 @@ function SuggestionRow({
               type="button"
               onClick={() => onRename(suggestion.name)}
               title="恢复原意象"
-              className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-(--tone)"
+              className="flex items-center gap-1 text-[11px] text-ink-meta hover:text-(--tone)"
             >
               <Undo2 size={11} />
               原：{suggestion.name}
@@ -197,7 +194,7 @@ function SuggestionRow({
             value={draft.motifId}
             motifs={motifs}
             onChange={(motifId) => onUpdate({ motifId })}
-            className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-700 outline-none focus:border-(--tone) dark:border-slate-700 dark:text-slate-200 [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]"
+            className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-ink-prose outline-none focus:border-(--tone) dark:border-slate-700 [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]"
           />
           {/* 统计的是原候选词；改名后不再适用 */}
           {!renamed && <HistoryBadge suggestion={suggestion} />}
@@ -207,9 +204,9 @@ function SuggestionRow({
           {suggestion.timetags.map((tag, i) => (
             <span
               key={tag}
-              className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
+              className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-ink-prose dark:border-slate-700"
             >
-              <span className="mr-1.5 font-mono text-[10px] text-slate-400">
+              <span className="mr-1.5 font-mono text-[10px] text-ink-meta">
                 {tag}
               </span>
               {suggestion.lines[i]}
@@ -321,7 +318,7 @@ export default function SuggestionReview({
             "text-sm",
             imagery.message.type === "error"
               ? "text-rose-600 dark:text-rose-400"
-              : "text-slate-600 dark:text-slate-300",
+              : "text-ink-prose",
           )}
         >
           {imagery.message.text}
@@ -337,16 +334,16 @@ export default function SuggestionReview({
             ))}
           </datalist>
           {!result.hasLyrics ? (
-            <p className="font-kaiti text-base text-slate-400">
+            <p className="font-kaiti text-base text-ink-meta">
               这首歌还没有歌词，无法生成候选。
             </p>
           ) : suggestions.length === 0 ? (
-            <p className="font-kaiti text-base text-slate-400">
+            <p className="font-kaiti text-base text-ink-meta">
               歌词中没有找到词典里尚未标注的意象。
             </p>
           ) : (
             <>
-              <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center justify-between text-xs text-ink-meta">
                 <span>
                   推荐 {recommended.length} 个（其他歌里常被标注的默认勾选）
                 </span>
@@ -372,7 +369,7 @@ export default function SuggestionReview({
                   open={othersOpen}
                   onToggle={(e) => setOthersOpen(e.currentTarget.open)}
                 >
-                  <summary className="cursor-pointer select-none text-xs text-slate-400 hover:text-slate-600">
+                  <summary className="cursor-pointer select-none text-xs text-ink-meta hover:text-ink-prose">
                     其他候选 {others.length}{" "}
                     个（其他歌里很少被标注，或被更长的意象包含，默认不勾选）
                   </summary>
@@ -381,7 +378,7 @@ export default function SuggestionReview({
               )}
 
               <div className="flex items-center justify-end gap-3 pt-3">
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-ink-muted">
                   已选 {imagery.selectedCount} 个
                 </span>
                 <button

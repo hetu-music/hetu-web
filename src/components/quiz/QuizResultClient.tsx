@@ -22,7 +22,7 @@ interface Props {
 const EASE = [0.16, 1, 0.3, 1] as const;
 /** 页尾的再寻、分享、保存 */
 const ACTION_CLASS =
-  "flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-slate-700 transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259] disabled:opacity-40";
+  "flex items-center gap-2 border border-slate-300 px-6 py-2.5 font-serif text-sm tracking-[0.3em] text-ink-prose transition-colors hover:border-[#9A6B2F] hover:text-[#9A6B2F] dark:border-slate-700 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259] disabled:opacity-40";
 /** 倾向条的满格对应的 z 分数 */
 const Z_RANGE = 2.5;
 
@@ -48,7 +48,7 @@ export default function QuizResultClient({ result }: Props) {
   const slug = savedId ?? result.slug;
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
+    <div className="min-h-screen bg-[#FAFAFA] text-ink-body dark:bg-[#0B0F19]">
       <TopBar
         exit={{ kind: "logo" }}
         actions={[
@@ -59,10 +59,10 @@ export default function QuizResultClient({ result }: Props) {
       <main className="mx-auto max-w-3xl px-6 pb-40 pt-32">
         {/* ── 气韵 ── */}
         <motion.header {...fadeUp(0)} className="text-center">
-          <p className="pl-[0.5em] font-serif text-sm tracking-[0.5em] text-slate-400 dark:text-slate-500">
+          <p className="pl-[0.5em] font-serif text-sm tracking-[0.5em] text-ink-meta">
             {t("result.eyebrow")}
           </p>
-          <h1 className="mt-8 font-calligraphy text-7xl text-slate-900 md:text-8xl dark:text-white">
+          <h1 className="mt-8 font-calligraphy text-7xl text-ink md:text-8xl">
             {result.persona.motto}
           </h1>
           {result.secondary && (
@@ -70,7 +70,7 @@ export default function QuizResultClient({ result }: Props) {
               {t("result.secondary", { motto: result.secondary.motto })}
             </p>
           )}
-          <p className="mx-auto mt-8 max-w-md font-kaiti text-lg leading-loose text-balance text-slate-600 md:max-w-xl dark:text-slate-400">
+          <p className="mx-auto mt-8 max-w-md font-kaiti text-lg leading-loose text-balance text-ink-muted md:max-w-xl">
             {result.persona.description}
           </p>
         </motion.header>
@@ -81,14 +81,14 @@ export default function QuizResultClient({ result }: Props) {
           className="mt-20 grid gap-12 border-t border-slate-200/70 pt-12 md:grid-cols-[1fr_1.4fr] dark:border-slate-800/70"
         >
           <div>
-            <h2 className="font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+            <h2 className="font-serif text-xs tracking-[0.3em] text-ink-meta">
               {t("result.imagery")}
             </h2>
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3">
               {result.imagery.map((name) => (
                 <span
                   key={name}
-                  className="font-calligraphy text-3xl text-slate-800 dark:text-slate-100"
+                  className="font-calligraphy text-3xl text-ink-body"
                 >
                   {name}
                 </span>
@@ -97,7 +97,7 @@ export default function QuizResultClient({ result }: Props) {
           </div>
 
           <div>
-            <h2 className="font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+            <h2 className="font-serif text-xs tracking-[0.3em] text-ink-meta">
               {t("result.profile")}
             </h2>
             <ul className="mt-5 space-y-2.5">
@@ -106,7 +106,7 @@ export default function QuizResultClient({ result }: Props) {
                 const positive = p.z >= 0;
                 return (
                   <li key={p.key} className="flex items-center gap-4">
-                    <span className="w-10 shrink-0 font-serif text-sm text-slate-600 dark:text-slate-400">
+                    <span className="w-10 shrink-0 font-serif text-sm text-ink-muted">
                       {p.label}
                     </span>
                     <div className="relative h-1.5 flex-1 rounded-full bg-slate-100 dark:bg-slate-800/70">
@@ -132,7 +132,7 @@ export default function QuizResultClient({ result }: Props) {
         <section className="mt-20 border-t border-slate-200/70 pt-12 dark:border-slate-800/70">
           <motion.h2
             {...fadeUp(0.3)}
-            className="font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500"
+            className="font-serif text-xs tracking-[0.3em] text-ink-meta"
           >
             {t("result.matches")}
           </motion.h2>
@@ -163,11 +163,11 @@ export default function QuizResultClient({ result }: Props) {
                       <div className="min-w-0">
                         <Link
                           href={`/song/${song.id}`}
-                          className="block truncate font-serif text-lg text-slate-900 transition-colors hover:text-[#9A6B2F] md:text-xl dark:text-slate-50 dark:hover:text-[#D4A259]"
+                          className="block truncate font-serif text-lg text-ink transition-colors hover:text-[#9A6B2F] md:text-xl dark:hover:text-[#D4A259]"
                         >
                           {song.title}
                         </Link>
-                        <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-ink-meta">
                           {[artist, song.album].filter(Boolean).join(" · ")}
                         </p>
                       </div>
@@ -175,15 +175,15 @@ export default function QuizResultClient({ result }: Props) {
                         <span className="font-serif text-2xl text-[#9A6B2F] tabular-nums dark:text-[#D4A259]">
                           {m.percent}
                         </span>
-                        <span className="ml-0.5 text-xs text-slate-400">%</span>
-                        <p className="text-[10px] tracking-widest text-slate-400 dark:text-slate-500">
+                        <span className="ml-0.5 text-xs text-ink-meta">%</span>
+                        <p className="text-[10px] tracking-widest text-ink-meta">
                           {t("result.match")}
                         </p>
                       </div>
                     </div>
 
                     {m.reasons.length > 0 && (
-                      <p className="mt-2 font-serif text-xs tracking-wider text-slate-500 dark:text-slate-400">
+                      <p className="mt-2 font-serif text-xs tracking-wider text-ink-muted">
                         {t("result.reasons", {
                           reasons: m.reasons.join(" · "),
                         })}
@@ -195,7 +195,7 @@ export default function QuizResultClient({ result }: Props) {
                         {m.lines.map((line) => (
                           <p
                             key={line}
-                            className="font-kaiti text-[15px] leading-relaxed text-slate-600 dark:text-slate-300"
+                            className="font-kaiti text-[15px] leading-relaxed text-ink-prose"
                           >
                             {line}
                           </p>
@@ -256,7 +256,7 @@ export default function QuizResultClient({ result }: Props) {
           )}
         </motion.div>
 
-        <p className="mt-10 text-center font-serif text-xs tracking-wider text-slate-400 dark:text-slate-600">
+        <p className="mt-10 text-center font-serif text-xs tracking-wider text-ink-meta">
           {t("result.method")}
         </p>
       </main>

@@ -46,10 +46,10 @@ export default function StatusPage({
 
         <div className="min-w-0 lg:pb-3">
           <span aria-hidden className="block w-8 h-px bg-(--tone) opacity-60" />
-          <h1 className="mt-6 font-serif text-4xl md:text-5xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50 text-balance">
+          <h1 className="mt-6 font-serif text-4xl md:text-5xl font-semibold leading-[1.1] tracking-tight text-ink text-balance">
             {title}
           </h1>
-          <p className="mt-6 max-w-[40em] font-kaiti text-[15px] leading-[2.05] text-slate-600 dark:text-slate-400">
+          <p className="mt-6 max-w-[40em] font-kaiti text-[15px] leading-[2.05] text-ink-muted">
             {description}
           </p>
           {children && (

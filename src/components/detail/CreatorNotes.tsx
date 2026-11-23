@@ -42,7 +42,7 @@ export default function CreatorNotes({ notes }: { notes: Notes }) {
           <div
             data-comment-clip={collapsed ? "" : undefined}
             className={cn(
-              "relative font-kaiti text-base sm:text-[17px] leading-[2.05] text-slate-700 dark:text-slate-300 space-y-5",
+              "relative font-kaiti text-base sm:text-[17px] leading-[2.05] text-ink-prose space-y-5",
               // 只在纵向裁切，好让左侧浮出的「批」不被剪掉
               collapsed && "max-h-[24rem] overflow-y-clip",
             )}
@@ -66,7 +66,7 @@ export default function CreatorNotes({ notes }: { notes: Notes }) {
                     key={k}
                     className={cn(
                       line.signature &&
-                        "text-right text-[0.9em] text-slate-400 dark:text-slate-500 mt-1",
+                        "text-right text-[0.9em] text-ink-meta mt-1",
                     )}
                   >
                     {line.text}

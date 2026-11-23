@@ -15,11 +15,11 @@ export const SOLID_BUTTON_CLASS =
 
 /** 次要的有框按钮（取消、重试） */
 export const OUTLINE_BUTTON_CLASS =
-  "inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-sm text-slate-600 dark:text-slate-300 transition-colors hover:border-slate-300 hover:text-slate-900 dark:hover:border-slate-600 dark:hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed";
+  "inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-sm text-ink-prose transition-colors hover:border-slate-300 hover:text-ink dark:hover:border-slate-600 disabled:opacity-40 disabled:cursor-not-allowed";
 
 /** 表单输入：细框，聚焦时换成强调色。后台字段多，底线输入框扫读起来太散 */
 export const INPUT_CLASS =
-  "block w-full rounded-md border border-slate-200 dark:border-slate-700 bg-transparent px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none transition-colors focus:border-(--tone) disabled:opacity-50";
+  "block w-full rounded-md border border-slate-200 dark:border-slate-700 bg-transparent px-3 py-1.5 text-sm text-ink-body placeholder:text-ink-meta outline-none transition-colors focus:border-(--tone) disabled:opacity-50";
 
 export const INPUT_ERROR_CLASS =
   "border-rose-300 dark:border-rose-500/60 focus:border-rose-500";
@@ -28,12 +28,10 @@ export const INPUT_ERROR_CLASS =
 export const SELECT_CLASS = `${INPUT_CLASS} [&>option]:bg-[#FAFAFA] dark:[&>option]:bg-[#0B0F19]`;
 
 /** 字段标签 */
-export const LABEL_CLASS =
-  "block text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500";
+export const LABEL_CLASS = "block text-xs tracking-[0.2em] text-ink-meta";
 
 /** 表头、元信息小字 */
-export const META_CLASS =
-  "text-xs tracking-[0.15em] text-slate-400 dark:text-slate-500";
+export const META_CLASS = "text-xs tracking-[0.15em] text-ink-meta";
 
 /** 列表的一行：只用细线分隔，不用卡片 */
 export const ROW_CLASS =
@@ -45,7 +43,7 @@ export const PANEL_CLASS =
 
 /** 小标签：只有一道细框，不铺底色 */
 export const TAG_CLASS =
-  "inline-flex items-center rounded border border-slate-200 dark:border-slate-700 px-1.5 text-[11px] leading-5 text-slate-500 dark:text-slate-400";
+  "inline-flex items-center rounded border border-slate-200 dark:border-slate-700 px-1.5 text-[11px] leading-5 text-ink-muted";
 
 /** 待处理、缺失：全站唯一允许的警示色 */
 export const WARN_TEXT_CLASS = "text-amber-600 dark:text-amber-400";
@@ -70,6 +68,6 @@ export function optionClass(active: boolean, onLine = false) {
     onLine ? "flex items-center after:bottom-0" : "after:bottom-0.5",
     active
       ? "font-medium text-(--tone) after:opacity-100"
-      : "text-slate-400 after:opacity-0 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
+      : "text-ink-meta after:opacity-0 hover:text-ink-prose",
   ].join(" ");
 }

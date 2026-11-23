@@ -17,16 +17,22 @@
 ### 底色与文字
 
 - 页面底色：`bg-[#FAFAFA] dark:bg-[#0B0F19]`。浮层（下拉、底部面板）用同一底色，不用纯白。
-- 文字只用 slate 一个色阶，按层级取用，每个颜色都要配 `dark:`：
+- 文字用「墨色」六级，按层级取用。深浅由 `globals.css` 的 CSS 变量切换，**只写 `text-ink-*`，不要再配 `dark:text-*`**：
 
-| 用途                 | 浅色                                  | 深色                                     |
-| -------------------- | ------------------------------------- | ---------------------------------------- |
-| 标题                 | `text-slate-900`                      | `dark:text-slate-50` / `dark:text-white` |
-| 正文                 | `text-slate-800`                      | `dark:text-slate-200`                    |
-| 诗文、手记、批注正文 | `text-slate-700`                      | `dark:text-slate-300`                    |
-| 次要信息             | `text-slate-500`、`text-slate-600`    | `dark:text-slate-400`                    |
-| 标签、落款、元信息   | `text-slate-400`                      | `dark:text-slate-500`                    |
-| 细线                 | `bg-slate-200`、`border-slate-200/70` | `dark:bg-slate-800`                      |
+| 用途                 | 类               | 取值（slate 浅 / 深） |
+| -------------------- | ---------------- | --------------------- |
+| 标题                 | `text-ink`       | 900 / 50              |
+| 正文                 | `text-ink-body`  | 800 / 200             |
+| 诗文、手记、批注正文 | `text-ink-prose` | 700 / 300             |
+| 次要信息             | `text-ink-muted` | 500 / 400             |
+| 标签、落款、元信息   | `text-ink-meta`  | 400 / 500             |
+| 分隔点、禁用         | `text-ink-faint` | 300 / 600             |
+
+为什么不写 `text-slate-900 dark:text-slate-100`：常态色一旦是两个类，当前项的强调色（`text-(--tone)`）写在同一个元素上时，深色下会被 `dark:` 那条盖住（两者优先级相同，`dark:` 排在后面），选中、正在播放就看不出来了。墨色只有一个类，`cn()` 会直接让强调色替换它。悬停（`hover:` / `group-hover:`）、透明度（`text-ink-meta/60`）照常写。
+
+不在这六级里的：实心强调色底上的字（下一节）、深色遮罩或图片上的白字，以及 404 那种极淡的装饰大字，仍按需写具体颜色。
+
+- 细线：`bg-slate-200`、`border-slate-200/70`，深色 `dark:bg-slate-800`。
 
 ### 强调色 `--tone`
 
@@ -62,9 +68,9 @@
 字距是这套风格的主要层级手段：
 
 - 章节题头：`font-serif text-sm tracking-[0.4em] text-(--tone)`，用 `h2`，随 `globals.css` 的标题样式加粗（700），不要另写 `font-normal`。浮层题头同样加粗，只是字号小一档（`text-xs`）。
-- 节内分组的题头（如个人中心的「公开资料」「登录邮箱」）：用 `GroupHeading`，与章节题头同一结构，但题名后接的是点线（像目录引线），不是实线，低一档，衬线、`text-[13px]`、加粗、`tracking-[0.3em]`、次要信息的灰（`text-slate-600 dark:text-slate-400`），不能比强调色的章节题头显眼；组距 `space-y-20`。不要写成和字段标签一样的灰色小字，也不要在组间单放一道分隔线：实线和输入框底线同形，会混。
+- 节内分组的题头（如个人中心的「公开资料」「登录邮箱」）：用 `GroupHeading`，与章节题头同一结构，但题名后接的是点线（像目录引线），不是实线，低一档，衬线、`text-[13px]`、加粗、`tracking-[0.3em]`、次要信息的灰（`text-ink-muted`），不能比强调色的章节题头显眼；组距 `space-y-20`。不要写成和字段标签一样的灰色小字，也不要在组间单放一道分隔线：实线和输入框底线同形，会混。
 - 眉题（类型 · 流派 · 年份）：`text-xs tracking-[0.35em] text-(--tone)`。
-- 字段标签：`text-xs tracking-[0.2em]`–`tracking-[0.3em] text-slate-400`。
+- 字段标签：`text-xs tracking-[0.2em]`–`tracking-[0.3em] text-ink-meta`。
 - 文字按钮、切换：`text-xs tracking-widest`。
 - 大标题反而收紧：`font-serif text-5xl md:text-6xl xl:text-7xl font-semibold leading-[1.1] tracking-tight text-balance`。
 
@@ -91,7 +97,7 @@
 ### 按钮
 
 - 顶栏图标按钮：统一用 `NAV_BUTTON_CLASS`（`src/components/shared/nav-button.ts`），图标 20px。
-- 文字按钮是默认形态：`text-xs tracking-widest`，常态 `text-slate-400 hover:text-slate-700`（深色 `dark:text-slate-500 dark:hover:text-slate-200`），主操作用 `text-(--tone)`。
+- 文字按钮是默认形态：`text-xs tracking-widest`，常态 `text-ink-meta hover:text-ink-prose`，主操作用 `text-(--tone)`。
 - 选中与开关状态只改文字颜色，并带 `aria-pressed` / `aria-current`，不加底色块。
 - 危险操作两步确认：文字从「删除」变成 rose 色的「确认删除」，3 秒内不点就复原。不用确认弹窗。
 - 悬停才出现的操作（如句旁的「批」），只在宽屏用（`hidden lg:flex`，`opacity-0 group-hover:opacity-60`），并保留 `focus-visible` 可见。
@@ -122,7 +128,7 @@
 
 ### 空状态与提示
 
-- 一句楷体灰字（`font-kaiti text-slate-400`），不配插图，不配大图标。
+- 一句楷体灰字（`font-kaiti text-ink-meta`），不配插图，不配大图标。
 
 ## 六、动效
 

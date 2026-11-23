@@ -167,9 +167,7 @@ export default function WordPanel({
     <div className="space-y-7">
       <header className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="font-serif text-xl text-slate-900 dark:text-slate-100">
-            {word.name}
-          </h2>
+          <h2 className="font-serif text-xl text-ink">{word.name}</h2>
           <p className={cn(META_CLASS, "mt-1")}>
             标注 {word.count} 处{ready ? ` · ${songs.length} 首歌` : ""}
           </p>
@@ -179,7 +177,7 @@ export default function WordPanel({
             type="button"
             onClick={onClose}
             aria-label="关闭"
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            className="text-ink-meta hover:text-ink-body"
           >
             <X size={16} />
           </button>
@@ -204,9 +202,7 @@ export default function WordPanel({
             </option>
           ))}
         </select>
-        <p className="text-xs text-slate-400 dark:text-slate-500">
-          {WORD_ROLE.primary.help}
-        </p>
+        <p className="text-xs text-ink-meta">{WORD_ROLE.primary.help}</p>
       </section>
 
       {(["alternative", "part"] as const).map((role) => (
@@ -236,7 +232,7 @@ export default function WordPanel({
             onRetry={() => void occurrences.refetch()}
           />
         ) : songs.length === 0 ? (
-          <p className="text-sm text-slate-400">还没有标注</p>
+          <p className="text-sm text-ink-meta">还没有标注</p>
         ) : (
           <ul>
             {songs.map((song) => (
@@ -246,11 +242,11 @@ export default function WordPanel({
               >
                 <Link
                   href={`/admin/songs/${song.id}?tab=imagery`}
-                  className="min-w-0 flex-1 truncate text-slate-800 hover:text-(--tone) dark:text-slate-200"
+                  className="min-w-0 flex-1 truncate text-ink-body hover:text-(--tone)"
                 >
                   {song.title}
                 </Link>
-                <span className="shrink-0 text-xs text-slate-400">
+                <span className="shrink-0 text-xs text-ink-meta">
                   {[...song.motifIds].map(nameOf).join("、")}
                 </span>
               </li>
@@ -308,7 +304,7 @@ function RoleSection({
         )}
       </div>
       {ids.length === 0 ? (
-        <p className="text-sm text-slate-400">（无）</p>
+        <p className="text-sm text-ink-meta">（无）</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {ids.map((id) => {
@@ -318,11 +314,11 @@ function RoleSection({
               <li
                 key={id}
                 title={pathOf(id)}
-                className="inline-flex items-center gap-1.5 rounded border border-slate-200 py-0.5 pr-1 pl-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                className="inline-flex items-center gap-1.5 rounded border border-slate-200 py-0.5 pr-1 pl-2 text-sm text-ink-prose dark:border-slate-700"
               >
                 {nameOf(id)}
                 {ready && count > 0 && (
-                  <span className="text-xs tabular-nums text-slate-400">
+                  <span className="text-xs tabular-nums text-ink-meta">
                     {count}
                   </span>
                 )}
@@ -336,7 +332,7 @@ function RoleSection({
                       ? `还有 ${count} 处标注挂在 ${nameOf(id)} 下，先到歌曲里改标或删掉`
                       : undefined
                   }
-                  className="text-slate-400 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-400"
+                  className="text-ink-meta hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-meta"
                 >
                   <X size={12} />
                 </button>
@@ -390,7 +386,7 @@ function RoleSection({
           </button>
         </div>
       )}
-      <p className="text-xs text-slate-400 dark:text-slate-500">{help}</p>
+      <p className="text-xs text-ink-meta">{help}</p>
     </section>
   );
 }

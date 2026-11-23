@@ -120,9 +120,7 @@ export default function AssetUpload({
       <span
         className={cn(
           "text-xs",
-          preset || exists
-            ? "text-slate-500 dark:text-slate-400"
-            : "text-slate-400 dark:text-slate-500",
+          preset || exists ? "text-ink-muted" : "text-ink-meta",
         )}
       >
         {preset
@@ -132,7 +130,7 @@ export default function AssetUpload({
             : exists
               ? "已上传"
               : "未上传"}
-        <span className="mx-2 text-slate-300 dark:text-slate-600">·</span>
+        <span className="mx-2 text-ink-faint">·</span>
         {config.format}，不超过 100MB
       </span>
       <input

@@ -44,25 +44,21 @@ function Section({
         className="flex w-full items-center justify-between py-3 text-sm"
       >
         <span
-          className={cn(
-            tone === "warn"
-              ? WARN_TEXT_CLASS
-              : "text-slate-700 dark:text-slate-200",
-          )}
+          className={cn(tone === "warn" ? WARN_TEXT_CLASS : "text-ink-prose")}
         >
           {title}
-          <span className="ml-2 tabular-nums text-slate-400">{count}</span>
+          <span className="ml-2 tabular-nums text-ink-meta">{count}</span>
         </span>
         <ChevronDown
           size={16}
           className={cn(
-            "text-slate-400 transition-transform",
+            "text-ink-meta transition-transform",
             open && "rotate-180",
           )}
         />
       </button>
       {open && (
-        <ul className="max-h-72 space-y-1.5 overflow-y-auto pb-3 text-xs text-slate-600 dark:text-slate-300">
+        <ul className="max-h-72 space-y-1.5 overflow-y-auto pb-3 text-xs text-ink-prose">
           {children}
         </ul>
       )}
@@ -98,10 +94,10 @@ export default function SyncPanel({
       <SectionHeading label="同步" />
       <div className="mt-6 flex flex-col gap-4 pb-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-slate-900 dark:text-slate-50">
+          <h2 className="text-ink">
             {changeCount === 0 ? "映射已是最新" : "可以自动同步"}
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-muted">
             {changeCount === 0
               ? "曲库与歌曲的关联和元数据一致，无需同步。"
               : `按标题与时长自动配对：新增/替换 ${plan.upserts.length} 条，删除失效 ${plan.deletes.length} 条，更新格式与时长 ${plan.mediaUpdates.length} 条，has_audio 变化 ${plan.hasAudioChanges.length} 首。已有且仍有效的关联只会更新格式与时长，不会改动指向。`}
@@ -179,7 +175,7 @@ export default function SyncPanel({
           <li key={r.song.id}>
             {songLabel(r.song)} —— {r.reason}
             {r.candidates.map((c) => (
-              <div key={c.id} className="ml-5 text-slate-400">
+              <div key={c.id} className="ml-5 text-ink-meta">
                 候选：{navLabel(c)}
               </div>
             ))}

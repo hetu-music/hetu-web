@@ -183,14 +183,14 @@ export default function CreditAliasPanel() {
                 autoComplete="off"
                 className={INPUT_CLASS}
               />
-              <p className="text-[11px] text-slate-400 min-h-4">
+              <p className="text-[11px] text-ink-meta min-h-4">
                 {name && (describeUsage(nameUsage) ?? "曲库里还没有这个名字")}
               </p>
             </div>
 
             <ArrowLeft
               size={16}
-              className="hidden md:block mt-8 text-slate-300 dark:text-slate-600"
+              className="hidden md:block mt-8 text-ink-faint"
               aria-hidden
             />
 
@@ -207,7 +207,7 @@ export default function CreditAliasPanel() {
                 autoComplete="off"
                 className={INPUT_CLASS}
               />
-              <p className="text-[11px] text-slate-400 min-h-4">
+              <p className="text-[11px] text-ink-meta min-h-4">
                 {alias &&
                   (describeUsage(aliasUsage) ?? (
                     <span className={WARN_TEXT_CLASS}>
@@ -246,7 +246,7 @@ export default function CreditAliasPanel() {
             {formError ? (
               <span className="text-rose-500">{formError}</span>
             ) : (
-              <span className="text-slate-400">
+              <span className="text-ink-meta">
                 只登记同一个人的不同署名。录入错字请直接在歌曲资料里改。登记后卷首、列表、筛选显示主名，版记照录原署。
               </span>
             )}
@@ -282,12 +282,12 @@ export default function CreditAliasPanel() {
                   <button
                     type="button"
                     onClick={() => setNameInput(main)}
-                    className="text-left text-sm text-slate-900 transition-colors wrap-break-word hover:text-(--tone) dark:text-slate-100"
+                    className="text-left text-sm text-ink transition-colors wrap-break-word hover:text-(--tone)"
                     title="填入主名，继续登记别名"
                   >
                     {main}
                   </button>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-ink-meta">
                     {describeUsage(usageByName.get(main)) ?? "曲库里没有署主名"}
                   </p>
                 </div>
@@ -295,10 +295,10 @@ export default function CreditAliasPanel() {
                   {rows.map((row) => (
                     <span
                       key={row.alias}
-                      className="inline-flex items-baseline gap-2 text-sm text-slate-700 dark:text-slate-200"
+                      className="inline-flex items-baseline gap-2 text-sm text-ink-prose"
                     >
                       <span className="wrap-break-word">{row.alias}</span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-ink-meta">
                         {usageByName.get(row.alias)?.songs ?? 0} 首
                       </span>
                       <ConfirmButton

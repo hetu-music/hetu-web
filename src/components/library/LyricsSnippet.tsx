@@ -24,7 +24,7 @@ export default function LyricsSnippet({
   for (const [start, end] of ranges) {
     if (start > pos) parts.push(text.slice(pos, start));
     parts.push(
-      <span key={start} className="text-slate-700 dark:text-slate-300">
+      <span key={start} className="text-ink-prose">
         {text.slice(start, end)}
       </span>,
     );
@@ -35,7 +35,7 @@ export default function LyricsSnippet({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-baseline gap-1.5 border-l-2 border-slate-200 pl-2 text-[11px] leading-relaxed text-slate-400 dark:border-slate-700 dark:text-slate-500",
+        "flex min-w-0 items-baseline gap-1.5 border-l-2 border-slate-200 pl-2 text-[11px] leading-relaxed text-ink-meta dark:border-slate-700",
         className,
       )}
     >

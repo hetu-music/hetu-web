@@ -46,13 +46,13 @@ const ACTION_LABELS: Record<string, string> = {
 
 const ACTION_TEXT: Record<string, string> = {
   INSERT: "text-(--tone)",
-  UPDATE: "text-slate-500 dark:text-slate-400",
+  UPDATE: "text-ink-muted",
   DELETE: "text-rose-600 dark:text-rose-400",
   CREATE: "text-(--tone)",
   PUBLISH: "text-(--tone)",
   REPUBLISH: "text-(--tone)",
   UNPUBLISH: "text-rose-600 dark:text-rose-400",
-  DISCARD_DRAFT: "text-slate-500 dark:text-slate-400",
+  DISCARD_DRAFT: "text-ink-muted",
 };
 
 function isEmpty(val: unknown): boolean {
@@ -99,16 +99,16 @@ function formatDate(ts: string | null): string {
 }
 
 function renderLogValue(val: unknown) {
-  if (val === null) return <span className="italic text-slate-400">null</span>;
+  if (val === null) return <span className="italic text-ink-meta">null</span>;
   if (val === undefined)
-    return <span className="italic text-slate-400">undefined</span>;
+    return <span className="italic text-ink-meta">undefined</span>;
   if (val === "")
     return (
-      <span className="italic text-slate-400">&quot;&quot; (空字符串)</span>
+      <span className="italic text-ink-meta">&quot;&quot; (空字符串)</span>
     );
   if (Array.isArray(val)) {
     if (val.length === 0)
-      return <span className="italic text-slate-400">[] (空数组)</span>;
+      return <span className="italic text-ink-meta">[] (空数组)</span>;
     return `[${val.map((v) => (typeof v === "string" ? `"${v}"` : String(v))).join(", ")}]`;
   }
   if (typeof val === "object") {
@@ -187,7 +187,7 @@ function DataBlock({
   return (
     <div className="min-w-0 space-y-1">
       <p className={cn("text-xs tracking-[0.2em]", className)}>{label}</p>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-ink-muted">
         {JSON.stringify(data, null, 2)}
       </pre>
     </div>
@@ -223,14 +223,14 @@ function LogDetail({ log }: { log: AuditLog }) {
 
   const diffKeys = getDiffKeys(log.old_data, log.new_data);
   if (diffKeys.length === 0) {
-    return <p className="pb-4 text-xs text-slate-400">无字段变更</p>;
+    return <p className="pb-4 text-xs text-ink-meta">无字段变更</p>;
   }
   return (
     <div className="overflow-x-auto pb-5">
       <table className="w-full text-[11px]">
         <thead>
           <tr className="border-b border-slate-200/70 text-left text-xs tracking-[0.2em] dark:border-slate-800">
-            <th className="w-1/4 py-1.5 pr-4 font-normal text-slate-400">
+            <th className="w-1/4 py-1.5 pr-4 font-normal text-ink-meta">
               字段
             </th>
             <th className="w-[37.5%] py-1.5 pr-4 font-normal text-rose-500 dark:text-rose-400">
@@ -245,13 +245,11 @@ function LogDetail({ log }: { log: AuditLog }) {
               key={k}
               className="border-b border-slate-200/40 align-top last:border-0 dark:border-slate-800/60"
             >
-              <td className="py-1.5 pr-4 font-mono text-slate-500 dark:text-slate-400">
-                {k}
-              </td>
-              <td className="break-all py-1.5 pr-4 font-mono text-slate-600 dark:text-slate-300">
+              <td className="py-1.5 pr-4 font-mono text-ink-muted">{k}</td>
+              <td className="break-all py-1.5 pr-4 font-mono text-ink-prose">
                 {renderLogValue(log.old_data?.[k])}
               </td>
-              <td className="break-all py-1.5 font-mono text-slate-800 dark:text-slate-100">
+              <td className="break-all py-1.5 font-mono text-ink-body">
                 {renderLogValue(log.new_data?.[k])}
               </td>
             </tr>
@@ -294,7 +292,7 @@ export default function AuditLogsPanel() {
     <>
       <AdminToolbar
         search={
-          <div className="flex items-center gap-4 text-xs text-slate-400">
+          <div className="flex items-center gap-4 text-xs text-ink-meta">
             <span className="tabular-nums">共 {data?.total ?? 0} 条</span>
             <button
               type="button"
@@ -350,30 +348,30 @@ export default function AuditLogsPanel() {
                   <span
                     className={cn(
                       "w-8 shrink-0",
-                      ACTION_TEXT[action] ?? "text-slate-500",
+                      ACTION_TEXT[action] ?? "text-ink-muted",
                     )}
                   >
                     {ACTION_LABELS[action] ?? log.action_type}
                   </span>
-                  <span className="hidden w-36 shrink-0 font-mono text-slate-500 sm:block dark:text-slate-400">
+                  <span className="hidden w-36 shrink-0 font-mono text-ink-muted sm:block">
                     {log.table_name}
                   </span>
                   <span
-                    className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-200"
+                    className="min-w-0 flex-1 truncate text-sm text-ink-prose"
                     title={identity ?? undefined}
                   >
                     {identity}
                   </span>
                   <span
                     className={cn(
-                      "hidden max-w-32 shrink-0 truncate text-slate-400 md:block",
+                      "hidden max-w-32 shrink-0 truncate text-ink-meta md:block",
                       !log.user_name && "font-mono",
                     )}
                     title={log.user_id ?? undefined}
                   >
                     {operatorLabel(log)}
                   </span>
-                  <span className="shrink-0 tabular-nums text-slate-400">
+                  <span className="shrink-0 tabular-nums text-ink-meta">
                     {formatDate(log.created_at)}
                   </span>
                 </button>

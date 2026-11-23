@@ -28,13 +28,13 @@ const LIST_STYLES: Record<TabsVariant, string> = {
 const TRIGGER_STYLES: Record<TabsVariant, string> = {
   fill: cn(
     "flex-1 pb-3 pt-4 text-sm font-medium",
-    "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
+    "text-ink-muted hover:text-ink-prose",
     "after:bottom-0 after:left-0 after:right-0",
   ),
   // 宽字距会在末字后多留 0.1em，短线右端收回同样的距离；选中加粗一档，深色下单靠字色分不清
   inline: cn(
     "py-2 text-sm tracking-widest data-active:font-medium",
-    "text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200",
+    "text-ink-meta hover:text-ink-prose",
     "after:bottom-0.5 after:left-0 after:right-[0.1em]",
   ),
 };

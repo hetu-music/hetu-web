@@ -52,7 +52,7 @@ function ToastList() {
         "data-starting-style:transform-[translateY(0.5rem)] data-starting-style:opacity-0 data-ending-style:opacity-0 data-limited:hidden",
         toast.type === "error"
           ? "text-rose-600 dark:text-rose-400"
-          : "text-slate-700 dark:text-slate-200",
+          : "text-ink-prose",
       )}
     >
       <BaseToast.Content>

@@ -22,7 +22,7 @@ interface FavoriteButtonProps {
 }
 
 const INLINE_IDLE_CLASS =
-  "text-slate-400 dark:text-slate-500 hover:text-rose-400 dark:hover:text-rose-400";
+  "text-ink-meta hover:text-rose-400 dark:hover:text-rose-400";
 
 const FavoriteButton: React.FC<FavoriteButtonProps> = ({
   songId,

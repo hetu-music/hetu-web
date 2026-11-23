@@ -48,7 +48,7 @@ export default function FavoritesSection() {
     return (
       <section>
         {heading}
-        <Loader2 size={20} className="mt-12 animate-spin text-slate-400" />
+        <Loader2 size={20} className="mt-12 animate-spin text-ink-meta" />
       </section>
     );
   }
@@ -57,7 +57,7 @@ export default function FavoritesSection() {
     return (
       <section>
         {heading}
-        <p className="mt-12 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+        <p className="mt-12 font-kaiti text-[15px] text-ink-meta">
           {t("favorites.empty")}
         </p>
       </section>
@@ -67,7 +67,7 @@ export default function FavoritesSection() {
   return (
     <section>
       {heading}
-      <p className="mt-8 lg:mt-12 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+      <p className="mt-8 lg:mt-12 text-xs tracking-[0.2em] text-ink-meta">
         {t("favorites.summary", { count: favoriteSongs.length })}
       </p>
       <ul className="mt-8 space-y-7">
@@ -108,11 +108,11 @@ function FavoriteRow({ song }: { song: Song }) {
           <Link
             href={`/song/${song.id}`}
             onClick={bumpNavDepth}
-            className="block font-serif text-base text-slate-900 dark:text-slate-100 truncate hover:text-(--tone) transition-colors"
+            className="block font-serif text-base text-ink truncate hover:text-(--tone) transition-colors"
           >
             {song.title}
           </Link>
-          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500 truncate">
+          <p className="mt-0.5 text-xs text-ink-meta truncate">
             {[artist, savedAt && t("savedAt", { date: formatDate(savedAt) })]
               .filter(Boolean)
               .join(" · ")}

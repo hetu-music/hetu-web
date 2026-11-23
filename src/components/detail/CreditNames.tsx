@@ -87,7 +87,7 @@ export default function CreditNames({
             id={noteId}
             role="note"
             className={cn(
-              "block pt-2 text-xs leading-relaxed text-slate-400 dark:text-slate-500 transition-opacity duration-300",
+              "block pt-2 text-xs leading-relaxed text-ink-meta transition-opacity duration-300",
               active ? "opacity-100" : "opacity-0",
             )}
           >
@@ -96,9 +96,7 @@ export default function CreditNames({
                 alias: shown,
                 name: aliasOf[shown],
                 em: (chunks) => (
-                  <span className="text-slate-600 dark:text-slate-300">
-                    {chunks}
-                  </span>
+                  <span className="text-ink-prose">{chunks}</span>
                 ),
               })}
           </span>

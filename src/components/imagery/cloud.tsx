@@ -506,8 +506,8 @@ export function CategoryButton({
       onClick={onClick}
       className={`group relative py-1.5 text-[14px] transition-all duration-700 font-serif whitespace-nowrap ${
         isActive
-          ? "text-slate-900 dark:text-white tracking-[0.25em]"
-          : "text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 tracking-[0.2em] hover:tracking-[0.25em]"
+          ? "text-ink tracking-[0.25em]"
+          : "text-ink-meta hover:text-ink-body tracking-[0.2em] hover:tracking-[0.25em]"
       }`}
     >
       {label}
@@ -544,8 +544,8 @@ export function BracketButton({
       onClick={onClick}
       className={`group relative ${size} transition-all duration-700 font-serif tracking-widest whitespace-nowrap py-1 ${
         isActive
-          ? "text-slate-700 dark:text-slate-300"
-          : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 hover:tracking-[0.15em]"
+          ? "text-ink-prose"
+          : "text-ink-meta hover:text-ink-muted hover:tracking-[0.15em]"
       }`}
     >
       <span
@@ -656,7 +656,7 @@ export function HeroMarquee({
             {[...words, ...words].map((w, i) => (
               <span
                 key={i}
-                className={`${size} mx-5 ${tint ? "" : "text-slate-900 dark:text-white"}`}
+                className={`${size} mx-5 ${tint ? "" : "text-ink"}`}
                 style={tint ? { color: tint } : undefined}
               >
                 {w}

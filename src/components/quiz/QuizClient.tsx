@@ -174,7 +174,7 @@ export default function QuizClient({
   const question = questions[index];
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
+    <div className="min-h-screen bg-[#FAFAFA] text-ink-body dark:bg-[#0B0F19]">
       <TopBar exit={{ kind: "logo" }} />
 
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 md:max-w-190 pb-24 pt-32">
@@ -195,22 +195,22 @@ export default function QuizClient({
               }}
               className="flex flex-1 flex-col items-center justify-center text-center"
             >
-              <p className="pl-[0.5em] font-serif text-sm tracking-[0.5em] text-slate-400 dark:text-slate-500">
+              <p className="pl-[0.5em] font-serif text-sm tracking-[0.5em] text-ink-meta">
                 {t("intro.eyebrow")}
               </p>
-              <h1 className="my-8 font-calligraphy text-8xl text-slate-900 md:text-9xl dark:text-white">
+              <h1 className="my-8 font-calligraphy text-8xl text-ink md:text-9xl">
                 {t("title")}
               </h1>
-              <p className="pl-[0.3em] font-serif text-base tracking-[0.3em] text-slate-600 md:text-lg dark:text-slate-300">
+              <p className="pl-[0.3em] font-serif text-base tracking-[0.3em] text-ink-prose md:text-lg">
                 {t("intro.subtitle")}
               </p>
-              <p className="mt-4 font-kaiti text-sm text-slate-400 dark:text-slate-500">
+              <p className="mt-4 font-kaiti text-sm text-ink-meta">
                 {t("intro.note")}
               </p>
               <button
                 onClick={start}
                 disabled={poolSize === 0}
-                className="group relative mt-16 border border-slate-300 px-12 py-3 pl-[calc(3rem+0.6em)] font-serif text-lg tracking-[0.6em] text-slate-700 transition-all duration-500 hover:border-[#9A6B2F] hover:text-[#9A6B2F] disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
+                className="group relative mt-16 border border-slate-300 px-12 py-3 pl-[calc(3rem+0.6em)] font-serif text-lg tracking-[0.6em] text-ink-prose transition-all duration-500 hover:border-[#9A6B2F] hover:text-[#9A6B2F] disabled:opacity-40 dark:border-slate-700 dark:hover:border-[#D4A259] dark:hover:text-[#D4A259]"
               >
                 {t("intro.start")}
               </button>
@@ -236,7 +236,7 @@ export default function QuizClient({
                     transition={{ duration: 0.6, ease: EASE }}
                   />
                 </div>
-                <p className="mt-3 font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                <p className="mt-3 font-serif text-xs tracking-[0.3em] text-ink-meta">
                   {t("question.progress", {
                     current: index + 1,
                     total: questions.length,
@@ -263,7 +263,7 @@ export default function QuizClient({
                   <p className="font-calligraphy text-4xl text-[#9A6B2F] dark:text-[#D4A259]">
                     {question.title}
                   </p>
-                  <h2 className="mt-5 font-serif text-2xl leading-relaxed text-slate-900 md:text-[28px] dark:text-slate-50">
+                  <h2 className="mt-5 font-serif text-2xl leading-relaxed text-ink md:text-[28px]">
                     {question.stem}
                   </h2>
 
@@ -278,7 +278,7 @@ export default function QuizClient({
                               "group flex w-full items-baseline gap-4 rounded-sm border px-5 py-4 text-left font-serif text-base leading-relaxed transition-all duration-300 md:text-lg",
                               selected
                                 ? "border-[#9A6B2F] bg-[#9A6B2F]/6 text-[#7A5222] dark:border-[#D4A259] dark:bg-[#D4A259]/10 dark:text-[#E8C48A]"
-                                : "border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-white dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-900/60",
+                                : "border-slate-200 text-ink-prose hover:border-slate-400 hover:bg-white dark:border-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-900/60",
                             )}
                           >
                             <span
@@ -286,7 +286,7 @@ export default function QuizClient({
                                 "font-mono text-xs transition-colors",
                                 selected
                                   ? "text-[#9A6B2F] dark:text-[#D4A259]"
-                                  : "text-slate-300 group-hover:text-slate-500 dark:text-slate-600",
+                                  : "text-ink-faint group-hover:text-ink-muted",
                               )}
                             >
                               {n + 1}
@@ -302,7 +302,7 @@ export default function QuizClient({
 
               <button
                 onClick={goBack}
-                className="mt-10 flex items-center gap-2 self-start font-serif text-sm tracking-widest text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
+                className="mt-10 flex items-center gap-2 self-start font-serif text-sm tracking-widest text-ink-meta transition-colors hover:text-ink-prose"
               >
                 <ArrowLeft size={14} />
                 {t("question.prev")}
@@ -324,7 +324,7 @@ export default function QuizClient({
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
-                className="font-kaiti text-2xl tracking-[0.4em] text-slate-500 dark:text-slate-400"
+                className="font-kaiti text-2xl tracking-[0.4em] text-ink-muted"
               >
                 {t("question.finishing")}
               </motion.p>

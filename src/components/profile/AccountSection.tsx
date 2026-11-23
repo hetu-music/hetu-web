@@ -18,7 +18,7 @@ export default function AccountSection() {
     <section>
       <ProfileSectionHeading label={t("tabs.account")} />
       {!loaded || !user ? (
-        <Loader2 size={20} className="mt-12 animate-spin text-slate-400" />
+        <Loader2 size={20} className="mt-12 animate-spin text-ink-meta" />
       ) : (
         <div className="mt-8 lg:mt-12 max-w-[40em] space-y-20">
           <ProfileForm />

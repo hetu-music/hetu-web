@@ -27,7 +27,7 @@ const MultiTagDisplay = ({
   return (
     <span
       title={labels.join(" · ")}
-      className="flex w-24 items-baseline justify-center gap-1.5 whitespace-nowrap text-xs tracking-wider text-slate-400 dark:text-slate-500"
+      className="flex w-24 items-baseline justify-center gap-1.5 whitespace-nowrap text-xs tracking-wider text-ink-meta"
     >
       <span className="min-w-0 truncate">
         {labels.slice(0, MAX_SHOWN).join(" · ")}

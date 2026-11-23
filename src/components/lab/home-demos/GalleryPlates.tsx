@@ -24,8 +24,7 @@ export function PoetryPlate({
   onCycle: () => void;
   canCycle: boolean;
 }) {
-  const columns =
-    entry.excerpt?.split(/\s+/).filter(Boolean).slice(0, 3) ?? [];
+  const columns = entry.excerpt?.split(/\s+/).filter(Boolean).slice(0, 3) ?? [];
 
   return (
     <article className="group flex flex-col">
@@ -63,7 +62,7 @@ export function PoetryPlate({
             }}
             aria-label="换一句摘句"
             title="换一句"
-            className="absolute right-2.5 top-2.5 rounded-full p-1.5 text-slate-400 transition-colors hover:text-(--tone) dark:text-slate-500"
+            className="absolute right-2.5 top-2.5 rounded-full p-1.5 text-ink-meta transition-colors hover:text-(--tone)"
           >
             <RefreshCw size={12} />
           </button>
@@ -79,7 +78,7 @@ export function PoetryPlate({
             {columns.map((col, i) => (
               <span
                 key={i}
-                className="font-calligraphy text-[17px] leading-none tracking-[0.26em] text-slate-800 [writing-mode:vertical-rl] sm:text-[21px] sm:tracking-[0.3em] dark:text-slate-100"
+                className="font-calligraphy text-[17px] leading-none tracking-[0.26em] text-ink-body [writing-mode:vertical-rl] sm:text-[21px] sm:tracking-[0.3em]"
                 style={{ marginTop: `${i * 0.85}rem` }}
               >
                 {col}
@@ -87,7 +86,7 @@ export function PoetryPlate({
             ))}
           </div>
         ) : (
-          <p className="px-2 text-center font-kaiti text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          <p className="px-2 text-center font-kaiti text-sm leading-relaxed text-ink-prose">
             你一定想知道，戏里讲了什么故事……
           </p>
         )}
@@ -99,15 +98,15 @@ export function PoetryPlate({
           <button
             type="button"
             onClick={() => onOpenSong(entry.song.id)}
-            className="line-clamp-1 text-left font-serif text-[15px] leading-snug text-slate-900 transition-colors group-hover:text-(--tone) sm:text-[18px] dark:text-slate-100"
+            className="line-clamp-1 text-left font-serif text-[15px] leading-snug text-ink transition-colors group-hover:text-(--tone) sm:text-[18px]"
           >
             《{entry.song.title}》
           </button>
-          <span className="shrink-0 font-mono text-[10px] tabular-nums text-slate-400 sm:text-[11px] dark:text-slate-500">
+          <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-meta sm:text-[11px]">
             {entry.song.year || "卷首"}
           </span>
         </div>
-        <p className="truncate font-kaiti text-xs text-slate-500 sm:text-[13px] dark:text-slate-400">
+        <p className="truncate font-kaiti text-xs text-ink-muted sm:text-[13px]">
           卷中拾句 · 点击入卷
         </p>
       </div>
@@ -219,7 +218,7 @@ export function FeaturePlate({ item }: { item: FeaturePlateItem }) {
           </span>
           <ArrowUpRight
             size={15}
-            className="text-slate-300 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-(--ink) dark:text-slate-600 dark:group-hover:text-(--ink-dark)"
+            className="text-ink-faint transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-(--ink) dark:group-hover:text-(--ink-dark)"
           />
         </div>
 
@@ -229,7 +228,7 @@ export function FeaturePlate({ item }: { item: FeaturePlateItem }) {
             aria-hidden
             className="mb-2.5 block h-px w-6 bg-(--ink)/60 transition-all duration-500 group-hover:w-11 dark:bg-(--ink-dark)/60"
           />
-          <p className="font-calligraphy text-2xl tracking-[0.2em] text-slate-900 transition-colors duration-300 group-hover:text-(--ink) sm:text-3xl dark:text-slate-50 dark:group-hover:text-(--ink-dark)">
+          <p className="font-calligraphy text-2xl tracking-[0.2em] text-ink transition-colors duration-300 group-hover:text-(--ink) sm:text-3xl dark:group-hover:text-(--ink-dark)">
             {item.title}
           </p>
         </div>
@@ -240,15 +239,15 @@ export function FeaturePlate({ item }: { item: FeaturePlateItem }) {
         <div className="flex items-baseline justify-between gap-2">
           <Link
             href={item.href}
-            className="line-clamp-1 font-serif text-[15px] leading-snug text-slate-900 transition-colors group-hover:text-(--tone) sm:text-[18px] dark:text-slate-100"
+            className="line-clamp-1 font-serif text-[15px] leading-snug text-ink transition-colors group-hover:text-(--tone) sm:text-[18px]"
           >
             {item.title}
           </Link>
-          <span className="shrink-0 text-[10px] tracking-[0.2em] text-slate-400 sm:text-[11px] dark:text-slate-500">
+          <span className="shrink-0 text-[10px] tracking-[0.2em] text-ink-meta sm:text-[11px]">
             {item.tag}
           </span>
         </div>
-        <p className="truncate font-kaiti text-xs text-slate-500 sm:text-[13px] dark:text-slate-400">
+        <p className="truncate font-kaiti text-xs text-ink-muted sm:text-[13px]">
           {item.subtitle}
         </p>
       </div>

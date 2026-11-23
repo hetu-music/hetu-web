@@ -53,7 +53,7 @@ export default function EnqueueButton({
         "rounded-lg p-2 transition-all duration-200",
         alreadyInQueue || justAdded
           ? "text-(--tone) bg-(--tone)/10 cursor-default"
-          : "text-slate-400 dark:text-slate-500 hover:text-(--tone) hover:bg-(--tone)/10",
+          : "text-ink-meta hover:text-(--tone) hover:bg-(--tone)/10",
         className,
       )}
     >

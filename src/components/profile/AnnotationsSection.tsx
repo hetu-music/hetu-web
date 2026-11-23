@@ -105,20 +105,20 @@ export default function AnnotationsSection() {
       </ProfileSectionHeading>
 
       {isPending ? (
-        <Loader2 size={20} className="mt-12 animate-spin text-slate-400" />
+        <Loader2 size={20} className="mt-12 animate-spin text-ink-meta" />
       ) : !hasAny ? (
-        <div className="mt-12 font-kaiti text-[15px] leading-[1.85] text-slate-400 dark:text-slate-500">
+        <div className="mt-12 font-kaiti text-[15px] leading-[1.85] text-ink-meta">
           <p>{t("annotations.empty")}</p>
           <p>{t("annotations.emptyHint")}</p>
         </div>
       ) : (
         <>
-          <p className="mt-8 lg:mt-12 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+          <p className="mt-8 lg:mt-12 text-xs tracking-[0.2em] text-ink-meta">
             {t("annotations.summary", { count: total, songs: groups.length })}
           </p>
 
           {filtered.length === 0 ? (
-            <p className="mt-10 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+            <p className="mt-10 font-kaiti text-[15px] text-ink-meta">
               {t("annotations.emptyFiltered")}
             </p>
           ) : (
@@ -140,16 +140,16 @@ export default function AnnotationsSection() {
                       />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block font-serif text-base text-slate-900 dark:text-slate-100 truncate group-hover:text-(--tone) transition-colors">
+                      <span className="block font-serif text-base text-ink truncate group-hover:text-(--tone) transition-colors">
                         {group.song.title}
                       </span>
                       {group.song.artist && group.song.artist.length > 0 && (
-                        <span className="block mt-0.5 text-xs text-slate-400 dark:text-slate-500 truncate">
+                        <span className="block mt-0.5 text-xs text-ink-meta truncate">
                           {group.song.artist.join(" / ")}
                         </span>
                       )}
                     </span>
-                    <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
+                    <span className="shrink-0 text-xs text-ink-meta">
                       {t("annotations.count", {
                         count: group.comments.length,
                       })}
@@ -202,7 +202,7 @@ function AnnotationRow({
   return (
     <li className={cn("transition-opacity", deleting && "opacity-40")}>
       {/* 批在哪里：章节，以及所批的原文或所回复的批注 */}
-      <p className="flex items-baseline gap-2.5 text-xs text-slate-400 dark:text-slate-500 min-w-0">
+      <p className="flex items-baseline gap-2.5 text-xs text-ink-meta min-w-0">
         <span className="shrink-0 tracking-[0.2em] text-(--tone)">
           {comment.isReply ? t("reply") : t(`anchor.${comment.anchor}`)}
         </span>
@@ -221,11 +221,11 @@ function AnnotationRow({
         )}
       </p>
 
-      <p className="mt-2 font-kaiti text-[15px] leading-[1.85] text-slate-700 dark:text-slate-300 whitespace-pre-line wrap-break-word">
+      <p className="mt-2 font-kaiti text-[15px] leading-[1.85] text-ink-prose whitespace-pre-line wrap-break-word">
         {comment.body}
       </p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 dark:text-slate-500">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-meta">
         <time dateTime={comment.createdAt} className="tabular-nums">
           {formatDate(comment.createdAt)}
           {comment.editedAt && ` · ${t("edited")}`}

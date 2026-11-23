@@ -90,7 +90,7 @@ export function FeatureRibbonB({ items }: { items: FeatureEntranceItem[] }) {
             type="button"
             onClick={() => scrollBy(-1)}
             aria-label="向左浏览"
-            className="p-1 text-slate-400 transition-colors hover:text-(--tone) dark:text-slate-500"
+            className="p-1 text-ink-meta transition-colors hover:text-(--tone)"
           >
             <ChevronLeft size={15} />
           </button>
@@ -98,7 +98,7 @@ export function FeatureRibbonB({ items }: { items: FeatureEntranceItem[] }) {
             type="button"
             onClick={() => scrollBy(1)}
             aria-label="向右浏览"
-            className="p-1 text-slate-400 transition-colors hover:text-(--tone) dark:text-slate-500"
+            className="p-1 text-ink-meta transition-colors hover:text-(--tone)"
           >
             <ChevronRight size={15} />
           </button>
@@ -160,15 +160,15 @@ export function FeatureRibbonB({ items }: { items: FeatureEntranceItem[] }) {
               </span>
               <ArrowUpRight
                 size={14}
-                className="text-slate-300 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-(--ink) dark:text-slate-600 dark:group-hover:text-(--ink-dark)"
+                className="text-ink-faint transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-(--ink) dark:group-hover:text-(--ink-dark)"
               />
             </div>
 
             <div className="relative flex items-baseline gap-3">
-              <span className="shrink-0 font-calligraphy text-[22px] leading-none tracking-[0.16em] text-slate-900 transition-colors group-hover:text-(--ink) dark:text-slate-100 dark:group-hover:text-(--ink-dark)">
+              <span className="shrink-0 font-calligraphy text-[22px] leading-none tracking-[0.16em] text-ink transition-colors group-hover:text-(--ink) dark:group-hover:text-(--ink-dark)">
                 {item.title}
               </span>
-              <span className="min-w-0 truncate font-kaiti text-xs text-slate-500 dark:text-slate-400">
+              <span className="min-w-0 truncate font-kaiti text-xs text-ink-muted">
                 {item.desc}
               </span>
             </div>

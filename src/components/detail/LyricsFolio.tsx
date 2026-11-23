@@ -152,7 +152,7 @@ export default function LyricsFolio({
     return (
       <section id="lyrics" className="py-16">
         <SectionHeading label={t("folio.sections.text")} />
-        <div className="flex flex-col items-center py-20 text-slate-400 opacity-60">
+        <div className="flex flex-col items-center py-20 text-ink-meta opacity-60">
           <FileText size={40} className="mb-3" />
           <p className="text-sm">{t("noLyrics")}</p>
         </div>
@@ -174,7 +174,7 @@ export default function LyricsFolio({
                   "lg:hidden transition-colors",
                   inline
                     ? "text-(--tone)"
-                    : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300",
+                    : "text-ink-meta hover:text-ink-prose",
                 )}
               >
                 {t("folio.comments.inline")}
@@ -189,9 +189,7 @@ export default function LyricsFolio({
               onClick={() => setMode(m)}
               className={cn(
                 "transition-colors",
-                mode === m
-                  ? "text-slate-900 dark:text-white"
-                  : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300",
+                mode === m ? "text-ink" : "text-ink-meta hover:text-ink-prose",
               )}
             >
               {t(`folio.readMode.${m}`)}
@@ -205,7 +203,7 @@ export default function LyricsFolio({
       )}
 
       {mode === "lrc" ? (
-        <pre className="mt-12 lg:ml-104 font-mono text-sm leading-7 text-slate-600 dark:text-slate-400 whitespace-pre-wrap wrap-break-word">
+        <pre className="mt-12 lg:ml-104 font-mono text-sm leading-7 text-ink-muted whitespace-pre-wrap wrap-break-word">
           {rawLyrics}
         </pre>
       ) : (
@@ -331,12 +329,9 @@ const FolioRow = memo(function FolioRow({
           title={seekable ? seekHint : undefined}
           className={cn(
             "relative font-serif text-[17px] sm:text-lg leading-[2.2] text-balance transition-[opacity,color] duration-500 max-lg:cursor-pointer",
-            isCurrent || selected
-              ? "text-slate-950 dark:text-white"
-              : "text-slate-700 dark:text-slate-300",
+            isCurrent || selected ? "text-ink" : "text-ink-prose",
             focused && !carriesActive && "opacity-[0.18]",
-            seekable &&
-              "lg:cursor-pointer hover:text-slate-950 dark:hover:text-white",
+            seekable && "lg:cursor-pointer hover:text-ink",
           )}
         >
           <AnnotateHandle
@@ -437,9 +432,7 @@ const FolioRow = memo(function FolioRow({
               title={mark.path.join(" › ")}
               className={cn(
                 "flex items-center gap-1.5 font-kaiti text-sm transition-colors",
-                active
-                  ? ""
-                  : "text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300",
+                active ? "" : "text-ink-meta hover:text-ink-prose",
               )}
               style={active ? { color: mark.accent } : undefined}
             >
@@ -476,10 +469,10 @@ function InlineNotes({
       {threads.map(({ comment, replies }) => (
         <span
           key={comment.id}
-          className="block font-kaiti text-sm leading-[1.8] text-slate-500 dark:text-slate-400"
+          className="block font-kaiti text-sm leading-[1.8] text-ink-muted"
         >
           {comment.deleted ? t("deleted") : comment.body}
-          <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">
+          <span className="ml-2 text-xs text-ink-meta">
             {!comment.deleted && (comment.author || t("anonymous"))}
             {replies.length > 0 &&
               ` · ${t("replies", { count: replies.length })}`}

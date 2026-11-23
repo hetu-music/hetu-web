@@ -91,7 +91,7 @@ function ReadField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className={LABEL_CLASS}>{label}</dt>
-      <dd className="mt-1 text-slate-700 dark:text-slate-300">{value}</dd>
+      <dd className="mt-1 text-ink-prose">{value}</dd>
     </div>
   );
 }
@@ -262,14 +262,12 @@ export default function UserManagePanel() {
                     aria-expanded={isExpanded}
                     className="flex min-w-0 flex-1 items-baseline gap-3 text-left"
                   >
-                    <span className="truncate text-slate-900 dark:text-slate-100">
-                      {user.name}
-                    </span>
+                    <span className="truncate text-ink">{user.name}</span>
                     {user.role !== "user" && (
                       <span className={TAG_CLASS}>{ROLE_LABEL[user.role]}</span>
                     )}
                     {user.can_stream && <span className={TAG_CLASS}>试听</span>}
-                    <span className="hidden min-w-0 truncate font-mono text-[11px] text-slate-400 md:block">
+                    <span className="hidden min-w-0 truncate font-mono text-[11px] text-ink-meta md:block">
                       {user.id}
                     </span>
                   </button>
@@ -369,13 +367,13 @@ export default function UserManagePanel() {
                           label="试听权益"
                           value={user.can_stream ? "有" : "无"}
                         />
-                        <div className="col-span-2 font-mono text-[11px] text-slate-400 sm:col-span-4 md:hidden">
+                        <div className="col-span-2 font-mono text-[11px] text-ink-meta sm:col-span-4 md:hidden">
                           {user.id}
                         </div>
                         {user.intro && (
                           <div className="col-span-2 sm:col-span-4">
                             <dt className={LABEL_CLASS}>简介</dt>
-                            <dd className="mt-1 font-kaiti leading-relaxed text-slate-700 dark:text-slate-300">
+                            <dd className="mt-1 font-kaiti leading-relaxed text-ink-prose">
                               {user.intro}
                             </dd>
                           </div>

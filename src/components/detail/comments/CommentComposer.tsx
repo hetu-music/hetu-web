@@ -66,7 +66,7 @@ export default function CommentComposer({
       // 行高取旁批正文的行高（15px × 1.85），宽屏旁批里才与所批的那一行对齐
       <p
         className={cn(
-          "text-xs leading-[27.75px] tracking-wider text-slate-400",
+          "text-xs leading-[27.75px] tracking-wider text-ink-meta",
           className,
         )}
       >
@@ -117,11 +117,11 @@ export default function CommentComposer({
         }}
         placeholder={placeholder}
         rows={1}
-        className="block w-full resize-none field-sizing-content max-h-[16em] bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:border-(--tone) focus:outline-none px-0 py-1.5 font-kaiti text-[15px] leading-[1.8] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors"
+        className="block w-full resize-none field-sizing-content max-h-[16em] bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:border-(--tone) focus:outline-none px-0 py-1.5 font-kaiti text-[15px] leading-[1.8] text-ink-body placeholder:text-ink-meta transition-colors"
       />
       <div className="mt-2.5 flex items-center gap-4 text-xs">
         {allowPrivate && (
-          <label className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 text-ink-meta cursor-pointer select-none">
             <input
               type="checkbox"
               checked={isPrivate}
@@ -135,7 +135,7 @@ export default function CommentComposer({
           <span
             className={cn(
               "tabular-nums",
-              length > COMMENT_BODY_MAX ? "text-rose-500" : "text-slate-400",
+              length > COMMENT_BODY_MAX ? "text-rose-500" : "text-ink-meta",
             )}
           >
             {length}/{COMMENT_BODY_MAX}
@@ -146,7 +146,7 @@ export default function CommentComposer({
           <button
             type="button"
             onClick={onCancel}
-            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className="text-ink-meta hover:text-ink-prose transition-colors"
           >
             {t("cancel")}
           </button>

@@ -96,7 +96,7 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
           "w-11 h-11 shrink-0 rounded-full flex items-center justify-center transition-all duration-300",
           "border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--tone)/40",
           isThisLoading
-            ? "border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed"
+            ? "border-slate-200 dark:border-slate-700 text-ink-meta cursor-not-allowed"
             : isThisPlaying
               ? "bg-(--tone) border-(--tone) text-white dark:text-slate-950 active:scale-95"
               : "border-(--tone)/40 text-(--tone) hover:bg-(--tone) hover:border-(--tone) hover:text-white dark:hover:text-slate-950 active:scale-95",
@@ -118,7 +118,7 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
             "text-sm tracking-wider truncate",
             currentError
               ? "text-rose-500 flex items-center gap-1.5"
-              : "text-slate-600 dark:text-slate-300",
+              : "text-ink-prose",
           )}
         >
           {currentError ? (
@@ -141,7 +141,7 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
       {isInQueue ? (
         <span
           title={t("inQueueTitle")}
-          className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 shrink-0"
+          className="flex items-center gap-1 text-xs text-ink-meta shrink-0"
         >
           <Check size={13} strokeWidth={2.5} />
           {t("inQueue")}
@@ -152,7 +152,7 @@ const NaviPlayer: React.FC<NaviPlayerProps> = ({
           onClick={handleEnqueue}
           aria-label={t("enqueueTitle")}
           title={t("enqueueTitle")}
-          className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 hover:text-(--tone) transition-colors shrink-0"
+          className="flex items-center gap-1 text-xs text-ink-meta hover:text-(--tone) transition-colors shrink-0"
         >
           <ListPlus size={14} />
           {t("enqueue")}

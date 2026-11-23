@@ -18,7 +18,7 @@ interface FloatingActionButtonsProps {
 const IDLE_MS = 2000;
 
 const BUTTON_CLASS =
-  "size-11 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10 active:bg-slate-900/10 dark:active:bg-white/15 transition-colors";
+  "size-11 flex items-center justify-center text-ink-prose hover:bg-slate-900/5 dark:hover:bg-white/10 active:bg-slate-900/10 dark:active:bg-white/15 transition-colors";
 
 /** 页面正在滚动，停下 IDLE_MS 后复位 */
 function useScrolling() {

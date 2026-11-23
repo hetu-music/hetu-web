@@ -28,10 +28,8 @@ export function SearchResultsDialog({
               onClick={() => onSelect(result)}
               className="w-full rounded-md px-2 py-2.5 text-left transition-colors hover:bg-slate-100/70 dark:hover:bg-slate-900"
             >
-              <span className="block truncate text-slate-900 dark:text-slate-100">
-                {result.name}
-              </span>
-              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+              <span className="block truncate text-ink">{result.name}</span>
+              <span className="block truncate text-xs text-ink-muted">
                 {[result.artists.join("、") || "未知艺术家", result.album]
                   .filter(Boolean)
                   .join(" · ")}

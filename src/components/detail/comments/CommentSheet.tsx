@@ -45,7 +45,7 @@ export default function CommentSheet() {
                   {t(`slot.${slot.section}`)}
                 </DrawerTitle>
                 {quote && (
-                  <p className="mt-2 font-serif text-[15px] leading-relaxed text-slate-800 dark:text-slate-200 line-clamp-2">
+                  <p className="mt-2 font-serif text-[15px] leading-relaxed text-ink-body line-clamp-2">
                     {quote}
                   </p>
                 )}

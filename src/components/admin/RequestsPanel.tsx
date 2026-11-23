@@ -38,7 +38,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 
 const STATUS_TEXT: Record<RequestStatus, string> = {
   pending: WARN_TEXT_CLASS,
-  replied: "text-slate-500 dark:text-slate-400",
+  replied: "text-ink-muted",
   approved: "text-(--tone)",
   rejected: "text-rose-600 dark:text-rose-400",
 };
@@ -167,7 +167,7 @@ export default function RequestsPanel({
     <>
       <AdminToolbar
         search={
-          <div className="flex items-center gap-4 text-xs text-slate-400">
+          <div className="flex items-center gap-4 text-xs text-ink-meta">
             <span className="tabular-nums">共 {total} 条</span>
             <button
               type="button"
@@ -247,12 +247,12 @@ export default function RequestsPanel({
                   <span className={cn(META_CLASS, "w-16 shrink-0")}>
                     {TYPE_LABELS[req.type]}
                   </span>
-                  <span className="w-20 shrink-0 truncate text-slate-700 dark:text-slate-200">
+                  <span className="w-20 shrink-0 truncate text-ink-prose">
                     {req.user_name ?? "—"}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-slate-500 dark:text-slate-400">
+                  <span className="min-w-0 flex-1 truncate text-ink-muted">
                     {req.song_title && (
-                      <span className="mr-2 text-slate-700 dark:text-slate-200">
+                      <span className="mr-2 text-ink-prose">
                         《{req.song_title}》
                       </span>
                     )}
@@ -263,24 +263,24 @@ export default function RequestsPanel({
                   >
                     {STATUS_LABELS[req.status]}
                   </span>
-                  <span className="hidden shrink-0 text-xs tabular-nums text-slate-400 sm:block">
+                  <span className="hidden shrink-0 text-xs tabular-nums text-ink-meta sm:block">
                     {new Date(req.created_at).toLocaleDateString("zh-CN")}
                   </span>
                 </button>
 
                 {isExpanded && (
                   <div className="space-y-5 pb-6 pt-2 md:pl-20">
-                    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-400">
+                    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-meta">
                       <div>
                         <dt className="inline">用户 </dt>
-                        <dd className="inline font-mono text-slate-600 dark:text-slate-300">
+                        <dd className="inline font-mono text-ink-prose">
                           {req.user_id.slice(0, 8)}…
                         </dd>
                       </div>
                       {req.category && (
                         <div>
                           <dt className="inline">类别 </dt>
-                          <dd className="inline text-slate-600 dark:text-slate-300">
+                          <dd className="inline text-ink-prose">
                             {req.category}
                           </dd>
                         </div>
@@ -293,7 +293,7 @@ export default function RequestsPanel({
                       </div>
                     </dl>
 
-                    <p className="max-w-[40em] whitespace-pre-wrap font-kaiti text-[15px] leading-[1.85] text-slate-700 dark:text-slate-300">
+                    <p className="max-w-[40em] whitespace-pre-wrap font-kaiti text-[15px] leading-[1.85] text-ink-prose">
                       {req.content}
                     </p>
 

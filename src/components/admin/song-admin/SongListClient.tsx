@@ -241,9 +241,7 @@ export default function SongListClient({
         />
         {subs && (
           <div className="flex items-baseline gap-3">
-            <span className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
-              缺
-            </span>
+            <span className="text-xs tracking-[0.2em] text-ink-meta">缺</span>
             <AdminOptions
               items={[
                 { id: "all", label: "全部" },
@@ -338,26 +336,26 @@ function SongRow({
           GRID_COLS,
         )}
       >
-        <span className="hidden text-right font-mono text-xs text-slate-400 tabular-nums lg:block">
+        <span className="hidden text-right font-mono text-xs text-ink-meta tabular-nums lg:block">
           {song.id}
         </span>
         <span className="row-span-2 size-10 overflow-hidden rounded ring-1 ring-slate-900/5 lg:row-span-1 dark:ring-white/10">
           <AdminCoverArt song={song} />
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-slate-900 transition-colors group-hover:text-(--tone) dark:text-slate-100">
+          <span className="block truncate text-ink transition-colors group-hover:text-(--tone)">
             {song.title}
           </span>
-          <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+          <span className="block truncate text-xs text-ink-muted">
             {[song.album || "未归档", join(song.lyricist)]
               .filter(Boolean)
               .join(" · ")}
           </span>
         </span>
-        <span className="hidden truncate text-sm text-slate-500 lg:block dark:text-slate-400">
+        <span className="hidden truncate text-sm text-ink-muted lg:block">
           {join(song.composer) || "—"}
         </span>
-        <span className="hidden truncate text-sm text-slate-500 lg:block dark:text-slate-400">
+        <span className="hidden truncate text-sm text-ink-muted lg:block">
           {song.type?.[0] ?? "—"}
         </span>
         {/* 窄屏排在歌名下面 */}
@@ -377,16 +375,12 @@ function SongRow({
             </span>
           )}
           {missingLinks.length > 0 && (
-            <span className="text-slate-500 dark:text-slate-400">
+            <span className="text-ink-muted">
               无{missingLinks.join("、")}链接
             </span>
           )}
           <span
-            className={
-              fewImagery
-                ? WARN_TEXT_CLASS
-                : "text-slate-400 dark:text-slate-500"
-            }
+            className={fewImagery ? WARN_TEXT_CLASS : "text-ink-meta"}
             title={
               fewImagery
                 ? `少于 ${MIN_OCCURRENCES} 个不会进入寻曲测验`

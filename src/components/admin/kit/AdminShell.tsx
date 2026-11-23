@@ -36,7 +36,7 @@ export default function AdminShell({
   const { user } = useUserContext();
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] font-sans text-slate-800 dark:bg-[#0B0F19] dark:text-slate-200">
+    <div className="min-h-screen bg-[#FAFAFA] font-sans text-ink-body dark:bg-[#0B0F19]">
       <AdminNavbar active={section} isSuper={user?.isSuper} pinned={pinned} />
 
       <main
@@ -52,11 +52,11 @@ export default function AdminShell({
                 {eyebrow}
               </div>
             )}
-            <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance text-slate-900 wrap-break-word md:text-4xl dark:text-slate-50">
+            <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance text-ink wrap-break-word md:text-4xl">
               {title}
             </h1>
             {description && (
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-muted">
                 {description}
               </p>
             )}

@@ -63,7 +63,7 @@ function ComboboxItem({
     <BaseCombobox.Item
       className={cn(
         "flex cursor-pointer select-none items-center gap-3 px-4 py-2 text-sm outline-none transition-colors",
-        "text-slate-600 dark:text-slate-300 data-highlighted:text-slate-900 dark:data-highlighted:text-slate-100",
+        "text-ink-prose data-highlighted:text-ink",
         "data-highlighted:bg-slate-900/3 dark:data-highlighted:bg-white/4",
         className,
       )}
@@ -80,7 +80,7 @@ function ComboboxEmpty({
   return (
     <BaseCombobox.Empty
       className={cn(
-        "px-4 py-2 font-kaiti text-sm text-slate-400 empty:hidden dark:text-slate-500",
+        "px-4 py-2 font-kaiti text-sm text-ink-meta empty:hidden",
         className,
       )}
       {...props}

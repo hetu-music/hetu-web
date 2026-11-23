@@ -10,12 +10,12 @@ export default function SiteMark({ className }: { className?: string }) {
   return (
     <p
       className={cn(
-        "font-mono text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500",
+        "font-mono text-xs tracking-[0.2em] text-ink-meta",
         className,
       )}
     >
       {tSite("name")}
-      <span aria-hidden className="mx-3 text-slate-300 dark:text-slate-600">
+      <span aria-hidden className="mx-3 text-ink-faint">
         ·
       </span>
       © {new Date().getFullYear()}

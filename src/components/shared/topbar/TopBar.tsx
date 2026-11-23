@@ -244,11 +244,11 @@ function MoreSheet({
                       onClose();
                       row.onClick();
                     }}
-                    className="group flex w-full items-center gap-3 py-3 text-left text-sm tracking-widest text-slate-700 dark:text-slate-300 hover:text-(--tone) transition-colors"
+                    className="group flex w-full items-center gap-3 py-3 text-left text-sm tracking-widest text-ink-prose hover:text-(--tone) transition-colors"
                   >
                     <Icon
                       size={16}
-                      className="shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-(--tone) transition-colors"
+                      className="shrink-0 text-ink-meta group-hover:text-(--tone) transition-colors"
                     />
                     {row.label}
                   </button>
@@ -257,7 +257,7 @@ function MoreSheet({
             </ul>
           )}
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-8">
-            <dt className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+            <dt className="text-xs tracking-[0.3em] text-ink-meta">
               {tNav("theme")}
             </dt>
             <dd>
@@ -269,7 +269,7 @@ function MoreSheet({
             </dd>
             {script && (
               <>
-                <dt className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                <dt className="text-xs tracking-[0.3em] text-ink-meta">
                   {tNav("script")}
                 </dt>
                 <dd>

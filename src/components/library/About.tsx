@@ -106,7 +106,7 @@ const fallbackColors = {
   border: "border-l-slate-500 dark:border-l-slate-400",
   hoverBorder: "hover:border-slate-300 dark:hover:border-slate-500/50",
   bg: "from-slate-50/50 dark:from-slate-500/5",
-  text: "text-slate-600 dark:text-slate-400",
+  text: "text-ink-muted",
 };
 
 const WeiboIcon = ({
@@ -179,16 +179,16 @@ const About = ({
       <AnimatedHeight>
         {/* About Tab */}
         <TabsContent value="about" className="max-h-[65vh]">
-          <div className="space-y-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          <div className="space-y-6 text-sm leading-relaxed text-ink-prose">
             <div className="space-y-2">
-              <h3 className="font-semibold text-slate-900 dark:text-white">
+              <h3 className="font-semibold text-ink">
                 {t("introSection.title")}
               </h3>
               <p>{t("introSection.content")}</p>
             </div>
 
             <div className="space-y-2">
-              <h3 className="font-semibold text-slate-900 dark:text-white">
+              <h3 className="font-semibold text-ink">
                 {t("feedbackSection.title")}
               </h3>
               <p>{t("feedbackSection.content")}</p>
@@ -217,13 +217,11 @@ const About = ({
                 <Award size={18} />
                 <span>{t("thanksSection.title")}</span>
               </div>
-              <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className="text-ink-prose leading-relaxed">
                 {t.rich("thanksSection.content", {
                   name: mainContributor?.name || "顾大一",
                   highlight: (chunks) => (
-                    <span className="font-semibold text-slate-900 dark:text-white">
-                      {chunks}
-                    </span>
+                    <span className="font-semibold text-ink">{chunks}</span>
                   ),
                 })}
               </p>
@@ -256,7 +254,7 @@ const About = ({
                     >
                       {type}
                     </div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                    <div className="text-sm text-ink-muted leading-relaxed">
                       {t(`typeDescriptions.${type}`)}
                     </div>
                   </div>
@@ -270,7 +268,7 @@ const About = ({
         <TabsContent value="maintainer" className="max-h-[65vh]">
           <div className="space-y-4">
             {contributorsLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+              <div className="flex flex-col items-center justify-center py-12 text-ink-meta gap-3">
                 <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm">
                   {t("maintainersSection.loading")}
@@ -282,7 +280,7 @@ const About = ({
                 <span className="text-sm">{contributorsError}</span>
               </div>
             ) : contributors.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+              <div className="flex flex-col items-center justify-center py-12 text-ink-meta gap-2">
                 <User size={32} className="opacity-20" />
                 <span className="text-sm">{t("maintainersSection.empty")}</span>
               </div>
@@ -296,15 +294,15 @@ const About = ({
                       style={{ animationDelay: `${idx * 40}ms` }}
                       className="animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both flex items-start gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 hover:border-(--tone)/30 dark:hover:border-slate-700 transition-colors"
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm font-bold shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-ink-muted text-sm font-bold shrink-0">
                         {contributor.name?.charAt(0).toUpperCase() ?? "?"}
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
-                        <div className="font-semibold text-slate-900 dark:text-white text-sm">
+                        <div className="font-semibold text-ink text-sm">
                           {contributor.name ?? t("maintainersSection.unknown")}
                         </div>
                         {contributor.intro && (
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                          <div className="text-xs text-ink-muted mt-1 leading-relaxed">
                             {contributor.intro}
                           </div>
                         )}
@@ -338,7 +336,7 @@ const About = ({
       <DialogContent variant="classic" className="overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
-          <DialogClose className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <DialogClose className="p-1 rounded-full text-ink-meta hover:text-ink-body hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
             <X size={20} />
           </DialogClose>
         </DialogHeader>

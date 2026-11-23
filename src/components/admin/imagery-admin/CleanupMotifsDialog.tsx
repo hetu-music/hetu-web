@@ -174,7 +174,7 @@ export function CleanupMotifsDialog({
         <EmptyState>每个母题都挂着词，没有要整理的</EmptyState>
       ) : (
         <div className="space-y-6">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-ink-muted">
             以下 {unused.data.length}{" "}
             个母题没有任何标注，可以删掉。只列母题，门类与类别不动。通常算作它的词，改为它其余可选母题里标注最多的那个。
           </p>
@@ -193,16 +193,14 @@ export function CleanupMotifsDialog({
                         className="mt-0.5 h-4 w-4 shrink-0 accent-(--tone)"
                       />
                       <span className="min-w-0">
-                        <span className="text-slate-800 dark:text-slate-200">
-                          {motif.name}
-                        </span>
+                        <span className="text-ink-body">{motif.name}</span>
                         {motif.description && (
-                          <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">
+                          <span className="ml-2 text-xs text-ink-meta">
                             {motif.description}
                           </span>
                         )}
                         {motif.words.length > 0 && (
-                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                          <span className="mt-0.5 block text-xs text-ink-muted">
                             {motif.words.map(describeWord).join("；")}
                           </span>
                         )}

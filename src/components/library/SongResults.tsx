@@ -27,8 +27,7 @@ const enterStyle = (index: number): React.CSSProperties => ({
 });
 
 /** 列表上下的一句提示：楷体灰字，同空状态（DESIGN.md「空状态与提示」） */
-const NOTE_CLASS =
-  "mb-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500";
+const NOTE_CLASS = "mb-8 font-kaiti text-[15px] text-ink-meta";
 
 interface SongResultsProps {
   /** 当前这一页的歌 */
@@ -103,7 +102,7 @@ export default function SongResults({
             </div>
           ) : (
             <div key={`list-${remountKey}`} className="flex flex-col gap-2">
-              <div className="mb-2 hidden px-4 py-2 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500 md:flex">
+              <div className="mb-2 hidden px-4 py-2 text-xs tracking-[0.2em] text-ink-meta md:flex">
                 <div className="mr-6 w-16">{t("listHeader.cover")}</div>
                 <div className="grow">{t("listHeader.title")}</div>
                 <div className="ml-8 w-8" />
@@ -149,7 +148,7 @@ export default function SongResults({
           />
         </>
       ) : (
-        <p className="py-20 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+        <p className="py-20 text-center font-kaiti text-[15px] text-ink-meta">
           {lyricsPending ? t("search.lyricsPending") : t("noFilteredSongs")}
         </p>
       )}

@@ -85,9 +85,9 @@ export default function QuizSection() {
       </ProfileSectionHeading>
 
       {isPending ? (
-        <Loader2 size={20} className="mt-12 animate-spin text-slate-400" />
+        <Loader2 size={20} className="mt-12 animate-spin text-ink-meta" />
       ) : records.length === 0 ? (
-        <div className="mt-12 font-kaiti text-[15px] leading-[1.85] text-slate-400 dark:text-slate-500">
+        <div className="mt-12 font-kaiti text-[15px] leading-[1.85] text-ink-meta">
           <p>{t("quiz.empty")}</p>
           <p>{t("quiz.emptyHint")}</p>
         </div>
@@ -138,7 +138,7 @@ function LatestRecord({
     <article className="mt-8 lg:mt-12">
       <Link
         href={href}
-        className="font-calligraphy text-5xl text-slate-900 dark:text-white hover:text-(--tone) dark:hover:text-(--tone) transition-colors"
+        className="font-calligraphy text-5xl text-ink hover:text-(--tone) dark:hover:text-(--tone) transition-colors"
       >
         {result.persona.motto}
       </Link>
@@ -147,21 +147,21 @@ function LatestRecord({
           {t("secondary", { motto: result.secondary.motto })}
         </p>
       )}
-      <p className="mt-6 max-w-xl font-kaiti text-[15px] leading-[1.85] text-slate-600 dark:text-slate-400">
+      <p className="mt-6 max-w-xl font-kaiti text-[15px] leading-[1.85] text-ink-muted">
         {result.persona.description}
       </p>
 
       <div className="mt-10 grid gap-10 sm:grid-cols-[1fr_1.4fr]">
         {result.imagery.length > 0 && (
           <div>
-            <h3 className="font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+            <h3 className="font-serif text-xs tracking-[0.3em] text-ink-meta">
               {t("imagery")}
             </h3>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
               {result.imagery.map((name) => (
                 <span
                   key={name}
-                  className="font-calligraphy text-2xl text-slate-800 dark:text-slate-100"
+                  className="font-calligraphy text-2xl text-ink-body"
                 >
                   {name}
                 </span>
@@ -170,7 +170,7 @@ function LatestRecord({
           </div>
         )}
         <div className={cn(result.imagery.length === 0 && "sm:col-span-2")}>
-          <h3 className="font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+          <h3 className="font-serif text-xs tracking-[0.3em] text-ink-meta">
             {t("profile")}
           </h3>
           <ul className="mt-4 space-y-2">
@@ -178,7 +178,7 @@ function LatestRecord({
               const ratio = Math.min(Math.abs(p.z) / Z_RANGE, 1) * 50;
               return (
                 <li key={p.key} className="flex items-center gap-4">
-                  <span className="w-10 shrink-0 font-serif text-xs text-slate-500 dark:text-slate-400">
+                  <span className="w-10 shrink-0 font-serif text-xs text-ink-muted">
                     {p.label}
                   </span>
                   <span className="relative h-1 flex-1 rounded-full bg-slate-100 dark:bg-slate-800/70">
@@ -201,7 +201,7 @@ function LatestRecord({
 
       {result.matches.length > 0 && (
         <div className="mt-10">
-          <h3 className="font-serif text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+          <h3 className="font-serif text-xs tracking-[0.3em] text-ink-meta">
             {t("matches")}
           </h3>
           <ol className="mt-6 space-y-7">
@@ -230,7 +230,7 @@ function LatestRecord({
                     <Link
                       href={`/song/${song.id}`}
                       onClick={bumpNavDepth}
-                      className="min-w-0 flex-1 truncate font-serif text-base text-slate-900 dark:text-slate-100 hover:text-(--tone) transition-colors"
+                      className="min-w-0 flex-1 truncate font-serif text-base text-ink hover:text-(--tone) transition-colors"
                     >
                       {song.title}
                     </Link>
@@ -239,7 +239,7 @@ function LatestRecord({
                     </span>
                   </div>
                   {reasons.length > 0 && (
-                    <p className="mt-1 font-serif text-xs tracking-wider text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 font-serif text-xs tracking-wider text-ink-muted">
                       {t("reasons", { reasons: reasons.join(" · ") })}
                     </p>
                   )}
@@ -248,7 +248,7 @@ function LatestRecord({
                       {lines.map((line) => (
                         <p
                           key={line}
-                          className="font-kaiti text-[15px] leading-relaxed text-slate-600 dark:text-slate-300"
+                          className="font-kaiti text-[15px] leading-relaxed text-ink-prose"
                         >
                           {line}
                         </p>
@@ -264,7 +264,7 @@ function LatestRecord({
 
       {/* 日期与删除排在整条结果之后，与往次各行的写法一致 */}
       <div className="mt-8 flex items-baseline justify-end gap-4">
-        <span className="text-xs tracking-wider text-slate-400 dark:text-slate-500">
+        <span className="text-xs tracking-wider text-ink-meta">
           {t("savedAt", savedMonth(record.savedAt))}
         </span>
         <DeleteButton onDelete={onDelete} />
@@ -288,16 +288,16 @@ function PastRow({
         href={`/quiz/result/${record.id}`}
         className="group flex min-w-0 flex-1 items-baseline gap-3"
       >
-        <span className="shrink-0 font-serif text-base text-slate-900 dark:text-slate-100 group-hover:text-(--tone) transition-colors">
+        <span className="shrink-0 font-serif text-base text-ink group-hover:text-(--tone) transition-colors">
           {record.persona.motto}
         </span>
         {record.secondary && (
-          <span className="truncate font-serif text-xs tracking-wider text-slate-400 dark:text-slate-500">
+          <span className="truncate font-serif text-xs tracking-wider text-ink-meta">
             {t("secondary", { motto: record.secondary.motto })}
           </span>
         )}
       </Link>
-      <span className="shrink-0 text-xs tracking-wider text-slate-400 dark:text-slate-500">
+      <span className="shrink-0 text-xs tracking-wider text-ink-meta">
         {t("savedAt", savedMonth(record.savedAt))}
       </span>
       <DeleteButton onDelete={onDelete} />

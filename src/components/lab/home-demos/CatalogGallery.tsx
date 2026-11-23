@@ -32,11 +32,7 @@ import {
 import { useTranslations } from "next-intl";
 import React, { useMemo } from "react";
 import { FeaturePlate, PoetryPlate } from "./GalleryPlates";
-import {
-  FEATURE_PLATES,
-  type FeaturedEntry,
-  songCreditLine,
-} from "./shared";
+import { FEATURE_PLATES, type FeaturedEntry, songCreditLine } from "./shared";
 
 interface CatalogGalleryProps {
   pageSongs: Song[];
@@ -234,9 +230,7 @@ export default function CatalogGallery({
                   }}
                   className={cn(
                     "relative flex h-full shrink-0 items-center whitespace-nowrap font-serif text-[15px] tracking-wider transition-colors select-none",
-                    active
-                      ? "text-slate-900 dark:text-slate-100"
-                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                    active ? "text-ink" : "text-ink-muted hover:text-ink",
                   )}
                 >
                   <span
@@ -260,21 +254,21 @@ export default function CatalogGallery({
             )}
           >
             <label className="group relative flex h-full min-w-0 flex-1 items-center gap-2 md:w-64 md:flex-none">
-              <Search size={15} className="shrink-0 text-slate-400" />
+              <Search size={15} className="shrink-0 text-ink-meta" />
               <input
                 type="text"
                 placeholder={tLib("search.placeholder")}
                 value={searchInput}
                 onFocus={onSearchFocus}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="h-full min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
+                className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink-body outline-none placeholder:text-ink-meta"
               />
               {searchInput ? (
                 <button
                   type="button"
                   onClick={() => onSearchChange("")}
                   aria-label="清空搜索"
-                  className="shrink-0 p-1 text-slate-300 transition-colors hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
+                  className="shrink-0 p-1 text-ink-faint transition-colors hover:text-ink-muted"
                 >
                   <XCircle size={14} />
                 </button>
@@ -341,7 +335,7 @@ export default function CatalogGallery({
                 type="button"
                 onClick={onReset}
                 disabled={!isAnyFilterActive}
-                className="text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 disabled:opacity-40 dark:text-slate-500 dark:hover:text-slate-200"
+                className="text-xs tracking-widest text-ink-meta transition-colors hover:text-ink-prose disabled:opacity-40"
               >
                 {tLib("filter.clearAll")}
               </button>
@@ -360,13 +354,13 @@ export default function CatalogGallery({
       {/* ── 画册唱片墙（手机 2 列 · 平板 3 列 · 桌面 4 列） ── */}
       <div className="min-h-[45vh]">
         {approximate && (
-          <p className="mb-8 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+          <p className="mb-8 font-kaiti text-[15px] text-ink-meta">
             {tLib("search.approximate")}
           </p>
         )}
 
         {pageSongs.length === 0 ? (
-          <p className="py-24 text-center font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+          <p className="py-24 text-center font-kaiti text-[15px] text-ink-meta">
             {lyricsPending
               ? tLib("search.lyricsPending")
               : tLib("noFilteredSongs")}
@@ -450,7 +444,7 @@ export default function CatalogGallery({
                           artist={song.artist?.join(" / ")}
                           coverUrl={getCoverUrl(song)}
                           hasAudio={song.has_audio}
-                          className="rounded-full bg-white/90 p-1.5 text-slate-900 shadow-sm hover:bg-white dark:bg-slate-900/90 dark:text-white"
+                          className="rounded-full bg-white/90 p-1.5 text-ink shadow-sm hover:bg-white dark:bg-slate-900/90"
                           size={13}
                         />
                         <EnqueueButton
@@ -459,7 +453,7 @@ export default function CatalogGallery({
                           artist={song.artist?.join(" / ")}
                           coverUrl={getCoverUrl(song)}
                           hasAudio={song.has_audio}
-                          className="rounded-full bg-white/90 p-1.5 text-slate-900 shadow-sm hover:bg-white dark:bg-slate-900/90 dark:text-white"
+                          className="rounded-full bg-white/90 p-1.5 text-ink shadow-sm hover:bg-white dark:bg-slate-900/90"
                           size={13}
                         />
                         {isLoggedIn && (
@@ -478,7 +472,7 @@ export default function CatalogGallery({
                               "rounded-full bg-white/90 p-1.5 shadow-sm transition-colors dark:bg-slate-900/90",
                               fav
                                 ? "text-rose-500"
-                                : "text-slate-600 hover:text-rose-500 dark:text-slate-300",
+                                : "text-ink-prose hover:text-rose-500",
                             )}
                           >
                             <Heart
@@ -509,7 +503,7 @@ export default function CatalogGallery({
                     <div className="flex items-baseline justify-between gap-2">
                       <h3
                         className={cn(
-                          "line-clamp-1 min-w-0 flex-1 font-serif text-[15px] leading-snug text-slate-900 transition-colors sm:text-[18px] dark:text-slate-100",
+                          "line-clamp-1 min-w-0 flex-1 font-serif text-[15px] leading-snug text-ink transition-colors sm:text-[18px]",
                           playing
                             ? "text-(--tone)"
                             : "group-hover:text-(--tone)",
@@ -518,19 +512,19 @@ export default function CatalogGallery({
                       >
                         {song.title}
                       </h3>
-                      <span className="shrink-0 font-mono text-[10px] tabular-nums text-slate-400 sm:text-[11px] dark:text-slate-500">
+                      <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-meta sm:text-[11px]">
                         {song.year || FILTER_OPTION_UNKNOWN}
                       </span>
                     </div>
 
-                    <p className="flex items-center gap-1.5 overflow-hidden text-xs text-slate-500 sm:text-[13px] dark:text-slate-400">
+                    <p className="flex items-center gap-1.5 overflow-hidden text-xs text-ink-muted sm:text-[13px]">
                       <span className="truncate font-kaiti">
                         {songCreditLine(song)}
                       </span>
                       {song.type?.[0] && (
                         <>
                           <span className="hidden h-1 w-1 shrink-0 rounded-full bg-slate-300 sm:inline-block dark:bg-slate-600" />
-                          <span className="hidden shrink-0 text-[11px] tracking-wider text-slate-400 sm:inline dark:text-slate-500">
+                          <span className="hidden shrink-0 text-[11px] tracking-wider text-ink-meta sm:inline">
                             {enumLabel(tEnum, "type", song.type[0])}
                           </span>
                         </>
@@ -548,7 +542,7 @@ export default function CatalogGallery({
         )}
 
         {lyricsPending && pageSongs.length > 0 && (
-          <p className="mt-10 font-kaiti text-[15px] text-slate-400 dark:text-slate-500">
+          <p className="mt-10 font-kaiti text-[15px] text-ink-meta">
             {tLib("search.lyricsPending")}
           </p>
         )}

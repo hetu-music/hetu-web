@@ -34,18 +34,18 @@ export default function RelatedWorks({ songs }: { songs: RelatedSong[] }) {
                   className="w-full h-full object-cover grayscale-[35%] transition duration-700 group-hover:grayscale-0 group-hover:scale-[1.04]"
                 />
               </div>
-              <p className="mt-4 font-serif text-base text-slate-900 dark:text-slate-100 truncate group-hover:text-(--tone) transition-colors">
+              <p className="mt-4 font-serif text-base text-ink truncate group-hover:text-(--tone) transition-colors">
                 {song.title}
               </p>
               {song.artist && song.artist.length > 0 && (
-                <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500 truncate">
+                <p className="mt-0.5 text-xs text-ink-meta truncate">
                   {song.artist.join(" / ")}
                 </p>
               )}
               {song.shared.length > 0 && (
-                <p className="mt-2 text-xs text-slate-400 dark:text-slate-500 truncate">
+                <p className="mt-2 text-xs text-ink-meta truncate">
                   {t("shared")}
-                  <span className="ml-2 font-kaiti text-sm text-slate-600 dark:text-slate-300">
+                  <span className="ml-2 font-kaiti text-sm text-ink-prose">
                     {song.shared.join(" · ")}
                   </span>
                 </p>

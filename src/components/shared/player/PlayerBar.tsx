@@ -20,7 +20,7 @@ import { ProgressLine, useProgress } from "./progress";
 import QueueControl from "./QueuePanel";
 
 const SKIP_BUTTON =
-  "flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-700 disabled:pointer-events-none disabled:opacity-30 md:size-9 dark:text-slate-500 dark:hover:text-slate-200";
+  "flex size-8 items-center justify-center rounded-full text-ink-meta transition-colors hover:text-ink-prose disabled:pointer-events-none disabled:opacity-30 md:size-9";
 
 /**
  * 贴底的播放条，与顶栏上下对称：页面底色，上沿一道进度细线。
@@ -73,7 +73,7 @@ export default function PlayerBar() {
                 className="size-full object-cover"
               />
             ) : (
-              <div className="flex size-full items-center justify-center text-slate-400">
+              <div className="flex size-full items-center justify-center text-ink-meta">
                 <Music size={14} />
               </div>
             )}
@@ -82,7 +82,7 @@ export default function PlayerBar() {
           <div className="@container min-w-0 flex-1">
             <Link
               href={`/song/${currentTrack.songId}`}
-              className="block truncate font-serif text-sm text-slate-900 transition-colors hover:text-(--tone) dark:text-slate-50"
+              className="block truncate font-serif text-sm text-ink transition-colors hover:text-(--tone)"
             >
               {currentTrack.title}
             </Link>
@@ -117,7 +117,7 @@ export default function PlayerBar() {
                 "flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors duration-300 md:size-10",
                 "focus-visible:ring-2 focus-visible:ring-(--tone)/40 focus-visible:outline-none",
                 isLoading
-                  ? "border-slate-200 text-slate-400 dark:border-slate-700"
+                  ? "border-slate-200 text-ink-meta dark:border-slate-700"
                   : isPlaying
                     ? "border-(--tone) bg-(--tone) text-white active:scale-95 dark:text-slate-950"
                     : "border-(--tone)/40 text-(--tone) hover:border-(--tone) hover:bg-(--tone) hover:text-white active:scale-95 dark:hover:text-slate-950",
@@ -143,7 +143,7 @@ export default function PlayerBar() {
           </div>
 
           <div className="flex items-center justify-end gap-4 md:pl-0">
-            <span className="hidden text-xs tracking-wider text-slate-400 tabular-nums md:inline dark:text-slate-500">
+            <span className="hidden text-xs tracking-wider text-ink-meta tabular-nums md:inline">
               {/* 由 useProgress 直接写入，React 不管它的内容 */}
               <span ref={timeRef} />
               <span className="mx-1.5 opacity-60">/</span>
@@ -196,7 +196,7 @@ function TrackSubline({
     );
   }
   return (
-    <p className="mt-0.5 truncate text-xs tracking-wider text-slate-400 dark:text-slate-500">
+    <p className="mt-0.5 truncate text-xs tracking-wider text-ink-meta">
       {artist || t("unknownArtist")}
     </p>
   );

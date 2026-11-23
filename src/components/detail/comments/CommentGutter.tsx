@@ -218,7 +218,7 @@ function SideNote({
             <button
               type="button"
               onClick={() => setOpenSlot(null)}
-              className="font-sans text-xs tracking-widest text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              className="font-sans text-xs tracking-widest text-ink-meta hover:text-ink-prose transition-colors"
             >
               {t("fold")}
             </button>
@@ -235,8 +235,8 @@ function SideNote({
 
   const body = lead.comment.deleted ? t("deleted") : lead.comment.body;
   const bodyTone = lead.comment.deleted
-    ? "text-slate-400 dark:text-slate-600"
-    : "text-slate-500 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200";
+    ? "text-ink-meta"
+    : "text-ink-muted group-hover:text-ink-body";
   const meta = (
     <>
       {!lead.comment.deleted && (
@@ -273,7 +273,7 @@ function SideNote({
         >
           {body}
         </span>
-        <span className="shrink-0 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">
+        <span className="shrink-0 whitespace-nowrap text-xs text-ink-meta">
           {meta}
         </span>
       </button>
@@ -300,7 +300,7 @@ function SideNote({
       >
         {body}
       </p>
-      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{meta}</p>
+      <p className="mt-1 text-xs text-ink-meta">{meta}</p>
     </button>
   );
 }

@@ -105,9 +105,7 @@ export default function AdminOverviewClient({
       </ol>
 
       <nav className="mt-16">
-        <h2 className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
-          全部板块
-        </h2>
+        <h2 className="text-xs tracking-[0.2em] text-ink-meta">全部板块</h2>
         <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
           {ADMIN_SECTIONS.filter(
             (s) => s.key !== "overview" && (!s.superOnly || isSuper),
@@ -115,7 +113,7 @@ export default function AdminOverviewClient({
             <li key={s.key}>
               <Link
                 href={s.href}
-                className="font-serif text-lg tracking-wider text-slate-600 transition-colors hover:text-(--tone) dark:text-slate-300"
+                className="font-serif text-lg tracking-wider text-ink-prose transition-colors hover:text-(--tone)"
               >
                 {s.label}
               </Link>
@@ -151,26 +149,21 @@ function TodoItem({
           className={cn(
             "w-16 shrink-0 text-right font-serif text-4xl tabular-nums transition-colors",
             count === null
-              ? "text-slate-300 dark:text-slate-700"
+              ? "text-ink-faint"
               : done
-                ? "text-slate-300 dark:text-slate-600"
-                : "text-slate-900 group-hover:text-(--tone) dark:text-slate-50",
+                ? "text-ink-faint"
+                : "text-ink group-hover:text-(--tone)",
           )}
         >
           {count ?? "·"}
         </span>
         <span className="min-w-0">
           <span
-            className={cn(
-              "block",
-              done
-                ? "text-slate-400 dark:text-slate-500"
-                : "text-slate-800 dark:text-slate-200",
-            )}
+            className={cn("block", done ? "text-ink-meta" : "text-ink-body")}
           >
             {label}
           </span>
-          <span className="mt-1 block text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+          <span className="mt-1 block text-xs leading-relaxed text-ink-meta">
             {hint}
           </span>
         </span>
@@ -181,19 +174,16 @@ function TodoItem({
           {parts.map((b, i) => (
             <span key={b.href} className="flex items-baseline gap-x-3">
               {i > 0 && (
-                <span
-                  aria-hidden
-                  className="text-slate-300 dark:text-slate-600"
-                >
+                <span aria-hidden className="text-ink-faint">
                   ·
                 </span>
               )}
               <Link
                 href={b.href}
-                className="text-slate-500 transition-colors hover:text-(--tone) dark:text-slate-400"
+                className="text-ink-muted transition-colors hover:text-(--tone)"
               >
                 {b.label}
-                <span className="ml-1.5 tabular-nums text-slate-800 dark:text-slate-200">
+                <span className="ml-1.5 tabular-nums text-ink-body">
                   {b.count}
                 </span>
               </Link>

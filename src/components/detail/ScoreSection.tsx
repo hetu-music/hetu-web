@@ -102,7 +102,7 @@ export default function ScoreSection({
             label={t("folio.comments.annotateScore")}
           />
           {failed ? (
-            <p className="py-16 text-center text-sm text-slate-400">
+            <p className="py-16 text-center text-sm text-ink-meta">
               {t("scoreLoadError")}
             </p>
           ) : expanded ? (
@@ -122,12 +122,12 @@ export default function ScoreSection({
                   onError={() => setFailed(true)}
                 />
               </button>
-              <div className="mt-4 flex justify-between text-xs tracking-[0.3em] text-slate-500">
+              <div className="mt-4 flex justify-between text-xs tracking-[0.3em] text-ink-muted">
                 <span>{t("zoomScore")}</span>
                 <button
                   type="button"
                   onClick={collapse}
-                  className="hover:text-slate-900 dark:hover:text-white transition-colors"
+                  className="hover:text-ink transition-colors"
                 >
                   {t("collapseScore")}
                 </button>
@@ -148,7 +148,7 @@ export default function ScoreSection({
                 onError={() => setFailed(true)}
               />
               <span className="absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-5">
-                <span className="text-xs tracking-[0.3em] text-slate-500 group-hover:text-slate-900 transition-colors">
+                <span className="text-xs tracking-[0.3em] text-ink-muted group-hover:text-ink transition-colors">
                   {t("expandScore")}
                 </span>
               </span>

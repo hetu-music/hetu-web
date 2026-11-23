@@ -118,7 +118,7 @@ export default function SongEmotionTab({
         {lines.length === 0 && !song.lyrics?.trim() ? (
           <EmptyState>这首歌还没有歌词，先在「资料」里补上</EmptyState>
         ) : (
-          <div className="mt-3 max-h-[70vh] space-y-1 overflow-y-auto text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+          <div className="mt-3 max-h-[70vh] space-y-1 overflow-y-auto text-sm leading-relaxed text-ink-prose">
             {lines.length > 0
               ? lines.map((l, i) => <p key={`${l.tag}-${i}`}>{l.text}</p>)
               : song.lyrics
@@ -131,7 +131,7 @@ export default function SongEmotionTab({
       <section className="space-y-6">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className={LABEL_CLASS}>基调</p>
-          <p className="text-sm text-slate-700 dark:text-slate-200">
+          <p className="text-sm text-ink-prose">
             {selected.length === 0
               ? "未标"
               : selected
@@ -155,8 +155,8 @@ export default function SongEmotionTab({
               {suggesting ? "AI 正在读歌词…" : "AI 建议"}
             </button>
             {suggestion && (
-              <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-                <span className="text-slate-700 dark:text-slate-200">
+              <p className="leading-relaxed text-ink-muted">
+                <span className="text-ink-prose">
                   {suggestion.emotionIds
                     .map((id) => byId.get(id)?.name ?? `#${id}`)
                     .join(" · ")}
@@ -181,7 +181,7 @@ export default function SongEmotionTab({
           if (group.length === 0) return null;
           return (
             <div key={tone + energy} className="space-y-2">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-ink-meta">
                 {tone} · {energy}
               </p>
               <div className="space-y-1">
@@ -205,14 +205,12 @@ export default function SongEmotionTab({
                       <span
                         className={cn(
                           "w-10 shrink-0 text-sm",
-                          rank >= 0
-                            ? "text-(--tone)"
-                            : "text-slate-800 dark:text-slate-100",
+                          rank >= 0 ? "text-(--tone)" : "text-ink-body",
                         )}
                       >
                         {e.name}
                       </span>
-                      <span className="min-w-0 flex-1 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="min-w-0 flex-1 text-xs text-ink-muted">
                         {e.description}
                       </span>
                       {rank >= 0 && (

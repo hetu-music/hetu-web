@@ -37,7 +37,13 @@ import { usePlayerStore } from "@/store/player-store";
 import { AnimatePresence, motion } from "framer-motion";
 import { Shuffle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import CatalogGallery from "./CatalogGallery";
 import ChronologySpectrum from "./ChronologySpectrum";
 import {
@@ -259,10 +265,10 @@ export default function HomeDemosClient({
         const sel = state.filters.facets[key];
         if (sel.mode === "include" && sel.values.length > 0) {
           const first =
-            key === "genre" ? enumLabel(tEnum, "genre", sel.values[0]) : sel.values[0];
-          parts.push(
-            sel.values.length > 1 ? `${first}等` : first,
-          );
+            key === "genre"
+              ? enumLabel(tEnum, "genre", sel.values[0])
+              : sel.values[0];
+          parts.push(sel.values.length > 1 ? `${first}等` : first);
           if (parts.length >= 2) break;
         }
       }
@@ -323,7 +329,7 @@ export default function HomeDemosClient({
             tooltip: "回到卷首",
           }}
           nav={
-            <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-slate-400 sm:inline-flex dark:text-slate-500">
+            <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
               <span aria-hidden>/</span>
               <span>光阴声谱原型</span>
             </span>
@@ -355,13 +361,13 @@ export default function HomeDemosClient({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
                       transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-                      className="font-serif text-4xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl md:text-[3.5rem]"
+                      className="font-serif text-4xl font-semibold leading-[1.1] tracking-tight text-ink sm:text-5xl md:text-[3.5rem]"
                     >
                       {livingTitle}
                     </motion.h1>
                   </AnimatePresence>
 
-                  <span className="font-serif text-sm tracking-[0.18em] text-slate-400 dark:text-slate-500 sm:text-base">
+                  <span className="font-serif text-sm tracking-[0.18em] text-ink-meta sm:text-base">
                     凡{" "}
                     <AnimatePresence mode="wait">
                       <motion.span
@@ -381,7 +387,7 @@ export default function HomeDemosClient({
               </div>
 
               <div className="flex items-center gap-5">
-                <p className="hidden font-kaiti text-sm tracking-wider text-slate-400 lg:block dark:text-slate-500">
+                <p className="hidden font-kaiti text-sm tracking-wider text-ink-meta lg:block">
                   你一定想知道，戏里讲了什么故事……
                 </p>
                 <span
@@ -391,7 +397,7 @@ export default function HomeDemosClient({
                 <button
                   type="button"
                   onClick={handleRandomSong}
-                  className="group inline-flex items-center gap-1.5 text-xs tracking-[0.22em] text-slate-500 transition-colors hover:text-(--tone) dark:text-slate-400 dark:hover:text-(--tone)"
+                  className="group inline-flex items-center gap-1.5 text-xs tracking-[0.22em] text-ink-muted transition-colors hover:text-(--tone) dark:hover:text-(--tone)"
                 >
                   <Shuffle
                     size={13}
@@ -450,7 +456,7 @@ export default function HomeDemosClient({
           <footer className="mt-24 border-t border-slate-200/75 pt-8 dark:border-slate-800/75">
             <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
               <SiteMark />
-              <div className="flex flex-wrap items-center gap-6 text-xs tracking-[0.25em] text-slate-400 dark:text-slate-500">
+              <div className="flex flex-wrap items-center gap-6 text-xs tracking-[0.25em] text-ink-meta">
                 {FEATURE_PLATES.map((item) => (
                   <Link
                     key={item.id}

@@ -16,11 +16,11 @@ export function GroupHeading({
 }) {
   return (
     <div className="flex items-center gap-4">
-      <h3 className="font-serif text-[13px] font-semibold tracking-[0.3em] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+      <h3 className="font-serif text-[13px] font-semibold tracking-[0.3em] text-ink-muted whitespace-nowrap">
         {label}
       </h3>
       {/* border-dotted 的点太碎，用背景画：直径约 1.5px，间距 6px */}
-      <span className="flex-1 h-[3px] text-slate-300 dark:text-slate-700 bg-[radial-gradient(circle,currentColor_0.75px,transparent_1.25px)] bg-size-[6px_3px] bg-repeat-x" />
+      <span className="flex-1 h-[3px] text-ink-faint bg-[radial-gradient(circle,currentColor_0.75px,transparent_1.25px)] bg-size-[6px_3px] bg-repeat-x" />
       {children}
     </div>
   );

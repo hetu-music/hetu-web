@@ -39,7 +39,7 @@ export default function SongAudioTab({ songId }: { songId: number }) {
         onPick={() => audio.setPickerSong(row.song)}
         onUnlink={() => audio.unlink(row.song)}
       />
-      <p className="mt-4 text-xs text-slate-400">
+      <p className="mt-4 text-xs text-ink-meta">
         Navidrome 升级或文件改名后曲目 ID 会变化，到
         <Link href="/admin/audio" className={`${TEXT_BUTTON_CLASS} mx-1`}>
           音频板块

@@ -93,10 +93,10 @@ export function LineCollations({
             label={t(`kinds.${c.kind as "slip" | "sung" | "version" | "note"}`)}
             className="shrink-0"
           />
-          <p className="min-w-0 flex-1 font-kaiti text-slate-600 dark:text-slate-400 wrap-break-word">
+          <p className="min-w-0 flex-1 font-kaiti text-ink-muted wrap-break-word">
             {c.quote && c.sung && t("sungAs", { quote: c.quote, sung: c.sung })}
             {c.body}
-            <span className="ml-3 font-sans text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
+            <span className="ml-3 font-sans text-xs text-ink-meta whitespace-nowrap">
               <Signature collation={c} verb="collator" />
             </span>
           </p>
@@ -127,15 +127,15 @@ export function SupplementsSection({
                 className="text-[15px]"
               />
               {c.date && (
-                <span className="text-xs tracking-wider tabular-nums text-slate-400 dark:text-slate-500">
+                <span className="text-xs tracking-wider tabular-nums text-ink-meta">
                   {c.date}
                 </span>
               )}
             </p>
-            <p className="mt-2 font-kaiti text-base sm:text-[17px] leading-[2.05] text-slate-700 dark:text-slate-300 whitespace-pre-line wrap-break-word">
+            <p className="mt-2 font-kaiti text-base sm:text-[17px] leading-[2.05] text-ink-prose whitespace-pre-line wrap-break-word">
               {c.body}
             </p>
-            <p className="mt-1 text-right text-xs tracking-wider text-slate-400 dark:text-slate-500">
+            <p className="mt-1 text-right text-xs tracking-wider text-ink-meta">
               <Signature collation={c} verb="compiler" />
             </p>
           </li>

@@ -55,7 +55,7 @@ export default function TrackPicker({
         placeholder="搜索曲库：标题、专辑、文件路径"
         className="md:w-full"
       />
-      <p className="mt-2 text-xs text-slate-400">
+      <p className="mt-2 text-xs text-ink-meta">
         {pending ? (
           <span className="inline-flex items-center gap-1.5">
             <Loader2 size={12} className="animate-spin" />
@@ -70,7 +70,7 @@ export default function TrackPicker({
 
       <ul className="-mx-2 mt-3">
         {candidates.length === 0 && (
-          <li className="py-10 text-center font-kaiti text-base text-slate-400">
+          <li className="py-10 text-center font-kaiti text-base text-ink-meta">
             没有候选曲目，试试搜索
           </li>
         )}
@@ -99,23 +99,21 @@ export default function TrackPicker({
                 )}
               >
                 <span className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-slate-800 dark:text-slate-100">
-                    {nav.title}
-                  </span>
+                  <span className="truncate text-ink-body">{nav.title}</span>
                   <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
                     {diffText && (
                       <span
-                        className={diffBad ? WARN_TEXT_CLASS : "text-slate-400"}
+                        className={diffBad ? WARN_TEXT_CLASS : "text-ink-meta"}
                       >
                         {diffText}
                       </span>
                     )}
-                    <span className="text-slate-500">
+                    <span className="text-ink-muted">
                       {formatDuration(nav.duration)}
                     </span>
                   </span>
                 </span>
-                <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-400">
+                <span className="mt-0.5 block truncate font-mono text-[11px] text-ink-meta">
                   {nav.path ?? nav.album}
                 </span>
                 {statusText && (

@@ -15,7 +15,7 @@ interface PaginationProps {
 
 // 首页没有「上一页」：用 invisible 而不是变淡，书上本来就没有，占位不动免得中间的页码跳
 const TEXT_BUTTON_CLASS =
-  "py-1 text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 disabled:invisible dark:text-slate-500 dark:hover:text-slate-200";
+  "py-1 text-xs tracking-widest text-ink-meta transition-colors hover:text-ink-prose disabled:invisible";
 
 /**
  * 列表收尾的那道细线按页数等分，当前页那一段亮强调色：线既收尾，也是页码。
@@ -144,9 +144,7 @@ const Pagination: React.FC<PaginationProps> = ({
             aria-hidden
             className={cn(
               "pointer-events-none absolute bottom-1/2 mb-1.5 -translate-x-1/2 font-serif text-xs tabular-nums",
-              previewing
-                ? "text-slate-500 dark:text-slate-400"
-                : "text-(--tone)",
+              previewing ? "text-ink-muted" : "text-(--tone)",
             )}
             style={{ left: `${((preview - 0.5) / totalPages) * 100}%` }}
           >
@@ -164,13 +162,11 @@ const Pagination: React.FC<PaginationProps> = ({
         >
           {t("prev")}
         </button>
-        <p className="font-serif text-sm tabular-nums text-slate-400 dark:text-slate-500">
+        <p className="font-serif text-sm tabular-nums text-ink-meta">
           <span
             className={cn(
               "transition-colors",
-              previewing
-                ? "text-(--tone)"
-                : "text-slate-700 dark:text-slate-300",
+              previewing ? "text-(--tone)" : "text-ink-prose",
             )}
           >
             {previewing ? preview : currentPage}

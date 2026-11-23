@@ -107,7 +107,7 @@ export default function ProfileForm() {
           {/* 公开展示：仅管理员可设（接口也只认管理员的） */}
           {user?.isAdmin && (
             <div className="sm:col-span-2">
-              <label className="inline-flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200 cursor-pointer select-none">
+              <label className="inline-flex items-center gap-2 text-sm text-ink-body cursor-pointer select-none">
                 <input
                   type="checkbox"
                   {...form.register("display")}
@@ -115,7 +115,7 @@ export default function ProfileForm() {
                 />
                 {t("display")}
               </label>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-meta">
                 {t("displayHint")}
               </p>
             </div>

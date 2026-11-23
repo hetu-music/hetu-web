@@ -73,18 +73,15 @@ export default function UsageNotesButton() {
                 className={
                   group.warn
                     ? "text-sm text-amber-700 dark:text-amber-400"
-                    : "text-sm text-slate-900 dark:text-slate-100"
+                    : "text-sm text-ink"
                 }
               >
                 {group.title}
               </h3>
-              <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-ink-muted">
                 {group.items.map((text) => (
                   <li key={text} className="flex gap-2">
-                    <span
-                      aria-hidden
-                      className="text-slate-300 dark:text-slate-600"
-                    >
+                    <span aria-hidden className="text-ink-faint">
                       ·
                     </span>
                     <span>{text}</span>

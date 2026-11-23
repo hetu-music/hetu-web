@@ -36,12 +36,12 @@ export default function ProfileHero() {
         {t(`role.${role}`)}
       </p>
 
-      <h2 className="font-serif text-4xl md:text-5xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50 text-balance wrap-break-word">
+      <h2 className="font-serif text-4xl md:text-5xl font-semibold leading-[1.1] tracking-tight text-ink text-balance wrap-break-word">
         {user.name}
       </h2>
 
       {user.intro && (
-        <p className="mt-6 font-kaiti text-[15px] leading-[2.05] text-slate-700 dark:text-slate-300 whitespace-pre-line wrap-break-word">
+        <p className="mt-6 font-kaiti text-[15px] leading-[2.05] text-ink-prose whitespace-pre-line wrap-break-word">
           {user.intro}
         </p>
       )}
@@ -49,10 +49,10 @@ export default function ProfileHero() {
       <dl className="mt-8 space-y-2 text-sm">
         {rows.map((row) => (
           <div key={row.key} className="flex items-baseline gap-4 min-w-0">
-            <dt className="w-10 shrink-0 text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
+            <dt className="w-10 shrink-0 text-xs tracking-[0.2em] text-ink-meta">
               {t(row.key)}
             </dt>
-            <dd className="min-w-0 text-slate-800 dark:text-slate-200 wrap-break-word">
+            <dd className="min-w-0 text-ink-body wrap-break-word">
               {row.value}
             </dd>
           </div>

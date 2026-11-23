@@ -89,10 +89,7 @@ export function AdminOptions<K extends string>({
           {i > 0 && (
             <span
               aria-hidden
-              className={cn(
-                "text-slate-300 dark:text-slate-600",
-                onLine && "self-center",
-              )}
+              className={cn("text-ink-faint", onLine && "self-center")}
             >
               ·
             </span>
@@ -160,7 +157,7 @@ export function SearchInput({
     >
       <Search
         size={14}
-        className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-ink-meta"
       />
       <input
         type="search"
@@ -169,7 +166,7 @@ export function SearchInput({
         placeholder={placeholder}
         aria-label={placeholder}
         className={cn(
-          "block w-full border-0 bg-transparent py-1.5 pl-6 pr-6 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-600 [&::-webkit-search-cancel-button]:hidden",
+          "block w-full border-0 bg-transparent py-1.5 pl-6 pr-6 text-sm text-ink-body outline-none transition-colors placeholder:text-ink-meta [&::-webkit-search-cancel-button]:hidden",
           onLine
             ? "py-2"
             : "border-b border-slate-300 focus:border-(--tone) dark:border-slate-700",
@@ -185,7 +182,7 @@ export function SearchInput({
         <button
           type="button"
           onClick={() => onChange("")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-ink-meta hover:text-ink-prose"
           aria-label="清除搜索"
         >
           <X size={14} />
@@ -197,7 +194,7 @@ export function SearchInput({
 
 export function LoadingState({ text = "加载中…" }: { text?: string }) {
   return (
-    <p className="flex items-center justify-center gap-2 py-20 text-sm text-slate-400">
+    <p className="flex items-center justify-center gap-2 py-20 text-sm text-ink-meta">
       <Loader2 size={14} className="animate-spin" />
       {text}
     </p>
@@ -215,7 +212,7 @@ export function EmptyState({
   return (
     <p
       className={cn(
-        "py-20 text-center font-kaiti text-base text-slate-400",
+        "py-20 text-center font-kaiti text-base text-ink-meta",
         className,
       )}
     >
@@ -300,19 +297,15 @@ export function StatLine({ stats }: { stats: readonly Stat[] }) {
       {stats.map((s, i) => (
         <div key={s.label} className="flex items-baseline gap-3">
           {i > 0 && (
-            <span aria-hidden className="text-slate-300 dark:text-slate-600">
+            <span aria-hidden className="text-ink-faint">
               ·
             </span>
           )}
-          <dt className="text-xs tracking-[0.2em] text-slate-400 dark:text-slate-500">
-            {s.label}
-          </dt>
+          <dt className="text-xs tracking-[0.2em] text-ink-meta">{s.label}</dt>
           <dd
             className={cn(
               "tabular-nums",
-              s.warn
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-slate-700 dark:text-slate-200",
+              s.warn ? "text-amber-600 dark:text-amber-400" : "text-ink-prose",
             )}
           >
             {s.value}

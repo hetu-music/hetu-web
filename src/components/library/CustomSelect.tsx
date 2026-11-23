@@ -154,11 +154,11 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       }}
     >
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-slate-200/70 px-4 dark:border-slate-800">
-        <Search className="shrink-0 text-slate-400" size={14} />
+        <Search className="shrink-0 text-ink-meta" size={14} />
         <ComboboxInput
           placeholder={t("search")}
           aria-label={label}
-          className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-300 dark:placeholder:text-slate-500"
+          className="min-w-0 flex-1 bg-transparent text-sm text-ink-prose outline-none placeholder:text-ink-meta"
         />
       </div>
 
@@ -174,7 +174,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             "flex shrink-0 items-center px-4 pt-3 pb-1 text-xs tracking-widest transition-colors",
             isAllSelected || isIndeterminate
               ? "text-(--tone)"
-              : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200",
+              : "text-ink-meta hover:text-ink-prose",
           )}
         >
           <span className="truncate">{t("selectAll")}</span>
@@ -197,7 +197,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
               className={cn(
                 isSelected &&
                   "text-(--tone) data-highlighted:text-(--tone) dark:text-(--tone) dark:data-highlighted:text-(--tone)",
-                "data-disabled:cursor-not-allowed data-disabled:text-slate-300 dark:data-disabled:text-slate-600",
+                "data-disabled:cursor-not-allowed data-disabled:text-ink-faint",
               )}
             >
               <span className="min-w-0 flex-1 truncate">
@@ -221,7 +221,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             onChange([]);
             handleOpenChange(false);
           }}
-          className="h-10 shrink-0 border-t border-slate-200/70 text-xs tracking-widest text-slate-400 transition-colors hover:text-slate-700 dark:border-slate-800 dark:text-slate-500 dark:hover:text-slate-200"
+          className="h-10 shrink-0 border-t border-slate-200/70 text-xs tracking-widest text-ink-meta transition-colors hover:text-ink-prose dark:border-slate-800"
         >
           {t("clearAll")}
         </button>
@@ -237,7 +237,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       className={cn(
         "flex h-9 w-full items-center justify-between gap-2",
         "border-0 border-b border-slate-300 bg-transparent px-0 dark:border-slate-700",
-        "text-sm text-slate-600 dark:text-slate-300",
+        "text-sm text-ink-prose",
         "transition-colors duration-200 hover:border-(--tone) focus:outline-none focus-visible:border-(--tone)",
         open && "border-(--tone)",
         "disabled:cursor-not-allowed disabled:opacity-50",
@@ -247,9 +247,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       <span
         className={cn(
           "flex-1 truncate text-left",
-          hasSelection
-            ? "text-slate-800 dark:text-slate-100"
-            : "text-slate-400 dark:text-slate-500",
+          hasSelection ? "text-ink-body" : "text-ink-meta",
         )}
       >
         {displayText}
@@ -266,7 +264,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") clearAll(e);
             }}
-            className="flex h-5 w-5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+            className="flex h-5 w-5 items-center justify-center text-ink-meta transition-colors hover:text-ink-prose"
           >
             <X size={12} />
           </span>
@@ -274,7 +272,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         <ChevronDown
           size={14}
           className={cn(
-            "text-slate-400 transition-transform duration-200",
+            "text-ink-meta transition-transform duration-200",
             open && "rotate-180",
           )}
         />

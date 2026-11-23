@@ -29,7 +29,7 @@ export function SiteLogo({
     <button
       type="button"
       onClick={onClick ?? (() => router.push("/"))}
-      className="flex min-w-0 cursor-pointer items-center gap-1 whitespace-nowrap font-serif text-2xl font-bold tracking-tight text-slate-900 transition-colors hover:text-(--tone) dark:text-white dark:hover:text-(--tone)"
+      className="flex min-w-0 cursor-pointer items-center gap-1 whitespace-nowrap font-serif text-2xl font-bold tracking-tight text-ink transition-colors hover:text-(--tone) dark:hover:text-(--tone)"
       title={tooltip ?? tNav("backToHome")}
     >
       {tLogo("part1")}
@@ -165,22 +165,17 @@ export function PlaceNav({
       aria-label={menuTitle}
       className="group flex min-w-0 max-w-full items-baseline gap-2 px-2 py-1.5"
     >
-      <span className="hidden sm:block min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+      <span className="hidden sm:block min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-ink">
         {title}
       </span>
-      <span
-        aria-hidden
-        className="hidden sm:block text-slate-300 dark:text-slate-600"
-      >
+      <span aria-hidden className="hidden sm:block text-ink-faint">
         ·
       </span>
       {/* 当前项与三角标自成一组居中对齐；整组再按基线与题名对齐 */}
       <span
         className={cn(
           "flex shrink-0 items-center gap-1.5 whitespace-nowrap font-serif text-sm tracking-wider transition-colors",
-          open
-            ? "text-slate-900 dark:text-slate-100"
-            : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100",
+          open ? "text-ink" : "text-ink-muted group-hover:text-ink",
         )}
       >
         <span className="hidden sm:inline">{activeLabel}</span>
@@ -188,7 +183,7 @@ export function PlaceNav({
         <ChevronDown
           size={14}
           className={cn(
-            "shrink-0 text-slate-400 transition-transform duration-300",
+            "shrink-0 text-ink-meta transition-transform duration-300",
             open && "rotate-180",
           )}
         />

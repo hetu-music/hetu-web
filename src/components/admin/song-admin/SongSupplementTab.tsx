@@ -166,7 +166,7 @@ function SupplementItem({
         <span className={TAG_CLASS}>{KIND_LABEL[c.kind]}</span>
         {c.date && <span className={META_CLASS}>{c.date}</span>}
       </p>
-      <p className="whitespace-pre-line wrap-break-word leading-relaxed text-slate-700 dark:text-slate-200">
+      <p className="whitespace-pre-line wrap-break-word leading-relaxed text-ink-prose">
         {c.body}
       </p>
       <p className="flex items-baseline gap-3">

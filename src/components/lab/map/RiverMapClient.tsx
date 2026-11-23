@@ -400,8 +400,8 @@ function Verse({ line, size }: { line: string; size: "lg" | "md" }) {
     <div
       className={
         size === "lg"
-          ? "font-kaiti text-[1.7rem] leading-[1.45] tracking-[0.12em] text-slate-800 dark:text-slate-100"
-          : "font-kaiti text-[1.35rem] leading-[1.45] tracking-[0.1em] text-slate-800 dark:text-slate-100"
+          ? "font-kaiti text-[1.7rem] leading-[1.45] tracking-[0.12em] text-ink-body"
+          : "font-kaiti text-[1.35rem] leading-[1.45] tracking-[0.1em] text-ink-body"
       }
     >
       {phrases(line).map((p, i) => (
@@ -438,18 +438,16 @@ function StopBody({
       <div className="mt-8 space-y-3">
         {stop.entries.map((entry) => (
           <div key={entry.song}>
-            <p className="font-serif text-base text-slate-900 dark:text-slate-50">
-              《{entry.song}》
-            </p>
+            <p className="font-serif text-base text-ink">《{entry.song}》</p>
             {entry.note && (
-              <p className="mt-1 font-kaiti text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              <p className="mt-1 font-kaiti text-sm leading-relaxed text-ink-muted">
                 {entry.note}
               </p>
             )}
           </div>
         ))}
         {sibs.length > 0 && (
-          <p className="pt-2 text-xs leading-loose tracking-widest text-slate-400 dark:text-slate-500">
+          <p className="pt-2 text-xs leading-loose tracking-widest text-ink-meta">
             同一首歌还到过
             {sibs.map((s) => (
               <button
@@ -525,11 +523,11 @@ function TreeRows({
               className="flex min-h-11 w-full items-baseline justify-between gap-4 py-2 pl-5 text-left"
             >
               <span
-                className={`font-serif text-[1.05rem] transition-colors ${lit ? "text-(--accent)" : "text-slate-800 dark:text-slate-200"}`}
+                className={`font-serif text-[1.05rem] transition-colors ${lit ? "text-(--accent)" : "text-ink-body"}`}
               >
                 {stop.name}
               </span>
-              <span className="shrink-0 text-[0.7rem] tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="shrink-0 text-[0.7rem] tracking-wider text-ink-meta">
                 {shortRegion(stop)}
               </span>
             </button>
@@ -622,10 +620,10 @@ export default function RiverMapClient() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.28, ease: EASE }}
               >
-                <p className="text-xs tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                <p className="text-xs tracking-[0.3em] text-ink-meta">
                   {shown.region}
                 </p>
-                <h2 className="mt-3 mb-10 font-serif text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                <h2 className="mt-3 mb-10 font-serif text-4xl font-semibold tracking-tight text-ink">
                   {shown.full ?? shown.name}
                 </h2>
                 <StopBody stop={shown} onGo={go} size="lg" />
@@ -638,15 +636,15 @@ export default function RiverMapClient() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.28, ease: EASE }}
               >
-                <h1 className="font-calligraphy text-8xl leading-none text-slate-900 [writing-mode:vertical-rl] dark:text-slate-50">
+                <h1 className="font-calligraphy text-8xl leading-none text-ink [writing-mode:vertical-rl]">
                   河图
                 </h1>
-                <p className="mt-10 font-kaiti text-lg leading-loose text-slate-600 dark:text-slate-400">
+                <p className="mt-10 font-kaiti text-lg leading-loose text-ink-muted">
                   歌里写到的地方，
                   <br />
                   顺着水都能找到。
                 </p>
-                <p className="mt-6 text-xs tracking-[0.25em] text-slate-400 dark:text-slate-500">
+                <p className="mt-6 text-xs tracking-[0.25em] text-ink-meta">
                   {STOPS.length} 处 · {SONG_COUNT} 首
                 </p>
               </motion.div>
@@ -730,13 +728,13 @@ export default function RiverMapClient() {
 
       {/* 窄屏：从入海口往上读 */}
       <main className="px-6 pt-32 pb-24 lg:hidden">
-        <h1 className="font-calligraphy text-7xl leading-none text-slate-900 [writing-mode:vertical-rl] dark:text-slate-50">
+        <h1 className="font-calligraphy text-7xl leading-none text-ink [writing-mode:vertical-rl]">
           河图
         </h1>
-        <p className="mt-8 font-kaiti text-lg leading-loose text-slate-600 dark:text-slate-400">
+        <p className="mt-8 font-kaiti text-lg leading-loose text-ink-muted">
           歌里写到的地方，顺着水都能找到。
         </p>
-        <p className="mt-3 text-xs tracking-[0.25em] text-slate-400 dark:text-slate-500">
+        <p className="mt-3 text-xs tracking-[0.25em] text-ink-meta">
           {STOPS.length} 处 · {SONG_COUNT} 首
         </p>
         <div className="mt-16 space-y-14">

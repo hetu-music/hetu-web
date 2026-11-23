@@ -88,14 +88,12 @@ export default function ImageryCaption({
                     {current.name}
                   </span>
                   <div className="min-w-0 flex-1 space-y-1">
-                    <p className="font-serif text-xs tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                    <p className="font-serif text-xs tracking-[0.2em] text-ink-muted">
                       {current.path.join(" · ")}
                     </p>
-                    <p className="font-kaiti text-sm text-slate-600 dark:text-slate-300">
+                    <p className="font-kaiti text-sm text-ink-prose">
                       {t("caption.lines", { count: shown.lineCount })}
-                      <span className="mx-2 text-slate-300 dark:text-slate-600">
-                        ·
-                      </span>
+                      <span className="mx-2 text-ink-faint">·</span>
                       {t("caption.songs", { count: current.songCount })}
                       <Link
                         href={`/imagery/${current.motifId}?w=${current.id}`}
@@ -112,7 +110,7 @@ export default function ImageryCaption({
                 type="button"
                 onClick={onClose}
                 aria-label={t("caption.close")}
-                className="shrink-0 p-2 -mr-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+                className="shrink-0 p-2 -mr-2 rounded-full text-ink-meta hover:text-ink-prose hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={18} />
               </button>

@@ -41,7 +41,7 @@ function PanelHeader({
       {closable && (
         <BaseDialog.Close
           aria-label={tNav("close")}
-          className="p-1 -mr-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+          className="p-1 -mr-1 rounded-full text-ink-meta hover:text-ink-prose transition-colors"
         >
           <X size={18} />
         </BaseDialog.Close>
@@ -146,10 +146,7 @@ function DialogTitle({
 }) {
   return (
     <BaseDialog.Title
-      className={cn(
-        "text-xl font-bold text-slate-900 dark:text-white",
-        className,
-      )}
+      className={cn("text-xl font-bold text-ink", className)}
       {...props}
     />
   );
@@ -163,7 +160,7 @@ function DialogDescription({
 }) {
   return (
     <BaseDialog.Description
-      className={cn("text-sm text-slate-500 dark:text-slate-400", className)}
+      className={cn("text-sm text-ink-muted", className)}
       {...props}
     />
   );

@@ -84,7 +84,7 @@ export const PALETTE_FULL: PaletteEntry[] = [
 ];
 
 export const GRAY_PALETTE: PaletteEntry = {
-  text: "text-slate-500 dark:text-slate-400",
+  text: "text-ink-muted",
   ring: "ring-slate-400/40",
   dot: "bg-slate-400",
   activeBg: "bg-slate-100 dark:bg-slate-800/40",

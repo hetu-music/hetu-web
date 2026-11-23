@@ -43,14 +43,12 @@ export default function SongAudioRow({
       {showSong && (
         <div className="min-w-0 md:w-2/5">
           <div className="flex items-baseline gap-2">
-            <span className="shrink-0 font-mono text-xs tabular-nums text-slate-400">
+            <span className="shrink-0 font-mono text-xs tabular-nums text-ink-meta">
               {song.id}
             </span>
-            <span className="truncate text-slate-900 dark:text-slate-100">
-              {song.title}
-            </span>
+            <span className="truncate text-ink">{song.title}</span>
           </div>
-          <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+          <div className="mt-0.5 truncate text-xs text-ink-muted">
             {song.album ?? "无专辑"} · {formatDuration(song.length)}
           </div>
         </div>
@@ -60,31 +58,29 @@ export default function SongAudioRow({
         {nav ? (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="truncate text-slate-700 dark:text-slate-200">
-                {nav.title}
-              </span>
-              <span className="shrink-0 text-xs tabular-nums text-slate-400">
+              <span className="truncate text-ink-prose">{nav.title}</span>
+              <span className="shrink-0 text-xs tabular-nums text-ink-meta">
                 {formatDuration(nav.duration)}
               </span>
               {diffText && (
                 <span
                   className={cn(
                     "shrink-0 text-xs tabular-nums",
-                    diffBad ? WARN_TEXT_CLASS : "text-slate-400",
+                    diffBad ? WARN_TEXT_CLASS : "text-ink-meta",
                   )}
                 >
                   {diffText}
                 </span>
               )}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[11px] text-slate-400">
+            <div className="mt-0.5 truncate font-mono text-[11px] text-ink-meta">
               {nav.path ?? nav.album}
             </div>
           </>
         ) : navidId ? (
           <span className={WARN_TEXT_CLASS}>关联的曲目已不在曲库中</span>
         ) : (
-          <span className="text-slate-400">未关联</span>
+          <span className="text-ink-meta">未关联</span>
         )}
         {hasAudioMismatch && (
           <div className={cn("mt-0.5 text-xs", WARN_TEXT_CLASS)}>
@@ -95,7 +91,7 @@ export default function SongAudioRow({
 
       <div className="flex shrink-0 items-center gap-4 md:justify-end">
         {busy ? (
-          <Loader2 size={14} className="animate-spin text-slate-400" />
+          <Loader2 size={14} className="animate-spin text-ink-meta" />
         ) : (
           <>
             <button

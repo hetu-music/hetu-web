@@ -34,6 +34,17 @@
   --font-kaiti:
     "Hetu KaiTi", "KaiTi", "STKaiti", "DFKai-SB", "BiauKai", "楷体",
     "楷体_GB2312", serif;
+
+  /* 文字墨色（DESIGN.md 第二节）：生成 text-ink-* 等工具类。这里是浅色值，深色值在下方 .dark 里覆盖，
+     页面上只写 text-ink-*，不再配 dark:text-*。取值即 Tailwind 的 slate 色阶：
+     ink 标题 900/50 · body 正文 800/200 · prose 诗文手记批注 700/300 ·
+     muted 次要 500/400 · meta 标签落款元信息 400/500 · faint 分隔点、禁用 300/600 */
+  --color-ink: oklch(20.8% 0.042 265.755);
+  --color-ink-body: oklch(27.9% 0.041 260.031);
+  --color-ink-prose: oklch(37.2% 0.044 257.287);
+  --color-ink-muted: oklch(55.4% 0.046 257.417);
+  --color-ink-meta: oklch(70.4% 0.04 256.788);
+  --color-ink-faint: oklch(86.9% 0.022 252.894);
 }
 
 /* 颜色：保留在 :root / .dark，支持运行时主题切换 */
@@ -56,6 +67,14 @@
   --background: #0b0f19;
   --foreground: #ededed;
   --tone: hsl(224 48% 72%);
+
+  /* 文字墨色的深色值（slate 50 / 200 / 300 / 400 / 500 / 600） */
+  --color-ink: oklch(98.4% 0.003 247.858);
+  --color-ink-body: oklch(92.9% 0.013 255.508);
+  --color-ink-prose: oklch(86.9% 0.022 252.894);
+  --color-ink-muted: oklch(70.4% 0.04 256.788);
+  --color-ink-meta: oklch(55.4% 0.046 257.417);
+  --color-ink-faint: oklch(44.6% 0.043 257.281);
 }
 
 /* ── 3. 基础样式 ─────────────────────────────────────────────────────────────── */

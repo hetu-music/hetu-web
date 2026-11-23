@@ -77,7 +77,7 @@ export default function MotifSelect({
         {!showAll && <option value="__all">其他母题…</option>}
       </select>
       {hint && offCandidate && (
-        <span className="block text-xs text-slate-400 dark:text-slate-500">
+        <span className="block text-xs text-ink-meta">
           这个词以前没这样标过，保存后会给它加一个「有时也指」
         </span>
       )}

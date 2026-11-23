@@ -24,18 +24,7 @@ export default async function HomeTimeLabPage({ params }: Props) {
     () => [],
   );
 
-  return <HomeTimeClient songs={songs} serverMonthDay={beijingMonthDay()} />;
-}
-
-/** 北京时间的 "MM-DD"。页面有缓存，跨了午夜时客户端会换成访客本地的日期 */
-function beijingMonthDay(): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((p) => p.type === type)?.value;
-  return `${get("month")}-${get("day")}`;
+  return <HomeTimeClient songs={songs} />;
 }
 
 export const revalidate = 21600;

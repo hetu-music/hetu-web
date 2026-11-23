@@ -8,63 +8,54 @@ import Image from "next/image";
 import React, {
   memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
-import {
-  creditSummary,
-  localMonthDay,
-  pickSeason,
-  seasonName,
-  stripeColor,
-} from "./timeline";
+import { creditSummary, stripeColor } from "./timeline";
 
 interface ColorTapestryProps {
-  /** 全部在册歌曲（顺序不限），从中挑出这个时节的 */
+  /** 已按由近及远排好序的全部在册歌曲 */
   songs: Song[];
-  /** 服务端渲染时的 "MM-DD"（北京时间）；客户端会换成访客本地日期 */
-  serverMonthDay: string;
-  /** 点击碟片或曲名时打开该曲详情 */
-  onOpenSong: (id: number) => void;
+  /** 当前筛选/搜索命中的歌曲 ID 集合；未筛选时为 null */
+  matched: ReadonlySet<number> | null;
+  /** 点击某张碟片或年份标尺时，跳到下方对应年份章节 */
+  onJumpToYear: (year: number | null) => void;
+  /** 点击预览曲名时，直接打开该曲详情 */
+  onOpenSong?: (id: number) => void;
   /** 抽起碟片时，把封面主色轻染到页面顶部光晕 */
   onSpotlightColor?: (color: string | null) => void;
 }
 
-// 日期在一次访问里不会变，不需要真的订阅
-const noopSubscribe = () => () => undefined;
+/** 首屏（服务端渲染、尚未量过尺寸时）先完整画出的碟数，最宽的屏也够铺满 */
+const INITIAL_LIVE = 120;
+/**
+ * 视口左右各多画出这么宽的碟，快速拖拽时边缘也不露空；
+ * 也要够提前触发封面的懒加载（浏览器原生阈值约 1250px 起），不然封面会比原来晚出现
+ */
+const BUFFER_PX = 1400;
 
 /**
- * 「这个时节」唱片架：当期陈列，不是馆藏的另一种视图。
- * 把二十年折叠到今天这个日子上——历年在这几天前后发布的歌立成一小排，每天都不一样；
- * 不跟着下方的检索与筛选变化。
+ * 「实体唱片架」：
+ * 一排立在架上的实体唱片封套（按由近及远排列，年份之间插有极简隔片）。
  * - 常态：每张碟以 3D 透视斜立叠排，露出真实封面的一截斜切面、封脊高光与投向后碟的柔和阴影；
- * - 滑过：经过哪一张，那张碟便向上抽出半寸并转正面向你，左右邻碟如真书架般轻微受触起伏。
+ * - 滑过：经过哪一张，那张碟便向上抽出半寸并转正面向你，左右邻碟如真书架般轻微受触起伏；
+ * - 筛选：架上瞬间只留命中的那几张碟，排成短短一排随手翻阅。
+ *
+ * 性能：每张碟是独立的 memo 组件，滑过时只有焦点碟与左右各两张会重渲；
+ * 只有视口附近的碟画出封套，其余只留同尺寸的空插槽（排版、透视原点都不变）。
  */
 function ColorTapestry({
   songs,
-  serverMonthDay,
+  matched,
+  onJumpToYear,
   onOpenSong,
   onSpotlightColor,
 }: ColorTapestryProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-
-  // 水合时沿用服务端的日子，之后换成访客本地的（跨时区、或缓存页面跨了午夜时才会不同）
-  const monthDay = useSyncExternalStore(
-    noopSubscribe,
-    localMonthDay,
-    () => serverMonthDay,
-  );
-
-  const season = useMemo(() => pickSeason(songs, monthDay), [songs, monthDay]);
-  const shelf = season.songs;
-  const yearCount = useMemo(
-    () => new Set(shelf.map((s) => s.year)).size,
-    [shelf],
-  );
 
   // 鼠标拖拽横向翻架（与滑过抽碟互不干扰）
   const dragRef = useRef<{
@@ -74,18 +65,97 @@ function ColorTapestry({
     dragged: boolean;
   }>({ down: false, startX: 0, startScroll: 0, dragged: false });
 
-  // 每一年第一张碟前插一块年份隔片
-  const yearStarts = useMemo(() => {
-    const starts = new Set<number>();
-    shelf.forEach((s, i) => {
-      if (i === 0 || s.year !== shelf[i - 1].year) starts.add(i);
+  // 有筛选时只留命中的碟在架上，真正像从大架上挑出一小叠来翻
+  const visibleSongs = useMemo(
+    () => (matched ? songs.filter((s) => matched.has(s.id)) : songs),
+    [songs, matched],
+  );
+
+  // 记录每一年的起始下标，用于插入极简年份隔片
+  const yearAnchors = useMemo(() => {
+    const anchors: Array<{ year: number | null; index: number }> = [];
+    let prev: number | null | undefined = undefined;
+    visibleSongs.forEach((s, i) => {
+      const y = s.year ?? null;
+      if (y !== prev) {
+        anchors.push({ year: y, index: i });
+        prev = y;
+      }
     });
-    return starts;
-  }, [shelf]);
+    return anchors;
+  }, [visibleSongs]);
+
+  const yearStartMap = useMemo(() => {
+    const map = new Map<number, number | null>();
+    yearAnchors.forEach((a) => map.set(a.index, a.year));
+    return map;
+  }, [yearAnchors]);
+
+  // ── 只画视口附近的碟 ──
+  const [live, setLive] = useState<readonly [number, number]>([
+    0,
+    INITIAL_LIVE - 1,
+  ]);
+  const offsetsRef = useRef<number[]>([]);
+
+  const measure = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    offsetsRef.current = Array.from(
+      el.querySelectorAll<HTMLElement>("[data-disc-idx]"),
+      (slot) => slot.offsetLeft,
+    );
+  }, []);
+
+  const updateLive = useCallback(() => {
+    const el = scrollerRef.current;
+    const offsets = offsetsRef.current;
+    if (!el || offsets.length === 0) return;
+    const left = el.scrollLeft - BUFFER_PX;
+    const right = el.scrollLeft + el.clientWidth + BUFFER_PX;
+    let lo = 0;
+    while (lo < offsets.length - 1 && offsets[lo] < left) lo++;
+    let hi = offsets.length - 1;
+    while (hi > lo && offsets[hi] > right) hi--;
+    setLive((prev) => (prev[0] === lo && prev[1] === hi ? prev : [lo, hi]));
+  }, []);
+
+  // 架上的碟换了（筛选）：绘制前同步量一次，避免露出一帧空架
+  useLayoutEffect(() => {
+    measure();
+    updateLive();
+  }, [visibleSongs, measure, updateLive]);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updateLive();
+      });
+    };
+    // 跨过 sm 断点时插槽宽度会变，重新量
+    const ro = new ResizeObserver(() => {
+      measure();
+      updateLive();
+    });
+    el.addEventListener("scroll", onScroll, { passive: true });
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [measure, updateLive]);
 
   const safeActive =
-    activeIndex !== null && activeIndex < shelf.length ? activeIndex : null;
-  const activeSong = safeActive !== null ? shelf[safeActive] : null;
+    activeIndex !== null && activeIndex < visibleSongs.length
+      ? activeIndex
+      : null;
+  const activeSong = safeActive !== null ? visibleSongs[safeActive] : null;
 
   // 点击时要知道焦点碟，但不想让 handlePick 随焦点变化而失去稳定（那样所有碟都会重渲）
   const activeRef = useRef(safeActive);
@@ -96,11 +166,13 @@ function ColorTapestry({
   const activate = useCallback(
     (idx: number | null) => {
       setActiveIndex(idx);
-      onSpotlightColor?.(
-        idx !== null && shelf[idx] ? stripeColor(shelf[idx]) : null,
-      );
+      if (idx !== null && visibleSongs[idx]) {
+        onSpotlightColor?.(stripeColor(visibleSongs[idx]));
+      } else {
+        onSpotlightColor?.(null);
+      }
     },
-    [shelf, onSpotlightColor],
+    [visibleSongs, onSpotlightColor],
   );
 
   const handleHover = useCallback(
@@ -113,9 +185,9 @@ function ColorTapestry({
   const handlePick = useCallback(
     (idx: number) => {
       if (dragRef.current.dragged) return;
-      const song = shelf[idx];
+      const song = visibleSongs[idx];
       if (!song) return;
-      // 手机端第一次轻点抽起该碟预览，再点才进详情
+      // 手机端第一次轻点抽起该碟预览，再点或桌面单击直接入卷/跳章
       if (
         activeRef.current !== idx &&
         window.matchMedia("(hover: none)").matches
@@ -123,9 +195,10 @@ function ColorTapestry({
         activate(idx);
         return;
       }
-      onOpenSong(song.id);
+      if (onOpenSong) onOpenSong(song.id);
+      else onJumpToYear(song.year ?? null);
     },
-    [shelf, activate, onOpenSong],
+    [visibleSongs, activate, onOpenSong, onJumpToYear],
   );
 
   const scrollRack = useCallback((dir: -1 | 1) => {
@@ -158,40 +231,42 @@ function ColorTapestry({
     }, 60);
   };
 
-  if (shelf.length === 0) return null;
+  if (visibleSongs.length === 0) return null;
 
   return (
-    <section aria-label="这个时节" className="relative select-none">
-      {/* 顶行：常态是展签，抽起碟片时换成曲名、日期与词曲；两种状态等高，不推动下方 */}
+    <section aria-label="唱片架" className="relative select-none">
+      {/* 顶行：常态安静，抽起碟片时浮现曲名、日期与词曲；右侧可左右推架 */}
       <div className="mb-1 flex min-h-11 items-center justify-between gap-4">
         {activeSong ? (
-          <button
-            type="button"
-            onClick={() => onOpenSong(activeSong.id)}
-            className="group min-w-0 text-left"
-          >
-            <div className="flex items-baseline gap-2.5">
-              <span className="truncate font-serif text-[15px] text-slate-900 transition-colors group-hover:text-(--tone) sm:text-base dark:text-slate-100">
-                《{activeSong.title}》
-              </span>
-              <span className="shrink-0 font-mono text-[11px] tabular-nums text-(--tone)">
-                {activeSong.date?.replaceAll("-", ".")}
-              </span>
-            </div>
-            <p className="truncate font-kaiti text-xs text-slate-500 dark:text-slate-400">
-              {creditSummary(activeSong) || "点此入卷"}
-            </p>
-          </button>
-        ) : (
-          <div className="min-w-0">
-            <p className="text-[11px] leading-6 tracking-[0.3em] text-(--tone)">
-              这个时节
-            </p>
-            <p className="truncate font-kaiti text-xs text-slate-500 dark:text-slate-400">
-              {seasonName(monthDay, season.days)} · {yearCount} 个年份里的
-              {season.days > 15 ? "这些日子" : "这几天"}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                onOpenSong
+                  ? onOpenSong(activeSong.id)
+                  : onJumpToYear(activeSong.year ?? null)
+              }
+              className="group min-w-0 text-left"
+            >
+              <div className="flex items-baseline gap-2.5">
+                <span className="truncate font-serif text-[15px] text-slate-900 transition-colors group-hover:text-(--tone) sm:text-base dark:text-slate-100">
+                  《{activeSong.title}》
+                </span>
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-(--tone)">
+                  {activeSong.date?.replaceAll("-", ".") ||
+                    activeSong.year ||
+                    "未详"}
+                </span>
+              </div>
+              <p className="truncate font-kaiti text-xs text-slate-500 dark:text-slate-400">
+                {creditSummary(activeSong) || "点此入卷"}
+              </p>
+            </button>
           </div>
+        ) : (
+          <span className="text-[11px] tracking-[0.3em] text-(--tone)">
+            架上唱片
+          </span>
         )}
 
         <div className="flex shrink-0 items-center gap-1">
@@ -214,7 +289,7 @@ function ColorTapestry({
         </div>
       </div>
 
-      {/* ── 唱片架横向轨道 ── */}
+      {/* ── 实体唱片架横向轨道 ── */}
       <div className="relative -mx-6">
         <div
           ref={scrollerRef}
@@ -225,14 +300,14 @@ function ColorTapestry({
             handleMouseUp();
             activate(null);
           }}
-          className="no-scrollbar relative flex cursor-grab items-end overflow-x-auto px-6 pt-13 pb-6 active:cursor-grabbing mask-[linear-gradient(to_right,transparent,black_24px,black_calc(100%-36px),transparent)]"
+          className="no-scrollbar relative flex cursor-grab items-end overflow-x-auto px-6 pt-11 pb-6 active:cursor-grabbing mask-[linear-gradient(to_right,transparent,black_24px,black_calc(100%-36px),transparent)]"
         >
-          {/* 唱片排：每个插槽保持固定横向占位，滑过时不抖动 */}
+          {/* 唱片排：每个插槽保持固定横向占位，确保滑过时绝对顺滑不抖动 */}
           <div
-            className="relative flex items-end pr-32 sm:pr-40"
+            className="relative flex items-end pr-28 sm:pr-32"
             style={{ perspective: "1100px" }}
           >
-            {shelf.map((song, idx) => (
+            {visibleSongs.map((song, idx) => (
               <Disc
                 key={song.id}
                 song={song}
@@ -242,7 +317,8 @@ function ColorTapestry({
                     ? 3
                     : Math.min(Math.abs(idx - safeActive), 3)
                 }
-                yearLabel={yearStarts.has(idx) ? song.year : undefined}
+                yearLabel={yearStartMap.get(idx)}
+                live={idx >= live[0] && idx <= live[1]}
                 onHover={handleHover}
                 onPick={handlePick}
               />
@@ -265,20 +341,22 @@ export default memo(ColorTapestry);
 /**
  * 一张碟。dist 是到焦点碟的距离，3 代表「3 及更远」（姿态都一样），
  * 这样滑过时只有姿态真正改变的几张碟会重渲。
+ * live 为 false 时只留同尺寸的空插槽。
  */
 const Disc = memo(function Disc({
   song,
   idx,
   dist,
   yearLabel,
+  live,
   onHover,
   onPick,
 }: {
   song: Song;
   idx: number;
   dist: number;
-  /** 这一年的第一张碟才有 */
   yearLabel: number | null | undefined;
+  live: boolean;
   onHover: (idx: number) => void;
   onPick: (idx: number) => void;
 }) {
@@ -292,89 +370,95 @@ const Disc = memo(function Disc({
 
   return (
     <div
+      data-disc-idx={idx}
       onMouseEnter={() => onHover(idx)}
       onClick={() => onPick(idx)}
       className={cn(
-        "relative h-30 w-7 shrink-0 cursor-pointer sm:h-38 sm:w-9",
-        yearLabel !== undefined && idx > 0 && "ml-6 sm:ml-8",
+        "relative h-25 w-5.5 shrink-0 cursor-pointer sm:h-29.5 sm:w-6.5",
+        yearLabel !== undefined && idx > 0 && "ml-5 sm:ml-6",
       )}
       style={{
         zIndex: isAct ? 50 : dist === 1 ? 30 : dist === 2 ? 20 : 10,
       }}
     >
-      {/* 年份隔片：插在每一年第一张碟前的极简年代标签，像唱片店的隔板 */}
+      {/* 年份隔片：插在每一年第一张碟前的极简年代标签，像唱片店木/纸隔板 */}
       {yearLabel !== undefined && (
         <span
           aria-hidden
           className="pointer-events-none absolute -top-7 left-0 flex items-center gap-1 font-mono text-[10px] tabular-nums tracking-wider text-slate-400/90 dark:text-slate-500"
         >
           <span className="inline-block h-2.5 w-px bg-slate-300 dark:bg-slate-700" />
-          {yearLabel}
+          {yearLabel ?? "未详"}
         </span>
       )}
 
-      {/* 唱片封套本体（绕左脊旋转，露出真实封面与立体厚度阴影） */}
-      <div
-        className="pointer-events-none absolute bottom-0 left-0 h-30 w-30 sm:h-38 sm:w-38"
-        style={{
-          transformOrigin: "left center",
-          transform: `translateY(${translateY}px) rotateY(${rotateY}deg) scale(${scale})`,
-          transition:
-            "transform 380ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 380ms ease, filter 380ms ease",
-        }}
-      >
-        {/* 抽起时碟后微探一弧黑胶边，强化“唱片”实感 */}
-        <span
-          aria-hidden
-          className={cn(
-            "absolute top-[-9%] inset-x-[9%] aspect-square rounded-full transition-all duration-400",
-            isAct ? "opacity-90 -translate-y-1" : "opacity-0",
-          )}
-          style={{
-            background:
-              "repeating-radial-gradient(circle at center, #181c26 0px, #181c26 2px, #0d1017 3px, #151923 4.5px)",
-          }}
-        />
-
-        {/* 封面封套主体 */}
+      {/* 实体唱片封套本体（绕左脊旋转，露出真实封面与立体厚度阴影） */}
+      {live && (
         <div
-          className={cn(
-            "relative h-full w-full overflow-hidden rounded-[3px] ring-1 transition-shadow duration-300",
-            isAct
-              ? "shadow-[0_24px_42px_-12px_rgba(15,23,42,0.55)] ring-slate-900/15 dark:shadow-[0_26px_48px_-10px_rgba(0,0,0,0.92)] dark:ring-white/25"
-              : "shadow-[-6px_6px_14px_-4px_rgba(15,23,42,0.28)] ring-slate-900/10 dark:shadow-[-8px_8px_18px_-4px_rgba(0,0,0,0.75)] dark:ring-white/12",
-          )}
-          style={{ backgroundColor: bg }}
+          className="pointer-events-none absolute bottom-0 left-0 h-25 w-25 sm:h-29.5 sm:w-29.5"
+          style={{
+            transformOrigin: "left center",
+            transform: `translateY(${translateY}px) rotateY(${rotateY}deg) scale(${scale})`,
+            transition:
+              "transform 380ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 380ms ease, filter 380ms ease",
+          }}
         >
-          <Image
-            src={getCoverUrl(song)}
-            alt={song.title}
-            width={200}
-            height={200}
-            sizes="152px"
+          {/* 抽起时碟后微探一弧黑胶边，强化“唱片”实感 */}
+          <span
+            aria-hidden
             className={cn(
-              "h-full w-full object-cover transition-[filter] duration-300",
-              isAct
-                ? "brightness-100 saturate-100"
-                : "brightness-95 saturate-[0.88] dark:brightness-90",
+              "absolute top-[-9%] inset-x-[9%] aspect-square rounded-full transition-all duration-400",
+              isAct ? "opacity-90 -translate-y-1" : "opacity-0",
             )}
+            style={{
+              background:
+                "repeating-radial-gradient(circle at center, #181c26 0px, #181c26 2px, #0d1017 3px, #151923 4.5px)",
+            }}
           />
 
-          {/* 封脊左缘极细纸边高光，模拟真实封套厚度 */}
-          <span
-            aria-hidden
-            className="absolute inset-y-0 left-0 w-0.5 bg-white/45 dark:bg-white/25"
-          />
-          {/* 未抽起时封套表面的微弱斜向阴影，拉开前后层叠景深 */}
-          <span
-            aria-hidden
+          {/* 封面封套主体 */}
+          <div
             className={cn(
-              "absolute inset-0 bg-linear-to-r from-transparent via-black/6 to-black/30 transition-opacity duration-300",
-              isAct ? "opacity-0" : "opacity-100",
+              "relative h-full w-full overflow-hidden rounded-[3px] ring-1 transition-shadow duration-300",
+              isAct
+                ? "shadow-[0_24px_42px_-12px_rgba(15,23,42,0.55)] ring-slate-900/15 dark:shadow-[0_26px_48px_-10px_rgba(0,0,0,0.92)] dark:ring-white/25"
+                : "shadow-[-6px_6px_14px_-4px_rgba(15,23,42,0.28)] ring-slate-900/10 dark:shadow-[-8px_8px_18px_-4px_rgba(0,0,0,0.75)] dark:ring-white/12",
             )}
-          />
+            style={{
+              backgroundColor: bg,
+            }}
+          >
+            <Image
+              src={getCoverUrl(song)}
+              alt={song.title}
+              width={160}
+              height={160}
+              sizes="118px"
+              loading={idx < 32 ? "eager" : "lazy"}
+              className={cn(
+                "h-full w-full object-cover transition-[filter] duration-300",
+                isAct
+                  ? "brightness-100 saturate-100"
+                  : "brightness-95 saturate-[0.88] dark:brightness-90",
+              )}
+            />
+
+            {/* 封脊左缘极细纸边高光，模拟真实实体封套厚度 */}
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-0 w-0.5 bg-white/45 dark:bg-white/25"
+            />
+            {/* 未抽起时封套表面的微弱斜向阴影，拉开前后层叠景深 */}
+            <span
+              aria-hidden
+              className={cn(
+                "absolute inset-0 bg-linear-to-r from-transparent via-black/6 to-black/30 transition-opacity duration-300",
+                isAct ? "opacity-0" : "opacity-100",
+              )}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 });

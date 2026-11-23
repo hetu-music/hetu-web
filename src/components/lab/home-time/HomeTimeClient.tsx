@@ -367,7 +367,6 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           <ColorTapestry
             songs={catalog}
             matched={matched}
-            onJumpToYear={jumpToYear}
             onOpenSong={handleOpenSong}
             onSpotlightColor={setSpotlightColor}
           />

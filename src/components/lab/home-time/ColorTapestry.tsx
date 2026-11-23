@@ -13,6 +13,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { creditSummary, stripeColor } from "./timeline";
 
@@ -21,10 +22,8 @@ interface ColorTapestryProps {
   songs: Song[];
   /** 当前筛选/搜索命中的歌曲 ID 集合；未筛选时为 null */
   matched: ReadonlySet<number> | null;
-  /** 点击某张碟片或年份标尺时，跳到下方对应年份章节 */
-  onJumpToYear: (year: number | null) => void;
-  /** 点击预览曲名时，直接打开该曲详情 */
-  onOpenSong?: (id: number) => void;
+  /** 点选抽起的碟时打开该曲详情 */
+  onOpenSong: (id: number) => void;
   /** 抽起碟片时，把封面主色轻染到页面顶部光晕 */
   onSpotlightColor?: (color: string | null) => void;
 }
@@ -36,34 +35,111 @@ const INITIAL_LIVE = 120;
  * 也要够提前触发封面的懒加载（浏览器原生阈值约 1250px 起），不然封面会比原来晚出现
  */
 const BUFFER_PX = 1400;
+/** 抽起的碟放大多少（与 Disc 的姿态一致） */
+const ACTIVE_SCALE = 1.06;
+/** 抽起的碟与后面让开的碟之间留的缝 */
+const ACTIVE_GAP = 8;
+/** 鼠标滚动/拖拽停下多久后，按光标位置重新抽碟 */
+const SCROLL_IDLE_MS = 140;
+/** 按下后移动超过这么多才算拖拽，否则算点选 */
+const DRAG_SLOP = 4;
+/** 松手后的惯性：每 16ms 速度衰减到原来的多少 */
+const FRICTION = 0.94;
+/** 松手前停顿超过这么久，就不带惯性 */
+const FLING_WINDOW_MS = 80;
+
+const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
+
+// ── 触屏（没有悬停）：滑动时经过取碟位的碟自动抽起 ──
+const HOVER_NONE = "(hover: none)";
+function subscribeHoverNone(onChange: () => void) {
+  const mq = window.matchMedia(HOVER_NONE);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+const getHoverNone = () => window.matchMedia(HOVER_NONE).matches;
+const getHoverNoneServer = () => false;
+
+/**
+ * 架上的几何，全部是碟排（strip）里的横坐标。
+ * shift：抽起一张碟时，它后面的碟整体右移多少，让抽起的封面完整露出来。
+ */
+interface Geometry {
+  offsets: number[];
+  slotW: number;
+  coverW: number;
+  shift: number;
+}
+const EMPTY_GEOMETRY: Geometry = { offsets: [], slotW: 0, coverW: 0, shift: 0 };
+
+/** 最后一个左缘不超过 x 的插槽；都在 x 右边时返回 -1 */
+function slotAt(offsets: number[], x: number): number {
+  let lo = 0;
+  let hi = offsets.length - 1;
+  if (hi < 0 || x < offsets[0]) return -1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (offsets[mid] <= x) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
+/**
+ * 光标指着哪张碟。按画出来的样子算：抽起的那张占一整张封面宽，后面的碟右移了 shift。
+ * 年份隔片的空隙算前一张（它的封面本就斜着伸过去）。
+ * 因为抽起的碟占得宽，往回走要多走一段才会换，边界上不会来回闪。
+ */
+function hitTest(g: Geometry, active: number | null, x: number): number | null {
+  const { offsets, slotW, coverW, shift } = g;
+  const n = offsets.length;
+  if (n === 0 || x < offsets[0]) return null;
+  if (active !== null && active < n) {
+    const left = offsets[active];
+    const right = left + slotW + shift;
+    if (x >= left && x < right) return active;
+    if (x >= right) x -= shift;
+  }
+  const i = slotAt(offsets, x);
+  if (i === n - 1 && x > offsets[i] + coverW) return null;
+  return i < 0 ? null : i;
+}
+
+/** 触屏：滚到取碟位（架子左缘）上的那张 */
+function indexAtScroll(g: Geometry, scrollLeft: number): number | null {
+  if (g.offsets.length === 0) return null;
+  return Math.max(0, slotAt(g.offsets, scrollLeft + g.slotW / 2));
+}
+
+type Source = "pointer" | "keyboard" | "scroll";
 
 /**
  * 「实体唱片架」：
  * 一排立在架上的实体唱片封套（按由近及远排列，年份之间插有极简隔片）。
- * - 常态：每张碟以 3D 透视斜立叠排，露出真实封面的一截斜切面、封脊高光与投向后碟的柔和阴影；
- * - 滑过：经过哪一张，那张碟便向上抽出半寸并转正面向你，左右邻碟如真书架般轻微受触起伏；
- * - 筛选：架上瞬间只留命中的那几张碟，排成短短一排随手翻阅。
+ * - 常态：每张碟斜立叠排，露出真实封面的一截斜切面、封脊高光与投向后碟的柔和阴影；
+ * - 鼠标：指着哪一张，那张碟便向上抽出并转正面向你，后面的碟让开位置，左右邻碟微微起伏让角；
+ *   拖拽跟手，松手带惯性；滚动时不抽碟，停下再按光标位置抽；
+ * - 触屏：架子左缘是取碟位，滑过的碟依次抽起，停下时吸附到一张；点抽起的进详情，点别的把它滑到取碟位；
+ * - 键盘：左右键换碟，回车进详情；
+ * - 筛选：架上只留命中的那几张碟。
  *
- * 性能：每张碟是独立的 memo 组件，滑过时只有焦点碟与左右各两张会重渲；
- * 只有视口附近的碟画出封套，其余只留同尺寸的空插槽（排版、透视原点都不变）。
+ * 命中不靠每张碟的 mouseenter（窄插槽和斜着伸出去的封面对不上），而是按光标横坐标在同一套几何里算。
+ * 性能：每张碟是独立的 memo 组件，换碟时只有姿态改变的几张重渲；
+ * 只有视口附近的碟画出封套，其余只留同尺寸的空插槽。
  */
 function ColorTapestry({
   songs,
   matched,
-  onJumpToYear,
   onOpenSong,
   onSpotlightColor,
 }: ColorTapestryProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-
-  // 鼠标拖拽横向翻架（与滑过抽碟互不干扰）
-  const dragRef = useRef<{
-    down: boolean;
-    startX: number;
-    startScroll: number;
-    dragged: boolean;
-  }>({ down: false, startX: 0, startScroll: 0, dragged: false });
+  const stripRef = useRef<HTMLDivElement>(null);
+  const isTouch = useSyncExternalStore(
+    subscribeHoverNone,
+    getHoverNone,
+    getHoverNoneServer,
+  );
 
   // 有筛选时只留命中的碟在架上，真正像从大架上挑出一小叠来翻
   const visibleSongs = useMemo(
@@ -71,45 +147,93 @@ function ColorTapestry({
     [songs, matched],
   );
 
-  // 记录每一年的起始下标，用于插入极简年份隔片
-  const yearAnchors = useMemo(() => {
-    const anchors: Array<{ year: number | null; index: number }> = [];
+  // 每一年第一张碟前插一块年份隔片
+  const yearStartMap = useMemo(() => {
+    const map = new Map<number, number | null>();
     let prev: number | null | undefined = undefined;
     visibleSongs.forEach((s, i) => {
       const y = s.year ?? null;
       if (y !== prev) {
-        anchors.push({ year: y, index: i });
+        map.set(i, y);
         prev = y;
       }
     });
-    return anchors;
+    return map;
   }, [visibleSongs]);
 
-  const yearStartMap = useMemo(() => {
-    const map = new Map<number, number | null>();
-    yearAnchors.forEach((a) => map.set(a.index, a.year));
-    return map;
-  }, [yearAnchors]);
-
-  // ── 只画视口附近的碟 ──
+  const [active, setActive] = useState<number | null>(null);
   const [live, setLive] = useState<readonly [number, number]>([
     0,
     INITIAL_LIVE - 1,
   ]);
-  const offsetsRef = useRef<number[]>([]);
+  const [shift, setShift] = useState(0);
 
+  // 交互过程中的可变状态：事件处理里读写，不参与渲染
+  const geoRef = useRef<Geometry>(EMPTY_GEOMETRY);
+  const activeRef = useRef<number | null>(null);
+  const isTouchRef = useRef(isTouch);
+  const ix = useRef({
+    source: null as Source | null,
+    pointerInside: false,
+    lastClientX: 0,
+    scrolling: false,
+    idleTimer: 0,
+    down: false,
+    dragging: false,
+    startX: 0,
+    startScroll: 0,
+    lastX: 0,
+    lastT: 0,
+    velocity: 0,
+    inertia: 0,
+    suppressClick: false,
+  });
+
+  const activate = useCallback(
+    (idx: number | null, source: Source, force = false) => {
+      if (!force && activeRef.current === idx) return;
+      activeRef.current = idx;
+      ix.current.source = idx === null ? null : source;
+      setActive(idx);
+      onSpotlightColor?.(
+        idx !== null && visibleSongs[idx]
+          ? stripeColor(visibleSongs[idx])
+          : null,
+      );
+    },
+    [visibleSongs, onSpotlightColor],
+  );
+
+  const stripX = useCallback(
+    (clientX: number) =>
+      clientX - (stripRef.current?.getBoundingClientRect().left ?? 0),
+    [],
+  );
+
+  // ── 几何与「只画视口附近的碟」 ──
   const measure = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    offsetsRef.current = Array.from(
-      el.querySelectorAll<HTMLElement>("[data-disc-idx]"),
-      (slot) => slot.offsetLeft,
-    );
+    const strip = stripRef.current;
+    if (!strip) return;
+    const slots = strip.querySelectorAll<HTMLElement>("[data-disc-idx]");
+    const first = slots[0];
+    const slotW = first?.offsetWidth ?? 0;
+    // 封面是正方形，边长等于插槽高
+    const coverW = first?.offsetHeight ?? 0;
+    const nextShift = first
+      ? Math.round(coverW * ACTIVE_SCALE) - slotW + ACTIVE_GAP
+      : 0;
+    geoRef.current = {
+      offsets: Array.from(slots, (slot) => slot.offsetLeft),
+      slotW,
+      coverW,
+      shift: nextShift,
+    };
+    setShift(nextShift);
   }, []);
 
   const updateLive = useCallback(() => {
     const el = scrollerRef.current;
-    const offsets = offsetsRef.current;
+    const { offsets } = geoRef.current;
     if (!el || offsets.length === 0) return;
     const left = el.scrollLeft - BUFFER_PX;
     const right = el.scrollLeft + el.clientWidth + BUFFER_PX;
@@ -120,24 +244,57 @@ function ColorTapestry({
     setLive((prev) => (prev[0] === lo && prev[1] === hi ? prev : [lo, hi]));
   }, []);
 
-  // 架上的碟换了（筛选）：绘制前同步量一次，避免露出一帧空架
+  // 架上的碟换了（筛选）或换了输入方式：绘制前同步量一次，避免露出一帧空架；
+  // 原来的下标已不指同一首，焦点重新定
   useLayoutEffect(() => {
+    isTouchRef.current = isTouch;
     measure();
     updateLive();
-  }, [visibleSongs, measure, updateLive]);
+    const el = scrollerRef.current;
+    activate(
+      isTouch && el ? indexAtScroll(geoRef.current, el.scrollLeft) : null,
+      "scroll",
+      true,
+    );
+  }, [visibleSongs, isTouch, measure, updateLive, activate]);
+
+  const stopInertia = useCallback(() => {
+    cancelAnimationFrame(ix.current.inertia);
+    ix.current.inertia = 0;
+  }, []);
 
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
+    const s = ix.current;
     let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        updateLive();
-      });
+
+    const onFrame = () => {
+      raf = 0;
+      updateLive();
+      if (isTouchRef.current) {
+        activate(indexAtScroll(geoRef.current, el.scrollLeft), "scroll");
+        return;
+      }
+      // 鼠标：滚动中放下焦点（键盘选中的除外），停下后按光标位置重新抽
+      if (s.source !== "keyboard") activate(null, "pointer");
+      s.scrolling = true;
+      window.clearTimeout(s.idleTimer);
+      s.idleTimer = window.setTimeout(() => {
+        s.scrolling = false;
+        if (s.pointerInside && !s.down && s.source !== "keyboard") {
+          activate(
+            hitTest(geoRef.current, activeRef.current, stripX(s.lastClientX)),
+            "pointer",
+          );
+        }
+      }, SCROLL_IDLE_MS);
     };
-    // 跨过 sm 断点时插槽宽度会变，重新量
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(onFrame);
+    };
+
+    // 跨过 sm 断点时插槽尺寸会变，重新量
     const ro = new ResizeObserver(() => {
       measure();
       updateLive();
@@ -147,129 +304,205 @@ function ColorTapestry({
     return () => {
       el.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(raf);
+      window.clearTimeout(s.idleTimer);
+      stopInertia();
       ro.disconnect();
     };
-  }, [measure, updateLive]);
+  }, [measure, updateLive, activate, stripX, stopInertia]);
 
-  const safeActive =
-    activeIndex !== null && activeIndex < visibleSongs.length
-      ? activeIndex
-      : null;
-  const activeSong = safeActive !== null ? visibleSongs[safeActive] : null;
-
-  // 点击时要知道焦点碟，但不想让 handlePick 随焦点变化而失去稳定（那样所有碟都会重渲）
-  const activeRef = useRef(safeActive);
-  useLayoutEffect(() => {
-    activeRef.current = safeActive;
-  }, [safeActive]);
-
-  const activate = useCallback(
-    (idx: number | null) => {
-      setActiveIndex(idx);
-      if (idx !== null && visibleSongs[idx]) {
-        onSpotlightColor?.(stripeColor(visibleSongs[idx]));
+  // ── 鼠标：指向、拖拽、惯性 ──
+  const startInertia = (v0: number) => {
+    const el = scrollerRef.current;
+    if (!el || Math.abs(v0) < 0.05) return;
+    let v = v0;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = Math.min(now - last, 32);
+      last = now;
+      const before = el.scrollLeft;
+      el.scrollLeft += v * dt;
+      v *= Math.pow(FRICTION, dt / 16);
+      // 到头了或慢下来了就停
+      if (Math.abs(v) > 0.02 && el.scrollLeft !== before) {
+        ix.current.inertia = requestAnimationFrame(step);
       } else {
-        onSpotlightColor?.(null);
+        ix.current.inertia = 0;
       }
-    },
-    [visibleSongs, onSpotlightColor],
-  );
+    };
+    ix.current.inertia = requestAnimationFrame(step);
+  };
 
-  const handleHover = useCallback(
-    (idx: number) => {
-      if (!dragRef.current.down) activate(idx);
-    },
-    [activate],
-  );
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = scrollerRef.current;
+    if (!el || e.pointerType !== "mouse" || e.button !== 0) return;
+    stopInertia();
+    const s = ix.current;
+    s.down = true;
+    s.dragging = false;
+    s.startX = s.lastX = e.clientX;
+    s.startScroll = el.scrollLeft;
+    s.lastT = e.timeStamp;
+    s.velocity = 0;
+  };
 
-  const handlePick = useCallback(
-    (idx: number) => {
-      if (dragRef.current.dragged) return;
-      const song = visibleSongs[idx];
-      if (!song) return;
-      // 手机端第一次轻点抽起该碟预览，再点或桌面单击直接入卷/跳章
-      if (
-        activeRef.current !== idx &&
-        window.matchMedia("(hover: none)").matches
-      ) {
-        activate(idx);
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse") return;
+    const el = scrollerRef.current;
+    const s = ix.current;
+    s.lastClientX = e.clientX;
+    if (s.down && el) {
+      const dx = e.clientX - s.startX;
+      if (!s.dragging && Math.abs(dx) > DRAG_SLOP) {
+        s.dragging = true;
+        el.setPointerCapture(e.pointerId);
+        activate(null, "pointer");
+      }
+      if (s.dragging) {
+        // 跟手 1:1
+        el.scrollLeft = s.startScroll - dx;
+        const dt = e.timeStamp - s.lastT;
+        if (dt > 0) {
+          s.velocity = 0.8 * ((s.lastX - e.clientX) / dt) + 0.2 * s.velocity;
+        }
+        s.lastX = e.clientX;
+        s.lastT = e.timeStamp;
+      }
+      return;
+    }
+    if (s.scrolling) return;
+    activate(
+      hitTest(geoRef.current, activeRef.current, stripX(e.clientX)),
+      "pointer",
+    );
+  };
+
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>, fling: boolean) => {
+    const s = ix.current;
+    if (!s.down) return;
+    s.down = false;
+    if (!s.dragging) return;
+    s.dragging = false;
+    scrollerRef.current?.releasePointerCapture(e.pointerId);
+    // 拖拽结束时紧跟着的那次 click 不算点选
+    s.suppressClick = true;
+    window.setTimeout(() => {
+      s.suppressClick = false;
+    }, 0);
+    if (fling && e.timeStamp - s.lastT < FLING_WINDOW_MS) {
+      startInertia(s.velocity);
+    }
+  };
+
+  const handlePointerLeave = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse") return;
+    ix.current.pointerInside = false;
+    if (!ix.current.dragging && ix.current.source === "pointer") {
+      activate(null, "pointer");
+    }
+  };
+
+  // ── 点选：鼠标点哪张开哪张；触屏点抽起的进详情，点别的把它滑到取碟位 ──
+  const scrollToIndex = (idx: number) => {
+    scrollerRef.current?.scrollTo({
+      left: geoRef.current.offsets[idx] ?? 0,
+      behavior: "smooth",
+    });
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (ix.current.suppressClick) return;
+    const idx = hitTest(geoRef.current, activeRef.current, stripX(e.clientX));
+    if (idx === null || !visibleSongs[idx]) return;
+    if (isTouchRef.current && idx !== activeRef.current) {
+      scrollToIndex(idx);
+      return;
+    }
+    onOpenSong(visibleSongs[idx].id);
+  };
+
+  // ── 键盘 ──
+  const revealIndex = (idx: number) => {
+    const el = scrollerRef.current;
+    const g = geoRef.current;
+    if (!el || g.offsets[idx] === undefined) return;
+    const left = g.offsets[idx];
+    const right = left + Math.round(g.coverW * ACTIVE_SCALE);
+    // 右侧留出边缘渐隐的宽度
+    const viewRight = el.scrollLeft + el.clientWidth - 64;
+    if (left < el.scrollLeft) {
+      el.scrollTo({ left, behavior: "smooth" });
+    } else if (right > viewRight) {
+      el.scrollTo({
+        left: el.scrollLeft + (right - viewRight),
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const n = visibleSongs.length;
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const cur = activeRef.current ?? (dir > 0 ? -1 : n);
+      const next = Math.min(n - 1, Math.max(0, cur + dir));
+      if (isTouchRef.current) {
+        scrollToIndex(next);
         return;
       }
-      if (onOpenSong) onOpenSong(song.id);
-      else onJumpToYear(song.year ?? null);
+      activate(next, "keyboard");
+      revealIndex(next);
+    } else if (e.key === "Enter" && activeRef.current !== null) {
+      const song = visibleSongs[activeRef.current];
+      if (song) onOpenSong(song.id);
+    }
+  };
+
+  const scrollRack = useCallback(
+    (dir: -1 | 1) => {
+      stopInertia();
+      scrollerRef.current?.scrollBy({ left: dir * 480, behavior: "smooth" });
     },
-    [visibleSongs, activate, onOpenSong, onJumpToYear],
+    [stopInertia],
   );
-
-  const scrollRack = useCallback((dir: -1 | 1) => {
-    scrollerRef.current?.scrollBy({ left: dir * 480, behavior: "smooth" });
-  }, []);
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = scrollerRef.current;
-    if (!el || e.button !== 0) return;
-    dragRef.current = {
-      down: true,
-      startX: e.clientX,
-      startScroll: el.scrollLeft,
-      dragged: false,
-    };
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = scrollerRef.current;
-    if (!dragRef.current.down || !el) return;
-    const dx = e.clientX - dragRef.current.startX;
-    if (Math.abs(dx) > 6) dragRef.current.dragged = true;
-    el.scrollLeft = dragRef.current.startScroll - dx * 1.4;
-  };
-
-  const handleMouseUp = () => {
-    dragRef.current.down = false;
-    window.setTimeout(() => {
-      dragRef.current.dragged = false;
-    }, 60);
-  };
 
   if (visibleSongs.length === 0) return null;
 
+  const safeActive =
+    active !== null && active < visibleSongs.length ? active : null;
+  const activeSong = safeActive !== null ? visibleSongs[safeActive] : null;
+
   return (
     <section aria-label="唱片架" className="relative select-none">
-      {/* 顶行：常态安静，抽起碟片时浮现曲名、日期与词曲；右侧可左右推架 */}
+      {/* 顶行：常态安静，抽起碟片时浮现曲名、日期与词曲；右侧可左右推架（触屏直接滑） */}
       <div className="mb-1 flex min-h-11 items-center justify-between gap-4">
         {activeSong ? (
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                onOpenSong
-                  ? onOpenSong(activeSong.id)
-                  : onJumpToYear(activeSong.year ?? null)
-              }
-              className="group min-w-0 text-left"
-            >
-              <div className="flex items-baseline gap-2.5">
-                <span className="truncate font-serif text-[15px] text-slate-900 transition-colors group-hover:text-(--tone) sm:text-base dark:text-slate-100">
-                  《{activeSong.title}》
-                </span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums text-(--tone)">
-                  {activeSong.date?.replaceAll("-", ".") ||
-                    activeSong.year ||
-                    "未详"}
-                </span>
-              </div>
-              <p className="truncate font-kaiti text-xs text-slate-500 dark:text-slate-400">
-                {creditSummary(activeSong) || "点此入卷"}
-              </p>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onOpenSong(activeSong.id)}
+            className="group min-w-0 text-left"
+          >
+            <div className="flex items-baseline gap-2.5">
+              <span className="truncate font-serif text-[15px] text-slate-900 transition-colors group-hover:text-(--tone) sm:text-base dark:text-slate-100">
+                《{activeSong.title}》
+              </span>
+              <span className="shrink-0 font-mono text-[11px] tabular-nums text-(--tone)">
+                {activeSong.date?.replaceAll("-", ".") ||
+                  activeSong.year ||
+                  "未详"}
+              </span>
+            </div>
+            <p className="truncate font-kaiti text-xs text-slate-500 dark:text-slate-400">
+              {creditSummary(activeSong) || "点此入卷"}
+            </p>
+          </button>
         ) : (
           <span className="text-[11px] tracking-[0.3em] text-(--tone)">
             架上唱片
           </span>
         )}
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1 [@media(hover:none)]:hidden">
           <button
             type="button"
             onClick={() => scrollRack(-1)}
@@ -289,23 +522,45 @@ function ColorTapestry({
         </div>
       </div>
 
-      {/* ── 实体唱片架横向轨道 ── */}
+      {/* ── 唱片架横向轨道 ── */}
       <div className="relative -mx-6">
         <div
           ref={scrollerRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={() => {
-            handleMouseUp();
-            activate(null);
+          tabIndex={0}
+          role="listbox"
+          aria-label="唱片架：左右键换碟，回车打开"
+          aria-activedescendant={
+            activeSong ? `disc-${activeSong.id}` : undefined
+          }
+          onPointerEnter={(e) => {
+            if (e.pointerType === "mouse") ix.current.pointerInside = true;
           }}
-          className="no-scrollbar relative flex cursor-grab items-end overflow-x-auto px-6 pt-11 pb-6 active:cursor-grabbing mask-[linear-gradient(to_right,transparent,black_24px,black_calc(100%-36px),transparent)]"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={(e) => endDrag(e, true)}
+          onPointerCancel={(e) => endDrag(e, false)}
+          onPointerLeave={handlePointerLeave}
+          onWheel={stopInertia}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          className={cn(
+            // isolate：碟片的 z-index 不越出架子，不压到吸顶的检目线上
+            "no-scrollbar relative isolate flex items-end overflow-x-auto px-6 pt-11 pb-6 outline-none",
+            isTouch
+              ? "snap-x snap-mandatory scroll-pl-6"
+              : safeActive !== null
+                ? "cursor-pointer active:cursor-grabbing"
+                : "cursor-grab active:cursor-grabbing",
+          )}
         >
-          {/* 唱片排：每个插槽保持固定横向占位，确保滑过时绝对顺滑不抖动 */}
+          {/* 唱片排：每个插槽保持固定横向占位，换碟只动 transform，不重排 */}
+          {/* 触屏末尾留出将近一屏的空架，最后几张碟也能滑到取碟位 */}
           <div
-            className="relative flex items-end pr-28 sm:pr-32"
-            style={{ perspective: "1100px" }}
+            ref={stripRef}
+            className={cn(
+              "relative flex items-end",
+              isTouch ? "pr-[calc(100vw-3rem)]" : "pr-28 sm:pr-32",
+            )}
           >
             {visibleSongs.map((song, idx) => (
               <Disc
@@ -317,14 +572,24 @@ function ColorTapestry({
                     ? 3
                     : Math.min(Math.abs(idx - safeActive), 3)
                 }
+                shift={safeActive !== null && idx > safeActive ? shift : 0}
                 yearLabel={yearStartMap.get(idx)}
                 live={idx >= live[0] && idx <= live[1]}
-                onHover={handleHover}
-                onPick={handlePick}
+                snap={isTouch}
               />
             ))}
           </div>
         </div>
+
+        {/* 两端渐隐（页面底色），代替整条架子上的 mask：滚动时不必每帧重算遮罩 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-linear-to-r from-[#FAFAFA] to-transparent dark:from-[#0B0F19]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-9 bg-linear-to-l from-[#FAFAFA] to-transparent dark:from-[#0B0F19]"
+        />
 
         {/* 架面承托细线 */}
         <div
@@ -339,46 +604,51 @@ function ColorTapestry({
 export default memo(ColorTapestry);
 
 /**
- * 一张碟。dist 是到焦点碟的距离，3 代表「3 及更远」（姿态都一样），
- * 这样滑过时只有姿态真正改变的几张碟会重渲。
+ * 一张碟。dist 是到焦点碟的距离，3 代表「3 及更远」（姿态都一样）；
+ * shift 是焦点碟后面让出的位移。换碟时只有这两项真正改变的几张碟会重渲。
  * live 为 false 时只留同尺寸的空插槽。
  */
 const Disc = memo(function Disc({
   song,
   idx,
   dist,
+  shift,
   yearLabel,
   live,
-  onHover,
-  onPick,
+  snap,
 }: {
   song: Song;
   idx: number;
   dist: number;
+  shift: number;
   yearLabel: number | null | undefined;
   live: boolean;
-  onHover: (idx: number) => void;
-  onPick: (idx: number) => void;
+  snap: boolean;
 }) {
   const isAct = dist === 0;
   const bg = stripeColor(song);
 
-  // 物理抽碟姿态：焦点碟抽出并转正面向你，左右邻碟如书架受触般微微起伏让角
+  // 抽碟姿态：焦点碟抽出并转正面向你，左右邻碟如书架受触般微微起伏让角
   const rotateY = isAct ? 0 : dist === 1 ? -34 : dist === 2 ? -48 : -58;
   const translateY = isAct ? -24 : dist === 1 ? -9 : dist === 2 ? -4 : 0;
-  const scale = isAct ? 1.06 : 1;
+  const scale = isAct ? ACTIVE_SCALE : 1;
 
   return (
     <div
+      id={`disc-${song.id}`}
+      role="option"
+      aria-selected={isAct}
+      aria-label={song.title}
       data-disc-idx={idx}
-      onMouseEnter={() => onHover(idx)}
-      onClick={() => onPick(idx)}
       className={cn(
-        "relative h-25 w-5.5 shrink-0 cursor-pointer sm:h-29.5 sm:w-6.5",
+        "relative h-25 w-5.5 shrink-0 sm:h-29.5 sm:w-6.5",
         yearLabel !== undefined && idx > 0 && "ml-5 sm:ml-6",
+        snap && "snap-start",
       )}
       style={{
         zIndex: isAct ? 50 : dist === 1 ? 30 : dist === 2 ? 20 : 10,
+        transform: shift ? `translateX(${shift}px)` : undefined,
+        transition: `transform 380ms ${EASE}`,
       }}
     >
       {/* 年份隔片：插在每一年第一张碟前的极简年代标签，像唱片店木/纸隔板 */}
@@ -392,15 +662,14 @@ const Disc = memo(function Disc({
         </span>
       )}
 
-      {/* 实体唱片封套本体（绕左脊旋转，露出真实封面与立体厚度阴影） */}
+      {/* 唱片封套本体（绕左脊旋转，露出真实封面与立体厚度阴影） */}
       {live && (
         <div
           className="pointer-events-none absolute bottom-0 left-0 h-25 w-25 sm:h-29.5 sm:w-29.5"
           style={{
             transformOrigin: "left center",
             transform: `translateY(${translateY}px) rotateY(${rotateY}deg) scale(${scale})`,
-            transition:
-              "transform 380ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 380ms ease, filter 380ms ease",
+            transition: `transform 380ms ${EASE}`,
           }}
         >
           {/* 抽起时碟后微探一弧黑胶边，强化“唱片”实感 */}
@@ -424,16 +693,15 @@ const Disc = memo(function Disc({
                 ? "shadow-[0_24px_42px_-12px_rgba(15,23,42,0.55)] ring-slate-900/15 dark:shadow-[0_26px_48px_-10px_rgba(0,0,0,0.92)] dark:ring-white/25"
                 : "shadow-[-6px_6px_14px_-4px_rgba(15,23,42,0.28)] ring-slate-900/10 dark:shadow-[-8px_8px_18px_-4px_rgba(0,0,0,0.75)] dark:ring-white/12",
             )}
-            style={{
-              backgroundColor: bg,
-            }}
+            style={{ backgroundColor: bg }}
           >
             <Image
               src={getCoverUrl(song)}
-              alt={song.title}
+              alt=""
               width={160}
               height={160}
               sizes="118px"
+              draggable={false}
               loading={idx < 32 ? "eager" : "lazy"}
               className={cn(
                 "h-full w-full object-cover transition-[filter] duration-300",

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { Fragment, useEffect, useState } from "react";
 import ColorTapestry from "./ColorTapestry";
+import type { FeatureData } from "./FeatureBand";
 import { CORE_FEATURES, type FeatureEntranceItem } from "./FeatureEntrances";
 import { HeaderDemoE as ScreenHeader } from "./HeaderDemoE";
 
@@ -17,37 +18,37 @@ export const HEADER_VARIANTS: readonly {
   label: string;
   note: string;
 }[] = [
-  {
-    id: "a",
-    code: "A",
-    label: "别册同架",
-    note: "左正面展册、右侧插唱片，同立一条架面",
-  },
-  {
-    id: "b",
-    code: "B",
-    label: "中式书扉",
-    note: "复刻歌曲页竖排刻本基因重构卷首",
-  },
-  {
-    id: "c",
-    code: "C",
-    label: "唱片顶置",
-    note: "开卷即见满架色彩，铭牌退居架下",
-  },
-  {
-    id: "d",
-    code: "D",
-    label: "升格顶栏",
-    note: "特辑进全站一级导航，卷首至纯",
-  },
-  {
-    id: "e",
-    code: "E",
-    label: "二十扇屏",
-    note: "二十扇屏 + 极轻切片横栏，不抢主视觉",
-  },
-];
+    {
+      id: "a",
+      code: "A",
+      label: "别册同架",
+      note: "左正面展册、右侧插唱片，同立一条架面",
+    },
+    {
+      id: "b",
+      code: "B",
+      label: "中式书扉",
+      note: "复刻歌曲页竖排刻本基因重构卷首",
+    },
+    {
+      id: "c",
+      code: "C",
+      label: "唱片顶置",
+      note: "开卷即见满架色彩，铭牌退居架下",
+    },
+    {
+      id: "d",
+      code: "D",
+      label: "升格顶栏",
+      note: "特辑进全站一级导航，卷首至纯",
+    },
+    {
+      id: "e",
+      code: "E",
+      label: "二十扇屏",
+      note: "纯二十扇屏 + 卷首题签借屏显影，检目收进顶栏",
+    },
+  ];
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 
@@ -695,14 +696,18 @@ export function HeaderDemoE({
   totalCount,
   matched,
   catalog,
+  features,
   onJumpYear,
-}: SharedHeaderProps) {
+}: SharedHeaderProps & {
+  features: FeatureData;
+}) {
   return (
     <ScreenHeader
       firstYear={firstYear}
       lastYear={lastYear}
       catalog={catalog}
       matched={matched}
+      features={features}
       onJumpYear={onJumpYear}
       countSlot={
         <SongCount

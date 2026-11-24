@@ -45,7 +45,7 @@ export const HEADER_VARIANTS: readonly {
     id: "e",
     code: "E",
     label: "二十扇屏",
-    note: "一年一幅并排成屏，指向哪年展开哪年",
+    note: "二十扇屏 + 极轻切片横栏，不抢主视觉",
   },
 ];
 

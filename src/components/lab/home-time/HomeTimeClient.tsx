@@ -86,7 +86,7 @@ export default function HomeTimeClient({
 
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [headerVariant, setHeaderVariant] = useState<HeaderVariant>("a");
+  const [headerVariant, setHeaderVariant] = useState<HeaderVariant>("e");
   // 年份标尺自己管当前年份：滚过年份时只重渲标尺，不牵动整页
   const rulerRef = useRef<StateHandle<string | null>>(null);
   const setActiveYearKey = useCallback(
@@ -334,7 +334,7 @@ export default function HomeTimeClient({
         <TopBar
           exit={{ kind: "logo", onClick: handleReset, tooltip: "回到卷首" }}
           nav={
-            headerVariant === "d" || headerVariant === "e" ? (
+            headerVariant === "d" ? (
               <DemoTopBarNavD onReset={handleReset} />
             ) : (
               <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
@@ -344,7 +344,7 @@ export default function HomeTimeClient({
             )
           }
         >
-          {(headerVariant === "d" || headerVariant === "e") && (
+          {headerVariant === "d" && (
             <DemoTopBarMobileStripD onReset={handleReset} />
           )}
         </TopBar>
@@ -352,14 +352,14 @@ export default function HomeTimeClient({
         <main
           className={cn(
             "relative mx-auto max-w-7xl px-6 pb-28",
-            headerVariant === "d" || headerVariant === "e"
+            headerVariant === "d"
               ? "pt-34 md:pt-32"
               : headerVariant === "c"
                 ? "pt-23 md:pt-25"
                 : "pt-26 md:pt-32",
           )}
         >
-          {/* ── 1 & 2. 卷首与唱片架（A 别册同架 / B 中式书扉 / C 唱片顶置 / D 升格顶栏） ── */}
+          {/* ── 1 & 2. 卷首与唱片架（A 别册同架 / B 中式书扉 / C 唱片顶置 / D 升格顶栏 / E 二十扇屏） ── */}
           {headerVariant === "a" && <HeaderDemoA {...headerProps} />}
           {headerVariant === "b" && <HeaderDemoB {...headerProps} />}
           {headerVariant === "c" && <HeaderDemoC {...headerProps} />}
@@ -375,7 +375,7 @@ export default function HomeTimeClient({
           <div
             className={cn(
               "sticky z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95",
-              headerVariant === "d" || headerVariant === "e"
+              headerVariant === "d"
                 ? "top-[calc(var(--nav-h)+2.125rem)] md:top-(--nav-h)"
                 : "top-(--nav-h)",
             )}

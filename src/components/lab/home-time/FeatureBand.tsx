@@ -13,100 +13,94 @@ export interface FeatureData {
   questionCount: number;
 }
 
-const OPTION_MARKS = ["甲", "乙", "丙", "丁"];
-
 function paletteText(palette: number): string {
   return palette >= 0
     ? PALETTE_FULL[palette % PALETTE_FULL.length].text
     : GRAY_PALETTE.text;
 }
 
-/** 母题字号只分三档：词云的连续字号放在这么小的一块里会显得乱 */
-function motifSize(count: number, max: number): string {
-  const r = count / max;
-  if (r > 0.66) return "text-[2rem] md:text-[2.25rem]";
-  if (r > 0.4) return "text-2xl md:text-[1.75rem]";
-  return "text-xl md:text-[1.375rem]";
-}
-
 /**
- * 特展：站内另外几处去处，每处只拿自己的一小片内容作门面，不另做包装。
- * - 倾尽天下是主角：长卷里的一帧画面，占大块；
- * - 意象：作品最多的几个母题，刻本字，按门类配色，点哪个进哪个；
- * - 寻曲：第一题原样摆出来，点选项即带着这一答进入测验。
- * 有主有次，三处之间只靠留白与细线分开，不用卡片。
+ * 特展（思路 2 · 极轻切片横栏）：
+ * 紧接「二十扇屏」下方的一条极轻无框三列索引（约 86px 高），不抢屏风主角、不把编年曲库推深；
+ * 每列仍只取真实内容的一小口切片作门面：一帧微缩雪景题图、五枚高频刻本母题、寻曲第一问题干。
  */
 export default function FeatureBand({ data }: { data: FeatureData }) {
-  const maxCount = data.motifs[0]?.songCount ?? 1;
+  const topMotifs = data.motifs.slice(0, 5);
 
   return (
-    <section aria-label="特展" className="mt-16 md:mt-20">
-      <div className="flex items-center gap-5">
-        <h2 className="whitespace-nowrap font-serif text-sm tracking-[0.4em] text-(--tone)">
-          特展
-        </h2>
-        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-      </div>
-
-      <div className="mt-10 grid gap-y-14 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] lg:gap-x-16">
-        {/* 倾尽天下：长卷里的一帧 */}
-        <Link href="/story/qjtx" className="group block outline-none">
-          <div className="relative aspect-[5/3] overflow-hidden rounded-md ring-1 ring-slate-900/5 dark:ring-white/10">
+    <nav
+      aria-label="站点特辑"
+      className="mt-4 border-y border-slate-200/75 dark:border-slate-800/80"
+    >
+      <div className="grid divide-y divide-slate-200/70 lg:grid-cols-3 lg:divide-x lg:divide-y-0 dark:divide-slate-800/75">
+        {/* 1. 倾尽天下：书籍题图式极小缩影 + 题名与一句楷体 */}
+        <Link
+          href="/story/qjtx"
+          className="group flex min-w-0 items-center gap-4 py-4 outline-none lg:pr-7"
+        >
+          <div className="relative h-13 w-20 shrink-0 overflow-hidden rounded-[3px] ring-1 ring-slate-900/8 dark:ring-white/10">
             <Image
               src="/story/qjtx/31.avif"
-              alt="倾尽天下长卷：雪中二人，一线朱砂"
+              alt="倾尽天下长卷缩影"
               fill
-              sizes="(min-width: 1024px) 720px, 100vw"
-              className="object-cover transition-transform duration-700 ease-page group-hover:scale-[1.03] group-focus-visible:scale-[1.03]"
+              sizes="80px"
+              className="object-cover grayscale-[35%] transition-all duration-700 ease-page group-hover:scale-[1.04] group-hover:grayscale-0 group-focus-visible:grayscale-0"
             />
           </div>
-          <div className="mt-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h3 className="font-serif text-2xl font-semibold tracking-tight text-ink md:text-[1.75rem]">
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="truncate font-serif text-[16px] font-semibold tracking-wide text-ink transition-colors group-hover:text-(--tone)">
                 倾尽天下
-              </h3>
-              <span className="text-xs tracking-[0.35em] text-(--tone)">
+              </span>
+              <span aria-hidden className="text-ink-faint">
+                ·
+              </span>
+              <span className="shrink-0 text-[11px] tracking-[0.22em] text-ink-meta">
                 互动长卷
               </span>
             </div>
-            <span className="text-xs tracking-widest text-ink-meta transition-colors group-hover:text-(--tone)">
-              入卷 →
-            </span>
+            <p className="mt-1 truncate font-kaiti text-[13px] text-ink-muted transition-colors group-hover:text-ink-prose">
+              一曲长歌，随乐声缓步展开江山旧梦
+            </p>
           </div>
-          <p className="mt-2 font-kaiti text-[15px] text-ink-muted">
-            一曲长歌，随乐声缓步展开江山旧梦
-          </p>
         </Link>
 
-        <div className="flex min-w-0 flex-col">
-          {/* 意象：最常写到的几个母题 */}
-          <div>
-            <div className="flex items-baseline justify-between gap-4">
-              <h3 className="font-serif text-lg font-semibold tracking-wide text-ink">
-                意象
-              </h3>
-              <Link
-                href="/imagery"
-                className="text-xs tracking-widest text-ink-meta transition-colors hover:text-(--tone)"
-              >
-                {data.motifCount > 0
-                  ? `全部 ${data.motifCount} 个母题`
-                  : "入词云"}{" "}
-                →
-              </Link>
-            </div>
-            <p className="mt-1 font-kaiti text-sm text-ink-muted">
-              二十年里，最常写到的是这些
-            </p>
-            <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2">
-              {data.motifs.map((m) => (
+        {/* 2. 意象词云：题名 + 前五枚真实刻本母题直达 */}
+        <div className="flex min-w-0 flex-col justify-center py-4 lg:px-7">
+          <div className="flex items-baseline justify-between gap-2">
+            <Link
+              href="/imagery"
+              className="group flex min-w-0 items-baseline gap-2 outline-none"
+            >
+              <span className="truncate font-serif text-[16px] font-semibold tracking-wide text-ink transition-colors group-hover:text-(--tone)">
+                意象词云
+              </span>
+              <span aria-hidden className="text-ink-faint">
+                ·
+              </span>
+              <span className="shrink-0 text-[11px] tracking-[0.2em] text-ink-meta">
+                {data.motifCount > 0 ? `${data.motifCount} 个母题` : "词中万象"}
+              </span>
+            </Link>
+            <Link
+              href="/imagery"
+              aria-label="进入意象词云"
+              className="shrink-0 text-xs text-ink-meta transition-colors hover:text-(--tone)"
+            >
+              →
+            </Link>
+          </div>
+
+          {topMotifs.length > 0 ? (
+            <div className="mt-1.5 flex items-baseline gap-x-3.5 overflow-hidden">
+              {topMotifs.map((m) => (
                 <Link
                   key={m.id}
                   href={`/imagery/${m.id}`}
                   title={`${m.songCount} 首作品写到`}
                   className={cn(
-                    "font-calligraphy leading-[1.3] transition-opacity hover:opacity-70",
-                    motifSize(m.songCount, maxCount),
+                    "shrink-0 font-calligraphy text-[17px] leading-none transition-opacity duration-300 hover:opacity-65",
                     paletteText(m.palette),
                   )}
                 >
@@ -114,41 +108,50 @@ export default function FeatureBand({ data }: { data: FeatureData }) {
                 </Link>
               ))}
             </div>
-          </div>
-
-          {/* 寻曲：第一题原样摆出 */}
-          {data.question && (
-            <div className="mt-10 border-t border-slate-200/70 pt-8 dark:border-slate-800">
-              <div className="flex items-baseline justify-between gap-4">
-                <h3 className="font-serif text-lg font-semibold tracking-wide text-ink">
-                  寻曲
-                </h3>
-                <span className="text-xs tracking-[0.2em] text-ink-meta">
-                  {data.questionCount} 问之一 · {data.question.title}
-                </span>
-              </div>
-              <p className="mt-3 font-serif text-[15px] text-ink-body">
-                {data.question.stem}
-              </p>
-              <ol className="mt-3 space-y-0.5">
-                {data.question.options.map((text, i) => (
-                  <li key={i}>
-                    <Link
-                      href={`/quiz?q1=${i}`}
-                      className="group flex items-baseline gap-3 py-1 font-kaiti text-sm leading-relaxed text-ink-prose transition-colors hover:text-(--tone)"
-                    >
-                      <span className="shrink-0 font-serif text-xs text-ink-meta transition-colors group-hover:text-(--tone)">
-                        {OPTION_MARKS[i] ?? i + 1}
-                      </span>
-                      <span>{text}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            </div>
+          ) : (
+            <Link
+              href="/imagery"
+              className="mt-1 truncate font-kaiti text-[13px] text-ink-muted transition-colors hover:text-ink-prose"
+            >
+              从长安白雪到孤城旧梦，漫游词中谱系
+            </Link>
           )}
         </div>
+
+        {/* 3. 寻曲：题名 + 第一问真实题干引句 */}
+        <Link
+          href="/quiz"
+          className="group flex min-w-0 flex-col justify-center py-4 outline-none lg:pl-7"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="flex min-w-0 items-baseline gap-2">
+              <span className="truncate font-serif text-[16px] font-semibold tracking-wide text-ink transition-colors group-hover:text-(--tone)">
+                寻曲
+              </span>
+              <span aria-hidden className="text-ink-faint">
+                ·
+              </span>
+              <span className="shrink-0 text-[11px] tracking-[0.22em] text-ink-meta">
+                {data.questionCount > 0
+                  ? `${data.questionCount} 问之一`
+                  : "十二问寻歌"}
+              </span>
+            </div>
+            <span
+              aria-hidden
+              className="shrink-0 text-xs text-ink-meta transition-colors group-hover:text-(--tone)"
+            >
+              →
+            </span>
+          </div>
+
+          <p className="mt-1 truncate font-kaiti text-[13px] text-ink-muted transition-colors group-hover:text-ink-prose">
+            {data.question
+              ? `「${data.question.stem}」`
+              : "十二个问题，一段旅程，寻一首懂你的歌"}
+          </p>
+        </Link>
       </div>
-    </section>
+    </nav>
   );
 }

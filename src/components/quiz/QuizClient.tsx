@@ -125,6 +125,32 @@ export default function QuizClient({
     window.scrollTo({ top: 0 });
   }, [questions]);
 
+  // 从首页特展里直接答了第一题（?q1=选项下标）：跳过启程页，带着这一答从第二题开始。
+  // 读完就把参数从地址栏去掉，刷新或返回时不再重复带入。
+  // 参数只在浏览器里有：渲染时读会和服务端结果不一致，所以水合后的下一帧再切到答题
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const raw = url.searchParams.get("q1");
+    if (raw === null) return;
+    const first = Number(raw);
+    const valid =
+      Number.isInteger(first) &&
+      first >= 0 &&
+      first < (questions[0]?.options.length ?? 0);
+    // 去参数也放进这一帧：开发模式下 effect 会先跑一遍再撤销，提前去掉第二遍就读不到了
+    const frame = requestAnimationFrame(() => {
+      url.searchParams.delete("q1");
+      window.history.replaceState(window.history.state, "", url);
+      if (!valid) return;
+      setOrder(questions.map((q) => shuffledIndices(q.options.length)));
+      setAnswers(questions.map((_, i) => (i === 0 ? first : null)));
+      setIndex(Math.min(1, questions.length - 1));
+      setDirection(1);
+      setStage("quiz");
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [questions]);
+
   const choose = useCallback(
     (optionIndex: number) => {
       if (advanceTimer.current) return; // 翻页动画进行中，忽略连点

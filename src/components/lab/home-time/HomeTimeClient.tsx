@@ -49,6 +49,7 @@ import {
   HeaderDemoSwitcher,
   type HeaderVariant,
 } from "./HeaderDemos";
+import FeatureBand, { type FeatureData } from "./FeatureBand";
 import YearChapters from "./YearChapters";
 import { type YearChapter, byDateDesc, groupByYear } from "./timeline";
 
@@ -68,7 +69,13 @@ interface ActiveChip {
  *   「类型」与年份滑轨、5 维多选统一收进筛选面板（宽屏内联展开，手机走 Base UI 底部抽屉）；
  * - 正文：固定「编年目录 + 由近及远」，一章一画幅 + 右栏编年目录。
  */
-export default function HomeTimeClient({ songs }: { songs: Song[] }) {
+export default function HomeTimeClient({
+  songs,
+  features,
+}: {
+  songs: Song[];
+  features: FeatureData;
+}) {
   const router = useRouter();
   const locale = useLocale();
   const tLib = useTranslations("library");
@@ -357,7 +364,12 @@ export default function HomeTimeClient({ songs }: { songs: Song[] }) {
           {headerVariant === "b" && <HeaderDemoB {...headerProps} />}
           {headerVariant === "c" && <HeaderDemoC {...headerProps} />}
           {headerVariant === "d" && <HeaderDemoD {...headerProps} />}
-          {headerVariant === "e" && <HeaderDemoE {...headerProps} />}
+          {headerVariant === "e" && (
+            <>
+              <HeaderDemoE {...headerProps} />
+              <FeatureBand data={features} />
+            </>
+          )}
 
           {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
           <div

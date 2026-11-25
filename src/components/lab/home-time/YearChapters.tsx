@@ -138,7 +138,7 @@ const ChapterBlock = memo(function ChapterBlock({
         id={`y${yearKey}`}
         data-year-key={yearKey}
         className={cn(
-          "flex scroll-mt-[calc(var(--nav-h)+4rem)] items-baseline gap-6 py-4",
+          "flex scroll-mt-[calc(var(--nav-h)+7rem)] items-baseline gap-6 py-4",
           !isFirst && "border-t border-slate-200/60 dark:border-slate-800/70",
         )}
       >
@@ -157,12 +157,12 @@ const ChapterBlock = memo(function ChapterBlock({
       id={`y${yearKey}`}
       data-year-key={yearKey}
       className={cn(
-        "grid scroll-mt-[calc(var(--nav-h)+4rem)] gap-y-8 py-12 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 lg:py-18 xl:grid-cols-[22rem_minmax(0,1fr)]",
+        "grid scroll-mt-[calc(var(--nav-h)+7rem)] gap-y-8 py-12 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 lg:py-18 xl:grid-cols-[22rem_minmax(0,1fr)]",
         !isFirst && "border-t border-slate-200/75 dark:border-slate-800/80",
       )}
     >
       {/* ── 左栏（宽屏吸顶展幅）/ 顶栏（手机紧凑章头） ── */}
-      <aside className="self-start lg:sticky lg:top-[calc(var(--nav-h)+4.5rem)]">
+      <aside className="self-start lg:sticky lg:top-[calc(var(--nav-h)+7.5rem)]">
         <div className="flex items-center justify-between gap-4 lg:block">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-3">

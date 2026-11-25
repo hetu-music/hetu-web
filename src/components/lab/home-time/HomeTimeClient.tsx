@@ -31,21 +31,21 @@ import { enumLabel } from "@/lib/utils/utils-song";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Fragment,
-  type Ref,
   useCallback,
-  useImperativeHandle,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { FoldedStrip, type StripHandle } from "./FoldedStrip";
 import {
-  HeaderDemoE,
-  HeaderDemoSwitcher,
-  type HeaderVariant,
-} from "./HeaderDemos";
-import FeatureBand, { type FeatureData } from "./FeatureBand";
+  type FeatureData,
+  SongCount,
+  TimeScreen,
+  buildPanels,
+} from "./TimeScreen";
 import YearChapters from "./YearChapters";
-import { type YearChapter, byDateDesc, groupByYear } from "./timeline";
+import { byDateDesc, groupByYear } from "./timeline";
 
 const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
 
@@ -56,12 +56,11 @@ interface ActiveChip {
 }
 
 /**
- * 首页原型「二十年的颜色 · 时间长卷」（由近及远 · 编年目录 · 书眉式极简检目）：
- * - 卷首：刊头 + 三径轻入口 + 「二十年的颜色」真实光谱；
- * - 书眉检目线（思路二）：严格对齐下方 `20–22rem | 1fr` 两栏中轴线，去掉软件感 Tab 与图标，
- *   左栏一根楷体底线寻曲，右栏静显已激活条件批注与「筛选 / 重置」纯文字按钮；
- *   「类型」与年份滑轨、5 维多选统一收进筛选面板（宽屏内联展开，手机走 Base UI 底部抽屉）；
- * - 正文：固定「编年目录 + 由近及远」，一章一画幅 + 右栏编年目录。
+ * 首页原型「二十年」：屏风即时间轴。
+ * - 卷首：一架屏风（TimeScreen）。最左序屏是题头与三处特展，其后一年一扇、由近及远，末尾未详；
+ * - 往下读时屏风合成吸顶细带（FoldedStrip），开着的那一扇跟着正在读的年份走，取代右侧年份标尺；
+ * - 检目线始终贴在屏风 / 细带下沿：搜索与筛选让屏扇、切片原地明暗；
+ * - 正文：编年目录，一章一画幅 + 右栏行目。
  */
 export default function HomeTimeClient({
   songs,
@@ -80,13 +79,41 @@ export default function HomeTimeClient({
 
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [headerVariant, setHeaderVariant] = useState<HeaderVariant>("e");
-  // 年份标尺自己管当前年份：滚过年份时只重渲标尺，不牵动整页
-  const rulerRef = useRef<StateHandle<string | null>>(null);
+  // 细带自己管正在读的年份：滚过年份时只重渲细带，不牵动整页
+  const stripRef = useRef<StripHandle>(null);
   const setActiveYearKey = useCallback(
-    (key: string) => rulerRef.current?.set(key),
+    (key: string) => stripRef.current?.setActive(key),
     [],
   );
+
+  // 屏风滚出去、检目线吸住顶栏的那一刻，细带出现
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const sentinel = sentinelRef.current;
+      const sticky = stickyRef.current;
+      if (!sentinel || !sticky) return;
+      setFolded(
+        sentinel.getBoundingClientRect().top <
+          sticky.getBoundingClientRect().top - 1,
+      );
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(check);
+    };
+    check();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, []);
 
   const handleSearchFocus = useCallback(() => setSearchFocused(true), []);
 
@@ -152,6 +179,11 @@ export default function HomeTimeClient({
       lastYear: Number.isFinite(max) ? max : 2026,
     };
   }, [songs]);
+
+  const panels = useMemo(
+    () => buildPanels(catalog, firstYear, lastYear),
+    [catalog, firstYear, lastYear],
+  );
 
   const chapters = useMemo(() => {
     const years: (number | null)[] = [];
@@ -311,17 +343,6 @@ export default function HomeTimeClient({
     </div>
   );
 
-  const headerProps = {
-    firstYear,
-    lastYear,
-    shownCount,
-    totalCount: catalog.length,
-    matched,
-    catalog,
-    onOpenSong: handleOpenSong,
-    onJumpYear: jumpToYear,
-  };
-
   return (
     <OverlayHostContext.Provider value={overlayHost}>
       <div className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
@@ -336,18 +357,31 @@ export default function HomeTimeClient({
         />
 
         <main className="relative mx-auto max-w-7xl px-6 pt-26 pb-28 md:pt-32">
-          {/* ── 1 & 2. 卷首（E 二十扇屏） ── */}
-          {headerVariant === "e" && (
-            <>
-              <HeaderDemoE {...headerProps} />
-              <FeatureBand data={features} />
-            </>
-          )}
+          {/* ── 1. 卷首：屏风展开 ── */}
+          <TimeScreen
+            panels={panels}
+            firstYear={firstYear}
+            lastYear={lastYear}
+            totalCount={catalog.length}
+            matched={matched}
+            features={features}
+            onJump={jumpToYear}
+          />
 
-          {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
+          {/* ── 2. 吸顶：合起的屏风 + 检目线。卷首时细带隐去，只留出一段空白 ── */}
+          <div ref={sentinelRef} aria-hidden />
           <div
-            className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95"
+            ref={stickyRef}
+            className="sticky top-(--nav-h) z-30 -mx-6 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95"
           >
+            <FoldedStrip
+              ref={stripRef}
+              panels={panels}
+              matched={matched}
+              visible={folded}
+              onJump={jumpToYear}
+              onTop={scrollToTop}
+            />
             <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
               {/* 左栏（与下方年份 & 大画幅严格左齐）：一根楷体寻曲底线，无图标堆砌 */}
               <div className="flex items-center justify-between gap-4">
@@ -388,6 +422,11 @@ export default function HomeTimeClient({
 
                 {/* 窄屏把「筛选 / 重置」紧贴同一行右侧，整条检目线只占一行 */}
                 <div className="flex shrink-0 items-center gap-3 lg:hidden">
+                  <SongCount
+                    shownCount={shownCount}
+                    totalCount={catalog.length}
+                    matched={matched}
+                  />
                   {state.isAnyFilterActive && (
                     <button
                       type="button"
@@ -444,6 +483,14 @@ export default function HomeTimeClient({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-4 text-xs tracking-[0.28em]">
+                  <SongCount
+                    shownCount={shownCount}
+                    totalCount={catalog.length}
+                    matched={matched}
+                  />
+                  <span aria-hidden className="text-ink-faint">
+                    ·
+                  </span>
                   {state.isAnyFilterActive && (
                     <>
                       <button
@@ -573,17 +620,6 @@ export default function HomeTimeClient({
           </footer>
         </main>
 
-        {/* 宽屏右侧悬浮年份标尺：由近及远，随时跨越二十年 */}
-        <YearRuler
-          ref={rulerRef}
-          chapters={chapters}
-          matched={matched}
-          onJump={jumpToYear}
-        />
-
-        {/* 左下角原型切换浮条：不侵入任何一套卷首版式，数字键按顺序切换 */}
-        <HeaderDemoSwitcher value={headerVariant} onChange={setHeaderVariant} />
-
         <FloatingActionButtons
           showScrollTop={showScrollTop}
           onScrollToTop={scrollToTop}
@@ -591,56 +627,5 @@ export default function HomeTimeClient({
         <div ref={setOverlayHost} />
       </div>
     </OverlayHostContext.Provider>
-  );
-}
-
-/** 子组件对外暴露的 setter：父组件只转发，不持有这份状态 */
-interface StateHandle<T> {
-  set: (value: T) => void;
-}
-
-function YearRuler({
-  ref,
-  chapters,
-  matched,
-  onJump,
-}: {
-  ref: Ref<StateHandle<string | null>>;
-  chapters: YearChapter[];
-  matched: ReadonlySet<number> | null;
-  onJump: (year: number | null) => void;
-}) {
-  const [activeYearKey, setActiveYearKey] = useState<string | null>(null);
-  useImperativeHandle(ref, () => ({ set: setActiveYearKey }), []);
-  return (
-    <nav
-      aria-label="年份标尺"
-      className="fixed right-4 top-1/2 z-20 hidden -translate-y-1/2 flex-col items-end gap-1 xl:flex"
-    >
-      {chapters.map((ch) => {
-        const key = String(ch.year ?? "unknown");
-        const active = activeYearKey === key;
-        const hasHit =
-          matched === null || ch.songs.some((s) => matched.has(s.id));
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onJump(ch.year)}
-            className={cn(
-              "flex items-center gap-1.5 font-mono text-[10px] tabular-nums tracking-wider transition-colors duration-300",
-              active
-                ? "text-(--tone)"
-                : hasHit
-                  ? "text-ink-meta/60 hover:text-ink-body"
-                  : "text-ink-faint/40",
-            )}
-          >
-            {active && <span className="h-px w-3 bg-(--tone)" />}
-            {ch.year ?? "未详"}
-          </button>
-        );
-      })}
-    </nav>
   );
 }

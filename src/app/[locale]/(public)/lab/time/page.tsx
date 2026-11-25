@@ -1,4 +1,4 @@
-import type { FeatureData } from "@/components/lab/home-time/FeatureBand";
+import type { FeatureData } from "@/components/lab/home-time/TimeScreen";
 import HomeTimeClient from "@/components/lab/home-time/HomeTimeClient";
 import { getImageryCloud } from "@/lib/server/service-imagery-cloud";
 import { getQuizQuestions } from "@/lib/server/service-quiz";

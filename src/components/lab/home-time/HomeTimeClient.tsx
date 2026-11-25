@@ -39,12 +39,6 @@ import {
   useState,
 } from "react";
 import {
-  DemoTopBarMobileStripD,
-  DemoTopBarNavD,
-  HeaderDemoA,
-  HeaderDemoB,
-  HeaderDemoC,
-  HeaderDemoD,
   HeaderDemoE,
   HeaderDemoSwitcher,
   type HeaderVariant,
@@ -334,36 +328,15 @@ export default function HomeTimeClient({
         <TopBar
           exit={{ kind: "logo", onClick: handleReset, tooltip: "回到卷首" }}
           nav={
-            headerVariant === "d" ? (
-              <DemoTopBarNavD onReset={handleReset} />
-            ) : (
-              <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
-                <span aria-hidden>/</span>
-                <span>二十年的颜色</span>
-              </span>
-            )
+            <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
+              <span aria-hidden>/</span>
+              <span>二十年的颜色</span>
+            </span>
           }
-        >
-          {headerVariant === "d" && (
-            <DemoTopBarMobileStripD onReset={handleReset} />
-          )}
-        </TopBar>
+        />
 
-        <main
-          className={cn(
-            "relative mx-auto max-w-7xl px-6 pb-28",
-            headerVariant === "d"
-              ? "pt-34 md:pt-32"
-              : headerVariant === "c"
-                ? "pt-23 md:pt-25"
-                : "pt-26 md:pt-32",
-          )}
-        >
-          {/* ── 1 & 2. 卷首与唱片架（A 别册同架 / B 中式书扉 / C 唱片顶置 / D 升格顶栏 / E 二十扇屏） ── */}
-          {headerVariant === "a" && <HeaderDemoA {...headerProps} />}
-          {headerVariant === "b" && <HeaderDemoB {...headerProps} />}
-          {headerVariant === "c" && <HeaderDemoC {...headerProps} />}
-          {headerVariant === "d" && <HeaderDemoD {...headerProps} />}
+        <main className="relative mx-auto max-w-7xl px-6 pt-26 pb-28 md:pt-32">
+          {/* ── 1 & 2. 卷首（E 二十扇屏） ── */}
           {headerVariant === "e" && (
             <>
               <HeaderDemoE {...headerProps} />
@@ -373,12 +346,7 @@ export default function HomeTimeClient({
 
           {/* ── 3. 思路二：严格对齐下方两栏中轴线的极简「书眉检目线」 ── */}
           <div
-            className={cn(
-              "sticky z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95",
-              headerVariant === "d"
-                ? "top-[calc(var(--nav-h)+2.125rem)] md:top-(--nav-h)"
-                : "top-(--nav-h)",
-            )}
+            className="sticky top-(--nav-h) z-30 -mx-6 mt-7 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95"
           >
             <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
               {/* 左栏（与下方年份 & 大画幅严格左齐）：一根楷体寻曲底线，无图标堆砌 */}
@@ -613,7 +581,7 @@ export default function HomeTimeClient({
           onJump={jumpToYear}
         />
 
-        {/* 左下角原型切换浮条：不侵入任何一套卷首版式，支持键盘 1–4 切换 */}
+        {/* 左下角原型切换浮条：不侵入任何一套卷首版式，数字键按顺序切换 */}
         <HeaderDemoSwitcher value={headerVariant} onChange={setHeaderVariant} />
 
         <FloatingActionButtons

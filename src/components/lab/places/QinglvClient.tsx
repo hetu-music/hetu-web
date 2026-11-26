@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PlacesEngine, type EngineStop, type EngineText } from "./engine";
+import { LabModeNav } from "./shared";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 const GOLD_TEXT =
@@ -141,7 +142,7 @@ export default function QinglvClient({ places }: { places: Place[] }) {
   return (
     // 整页是夜色的青绿山水，顶栏也跟着走深色
     <div className="dark fixed inset-0 overflow-hidden bg-[#04121a] text-[#f5ecd2] [--tone:#e9c26b]">
-      <TopBar exit={{ kind: "logo" }} />
+      <TopBar exit={{ kind: "logo" }} nav={<LabModeNav active="qinglv" />} />
 
       <div ref={containerRef} className="absolute inset-0">
         <canvas ref={canvasRef} className="block h-full w-full touch-none" />

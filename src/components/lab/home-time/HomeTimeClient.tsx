@@ -28,11 +28,14 @@ import type { Song } from "@/lib/types";
 import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { cn } from "@/lib/utils/utils";
 import { enumLabel } from "@/lib/utils/utils-song";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Fragment,
+  type Ref,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -40,12 +43,15 @@ import {
 import { FoldedStrip, type StripHandle } from "./FoldedStrip";
 import {
   type FeatureData,
+  HEADER_VARIANTS,
+  type HeaderVariant,
+  type ScreenPanel,
   SongCount,
   TimeScreen,
   buildPanels,
 } from "./TimeScreen";
 import YearChapters from "./YearChapters";
-import { byDateDesc, groupByYear } from "./timeline";
+import { byDateDesc, creditSummary, groupByYear } from "./timeline";
 
 const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
 
@@ -55,12 +61,186 @@ interface ActiveChip {
   onRemove: () => void;
 }
 
+interface ShelfCaptionHandle {
+  setReading: (key: string) => void;
+  setStripHover: (key: string | null) => void;
+}
+
 /**
- * 首页原型「二十年」：屏风即时间轴。
- * - 卷首：一架屏风（TimeScreen）。最左序屏是题头与三处特展，其后一年一扇、由近及远，末尾未详；
- * - 往下读时屏风合成吸顶细带（FoldedStrip），开着的那一扇跟着正在读的年份走，取代右侧年份标尺；
- * - 检目线始终贴在屏风 / 细带下沿：搜索与筛选让屏扇、切片原地明暗；
- * - 正文：编年目录，一章一画幅 + 右栏行目。
+ * 检目线右栏常态槽位：未启筛选条件时，稳稳托住当前展开屏扇的题跋；
+ * 滚动吸顶后切换为正在阅读（或悬停细带）的年份落款。
+ * 通过 ref 接收滚动年份更新，滚动时只重渲这一小段，不牵动整页与正文目录。
+ */
+function ShelfCaption({
+  ref,
+  variant,
+  panels,
+  openKey,
+  folded,
+  onJump,
+  onTop,
+}: {
+  ref: Ref<ShelfCaptionHandle>;
+  variant: HeaderVariant;
+  panels: ScreenPanel[];
+  openKey: string;
+  folded: boolean;
+  onJump: (year: number | null) => void;
+  onTop: () => void;
+}) {
+  const [readingKey, setReadingKey] = useState(panels[0]?.key ?? "");
+  const [stripHoverKey, setStripHoverKey] = useState<string | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setReading: setReadingKey,
+      setStripHover: setStripHoverKey,
+    }),
+    [],
+  );
+
+  const activeKey = folded ? (stripHoverKey ?? readingKey) : openKey;
+  const panel = useMemo(
+    () => panels.find((p) => p.key === activeKey) ?? panels[0] ?? null,
+    [panels, activeKey],
+  );
+
+  if (!panel) return null;
+
+  return (
+    <div className="flex min-w-0 items-baseline gap-2.5 overflow-hidden">
+      {/* 方案一细带全宽收拢，无左栏「二十年」按钮，在此处提供轻巧归顶入口 */}
+      {folded && variant === "masthead" && (
+        <>
+          <button
+            type="button"
+            onClick={onTop}
+            title="回到卷首"
+            className="shrink-0 font-serif text-xs font-semibold tracking-[0.25em] text-ink-muted transition-colors hover:text-(--tone)"
+          >
+            ↑ 二十年
+          </button>
+          <span aria-hidden className="shrink-0 text-ink-faint">
+            ·
+          </span>
+        </>
+      )}
+
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.button
+          key={`${folded ? "f" : "o"}-${panel.key}`}
+          type="button"
+          onClick={() => onJump(panel.year)}
+          initial={{ opacity: 0, y: 2 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -2 }}
+          transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+          className="group flex min-w-0 items-baseline gap-2 text-left outline-none"
+        >
+          <span className="shrink-0 font-mono text-[11px] tabular-nums tracking-[0.18em] text-(--tone)">
+            {panel.year ?? "未详"}
+          </span>
+          {panel.ids.size > 0 && (
+            <span className="shrink-0 font-mono text-[10px] tabular-nums tracking-wider text-ink-meta">
+              {panel.ids.size} 曲
+            </span>
+          )}
+          {panel.song && (
+            <>
+              <span aria-hidden className="shrink-0 text-ink-faint">
+                —
+              </span>
+              <span className="truncate font-serif text-[14px] text-ink transition-colors group-hover:text-(--tone)">
+                《{panel.song.title}》
+              </span>
+              {creditSummary(panel.song) && (
+                <span className="hidden truncate font-kaiti text-xs text-ink-muted xl:inline">
+                  {creditSummary(panel.song)}
+                </span>
+              )}
+            </>
+          )}
+        </motion.button>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** 底部左下角极简方案切换胶囊：支持点击与数字键 1 / 2 即时对比两套头部设计 */
+function HeaderVariantSwitcher({
+  value,
+  onChange,
+}: {
+  value: HeaderVariant;
+  onChange: (next: HeaderVariant) => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const next = HEADER_VARIANTS[Number(e.key) - 1];
+      if (next) onChange(next.id);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onChange]);
+
+  const current = HEADER_VARIANTS.find((v) => v.id === value);
+
+  return (
+    <div
+      role="region"
+      aria-label="头部方案切换"
+      className="fixed bottom-5 left-4 z-50 flex flex-col items-start gap-1.5 sm:left-6"
+    >
+      {current && (
+        <p className="hidden rounded-full border border-slate-200/75 bg-[#FAFAFA]/95 px-3 py-1 font-kaiti text-xs text-ink-muted shadow-sm sm:block dark:border-slate-800 dark:bg-[#0B0F19]/95">
+          方案{current.code}：{current.note}
+        </p>
+      )}
+      <div className="flex items-center rounded-full border border-slate-200/80 bg-[#FAFAFA]/95 px-1.5 py-1 shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[#0B0F19]/95 dark:shadow-[0_10px_28px_-8px_rgba(0,0,0,0.65)]">
+        <span className="hidden pl-2.5 pr-2 text-[10px] tracking-[0.24em] text-ink-meta sm:inline">
+          卷首
+        </span>
+        {HEADER_VARIANTS.map((v, idx) => {
+          const active = v.id === value;
+          return (
+            <Fragment key={v.id}>
+              {idx > 0 && (
+                <span aria-hidden className="mx-0.5 text-[10px] text-ink-faint">
+                  ·
+                </span>
+              )}
+              <button
+                type="button"
+                aria-pressed={active}
+                onClick={() => onChange(v.id)}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs tracking-wider transition-colors",
+                  active
+                    ? "font-serif font-semibold text-(--tone)"
+                    : "text-ink-muted hover:text-ink",
+                )}
+              >
+                <span>{v.code}</span>
+                <span className="ml-1">{v.label}</span>
+              </button>
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 首页原型「二十年」：屏风、时间轴、题字、入口、搜索栏一体化方案对比页。
+ * - 卷首支持两套完整架构实时切换：一 · 题眉通屏 / 二 · 素绢引首；
+ * - 屏风底部落古琴徽位时间弦，仅疏标首尾、逢五与当前展开年；
+ * - 检目线紧承屏底作下槛，左栏严格对齐下方大画幅，右栏常态承载展开扇题跋；
+ * - 向下滚过屏风时，吸顶细带从 0 高度顺势抽出，与上方屏风逐扇同构收合。
  */
 export default function HomeTimeClient({
   songs,
@@ -77,16 +257,22 @@ export default function HomeTimeClient({
   const isDesktop = useIsDesktop();
   const { showScrollTop, scrollToTop } = useScrollTop();
 
+  const [variant, setVariant] = useState<HeaderVariant>("masthead");
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
-  // 细带自己管正在读的年份：滚过年份时只重渲细带，不牵动整页
-  const stripRef = useRef<StripHandle>(null);
-  const setActiveYearKey = useCallback(
-    (key: string) => stripRef.current?.setActive(key),
-    [],
-  );
 
-  // 屏风滚出去、检目线吸住顶栏的那一刻，细带出现
+  // 细带与书眉落款各自管正在读的年份：滚过年份时只局部更新，不牵动整页
+  const stripRef = useRef<StripHandle>(null);
+  const captionRef = useRef<ShelfCaptionHandle>(null);
+  const setActiveYearKey = useCallback((key: string) => {
+    stripRef.current?.setActive(key);
+    captionRef.current?.setReading(key);
+  }, []);
+  const handleStripHoverChange = useCallback((key: string | null) => {
+    captionRef.current?.setStripHover(key);
+  }, []);
+
+  // 屏风滚出去、检目线吸住顶栏的那一刻，细带从 0 高度平滑抽出
   const sentinelRef = useRef<HTMLDivElement>(null);
   const stickyRef = useRef<HTMLDivElement>(null);
   const [folded, setFolded] = useState(false);
@@ -113,7 +299,7 @@ export default function HomeTimeClient({
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
-  }, []);
+  }, [variant]);
 
   const handleSearchFocus = useCallback(() => setSearchFocused(true), []);
 
@@ -184,6 +370,13 @@ export default function HomeTimeClient({
     () => buildPanels(catalog, firstYear, lastYear),
     [catalog, firstYear, lastYear],
   );
+
+  const [openPanelKey, setOpenPanelKey] = useState(
+    () => panels[0]?.key ?? String(lastYear),
+  );
+  const resolvedOpenKey = panels.some((p) => p.key === openPanelKey)
+    ? openPanelKey
+    : (panels[0]?.key ?? "");
 
   const chapters = useMemo(() => {
     const years: (number | null)[] = [];
@@ -356,39 +549,49 @@ export default function HomeTimeClient({
           }
         />
 
-        <main className="relative mx-auto max-w-7xl px-6 pt-26 pb-28 md:pt-32">
-          {/* ── 1. 卷首：屏风展开 ── */}
+        <main className="relative mx-auto max-w-7xl px-6 pt-24 pb-28 md:pt-28">
+          {/* ── 1. 卷首：题字 · 入口 · 折屏 · 琴徽时间弦 ── */}
           <TimeScreen
+            variant={variant}
             panels={panels}
+            openKey={resolvedOpenKey}
             firstYear={firstYear}
             lastYear={lastYear}
-            totalCount={catalog.length}
             matched={matched}
             features={features}
+            onOpenChange={setOpenPanelKey}
             onJump={jumpToYear}
           />
 
-          {/* ── 2. 吸顶：合起的屏风 + 检目线。卷首时细带隐去，只留出一段空白 ── */}
+          {/* ── 2. 吸顶：合起的屏风（卷首时占高为 0） + 下槛检目线 ── */}
           <div ref={sentinelRef} aria-hidden />
           <div
             ref={stickyRef}
-            className="sticky top-(--nav-h) z-30 -mx-6 bg-[#FAFAFA]/95 px-6 pt-2 backdrop-blur-sm dark:bg-[#0B0F19]/95"
+            className="sticky top-(--nav-h) z-30 -mx-6 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95"
           >
             <FoldedStrip
               ref={stripRef}
+              variant={variant}
               panels={panels}
               matched={matched}
               visible={folded}
               onJump={jumpToYear}
               onTop={scrollToTop}
+              onHoverKeyChange={handleStripHoverChange}
             />
             <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
-              {/* 左栏（与下方年份 & 大画幅严格左齐）：一根楷体寻曲底线，无图标堆砌 */}
+              {/* 左栏（与下方年份 & 大画幅严格左齐）：一枚刻本「寻」字引 + 楷体寻曲底线 */}
               <div className="flex items-center justify-between gap-4">
-                <label className="group relative flex min-w-0 flex-1 items-center gap-2 py-1">
+                <label className="group relative flex min-w-0 flex-1 items-baseline gap-2.5 py-1">
+                  <span
+                    aria-hidden
+                    className="shrink-0 font-calligraphy text-[15px] leading-none text-ink-meta transition-colors duration-300 group-focus-within:text-(--tone)"
+                  >
+                    寻
+                  </span>
                   <input
                     type="text"
-                    placeholder="寻歌、词人或一句歌词……"
+                    placeholder="歌名、词人或一句歌词……"
                     value={state.searchInput}
                     onFocus={handleSearchFocus}
                     onChange={(e) => state.setSearchInput(e.target.value)}
@@ -405,7 +608,7 @@ export default function HomeTimeClient({
                   ) : lyrics.state === "loading" ? (
                     <span
                       aria-label="歌词检索准备中"
-                      className="block h-2.5 w-2.5 shrink-0 animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600"
+                      className="block h-2.5 w-2.5 shrink-0 self-center animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600"
                     />
                   ) : lyrics.state === "ready" ? (
                     <span className="shrink-0 text-[10px] tracking-[0.2em] text-(--tone)/65">
@@ -420,7 +623,7 @@ export default function HomeTimeClient({
                   />
                 </label>
 
-                {/* 窄屏把「筛选 / 重置」紧贴同一行右侧，整条检目线只占一行 */}
+                {/* 窄屏把曲数与「筛选 / 重置」紧贴同一行右侧，整条检目线只占一行 */}
                 <div className="flex shrink-0 items-center gap-3 lg:hidden">
                   <SongCount
                     shownCount={shownCount}
@@ -457,30 +660,42 @@ export default function HomeTimeClient({
                 </div>
               </div>
 
-              {/* 右栏（宽屏，与下方编年目录严格左齐）：已选条件轻注脚 + 「筛选」纯文字开关 */}
-              <div className="hidden items-center justify-between gap-6 lg:flex">
-                <div className="flex min-w-0 flex-wrap items-baseline gap-y-1 text-xs">
-                  {activeChips.map((chip, idx) => (
-                    <Fragment key={chip.key}>
-                      {idx > 0 && (
-                        <span aria-hidden className="mx-2.5 text-ink-faint">
-                          ·
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={chip.onRemove}
-                        title="点击撤回此项筛选"
-                        className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-ink-prose transition-colors hover:text-(--tone)"
-                      >
-                        <span>{chip.label}</span>
-                        <span className="font-sans text-[11px] text-ink-meta transition-colors group-hover:text-(--tone)">
-                          ×
-                        </span>
-                      </button>
-                    </Fragment>
-                  ))}
-                </div>
+              {/* 右栏（宽屏，与下方编年目录严格左齐）：常态承接屏扇题跋，筛选时切换为条件注脚 */}
+              <div className="hidden min-w-0 items-center justify-between gap-6 lg:flex">
+                {activeChips.length > 0 ? (
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-y-1 text-xs">
+                    {activeChips.map((chip, idx) => (
+                      <Fragment key={chip.key}>
+                        {idx > 0 && (
+                          <span aria-hidden className="mx-2.5 text-ink-faint">
+                            ·
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={chip.onRemove}
+                          title="点击撤回此项筛选"
+                          className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-ink-prose transition-colors hover:text-(--tone)"
+                        >
+                          <span>{chip.label}</span>
+                          <span className="font-sans text-[11px] text-ink-meta transition-colors group-hover:text-(--tone)">
+                            ×
+                          </span>
+                        </button>
+                      </Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <ShelfCaption
+                    ref={captionRef}
+                    variant={variant}
+                    panels={panels}
+                    openKey={resolvedOpenKey}
+                    folded={folded}
+                    onJump={jumpToYear}
+                    onTop={scrollToTop}
+                  />
+                )}
 
                 <div className="flex shrink-0 items-center gap-4 text-xs tracking-[0.28em]">
                   <SongCount
@@ -591,7 +806,7 @@ export default function HomeTimeClient({
             </p>
           )}
 
-          {/* ── 4. 编年目录正文（由近及远，一年一画幅 + 右侧编年行目） ── */}
+          {/* ── 3. 编年目录正文（由近及远，一年一画幅 + 右侧编年行目） ── */}
           {shownCount === 0 ? (
             <p className="py-24 text-center font-kaiti text-[15px] text-ink-meta">
               {lyricsPending
@@ -619,6 +834,8 @@ export default function HomeTimeClient({
             <p className="font-kaiti text-sm text-ink-meta">未完。</p>
           </footer>
         </main>
+
+        <HeaderVariantSwitcher value={variant} onChange={setVariant} />
 
         <FloatingActionButtons
           showScrollTop={showScrollTop}

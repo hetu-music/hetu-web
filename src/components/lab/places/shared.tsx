@@ -384,13 +384,18 @@ export function LabModeNav({
 }: {
   active: "atlas" | "scroll" | "qinglv";
 }) {
-  const items: { key: "atlas" | "scroll" | "qinglv"; label: string; href: string }[] = [
-    { key: "atlas", label: "绢本舆图", href: "/lab/places/atlas" },
-    { key: "scroll", label: "溯洄横卷", href: "/lab/places/scroll" },
-    { key: "qinglv", label: "青绿三维", href: "/lab/places" },
+  const items: {
+    key: "atlas" | "scroll" | "qinglv";
+    label: string;
+    shortLabel: string;
+    href: string;
+  }[] = [
+    { key: "atlas", label: "绢本舆图", shortLabel: "舆图", href: "/lab/places/atlas" },
+    { key: "scroll", label: "溯洄横卷", shortLabel: "横卷", href: "/lab/places/scroll" },
+    { key: "qinglv", label: "青绿三维", shortLabel: "三维", href: "/lab/places" },
   ];
   return (
-    <div className="ml-2 flex items-center gap-3 border-l border-current/15 pl-3 text-xs tracking-[0.22em]">
+    <div className="ml-1.5 flex items-center gap-2 border-l border-current/15 pl-2 text-[11px] tracking-[0.14em] sm:ml-2 sm:gap-3 sm:pl-3 sm:text-xs sm:tracking-[0.22em]">
       {items.map((item) => {
         const isCurrent = item.key === active;
         return (
@@ -400,11 +405,12 @@ export function LabModeNav({
             aria-current={isCurrent ? "page" : undefined}
             className={
               isCurrent
-                ? "font-serif font-semibold text-(--tone)"
-                : "text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
+                ? "shrink-0 font-serif font-semibold text-(--tone)"
+                : "shrink-0 text-slate-400 transition-colors hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
             }
           >
-            {item.label}
+            <span className="sm:hidden">{item.shortLabel}</span>
+            <span className="hidden sm:inline">{item.label}</span>
           </Link>
         );
       })}

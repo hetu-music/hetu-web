@@ -28,166 +28,54 @@ import type { Song } from "@/lib/types";
 import { bumpNavDepth } from "@/lib/utils/nav-depth";
 import { cn } from "@/lib/utils/utils";
 import { enumLabel } from "@/lib/utils/utils-song";
-import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Fragment,
-  type Ref,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { FoldedStrip, type StripHandle } from "./FoldedStrip";
-import {
-  type FeatureData,
-  HEADER_VARIANTS,
-  type HeaderVariant,
-  type ScreenPanel,
-  SongCount,
-  TimeScreen,
-  buildPanels,
-} from "./TimeScreen";
+import { FolioHero, ForeEdgeRail } from "./HeaderFolio";
+import { PaperFoldingScreen, PaperStickyBar } from "./HeaderPaperScreen";
+import { ChronicleString, StringHero } from "./HeaderString";
 import YearChapters from "./YearChapters";
-import { byDateDesc, creditSummary, groupByYear } from "./timeline";
+import {
+  type ActiveChip,
+  type FeatureData,
+  HEADER_SCHEMES,
+  type HeaderScheme,
+  SearchInputLine,
+  SongCount,
+  type YearRailHandle,
+  buildPanels,
+} from "./header-shared";
+import { byDateDesc, groupByYear } from "./timeline";
 
 const NO_FACET_OPTIONS = mapFacets((): FacetOption[] => []);
 
-interface ActiveChip {
-  key: string;
-  label: string;
-  onRemove: () => void;
-}
-
-interface ShelfCaptionHandle {
-  setReading: (key: string) => void;
-  setStripHover: (key: string | null) => void;
-}
-
-/**
- * 检目线右栏常态槽位：未启筛选条件时，稳稳托住当前展开屏扇的题跋；
- * 滚动吸顶后切换为正在阅读（或悬停细带）的年份落款。
- * 通过 ref 接收滚动年份更新，滚动时只重渲这一小段，不牵动整页与正文目录。
- */
-function ShelfCaption({
-  ref,
-  variant,
-  panels,
-  openKey,
-  folded,
-  onJump,
-  onTop,
-}: {
-  ref: Ref<ShelfCaptionHandle>;
-  variant: HeaderVariant;
-  panels: ScreenPanel[];
-  openKey: string;
-  folded: boolean;
-  onJump: (year: number | null) => void;
-  onTop: () => void;
-}) {
-  const [readingKey, setReadingKey] = useState(panels[0]?.key ?? "");
-  const [stripHoverKey, setStripHoverKey] = useState<string | null>(null);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      setReading: setReadingKey,
-      setStripHover: setStripHoverKey,
-    }),
-    [],
-  );
-
-  const activeKey = folded ? (stripHoverKey ?? readingKey) : openKey;
-  const panel = useMemo(
-    () => panels.find((p) => p.key === activeKey) ?? panels[0] ?? null,
-    [panels, activeKey],
-  );
-
-  if (!panel) return null;
-
-  return (
-    <div className="flex min-w-0 items-baseline gap-2.5 overflow-hidden">
-      {/* 方案一细带全宽收拢，无左栏「二十年」按钮，在此处提供轻巧归顶入口 */}
-      {folded && variant === "masthead" && (
-        <>
-          <button
-            type="button"
-            onClick={onTop}
-            title="回到卷首"
-            className="shrink-0 font-serif text-xs font-semibold tracking-[0.25em] text-ink-muted transition-colors hover:text-(--tone)"
-          >
-            ↑ 二十年
-          </button>
-          <span aria-hidden className="shrink-0 text-ink-faint">
-            ·
-          </span>
-        </>
-      )}
-
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.button
-          key={`${folded ? "f" : "o"}-${panel.key}`}
-          type="button"
-          onClick={() => onJump(panel.year)}
-          initial={{ opacity: 0, y: 2 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -2 }}
-          transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-          className="group flex min-w-0 items-baseline gap-2 text-left outline-none"
-        >
-          <span className="shrink-0 font-mono text-[11px] tabular-nums tracking-[0.18em] text-(--tone)">
-            {panel.year ?? "未详"}
-          </span>
-          {panel.ids.size > 0 && (
-            <span className="shrink-0 font-mono text-[10px] tabular-nums tracking-wider text-ink-meta">
-              {panel.ids.size} 曲
-            </span>
-          )}
-          {panel.song && (
-            <>
-              <span aria-hidden className="shrink-0 text-ink-faint">
-                —
-              </span>
-              <span className="truncate font-serif text-[14px] text-ink transition-colors group-hover:text-(--tone)">
-                《{panel.song.title}》
-              </span>
-              {creditSummary(panel.song) && (
-                <span className="hidden truncate font-kaiti text-xs text-ink-muted xl:inline">
-                  {creditSummary(panel.song)}
-                </span>
-              )}
-            </>
-          )}
-        </motion.button>
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/** 底部左下角极简方案切换胶囊：支持点击与数字键 1 / 2 即时对比两套头部设计 */
-function HeaderVariantSwitcher({
+/** 底部左下角极简方案切换胶囊：支持点击与数字键 1 / 2 / 3 即时对比三套重新设计的方案 */
+function HeaderSchemeSwitcher({
   value,
   onChange,
 }: {
-  value: HeaderVariant;
-  onChange: (next: HeaderVariant) => void;
+  value: HeaderScheme;
+  onChange: (next: HeaderScheme) => void;
 }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      const next = HEADER_VARIANTS[Number(e.key) - 1];
+      const next = HEADER_SCHEMES[Number(e.key) - 1];
       if (next) onChange(next.id);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onChange]);
 
-  const current = HEADER_VARIANTS.find((v) => v.id === value);
+  const current = HEADER_SCHEMES.find((s) => s.id === value);
 
   return (
     <div
@@ -204,10 +92,10 @@ function HeaderVariantSwitcher({
         <span className="hidden pl-2.5 pr-2 text-[10px] tracking-[0.24em] text-ink-meta sm:inline">
           卷首
         </span>
-        {HEADER_VARIANTS.map((v, idx) => {
-          const active = v.id === value;
+        {HEADER_SCHEMES.map((s, idx) => {
+          const active = s.id === value;
           return (
-            <Fragment key={v.id}>
+            <Fragment key={s.id}>
               {idx > 0 && (
                 <span aria-hidden className="mx-0.5 text-[10px] text-ink-faint">
                   ·
@@ -216,7 +104,7 @@ function HeaderVariantSwitcher({
               <button
                 type="button"
                 aria-pressed={active}
-                onClick={() => onChange(v.id)}
+                onClick={() => onChange(s.id)}
                 className={cn(
                   "rounded-full px-2.5 py-1 text-xs tracking-wider transition-colors",
                   active
@@ -224,8 +112,8 @@ function HeaderVariantSwitcher({
                     : "text-ink-muted hover:text-ink",
                 )}
               >
-                <span>{v.code}</span>
-                <span className="ml-1">{v.label}</span>
+                <span>{s.code}</span>
+                <span className="ml-1 hidden sm:inline">{s.label}</span>
               </button>
             </Fragment>
           );
@@ -236,11 +124,10 @@ function HeaderVariantSwitcher({
 }
 
 /**
- * 首页原型「二十年」：屏风、时间轴、题字、入口、搜索栏一体化方案对比页。
- * - 卷首支持两套完整架构实时切换：一 · 题眉通屏 / 二 · 素绢引首；
- * - 屏风底部落古琴徽位时间弦，仅疏标首尾、逢五与当前展开年；
- * - 检目线紧承屏底作下槛，左栏严格对齐下方大画幅，右栏常态承载展开扇题跋；
- * - 向下滚过屏风时，吸顶细带从 0 高度顺势抽出，与上方屏风逐扇同构收合。
+ * 首页原型「二十年」：三套去繁就简的卷首方案对比页。
+ * - 方案一（folio · 总目开篇）：零图留白刊头 + 右侧竖排刻本三径 + 视口右缘书口色签；
+ * - 方案二（string · 素卷琴弦）：居中素白开篇 + 吸顶不变形的 3px 色丝琴弦（悬停轻浮单帧小画笺）；
+ * - 方案三（paper-screen · 素骨折屏）：屏外零杂物，左扉页收题字/入口/寻曲，右侧二十一扇素纸藏锋、唯独一扇显画。
  */
 export default function HomeTimeClient({
   songs,
@@ -257,22 +144,17 @@ export default function HomeTimeClient({
   const isDesktop = useIsDesktop();
   const { showScrollTop, scrollToTop } = useScrollTop();
 
-  const [variant, setVariant] = useState<HeaderVariant>("masthead");
+  const [scheme, setScheme] = useState<HeaderScheme>("folio");
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // 细带与书眉落款各自管正在读的年份：滚过年份时只局部更新，不牵动整页
-  const stripRef = useRef<StripHandle>(null);
-  const captionRef = useRef<ShelfCaptionHandle>(null);
+  // 年份指示器（书口色签 / 色丝琴弦 / 素屏吸顶尺）各自局部维护当前年份，滚过正文不重渲整页
+  const railRef = useRef<YearRailHandle>(null);
   const setActiveYearKey = useCallback((key: string) => {
-    stripRef.current?.setActive(key);
-    captionRef.current?.setReading(key);
-  }, []);
-  const handleStripHoverChange = useCallback((key: string | null) => {
-    captionRef.current?.setStripHover(key);
+    railRef.current?.setActive(key);
   }, []);
 
-  // 屏风滚出去、检目线吸住顶栏的那一刻，细带从 0 高度平滑抽出
+  // 判断卷首是否已滚过吸顶线（供方案二翻转悬浮画笺方向、方案三抽出吸顶条）
   const sentinelRef = useRef<HTMLDivElement>(null);
   const stickyRef = useRef<HTMLDivElement>(null);
   const [folded, setFolded] = useState(false);
@@ -299,7 +181,7 @@ export default function HomeTimeClient({
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
-  }, [variant]);
+  }, [scheme]);
 
   const handleSearchFocus = useCallback(() => setSearchFocused(true), []);
 
@@ -371,13 +253,6 @@ export default function HomeTimeClient({
     [catalog, firstYear, lastYear],
   );
 
-  const [openPanelKey, setOpenPanelKey] = useState(
-    () => panels[0]?.key ?? String(lastYear),
-  );
-  const resolvedOpenKey = panels.some((p) => p.key === openPanelKey)
-    ? openPanelKey
-    : (panels[0]?.key ?? "");
-
   const chapters = useMemo(() => {
     const years: (number | null)[] = [];
     for (let y = lastYear; y >= firstYear; y--) years.push(y);
@@ -395,7 +270,6 @@ export default function HomeTimeClient({
 
   const { setType, setYearSlider, setFacetChecked, resetAll } = state;
 
-  // 将当前激活的筛选条件整理成书眉上的轻柔文字注脚，点任意一项可直接单项撤回
   const activeChips = useMemo<ActiveChip[]>(() => {
     const chips: ActiveChip[] = [];
 
@@ -483,6 +357,10 @@ export default function HomeTimeClient({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [resetAll]);
 
+  const toggleAdvanced = useCallback(() => {
+    state.setAdvanced(!state.advanced);
+  }, [state]);
+
   // 完整筛选面板：将「类型」作为第一行纯文字书卷选项，与年份滑轨及 5 维筛选浑然一体
   const fullFilterContent = (
     <div className="space-y-6">
@@ -536,6 +414,128 @@ export default function HomeTimeClient({
     </div>
   );
 
+  // 方案一与方案二共用的极净检目行：常态右栏大片留白，只在筛选或输入时才显命中数与条件注脚
+  const quietSearchBar = (
+    <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
+      <div className="flex items-center justify-between gap-4">
+        <SearchInputLine
+          value={state.searchInput}
+          onChange={state.setSearchInput}
+          onFocus={handleSearchFocus}
+          lyricsState={lyrics.state}
+        />
+
+        <div className="flex shrink-0 items-center gap-3 lg:hidden">
+          {matched && (
+            <SongCount
+              shownCount={shownCount}
+              totalCount={catalog.length}
+              matched={matched}
+            />
+          )}
+          {state.isAnyFilterActive && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-xs tracking-[0.22em] text-(--tone) transition-opacity hover:opacity-75"
+            >
+              重置
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={toggleAdvanced}
+            aria-pressed={state.advanced}
+            className={cn(
+              "text-xs tracking-[0.25em] transition-colors",
+              state.advanced || activeChips.length > 0
+                ? "text-(--tone)"
+                : "text-ink-muted hover:text-ink",
+            )}
+          >
+            筛选
+            {activeChips.length > 0 && (
+              <span className="ml-1 font-mono tabular-nums">
+                · {activeChips.length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="hidden min-w-0 items-center justify-between gap-6 lg:flex">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-y-1 text-xs">
+          {activeChips.map((chip, idx) => (
+            <Fragment key={chip.key}>
+              {idx > 0 && (
+                <span aria-hidden className="mx-2.5 text-ink-faint">
+                  ·
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={chip.onRemove}
+                title="点击撤回此项筛选"
+                className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-ink-prose transition-colors hover:text-(--tone)"
+              >
+                <span>{chip.label}</span>
+                <span className="font-sans text-[11px] text-ink-meta transition-colors group-hover:text-(--tone)">
+                  ×
+                </span>
+              </button>
+            </Fragment>
+          ))}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-4 text-xs tracking-[0.28em]">
+          {matched && (
+            <>
+              <SongCount
+                shownCount={shownCount}
+                totalCount={catalog.length}
+                matched={matched}
+              />
+              <span aria-hidden className="text-ink-faint">
+                ·
+              </span>
+            </>
+          )}
+          {state.isAnyFilterActive && (
+            <>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="text-(--tone) transition-opacity hover:opacity-75"
+              >
+                重置
+              </button>
+              <span aria-hidden className="text-ink-faint">
+                ·
+              </span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={toggleAdvanced}
+            aria-pressed={state.advanced}
+            className={cn(
+              "transition-colors",
+              state.advanced || activeChips.length > 0
+                ? "text-(--tone)"
+                : "text-ink-muted hover:text-ink",
+            )}
+          >
+            {state.advanced
+              ? "收起筛选"
+              : activeChips.length > 0
+                ? `筛选 · ${activeChips.length}`
+                : "筛选"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <OverlayHostContext.Provider value={overlayHost}>
       <div className="relative min-h-screen overflow-x-clip bg-[#FAFAFA] transition-colors duration-500 dark:bg-[#0B0F19]">
@@ -544,237 +544,140 @@ export default function HomeTimeClient({
           nav={
             <span className="hidden items-center gap-2 text-xs tracking-[0.2em] text-ink-meta sm:inline-flex">
               <span aria-hidden>/</span>
-              <span>二十年的颜色</span>
+              <span>二十年</span>
             </span>
           }
         />
 
         <main className="relative mx-auto max-w-7xl px-6 pt-24 pb-28 md:pt-28">
-          {/* ── 1. 卷首：题字 · 入口 · 折屏 · 琴徽时间弦 ── */}
-          <TimeScreen
-            variant={variant}
-            panels={panels}
-            openKey={resolvedOpenKey}
-            firstYear={firstYear}
-            lastYear={lastYear}
-            matched={matched}
-            features={features}
-            onOpenChange={setOpenPanelKey}
-            onJump={jumpToYear}
-          />
+          {/* ── 1. 卷首：三套彻底解耦的构图 ── */}
+          {scheme === "folio" && (
+            <FolioHero
+              firstYear={firstYear}
+              lastYear={lastYear}
+              totalCount={catalog.length}
+              features={features}
+            />
+          )}
 
-          {/* ── 2. 吸顶：合起的屏风（卷首时占高为 0） + 下槛检目线 ── */}
+          {scheme === "string" && (
+            <StringHero
+              firstYear={firstYear}
+              lastYear={lastYear}
+              features={features}
+            />
+          )}
+
+          {scheme === "paper-screen" && (
+            <PaperFoldingScreen
+              panels={panels}
+              firstYear={firstYear}
+              lastYear={lastYear}
+              matched={matched}
+              features={features}
+              searchInput={state.searchInput}
+              onSearchChange={state.setSearchInput}
+              onSearchFocus={handleSearchFocus}
+              lyricsState={lyrics.state}
+              advanced={state.advanced}
+              onToggleAdvanced={toggleAdvanced}
+              activeChips={activeChips}
+              isAnyFilterActive={state.isAnyFilterActive}
+              onReset={handleReset}
+              shownCount={shownCount}
+              totalCount={catalog.length}
+              onJump={jumpToYear}
+            />
+          )}
+
+          {/* ── 2. 吸顶层：随所选方案呈现各自最干净的形态 ── */}
           <div ref={sentinelRef} aria-hidden />
           <div
             ref={stickyRef}
             className="sticky top-(--nav-h) z-30 -mx-6 bg-[#FAFAFA]/95 px-6 backdrop-blur-sm dark:bg-[#0B0F19]/95"
           >
-            <FoldedStrip
-              ref={stripRef}
-              variant={variant}
-              panels={panels}
-              matched={matched}
-              visible={folded}
-              onJump={jumpToYear}
-              onTop={scrollToTop}
-              onHoverKeyChange={handleStripHoverChange}
-            />
-            <div className="grid items-center gap-x-6 border-b border-slate-200/75 py-2.5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-16 xl:grid-cols-[22rem_minmax(0,1fr)] dark:border-slate-800/80">
-              {/* 左栏（与下方年份 & 大画幅严格左齐）：一枚刻本「寻」字引 + 楷体寻曲底线 */}
-              <div className="flex items-center justify-between gap-4">
-                <label className="group relative flex min-w-0 flex-1 items-baseline gap-2.5 py-1">
-                  <span
-                    aria-hidden
-                    className="shrink-0 font-calligraphy text-[15px] leading-none text-ink-meta transition-colors duration-300 group-focus-within:text-(--tone)"
-                  >
-                    寻
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="歌名、词人或一句歌词……"
-                    value={state.searchInput}
-                    onFocus={handleSearchFocus}
-                    onChange={(e) => state.setSearchInput(e.target.value)}
-                    className="w-full min-w-0 bg-transparent font-kaiti text-[15px] text-ink-body outline-none placeholder:text-ink-meta"
-                  />
-                  {state.searchInput ? (
-                    <button
-                      type="button"
-                      onClick={() => state.setSearchInput("")}
-                      className="shrink-0 text-[11px] tracking-[0.2em] text-ink-meta transition-colors hover:text-ink-body"
-                    >
-                      清空
-                    </button>
-                  ) : lyrics.state === "loading" ? (
-                    <span
-                      aria-label="歌词检索准备中"
-                      className="block h-2.5 w-2.5 shrink-0 self-center animate-spin rounded-full border border-slate-300 border-t-(--tone) dark:border-slate-600"
-                    />
-                  ) : lyrics.state === "ready" ? (
-                    <span className="shrink-0 text-[10px] tracking-[0.2em] text-(--tone)/65">
-                      含词
-                    </span>
-                  ) : null}
+            {scheme === "folio" && quietSearchBar}
 
-                  {/* 聚焦时细底线才缓缓亮起强调色 */}
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 -bottom-2.5 h-[1.5px] bg-(--tone) opacity-0 transition-opacity duration-300 group-focus-within:opacity-100"
-                  />
-                </label>
+            {scheme === "string" && (
+              <>
+                <ChronicleString
+                  ref={railRef}
+                  panels={panels}
+                  matched={matched}
+                  folded={folded}
+                  onJump={jumpToYear}
+                />
+                {quietSearchBar}
+              </>
+            )}
 
-                {/* 窄屏把曲数与「筛选 / 重置」紧贴同一行右侧，整条检目线只占一行 */}
-                <div className="flex shrink-0 items-center gap-3 lg:hidden">
-                  <SongCount
-                    shownCount={shownCount}
-                    totalCount={catalog.length}
-                    matched={matched}
-                  />
-                  {state.isAnyFilterActive && (
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="text-xs tracking-[0.22em] text-(--tone) transition-opacity hover:opacity-75"
-                    >
-                      重置
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => state.setAdvanced(!state.advanced)}
-                    aria-pressed={state.advanced}
-                    className={cn(
-                      "text-xs tracking-[0.25em] transition-colors",
-                      state.advanced || activeChips.length > 0
-                        ? "text-(--tone)"
-                        : "text-ink-muted hover:text-ink",
-                    )}
-                  >
-                    筛选
-                    {activeChips.length > 0 && (
-                      <span className="ml-1 font-mono tabular-nums">
-                        · {activeChips.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              </div>
+            {scheme === "paper-screen" && (
+              <PaperStickyBar
+                ref={railRef}
+                visible={folded}
+                panels={panels}
+                matched={matched}
+                searchInput={state.searchInput}
+                onSearchChange={state.setSearchInput}
+                onSearchFocus={handleSearchFocus}
+                lyricsState={lyrics.state}
+                advanced={state.advanced}
+                onToggleAdvanced={toggleAdvanced}
+                activeChips={activeChips}
+                isAnyFilterActive={state.isAnyFilterActive}
+                onReset={handleReset}
+                shownCount={shownCount}
+                totalCount={catalog.length}
+                onJump={jumpToYear}
+                onTop={scrollToTop}
+              />
+            )}
 
-              {/* 右栏（宽屏，与下方编年目录严格左齐）：常态承接屏扇题跋，筛选时切换为条件注脚 */}
-              <div className="hidden min-w-0 items-center justify-between gap-6 lg:flex">
-                {activeChips.length > 0 ? (
-                  <div className="flex min-w-0 flex-wrap items-baseline gap-y-1 text-xs">
-                    {activeChips.map((chip, idx) => (
-                      <Fragment key={chip.key}>
-                        {idx > 0 && (
-                          <span aria-hidden className="mx-2.5 text-ink-faint">
-                            ·
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={chip.onRemove}
-                          title="点击撤回此项筛选"
-                          className="group inline-flex items-baseline gap-1 font-kaiti text-[13px] text-ink-prose transition-colors hover:text-(--tone)"
-                        >
-                          <span>{chip.label}</span>
-                          <span className="font-sans text-[11px] text-ink-meta transition-colors group-hover:text-(--tone)">
-                            ×
-                          </span>
-                        </button>
-                      </Fragment>
-                    ))}
-                  </div>
-                ) : (
-                  <ShelfCaption
-                    ref={captionRef}
-                    variant={variant}
-                    panels={panels}
-                    openKey={resolvedOpenKey}
-                    folded={folded}
-                    onJump={jumpToYear}
-                    onTop={scrollToTop}
-                  />
-                )}
-
-                <div className="flex shrink-0 items-center gap-4 text-xs tracking-[0.28em]">
-                  <SongCount
-                    shownCount={shownCount}
-                    totalCount={catalog.length}
-                    matched={matched}
-                  />
-                  <span aria-hidden className="text-ink-faint">
-                    ·
-                  </span>
-                  {state.isAnyFilterActive && (
-                    <>
+            {/* 窄屏已选筛选注脚行（方案三在卷首已内嵌进扉页，吸顶后才在此展示） */}
+            {activeChips.length > 0 &&
+              (scheme !== "paper-screen" || folded) && (
+                <div className="flex flex-wrap items-baseline gap-y-1 border-b border-slate-200/60 py-2 text-xs lg:hidden dark:border-slate-800/70">
+                  {activeChips.map((chip, idx) => (
+                    <Fragment key={chip.key}>
+                      {idx > 0 && (
+                        <span aria-hidden className="mx-2 text-ink-faint">
+                          ·
+                        </span>
+                      )}
                       <button
                         type="button"
-                        onClick={handleReset}
-                        className="text-(--tone) transition-opacity hover:opacity-75"
+                        onClick={chip.onRemove}
+                        className="inline-flex items-baseline gap-1 font-kaiti text-xs text-ink-prose"
                       >
-                        重置
+                        <span>{chip.label}</span>
+                        <span className="font-sans text-[10px] text-ink-meta">
+                          ×
+                        </span>
                       </button>
-                      <span aria-hidden className="text-ink-faint">
-                        ·
-                      </span>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => state.setAdvanced(!state.advanced)}
-                    aria-pressed={state.advanced}
-                    className={cn(
-                      "transition-colors",
-                      state.advanced || activeChips.length > 0
-                        ? "text-(--tone)"
-                        : "text-ink-muted hover:text-ink",
-                    )}
-                  >
-                    {state.advanced
-                      ? "收起筛选"
-                      : activeChips.length > 0
-                        ? `筛选 · ${activeChips.length}`
-                        : "筛选"}
-                  </button>
+                    </Fragment>
+                  ))}
                 </div>
-              </div>
-            </div>
-
-            {/* 窄屏已选筛选注脚行：仅在真的有筛选条件时才轻轻露出一行 */}
-            {activeChips.length > 0 && (
-              <div className="flex flex-wrap items-baseline gap-y-1 border-b border-slate-200/60 py-2 text-xs lg:hidden dark:border-slate-800/70">
-                {activeChips.map((chip, idx) => (
-                  <Fragment key={chip.key}>
-                    {idx > 0 && (
-                      <span aria-hidden className="mx-2 text-ink-faint">
-                        ·
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={chip.onRemove}
-                      className="inline-flex items-baseline gap-1 font-kaiti text-xs text-ink-prose"
-                    >
-                      <span>{chip.label}</span>
-                      <span className="font-sans text-[10px] text-ink-meta">
-                        ×
-                      </span>
-                    </button>
-                  </Fragment>
-                ))}
-              </div>
-            )}
+              )}
 
             {/* 宽屏内联展开完整筛选（类型 + 年份滑轨 + 5 维多选） */}
             {state.advanced && isDesktop && (
-              <div className="animate-in slide-in-from-top-2 fade-in border-b border-slate-200/75 pb-7 pt-6 duration-300 dark:border-slate-800">
+              <div className="animate-in slide-in-from-top-2 fade-in border-b border-slate-200/75 pt-6 pb-7 duration-300 dark:border-slate-800">
                 {fullFilterContent}
               </div>
             )}
           </div>
 
-          {/* 移动端底部抽屉承载完整筛选（类型 + 年份滑轨 + 5 维多选） */}
+          {/* 方案一专属：视口右缘「书口色签」 */}
+          {scheme === "folio" && (
+            <ForeEdgeRail
+              ref={railRef}
+              panels={panels}
+              matched={matched}
+              onJump={jumpToYear}
+            />
+          )}
+
+          {/* 移动端底部抽屉承载完整筛选 */}
           {!isDesktop && (
             <Drawer open={state.advanced} onOpenChange={state.setAdvanced}>
               <DrawerContent title={tLib("advancedFilter")}>
@@ -806,22 +709,24 @@ export default function HomeTimeClient({
             </p>
           )}
 
-          {/* ── 3. 编年目录正文（由近及远，一年一画幅 + 右侧编年行目） ── */}
-          {shownCount === 0 ? (
-            <p className="py-24 text-center font-kaiti text-[15px] text-ink-meta">
-              {lyricsPending
-                ? tLib("search.lyricsPending")
-                : tLib("noFilteredSongs")}
-            </p>
-          ) : (
-            <YearChapters
-              chapters={chapters}
-              matched={matched}
-              onOpenSong={handleOpenSong}
-              getLyricsSnippet={getLyricsSnippet}
-              onActiveYearChange={setActiveYearKey}
-            />
-          )}
+          {/* ── 3. 编年目录正文 ── */}
+          <div className={cn(scheme === "paper-screen" && "mt-4 md:mt-6")}>
+            {shownCount === 0 ? (
+              <p className="py-24 text-center font-kaiti text-[15px] text-ink-meta">
+                {lyricsPending
+                  ? tLib("search.lyricsPending")
+                  : tLib("noFilteredSongs")}
+              </p>
+            ) : (
+              <YearChapters
+                chapters={chapters}
+                matched={matched}
+                onOpenSong={handleOpenSong}
+                getLyricsSnippet={getLyricsSnippet}
+                onActiveYearChange={setActiveYearKey}
+              />
+            )}
+          </div>
 
           {lyricsPending && shownCount > 0 && (
             <p className="mt-8 font-kaiti text-[15px] text-ink-meta">
@@ -835,7 +740,7 @@ export default function HomeTimeClient({
           </footer>
         </main>
 
-        <HeaderVariantSwitcher value={variant} onChange={setVariant} />
+        <HeaderSchemeSwitcher value={scheme} onChange={setScheme} />
 
         <FloatingActionButtons
           showScrollTop={showScrollTop}

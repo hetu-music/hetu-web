@@ -17,7 +17,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
@@ -41,9 +40,10 @@ import {
   ATLAS_THEME_VARS,
   MobileCatalogDrawer,
   MobilePlaceDrawer,
-  TouchViewport,
-  type TouchViewportHandle,
 } from "./MobileAtlasStage";
+import MobileFolioAtlas from "./MobileFolioAtlas";
+import MobileHangingScroll from "./MobileHangingScroll";
+import MobileRiverCatalog from "./MobileRiverCatalog";
 import {
   LabModeNav,
   PlaceGlyph,
@@ -57,22 +57,12 @@ import {
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 
-/** 窄屏底部方域快切预设（与三幅厢图互补，确保西北/东北不遗漏） */
-type MobileRegionKey =
-  | "all"
-  | "jiangnan"
-  | "changsha"
-  | "yuanling"
-  | "ganzhou"
-  | "west";
+type MobileStyleMode = "hanging" | "folio" | "river";
 
-const MOBILE_REGIONS: { key: MobileRegionKey; label: string }[] = [
-  { key: "all", label: "全图" },
-  { key: "jiangnan", label: "江南东海" },
-  { key: "changsha", label: "长沙" },
-  { key: "yuanling", label: "沅陵" },
-  { key: "ganzhou", label: "赣州" },
-  { key: "west", label: "关山雪域" },
+const MOBILE_MODES: { key: MobileStyleMode; label: string; hint: string }[] = [
+  { key: "hanging", label: "M1 · 溯洄立轴", hint: "立轴" },
+  { key: "folio", label: "M2 · 方域册页", hint: "册页" },
+  { key: "river", label: "M3 · 水脉目录", hint: "水脉" },
 ];
 
 function songsOf(place: Place): Set<number> {
@@ -840,19 +830,6 @@ function InsetMapSvg({
   );
 }
 
-/** 查任意地点在其所属视图（总图或对应厢图）中的 SVG 坐标 */
-function stopCoordInView(
-  id: number,
-  cluster: AtlasCluster | null,
-): { x: number; y: number } | null {
-  if (cluster) {
-    const s = cluster.stops.find((st) => st.id === id);
-    return s ? { x: s.x, y: s.y } : null;
-  }
-  const s = OVERVIEW_STOPS.find((st) => st.id === id);
-  return s ? { x: s.x, y: s.y } : null;
-}
-
 export default function AtlasClient({ places }: { places: Place[] }) {
   const t = useTranslations("places");
   const reduce = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -862,11 +839,9 @@ export default function AtlasClient({ places }: { places: Place[] }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
 
-  // 移动端专属状态：初见引首浮笺、目录抽屉、当前激活方域快切
-  const [showMobileIntro, setShowMobileIntro] = useState(true);
+  // 移动端原生三形态切换（M1 立轴 / M2 册页 / M3 水脉目录）与目录抽屉
+  const [mobileMode, setMobileMode] = useState<MobileStyleMode>("hanging");
   const [catalogOpen, setCatalogOpen] = useState(false);
-  const [mobileRegion, setMobileRegion] = useState<MobileRegionKey>("jiangnan");
-  const mobileCamRef = useRef<TouchViewportHandle>(null);
 
   const placeById = useMemo(
     () => new Map(places.map((p) => [p.id, p])),
@@ -899,82 +874,22 @@ export default function AtlasClient({ places }: { places: Place[] }) {
     [selected, siblingsOf],
   );
 
-  /** 窄屏选中某处后：自动把该地标平移到上半屏（anchorY = 0.27），避免被下半屏词句抽屉盖住 */
-  useEffect(() => {
-    if (!isNarrow || selectedId === null) return;
-    const coord = stopCoordInView(selectedId, activeCluster);
-    if (!coord) return;
-    // 等总图/厢图切换挂载后下一帧平滑飞镜
-    const raf = requestAnimationFrame(() => {
-      const cam = mobileCamRef.current;
-      if (!cam) return;
-      const fit = cam.getFitScale();
-      const targetScale = activeCluster
-        ? Math.max(fit * 1.45, 0.68)
-        : Math.max(fit * 2.55, 0.62);
-      cam.flyTo({
-        x: coord.x,
-        y: coord.y,
-        scale: targetScale,
-        anchorY: 0.27,
-      });
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [isNarrow, selectedId, activeCluster]);
-
   const goPlace = useCallback((id: number) => {
     const cluster = clusterOfPlace(id);
-    setShowMobileIntro(false);
     setActiveClusterId(cluster ? cluster.id : null);
-    if (cluster) setMobileRegion(cluster.id);
     setSelectedId(id);
     setHoverId(null);
   }, []);
 
   const togglePlace = useCallback((id: number) => {
-    setShowMobileIntro(false);
     setSelectedId((cur) => (cur === id ? null : id));
   }, []);
 
   const openCluster = useCallback((id: ClusterId) => {
-    setShowMobileIntro(false);
     setActiveClusterId(id);
-    setMobileRegion(id);
     setSelectedId(null);
     setHoverId(null);
   }, []);
-
-  /** 窄屏底部方域快切点击 */
-  const pickMobileRegion = useCallback(
-    (key: MobileRegionKey) => {
-      setShowMobileIntro(false);
-      setSelectedId(null);
-      setMobileRegion(key);
-
-      if (key === "changsha" || key === "yuanling" || key === "ganzhou") {
-        setActiveClusterId(key);
-        return;
-      }
-
-      const wasInCluster = activeClusterId !== null;
-      if (wasInCluster) setActiveClusterId(null);
-
-      // 下一帧操作总图相机
-      requestAnimationFrame(() => {
-        const cam = mobileCamRef.current;
-        if (!cam) return;
-        const fit = cam.getFitScale();
-        if (key === "all") {
-          cam.fitAll();
-        } else if (key === "jiangnan") {
-          cam.flyTo({ x: 1125, y: 445, scale: Math.max(fit * 2.35, 0.58) });
-        } else if (key === "west") {
-          cam.flyTo({ x: 390, y: 455, scale: Math.max(fit * 2.1, 0.52) });
-        }
-      });
-    },
-    [activeClusterId],
-  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1044,25 +959,6 @@ export default function AtlasClient({ places }: { places: Place[] }) {
   const coastPath = useMemo(() => splineCenterPath(COASTLINE_PTS, 14), []);
   const dimmed = selected !== null;
   const count = t("count", { places: places.length, songs: songCount });
-
-  // 窄屏视图初始落点：总图聚焦江南潇湘核心，厢图居中铺满
-  const mobileInitialFocus = useMemo(() => {
-    if (!activeCluster) {
-      return { x: 960, y: 530, scaleMultiplier: 2.3 };
-    }
-    return {
-      x: activeCluster.view.width * 0.5,
-      y: activeCluster.view.height * 0.48,
-      scaleMultiplier: 1.38,
-    };
-  }, [activeCluster]);
-
-  const mobileContentW = activeCluster
-    ? activeCluster.view.width
-    : ATLAS_VIEW.width;
-  const mobileContentH = activeCluster
-    ? activeCluster.view.height
-    : ATLAS_VIEW.height;
 
   return (
     <div
@@ -1309,213 +1205,104 @@ export default function AtlasClient({ places }: { places: Place[] }) {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          二、移动端全出血手势画布（< lg）：拖曳 / 双指缩放 / 方域快切 / 水系目录
+          二、移动端原生三方案（< lg）：M1 溯洄立轴 · M2 方域册页 · M3 画意水脉目录
           ══════════════════════════════════════════════════════════════════════ */}
       <div className="fixed inset-x-0 top-20 bottom-0 z-10 flex flex-col overflow-hidden lg:hidden">
-        {/* 满屏可拖曳与双指缩放的绢本画布 */}
-        <div className="relative min-h-0 flex-1">
-          {/* 画幅内极细乌丝装帧线（不占位、保古籍感） */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-2 z-10 border border-(--ink)/12"
-          />
-
-          <TouchViewport
-            ref={mobileCamRef}
-            contentWidth={mobileContentW}
-            contentHeight={mobileContentH}
-            initialFocus={mobileInitialFocus}
-            viewKey={activeCluster ? `in-${activeCluster.id}` : "overview"}
+        {mobileMode === "hanging" && (
+          <MobileHangingScroll
+            places={places}
+            placeById={placeById}
+            selected={selected}
+            kin={kin}
             reduce={reduce}
-            onInteract={() => setShowMobileIntro(false)}
-            onBackgroundTap={() => {
-              setShowMobileIntro(false);
-              if (selectedId !== null) setSelectedId(null);
-            }}
-          >
-            {!activeCluster ? (
-              <OverviewMapSvg
-                prefix="mob-ov"
-                className="block h-full w-full select-none"
-                coastPath={coastPath}
-                dimmed={dimmed}
-                reduce={reduce}
-                threads={overviewThreads}
-                placeById={placeById}
-                selected={selected}
-                kin={kin}
-                fontSize={18}
-                hitRadius={26}
-                onPick={togglePlace}
-                onOpenCluster={openCluster}
-              />
-            ) : (
-              <InsetMapSvg
-                prefix={`mob-in-${activeCluster.id}`}
-                cluster={activeCluster}
-                className="block h-full w-full select-none"
-                dimmed={dimmed}
-                reduce={reduce}
-                threads={insetThreads}
-                placeById={placeById}
-                selected={selected}
-                kin={kin}
-                fontSize={18}
-                hitRadius={26}
-                onPick={togglePlace}
-              />
-            )}
-          </TouchViewport>
+            title={t("title")}
+            tagline={t("tagline")}
+            countText={count}
+            creditText={t("credit")}
+            onPick={togglePlace}
+            onClear={() => setSelectedId(null)}
+          />
+        )}
 
-          {/* 厢图顶部浮动标题与返回总图 */}
-          <AnimatePresence>
-            {activeCluster && (
-              <motion.div
-                key={`mob-head-${activeCluster.id}`}
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.25, ease: EASE }}
-                className="pointer-events-none absolute top-4 right-4 left-4 z-20 flex items-start justify-between"
-              >
-                <button
-                  type="button"
-                  onClick={() => pickMobileRegion("all")}
-                  className="pointer-events-auto cursor-pointer border border-(--ink)/20 bg-(--paper)/88 px-3 py-1.5 text-xs tracking-[0.22em] text-(--ink) backdrop-blur-xs transition-colors active:border-(--seal) active:text-(--seal)"
-                >
-                  ← 总图
-                </button>
-                <div className="bg-(--paper)/75 px-2.5 py-1 text-right backdrop-blur-xs">
-                  <p className="font-calligraphy text-2xl leading-none text-(--ink)">
-                    {activeCluster.name}厢图
-                  </p>
-                  <p className="mt-0.5 text-[10px] tracking-[0.22em] text-(--ink-muted)">
-                    {activeCluster.subtitle}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {mobileMode === "folio" && (
+          <MobileFolioAtlas
+            placeById={placeById}
+            selected={selected}
+            kin={kin}
+            reduce={reduce}
+            onPick={togglePlace}
+            onClear={() => setSelectedId(null)}
+          />
+        )}
 
-          {/* 右侧极轻单手缩放与归位小字按钮 */}
-          <div className="absolute right-4 bottom-4 z-20 flex flex-col items-center divide-y divide-(--ink)/12 border border-(--ink)/16 bg-(--paper)/86 text-xs text-(--ink) backdrop-blur-xs">
-            <button
-              type="button"
-              aria-label="放大舆图"
-              onClick={() => {
-                setShowMobileIntro(false);
-                mobileCamRef.current?.zoomBy(1.38);
-              }}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center font-serif text-base active:text-(--seal)"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              aria-label="缩小舆图"
-              onClick={() => {
-                setShowMobileIntro(false);
-                mobileCamRef.current?.zoomBy(0.72);
-              }}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center font-serif text-base active:text-(--seal)"
-            >
-              −
-            </button>
-            <button
-              type="button"
-              aria-label="览全幅"
-              onClick={() => {
-                setShowMobileIntro(false);
-                mobileCamRef.current?.fitAll();
-              }}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center font-serif text-[11px] tracking-wider active:text-(--seal)"
-            >
-              全
-            </button>
-          </div>
+        {mobileMode === "river" && (
+          <MobileRiverCatalog
+            places={places}
+            placeById={placeById}
+            siblingsOf={siblingsOf}
+            selectedId={selectedId}
+            kin={kin}
+            title={t("title")}
+            tagline={t("tagline")}
+            countText={count}
+            creditText={t("credit")}
+            elsewhereLabel={t("elsewhere")}
+            onToggle={togglePlace}
+            onGo={goPlace}
+          />
+        )}
 
-          {/* 初见「引首浮笺」：手指一拖或一点画布即优雅淡出，把屏幕还给山水 */}
-          <AnimatePresence>
-            {showMobileIntro && !activeCluster && !selected && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                transition={{ duration: 0.4, ease: EASE }}
-                onClick={() => setShowMobileIntro(false)}
-                className="absolute bottom-4 left-4 z-20 max-w-[15.5rem] border border-(--ink)/15 bg-(--paper)/88 px-4 py-3.5 backdrop-blur-sm"
-              >
-                <div className="flex items-end gap-2.5">
-                  <h1 className="font-calligraphy text-5xl leading-none text-(--ink) [writing-mode:vertical-rl]">
-                    {t("title")}
-                  </h1>
-                  <div className="pb-0.5">
-                    <SealStamp text="溯洄" className="mb-2 scale-90" />
-                    <p className="font-kaiti text-xs leading-relaxed text-(--ink-muted)">
-                      {t("tagline")}
-                    </p>
-                    <p className="mt-1.5 text-[10px] tracking-[0.22em] text-(--ink-muted)/80">
-                      {count}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-2.5 border-t border-(--ink)/10 pt-2 text-[10px] tracking-[0.24em] text-(--seal)/85">
-                  单指拖曳 · 双指缩放 · 点地标读词
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* 底部「方域快切 + 水系目录」浮栏（适配 iPhone 底部安全区） */}
+        {/* 底部移动端方案横评切换条 + 全局水系目录抽屉入口 */}
         <nav
-          aria-label="方域与水系目录"
-          className="relative z-20 shrink-0 border-t border-(--ink)/14 bg-(--paper)/94 px-3 pt-2 pb-[calc(0.6rem+env(safe-area-inset-bottom))] backdrop-blur-md"
+          aria-label="移动端视图切换"
+          className="relative z-20 shrink-0 border-t border-(--ink)/14 bg-(--paper)/95 px-4 pt-2 pb-[calc(0.6rem+env(safe-area-inset-bottom))] backdrop-blur-md"
         >
-          <div className="flex items-center gap-2">
-            <div className="mask-linear-fade-edges flex min-w-0 flex-1 items-center gap-4 overflow-x-auto px-2 py-1 no-scrollbar">
-              {MOBILE_REGIONS.map((r) => {
-                const active = activeClusterId
-                  ? activeClusterId === r.key
-                  : mobileRegion === r.key;
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-4">
+              {MOBILE_MODES.map((m) => {
+                const active = mobileMode === m.key;
                 return (
                   <button
-                    key={r.key}
+                    key={m.key}
                     type="button"
-                    onClick={() => pickMobileRegion(r.key)}
-                    className={`shrink-0 cursor-pointer text-xs tracking-[0.22em] transition-colors ${
+                    aria-pressed={active}
+                    onClick={() => {
+                      setMobileMode(m.key);
+                      setSelectedId(null);
+                    }}
+                    className={`cursor-pointer py-1 text-xs tracking-[0.18em] transition-colors ${
                       active
                         ? "font-serif font-semibold text-(--seal)"
                         : "text-(--ink-muted) active:text-(--ink)"
                     }`}
                   >
-                    {r.label}
+                    {m.label}
                   </button>
                 );
               })}
             </div>
 
-            <span
-              aria-hidden
-              className="h-3.5 w-px shrink-0 bg-(--ink)/18"
-            />
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowMobileIntro(false);
-                setCatalogOpen(true);
-              }}
-              className="shrink-0 cursor-pointer px-2 py-1 font-serif text-xs tracking-[0.24em] text-(--ink) transition-colors active:text-(--seal)"
-            >
-              目录
-            </button>
+            {mobileMode !== "river" && (
+              <>
+                <span
+                  aria-hidden
+                  className="h-3.5 w-px shrink-0 bg-(--ink)/18"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCatalogOpen(true)}
+                  className="shrink-0 cursor-pointer py-1 font-serif text-xs tracking-[0.22em] text-(--ink) transition-colors active:text-(--seal)"
+                >
+                  目录
+                </button>
+              </>
+            )}
           </div>
         </nav>
       </div>
 
-      {/* 移动端：水系目录册页抽屉 */}
-      {isNarrow && (
+      {/* 移动端：全局水系目录册页抽屉（配合 M1 立轴与 M2 册页使用） */}
+      {isNarrow && mobileMode !== "river" && (
         <MobileCatalogDrawer
           open={catalogOpen}
           onOpenChange={setCatalogOpen}
@@ -1528,8 +1315,8 @@ export default function AtlasClient({ places }: { places: Place[] }) {
         />
       )}
 
-      {/* 移动端：选点后的下半屏词句抽屉（透明遮罩，上半屏山水与朱砂游丝完整可见） */}
-      {isNarrow && (
+      {/* 移动端：M1 与 M2 选点后的下半屏词句抽屉（M3 水脉目录采用就地展开，不另弹抽屉） */}
+      {isNarrow && mobileMode !== "river" && (
         <MobilePlaceDrawer
           place={selected}
           siblings={selected ? siblingsOf(selected) : []}
